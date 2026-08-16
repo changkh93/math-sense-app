@@ -24,7 +24,12 @@ import AssignmentShareModal from '../Community/AssignmentShareModal';
 import WarpGateDocking from './WarpGateDocking';
 import '../../styles/space-theme.css'; // Assuming we re-use our cosmic buttons and glass cards
 import { getTodayKST } from '../../utils/streakUtils';
+import { getKSTTimeString } from '../../utils/readingTime';
 import { formatFeedbackForDisplay } from '../../utils/feedbackFormatting';
+import { isWesternClassicCluster } from '../../constants/westernClassicNavigation';
+import { useReadingBooks } from '../../hooks/useReadingLibrary';
+import ReadingBookFormModal from './ReadingLibrary/ReadingBookFormModal';
+import './ReadingLibrary/ReadingLibrary.css';
 
 const MotionDiv = motion.div;
 const ASSIGNMENT_MISSING_GRACE_MS = 12 * 60 * 60 * 1000;
@@ -153,7 +158,9 @@ const hasDraftPayload = (draft = {}) => (
   Boolean(String(draft.content || '').trim()) ||
   Boolean(String(draft.newLink || '').trim()) ||
   Boolean((draft.links || []).length) ||
-  Boolean((draft.existingAttachments || []).length)
+  Boolean((draft.existingAttachments || []).length) ||
+  Boolean(String(draft.readingBookId || '').trim()) ||
+  Boolean(String(draft.readingPage || '').trim())
 );
 
 const areDraftListsEqual = (left = [], right = []) => (
@@ -167,7 +174,9 @@ const hasDraftChangedFromAssignment = (draft = {}, assignment = null) => {
     String(draft.content || '') !== String(assignment.content || '') ||
     Boolean(String(draft.newLink || '').trim()) ||
     !areDraftListsEqual(draft.links || [], assignment.links || []) ||
-    !areDraftListsEqual(draft.existingAttachments || [], assignment.attachments || [])
+    !areDraftListsEqual(draft.existingAttachments || [], assignment.attachments || []) ||
+    String(draft.readingBookId || '') !== String(assignment.reading?.bookId || '') ||
+    String(draft.readingPage || '') !== String(assignment.reading?.page || '')
   );
 };
 
@@ -186,6 +195,22 @@ const getTimestampMs = (value) => {
   if (value._seconds) return value._seconds * 1000;
   const parsed = new Date(value).getTime();
   return Number.isFinite(parsed) ? parsed : 0;
+};
+
+const formatReadingClockTime = (readAt) => {
+  if (!readAt) return '';
+  const ms = getTimestampMs(readAt);
+  if (!ms || !Number.isFinite(ms)) return '';
+  try {
+    return new Intl.DateTimeFormat('ko-KR', {
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+      timeZone: 'Asia/Seoul'
+    }).format(new Date(ms));
+  } catch (e) {
+    return '';
+  }
 };
 
 const getAttendanceBaseMs = (attendance) => (
@@ -1172,6 +1197,14 @@ function SubmissionPanel({ clusterId, regionId, dateStr, assignment, warnings = 
   const [appealTextByWarning, setAppealTextByWarning] = useState({});
   const [appealSubmittedByWarning, setAppealSubmittedByWarning] = useState({});
   const [appealErrorByWarning, setAppealErrorByWarning] = useState({});
+  const isClassic = isWesternClassicCluster(clusterId);
+  const { data: userReadingBooks = [] } = useReadingBooks(user?.uid);
+  const [readingBookId, setReadingBookId] = useState(assignment?.reading?.bookId || '');
+  const [readingPage, setReadingPage] = useState(assignment?.reading?.page ? String(assignment.reading.page) : '');
+  const [readingClockTime, setReadingClockTime] = useState('20:00');
+  const [isNewBookModalOpen, setIsNewBookModalOpen] = useState(false);
+  const isBookLocked = Boolean(assignment?.reading?.bookId);
+
   const fileInputRef = useRef(null);
   const skipNextDraftAutosaveRef = useRef(true);
   const draftStorageKey = useMemo(() => (
@@ -1322,6 +1355,12 @@ function SubmissionPanel({ clusterId, regionId, dateStr, assignment, warnings = 
       setDraftStatus('');
     }
 
+    if (isClassic) {
+      setReadingBookId(shouldRestoreDraft ? (draft.readingBookId || '') : (assignment?.reading?.bookId || ''));
+      setReadingPage(shouldRestoreDraft ? (draft.readingPage || '') : (assignment?.reading?.page ? String(assignment.reading.page) : ''));
+      setReadingClockTime(shouldRestoreDraft ? (draft.readingClockTime || '20:00') : '20:00');
+    }
+
     safeReadAssignmentDraftFiles(draftStorageKey).then((draftFiles) => {
       if (cancelled) return;
       setFiles(draftFiles);
@@ -1338,6 +1377,7 @@ function SubmissionPanel({ clusterId, regionId, dateStr, assignment, warnings = 
     assignment,
     canEditSubmission,
     draftStorageKey,
+    isClassic,
     onDraftStateChange
   ]);
 
@@ -1357,6 +1397,9 @@ function SubmissionPanel({ clusterId, regionId, dateStr, assignment, warnings = 
       links,
       newLink,
       existingAttachments,
+      readingBookId: isClassic ? readingBookId : null,
+      readingPage: isClassic ? readingPage : null,
+      readingClockTime: isClassic ? readingClockTime : null,
       updatedAt: Date.now()
     };
 
@@ -1383,10 +1426,14 @@ function SubmissionPanel({ clusterId, regionId, dateStr, assignment, warnings = 
     draftStorageKey,
     existingAttachments,
     files.length,
+    isClassic,
     isSubmitting,
     links,
     newLink,
-    onDraftStateChange
+    onDraftStateChange,
+    readingBookId,
+    readingClockTime,
+    readingPage
   ]);
 
   useEffect(() => () => {
@@ -1404,6 +1451,9 @@ function SubmissionPanel({ clusterId, regionId, dateStr, assignment, warnings = 
       links,
       newLink,
       existingAttachments,
+      readingBookId: isClassic ? readingBookId : null,
+      readingPage: isClassic ? readingPage : null,
+      readingClockTime: isClassic ? readingClockTime : null,
       updatedAt: Date.now(),
       ...nextDraftFields
     };
@@ -1430,10 +1480,14 @@ function SubmissionPanel({ clusterId, regionId, dateStr, assignment, warnings = 
     draftStorageKey,
     existingAttachments,
     files.length,
+    isClassic,
     isSubmitting,
     links,
     newLink,
-    onDraftStateChange
+    onDraftStateChange,
+    readingBookId,
+    readingClockTime,
+    readingPage
   ]);
 
   const handleContentChange = (event) => {
@@ -1587,9 +1641,29 @@ function SubmissionPanel({ clusterId, regionId, dateStr, assignment, warnings = 
   };
 
   const handleSubmit = async () => {
-    if (content.trim().length < 10) {
-      alert("최소 10자 이상의 탐사 보고서를 작성해야 합니다.");
-      return;
+    if (isClassic) {
+      if (!readingBookId) {
+        alert("읽은 책을 선택해 주세요. 등록된 책이 없다면 '+ 새 책 등록' 버튼을 눌러 먼저 책을 등록해 주세요.");
+        setIsSubmitting(false);
+        return;
+      }
+      const pageNum = Number(readingPage);
+      if (!pageNum || pageNum < 1 || pageNum > 99999) {
+        alert("올바른 마지막 읽은 페이지(1~99,999)를 입력해 주세요.");
+        setIsSubmitting(false);
+        return;
+      }
+      if (content.trim().length < 10) {
+        alert("오늘 읽은 내용은 최소 10자 이상 작성해야 합니다.");
+        setIsSubmitting(false);
+        return;
+      }
+    } else {
+      if (content.trim().length < 10) {
+        alert("최소 10자 이상의 탐사 보고서를 작성해야 합니다.");
+        setIsSubmitting(false);
+        return;
+      }
     }
 
     setIsSubmitting(true);
@@ -1688,6 +1762,11 @@ function SubmissionPanel({ clusterId, regionId, dateStr, assignment, warnings = 
         attachments: finalAttachments,
         notebookData,
         status: 'submitted',
+        reading: isClassic ? {
+          bookId: readingBookId,
+          page: Number(readingPage),
+          clockTime: getKSTTimeString(),
+        } : null,
         revisionCount: (assignment?.revisionCount || 0) + (isNeedsRevision ? 1 : 0)
       };
 
@@ -2028,6 +2107,55 @@ function SubmissionPanel({ clusterId, regionId, dateStr, assignment, warnings = 
               <p>이 보고서는 사령부 확인이 완료되어 더 이상 수정할 수 없습니다.</p>
               <div className="glass-card" style={{ marginTop: '2rem', padding: '1.5rem', opacity: 0.8 }}>
                  <h4 style={{ color: 'var(--text-bright)', marginBottom: '1rem' }}>제출된 기록</h4>
+
+                 {/* Reading Metadata for Western Classic */}
+                 {(assignment?.reading || isClassic) && (
+                   <div style={{
+                     marginBottom: '1.2rem',
+                     padding: '0.85rem 1rem',
+                     background: 'rgba(20, 184, 166, 0.12)',
+                     border: '1px solid rgba(45, 212, 191, 0.35)',
+                     borderRadius: '8px',
+                     display: 'flex',
+                     alignItems: 'center',
+                     justifyContent: 'space-between',
+                     flexWrap: 'wrap',
+                     gap: '0.6rem'
+                   }}>
+                     {assignment?.reading ? (
+                       <>
+                         <div>
+                           <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: '#5eead4', fontWeight: 800, fontSize: '0.95rem' }}>
+                             <span>📖</span>
+                             <span>{assignment.reading.title}</span>
+                             {assignment.reading.author && (
+                               <span style={{ fontSize: '0.82rem', color: 'rgba(224, 242, 254, 0.65)', fontWeight: 500 }}>
+                                 ({assignment.reading.author})
+                               </span>
+                             )}
+                           </div>
+                           <div style={{ fontSize: '0.78rem', color: 'rgba(224, 242, 254, 0.6)', marginTop: 2 }}>
+                             기록 기준일: {assignment.reading.readDateKst || assignment.date}
+                             {formatReadingClockTime(assignment.reading.readAt) && (
+                               <span style={{ marginLeft: 6 }}>
+                                 · 읽은 시각: {formatReadingClockTime(assignment.reading.readAt)}
+                               </span>
+                             )}
+                           </div>
+                         </div>
+                         <div style={{ color: '#5eead4', fontWeight: 900, fontSize: '1.05rem' }}>
+                           {assignment.reading.page}쪽까지 읽음
+                         </div>
+                       </>
+                     ) : (
+                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: 'rgba(224, 242, 254, 0.6)', fontSize: '0.82rem' }}>
+                         <span>📖</span>
+                         <span style={{ fontStyle: 'italic' }}>책 정보 없음 · 기존 기록</span>
+                       </div>
+                     )}
+                   </div>
+                 )}
+
                  <div style={{ whiteSpace: 'pre-wrap', fontSize: '1rem', lineHeight: '1.6', color: 'var(--text-muted)' }}>{assignment.content}</div>
              
              {assignment.attachments?.length > 0 && (
@@ -2061,6 +2189,54 @@ function SubmissionPanel({ clusterId, regionId, dateStr, assignment, warnings = 
           </p>
           <div className="glass-card" style={{ marginTop: '2rem', padding: '1.5rem', opacity: 0.6, width: '100%' }}>
              <h4 style={{ color: 'var(--text-bright)', marginBottom: '1rem' }}>제출된 기록</h4>
+
+             {assignment && (assignment.reading || isClassic) && (
+               <div style={{
+                 marginBottom: '1.2rem',
+                 padding: '0.85rem 1rem',
+                 background: 'rgba(20, 184, 166, 0.12)',
+                 border: '1px solid rgba(45, 212, 191, 0.35)',
+                 borderRadius: '8px',
+                 display: 'flex',
+                 alignItems: 'center',
+                 justifyContent: 'space-between',
+                 flexWrap: 'wrap',
+                 gap: '0.6rem'
+               }}>
+                 {assignment.reading ? (
+                   <>
+                     <div>
+                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: '#5eead4', fontWeight: 800, fontSize: '0.95rem' }}>
+                         <span>📖</span>
+                         <span>{assignment.reading.title}</span>
+                         {assignment.reading.author && (
+                           <span style={{ fontSize: '0.82rem', color: 'rgba(224, 242, 254, 0.65)', fontWeight: 500 }}>
+                             ({assignment.reading.author})
+                           </span>
+                         )}
+                       </div>
+                       <div style={{ fontSize: '0.78rem', color: 'rgba(224, 242, 254, 0.6)', marginTop: 2 }}>
+                         기록 기준일: {assignment.reading.readDateKst || assignment.date}
+                         {formatReadingClockTime(assignment.reading.readAt) && (
+                            <span style={{ marginLeft: 6 }}>
+                              · 읽은 시각: {formatReadingClockTime(assignment.reading.readAt)}
+                            </span>
+                          )}
+                       </div>
+                     </div>
+                     <div style={{ color: '#5eead4', fontWeight: 900, fontSize: '1.05rem' }}>
+                       {assignment.reading.page}쪽까지 읽음
+                     </div>
+                   </>
+                 ) : (
+                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: 'rgba(224, 242, 254, 0.6)', fontSize: '0.82rem' }}>
+                     <span>📖</span>
+                     <span style={{ fontStyle: 'italic' }}>책 정보 없음 · 기존 기록</span>
+                   </div>
+                 )}
+               </div>
+             )}
+
              <div style={{ whiteSpace: 'pre-wrap', fontSize: '0.9rem', lineHeight: '1.6' }}>
                {assignment ? assignment.content : "제출된 기록이 없습니다."}
              </div>
@@ -2086,10 +2262,80 @@ function SubmissionPanel({ clusterId, regionId, dateStr, assignment, warnings = 
             </div>
           )}
 
-          <label className="font-tech" style={{ color: 'var(--crystal-cyan)', marginBottom: '0.5rem', fontSize: '0.9rem' }}>오늘 한 내용 정리 (필수)</label>
+          {/* Classic Reading Selection (Only for Western Classic cluster) */}
+          {isClassic && (
+            <div className="glass-card" style={{ padding: '1.1rem', marginBottom: '1.2rem', border: '1px solid rgba(45, 212, 191, 0.4)', background: 'rgba(15, 23, 42, 0.6)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.8rem' }}>
+                <label className="font-tech" style={{ color: '#5eead4', fontSize: '0.95rem', fontWeight: 'bold' }}>
+                  📖 오늘 읽은 책 & 페이지 (필수)
+                </label>
+                {!isBookLocked && (
+                  <button
+                    type="button"
+                    className="bookshelf-add-btn font-tech"
+                    onClick={() => setIsNewBookModalOpen(true)}
+                    style={{ fontSize: '0.78rem', padding: '0.35rem 0.75rem' }}
+                  >
+                    + 새 책 등록
+                  </button>
+                )}
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: 'minmax(180px, 1fr) 140px', gap: '0.85rem', alignItems: 'flex-start' }}>
+                <div>
+                  <label style={{ fontSize: '0.78rem', color: 'rgba(224,242,254,0.7)', display: 'block', marginBottom: 4 }}>
+                    책 선택 {isBookLocked && <span style={{ color: '#fbbf24', fontSize: '0.72rem' }}>(첫 제출 후 책 변경 불가)</span>}
+                  </label>
+                  <select
+                    className="space-input"
+                    value={readingBookId}
+                    disabled={isBookLocked}
+                    onChange={(e) => {
+                      setReadingBookId(e.target.value);
+                      persistDraftImmediately({ readingBookId: e.target.value });
+                    }}
+                    style={{ width: '100%', fontSize: '0.9rem' }}
+                  >
+                    <option value="">-- 읽은 책을 선택하세요 --</option>
+                    {userReadingBooks.map((b) => (
+                      <option key={b.id} value={b.id}>
+                        {b.title} ({b.author})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label style={{ fontSize: '0.78rem', color: 'rgba(224,242,254,0.7)', display: 'block', marginBottom: 4 }}>
+                    마지막 페이지 (쪽)
+                  </label>
+                  <input
+                    type="number"
+                    inputMode="numeric"
+                    min={1}
+                    max={99999}
+                    className="space-input"
+                    placeholder="예: 64"
+                    value={readingPage}
+                    onChange={(e) => {
+                      setReadingPage(e.target.value);
+                      persistDraftImmediately({ readingPage: e.target.value });
+                    }}
+                    style={{ width: '100%', fontSize: '0.9rem' }}
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+
+          <label className="font-tech" style={{ color: 'var(--crystal-cyan)', marginBottom: '0.5rem', fontSize: '0.9rem' }}>
+            {isClassic ? '오늘 읽은 내용 요약 (필수, 최소 10자)' : '오늘 한 내용 정리 (필수)'}
+          </label>
           <textarea 
             className="space-input" 
-            placeholder="오늘 제출할 과제의 요점을 정리해 보세요. 나의 언어로 정리하는 순간, 지식은 온전히 내 것이 됩니다! (최소 10자)" 
+            placeholder={isClassic
+              ? "오늘 읽은 페이지의 핵심 내용이나 인상 깊었던 구절, 느낀 점을 자유롭게 기록해 보세요. (최소 10자)"
+              : "오늘 제출할 과제의 요점을 정리해 보세요. 나의 언어로 정리하는 순간, 지식은 온전히 내 것이 됩니다! (최소 10자)"}
             value={content}
             onChange={handleContentChange}
             style={{ 
@@ -2282,6 +2528,21 @@ function SubmissionPanel({ clusterId, regionId, dateStr, assignment, warnings = 
         </div>
         )}
         </>
+      )}
+
+      {/* Inline Reading Book Form Modal */}
+      {isClassic && (
+        <ReadingBookFormModal
+          isOpen={isNewBookModalOpen}
+          onClose={() => setIsNewBookModalOpen(false)}
+          existingBooks={userReadingBooks}
+          onBookCreated={(newBook) => {
+            if (newBook?.bookId) {
+              setReadingBookId(newBook.bookId);
+              persistDraftImmediately({ readingBookId: newBook.bookId });
+            }
+          }}
+        />
       )}
     </div>
   );

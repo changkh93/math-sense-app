@@ -72,6 +72,8 @@ const CrystalLedger = lazy(() => import('./CrystalLedger'))
 const loadMetaGalaxy = () => import('../GalaxySocial/MetaGalaxy')
 const MetaGalaxy = lazy(loadMetaGalaxy)
 const PythonProtocolHub = lazy(() => import('../PythonWorld/PythonProtocolHub'))
+const ReadingLibraryView = lazy(() => import('./ReadingLibrary/ReadingLibraryView'))
+import { isWesternClassicCluster, filterWesternClassicRegions } from '../../constants/westernClassicNavigation'
 
 function SpaceViewFallback() {
   return (
@@ -570,7 +572,7 @@ function RegionPlanetVisual({ imageSrc, title, icon, isMobile, isLocked }) {
 
 const REFINERY_CAUSE_IDS = ['concept_gap', 'equation_setup', 'missed_condition', 'calculation_error', 'no_checking']
 const LOGIN_NOTICE_KEY = 'metasenseLoginNotice'
-const ROOT_VIEWS = new Set(['planet', 'galaxy', 'battle', 'dashboard', 'ranking', 'store', 'crew', 'journey', 'ledger', 'profile', 'assignment_hub', 'mistake_notebook', 'lumi_protocol'])
+const ROOT_VIEWS = new Set(['planet', 'galaxy', 'battle', 'dashboard', 'ranking', 'store', 'crew', 'journey', 'ledger', 'profile', 'assignment_hub', 'mistake_notebook', 'lumi_protocol', 'reading_library'])
 
 function getRequestedRootView(location) {
   const requestedView = location.state?.view || new URLSearchParams(location.search).get('view')
@@ -1338,6 +1340,7 @@ function SpaceHome() {
     if (currentView === 'assignment_hub') return '항행 일지(과제) 작성 중';
     if (currentView === 'mistake_notebook') return '오답노트 행성 복습 중';
     if (currentView === 'lumi_protocol') return '루미 프로토콜 복구 중';
+    if (currentView === 'reading_library') return '나의 책장 & 독서 기록 확인 중';
     return '우주 공간(메인) 대기 중';
   }, [activeUnit, activeChapter, activeRegion, isDarkMatterMode, currentView, quickQuizMode]);
 
@@ -3951,6 +3954,21 @@ function SpaceHome() {
     )
   }
 
+  if (currentView === 'reading_library') {
+    return (
+      <div className="space-focus-route">
+        <Suspense fallback={<SpaceViewFallback />}>
+          <ReadingLibraryView
+            onBack={() => {
+              switchRootView('planet');
+              if (soundManager?.playWarp) soundManager.playWarp();
+            }}
+          />
+        </Suspense>
+      </div>
+    )
+  }
+
   // --- Dark Matter View ---
   if (isDarkMatterMode && darkMatterQuestions.length > 0) {
     // Stage 1: Dashboard
@@ -4034,6 +4052,7 @@ function SpaceHome() {
             <Suspense fallback={null}>
               <SpaceScene
                 regions={regions}
+                clusterId={selectedClusterId}
                 selectedRegionId={selectedRegionId}
                 recentRegionId={recentRegionId}
                 explorationStatus={explorationStatus}
@@ -4056,6 +4075,10 @@ function SpaceHome() {
                 onSelectArchive={() => {
                   setAssignmentHubInitialDate(null);
                   switchRootView('assignment_hub');
+                  soundManager.playWarp();
+                }}
+                onSelectReadingLibrary={() => {
+                  switchRootView('reading_library');
                   soundManager.playWarp();
                 }}
                 onSelectDarkMatter={() => {
@@ -4377,8 +4400,8 @@ function SpaceHome() {
                           <Motion.button
                             type="button"
                             initial={{ opacity: 0, scale: 0.8 }}
-                            animate={{ opacity: 1, scale: 1, transition: { delay: 0.03 } }}
-                            whileHover={isMobile ? undefined : { scale: 1.05, filter: 'brightness(1.16)' }}
+                            animate={{ opacity: 1, scale: 1, transition: { delay: 0.04 } }}
+                            whileHover={isMobile ? undefined : { scale: 1.05, filter: 'brightness(1.18)' }}
                             whileTap={{ scale: 0.95 }}
                             onClick={() => {
                               switchRootView('lumi_protocol')
@@ -4443,13 +4466,13 @@ function SpaceHome() {
                         <Motion.div
                           initial={{ opacity: 0, scale: 0.8 }}
                           animate={{ opacity: 1, scale: 1, transition: { delay: 0.1 } }}
-                                  whileHover={{ scale: 1.05, filter: 'brightness(1.2)' }}
-                                  whileTap={{ scale: 0.95 }}
-                                  onClick={() => {
-                                    setAssignmentHubInitialDate(null);
-                                    switchRootView('assignment_hub');
-                                    if (soundManager?.playWarp) soundManager.playWarp();
-                                  }}
+                          whileHover={{ scale: 1.05, filter: 'brightness(1.2)' }}
+                          whileTap={{ scale: 0.95 }}
+                          onClick={() => {
+                            setAssignmentHubInitialDate(null);
+                            switchRootView('assignment_hub');
+                            if (soundManager?.playWarp) soundManager.playWarp();
+                          }}
                           style={{
                             padding: isMobile ? '0.85rem 0.65rem' : '1.5rem',
                             width: isMobile ? 'calc(50% - 0.45rem)' : '250px',
@@ -4474,39 +4497,88 @@ function SpaceHome() {
                           </div>
                         </Motion.div>
 
-                        {/* Special Card: Mistake Notebook */}
-                        <Motion.div
-                          initial={{ opacity: 0, scale: 0.8 }}
-                          animate={{ opacity: 1, scale: 1, transition: { delay: 0.13 } }}
-                          whileHover={{ scale: 1.05, filter: 'brightness(1.2)' }}
-                          whileTap={{ scale: 0.95 }}
-                          onClick={() => {
-                            switchRootView('mistake_notebook');
-                            if (soundManager?.playWarp) soundManager.playWarp();
-                          }}
-                          style={{
-                            padding: isMobile ? '0.85rem 0.65rem' : '1.5rem',
-                            width: isMobile ? 'calc(50% - 0.45rem)' : '250px',
-                            background: 'rgba(20, 184, 166, 0.1)',
-                            border: '1px solid rgba(45, 212, 191, 0.42)',
-                            borderRadius: isMobile ? '14px' : '20px',
-                            color: 'white',
-                            cursor: 'pointer',
-                            display: 'flex',
-                            flexDirection: 'column',
-                            alignItems: 'center',
-                            gap: '1rem',
-                            boxShadow: '0 8px 32px rgba(20, 184, 166, 0.18)',
-                            position: 'relative',
-                            overflow: 'hidden'
-                          }}
-                        >
-                          <div style={{ position: 'relative', zIndex: 1 }}>
-                            <div style={{ fontSize: isMobile ? '2.2rem' : '4rem', marginBottom: '0.5rem' }}>🧠</div>
-                            <span className="font-tech" style={{ fontSize: isMobile ? '0.92rem' : '1.3rem', fontWeight: 'bold' }}>오답노트 행성</span>
-                            <div style={{ marginTop: '0.8rem', fontSize: '0.8rem', color: '#5eead4', fontWeight: 'bold' }}>Memory Planet</div>
-                          </div>
-                        </Motion.div>
+                        {/* Special Card: Reading Bookshelf for Western Classic */}
+                        {isWesternClassicCluster(selectedClusterId) && (
+                          <Motion.div
+                            initial={{ opacity: 0, scale: 0.8 }}
+                            animate={{ opacity: 1, scale: 1, transition: { delay: 0.12 } }}
+                            whileHover={{ scale: 1.05, filter: 'brightness(1.2)' }}
+                            whileTap={{ scale: 0.95 }}
+                            onClick={() => {
+                              switchRootView('reading_library');
+                              if (soundManager?.playWarp) soundManager.playWarp();
+                            }}
+                            style={{
+                              padding: isMobile ? '0.85rem 0.65rem' : '1.5rem',
+                              width: isMobile ? 'calc(50% - 0.45rem)' : '250px',
+                              background: 'rgba(20, 184, 166, 0.12)',
+                              border: '1px solid rgba(45, 212, 191, 0.5)',
+                              borderRadius: isMobile ? '14px' : '20px',
+                              color: 'white',
+                              cursor: 'pointer',
+                              display: 'flex',
+                              flexDirection: 'column',
+                              alignItems: 'center',
+                              gap: '1rem',
+                              boxShadow: '0 8px 32px rgba(20, 184, 166, 0.22)',
+                              position: 'relative',
+                              overflow: 'hidden'
+                            }}
+                          >
+                            <div style={{ position: 'relative', zIndex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                              <img
+                                src="/assets/planets/reading-library.webp"
+                                alt="나의 책장"
+                                style={{
+                                  width: isMobile ? '64px' : '92px',
+                                  height: isMobile ? '64px' : '92px',
+                                  objectFit: 'contain',
+                                  borderRadius: '50%',
+                                  boxShadow: '0 0 20px rgba(94, 234, 212, 0.4)',
+                                  marginBottom: '0.5rem'
+                                }}
+                              />
+                              <span className="font-tech" style={{ fontSize: isMobile ? '0.92rem' : '1.3rem', fontWeight: 'bold' }}>나의 책장</span>
+                              <div style={{ marginTop: '0.4rem', fontSize: '0.8rem', color: '#5eead4', fontWeight: 'bold' }}>Reading Bookshelf</div>
+                            </div>
+                          </Motion.div>
+                        )}
+
+                        {/* Special Card: Mistake Notebook (Hidden for Western Classic) */}
+                        {!isWesternClassicCluster(selectedClusterId) && (
+                          <Motion.div
+                            initial={{ opacity: 0, scale: 0.8 }}
+                            animate={{ opacity: 1, scale: 1, transition: { delay: 0.13 } }}
+                            whileHover={{ scale: 1.05, filter: 'brightness(1.2)' }}
+                            whileTap={{ scale: 0.95 }}
+                            onClick={() => {
+                              switchRootView('mistake_notebook');
+                              if (soundManager?.playWarp) soundManager.playWarp();
+                            }}
+                            style={{
+                              padding: isMobile ? '0.85rem 0.65rem' : '1.5rem',
+                              width: isMobile ? 'calc(50% - 0.45rem)' : '250px',
+                              background: 'rgba(20, 184, 166, 0.1)',
+                              border: '1px solid rgba(45, 212, 191, 0.42)',
+                              borderRadius: isMobile ? '14px' : '20px',
+                              color: 'white',
+                              cursor: 'pointer',
+                              display: 'flex',
+                              flexDirection: 'column',
+                              alignItems: 'center',
+                              gap: '1rem',
+                              boxShadow: '0 8px 32px rgba(20, 184, 166, 0.18)',
+                              position: 'relative',
+                              overflow: 'hidden'
+                            }}
+                          >
+                            <div style={{ position: 'relative', zIndex: 1 }}>
+                              <div style={{ fontSize: isMobile ? '2.2rem' : '4rem', marginBottom: '0.5rem' }}>🧠</div>
+                              <span className="font-tech" style={{ fontSize: isMobile ? '0.92rem' : '1.3rem', fontWeight: 'bold' }}>오답노트 행성</span>
+                              <div style={{ marginTop: '0.8rem', fontSize: '0.8rem', color: '#5eead4', fontWeight: 'bold' }}>Memory Planet</div>
+                            </div>
+                          </Motion.div>
+                        )}
 
                         {/* Special Card: Dark Matter */}
                         <Motion.div
@@ -4542,42 +4614,44 @@ function SpaceHome() {
                           </div>
                         </Motion.div>
 
-                        {/* Special Card: Dark Matter Refinery */}
-                        <Motion.div
-                          initial={{ opacity: 0, scale: 0.8 }}
-                          animate={{ opacity: 1, scale: 1, transition: { delay: 0.2 } }}
-                          whileHover={{ scale: 1.05, filter: 'brightness(1.2)' }}
-                          whileTap={{ scale: 0.95 }}
-                          onClick={() => {
-                            startDarkMatterMode('refinery');
-                            if (soundManager?.playWarp) soundManager.playWarp();
-                          }}
-                          style={{
-                            padding: isMobile ? '0.85rem 0.65rem' : '1.5rem',
-                            width: isMobile ? 'calc(50% - 0.45rem)' : '250px',
-                            background: 'rgba(245, 158, 11, 0.1)',
-                            border: '1px solid rgba(245, 158, 11, 0.45)',
-                            borderRadius: isMobile ? '14px' : '20px',
-                            color: 'white',
-                            cursor: 'pointer',
-                            display: 'flex',
-                            flexDirection: 'column',
-                            alignItems: 'center',
-                            gap: '1rem',
-                            boxShadow: '0 8px 32px rgba(245, 158, 11, 0.22)',
-                            position: 'relative',
-                            overflow: 'hidden'
-                          }}
-                        >
-                          <div style={{ position: 'relative', zIndex: 1 }}>
-                            <div style={{ fontSize: isMobile ? '2.2rem' : '4rem', marginBottom: '0.5rem' }}>⚗️</div>
-                            <span className="font-tech" style={{ fontSize: isMobile ? '0.92rem' : '1.3rem', fontWeight: 'bold' }}>다크매터 정제소</span>
-                            <div style={{ marginTop: '0.8rem', fontSize: '0.8rem', color: '#fbbf24', fontWeight: 'bold' }}>Purification: {darkMatterCount}</div>
-                          </div>
-                        </Motion.div>
+                        {/* Special Card: Dark Matter Refinery (Hidden for Western Classic) */}
+                        {!isWesternClassicCluster(selectedClusterId) && (
+                          <Motion.div
+                            initial={{ opacity: 0, scale: 0.8 }}
+                            animate={{ opacity: 1, scale: 1, transition: { delay: 0.2 } }}
+                            whileHover={{ scale: 1.05, filter: 'brightness(1.2)' }}
+                            whileTap={{ scale: 0.95 }}
+                            onClick={() => {
+                              startDarkMatterMode('refinery');
+                              if (soundManager?.playWarp) soundManager.playWarp();
+                            }}
+                            style={{
+                              padding: isMobile ? '0.85rem 0.65rem' : '1.5rem',
+                              width: isMobile ? 'calc(50% - 0.45rem)' : '250px',
+                              background: 'rgba(245, 158, 11, 0.1)',
+                              border: '1px solid rgba(245, 158, 11, 0.45)',
+                              borderRadius: isMobile ? '14px' : '20px',
+                              color: 'white',
+                              cursor: 'pointer',
+                              display: 'flex',
+                              flexDirection: 'column',
+                              alignItems: 'center',
+                              gap: '1rem',
+                              boxShadow: '0 8px 32px rgba(245, 158, 11, 0.22)',
+                              position: 'relative',
+                              overflow: 'hidden'
+                            }}
+                          >
+                            <div style={{ position: 'relative', zIndex: 1 }}>
+                              <div style={{ fontSize: isMobile ? '2.2rem' : '4rem', marginBottom: '0.5rem' }}>⚗️</div>
+                              <span className="font-tech" style={{ fontSize: isMobile ? '0.92rem' : '1.3rem', fontWeight: 'bold' }}>다크매터 정제소</span>
+                              <div style={{ marginTop: '0.8rem', fontSize: '0.8rem', color: '#fbbf24', fontWeight: 'bold' }}>Purification: {darkMatterCount}</div>
+                            </div>
+                          </Motion.div>
+                        )}
                       </>
                     )}
-                    {regions.map((region, idx) => {
+                    {(isWesternClassicCluster(selectedClusterId) ? filterWesternClassicRegions(regions, selectedClusterId) : regions).map((region, idx) => {
                     const isRegionLocked = region.isPrivate && userData?.regionAccess?.[region.id] !== 'active' && userData?.regionAccess?.[region.id] !== 'completed';
                     const isCompleted = explorationStatus[region.id] === 'completed';
                     const middleMathRegionImage = selectedClusterId === 'middle-math' ? getMiddleMathRegionImage(region) : null;
@@ -4671,7 +4745,7 @@ function SpaceHome() {
                     )
                   })}
                   </>
-                  )}
+                )}
                 </Motion.div>
               </div>
             ) : !selectedChapterDocId ? (

@@ -40,6 +40,7 @@ inspect_unit_*.mjs
 recover_unit_triangle_pitr.mjs
 restore_unit_triangle.mjs
 scripts/audit-western-classic-*.mjs
+!scripts/audit-western-classic-reading-migration.mjs
 scripts/apply-manual-western-classic-option-repairs.mjs
 scripts/apply-western-classic-option-style-repairs.mjs
 scripts/build-western-classic-*.mjs

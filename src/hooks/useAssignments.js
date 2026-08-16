@@ -74,6 +74,27 @@ export const useSubmitAssignment = () => {
 
   return useMutation({
     mutationFn: async ({ docId, assignmentData }) => {
+      const isClassic = assignmentData.clusterId === 'western-classic' ||
+        assignmentData.clusterId === '서양고전' ||
+        Boolean(assignmentData.reading);
+
+      if (isClassic) {
+        const submitClassicFn = httpsCallable(functions, 'submitClassicReadingAssignment');
+        const commandId = assignmentData.commandId || ('cmd_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 9));
+        const response = await submitClassicFn({
+          commandId,
+          assignmentId: docId || null,
+          date: assignmentData.date,
+          clusterId: 'western-classic',
+          regionId: assignmentData.regionId,
+          content: assignmentData.content,
+          links: assignmentData.links,
+          attachments: assignmentData.attachments,
+          reading: assignmentData.reading,
+        });
+        return { id: response.data?.assignmentId || docId };
+      }
+
       if (docId) {
         // Update existing (Revision)
         const ref = doc(db, 'assignments', docId);
@@ -97,8 +118,13 @@ export const useSubmitAssignment = () => {
     },
     onSuccess: (_, variables) => {
       // Broaden invalidation to ensure calendar AND chronicle update
-      queryClient.invalidateQueries({ queryKey: ['assignments', 'student', variables.assignmentData.userId] });
-      queryClient.invalidateQueries({ queryKey: ['assignments', 'student'] }); // Broader catch-all
+      const uid = variables?.assignmentData?.userId;
+      if (uid) {
+        queryClient.invalidateQueries({ queryKey: ['assignments', 'student', uid] });
+        queryClient.invalidateQueries({ queryKey: ['readingBooks', uid] });
+        queryClient.invalidateQueries({ queryKey: ['readingLogs', uid] });
+      }
+      queryClient.invalidateQueries({ queryKey: ['assignments', 'student'] });
     }
   });
 };
@@ -534,7 +560,19 @@ export const useReviewAssignment = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async ({ assignmentId, feedback, status, bonusCrystals, userId }) => {
+    mutationFn: async ({ assignmentId, feedback, status, bonusCrystals, userId, clusterId }) => {
+      const isClassic = clusterId === 'western-classic' || clusterId === '서양고전';
+      if (isClassic) {
+        const reviewClassicFn = httpsCallable(functions, 'reviewClassicReadingAssignment');
+        const response = await reviewClassicFn({
+          assignmentId,
+          feedback,
+          status,
+          bonusCrystals: status === 'reviewed' ? (Number(bonusCrystals) || 0) : 0,
+        });
+        return response.data;
+      }
+
       const ref = doc(db, 'assignments', assignmentId);
       
       const newBonus = status === 'reviewed' ? (Number(bonusCrystals) || 0) : 0;
@@ -589,6 +627,7 @@ export const useReviewAssignment = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['assignments'] });
+      queryClient.invalidateQueries({ queryKey: ['readingLogs'] });
     }
   });
 };

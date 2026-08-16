@@ -105,6 +105,7 @@ export default function AdminAssignmentDetail({ assignment, onReviewed }) {
       await reviewMutation.mutateAsync({
         assignmentId: assignment.id,
         userId: assignment.userId,
+        clusterId: assignment.clusterId,
         feedback,
         status,
         bonusCrystals: isApproved ? Number(bonusCrystals) : 0,
@@ -298,6 +299,49 @@ export default function AdminAssignmentDetail({ assignment, onReviewed }) {
           <h3 style={{ margin: 0 }}>{assignment.userName} 대원의 보고서 <span style={{fontSize: '0.9rem', color: 'var(--text-muted)', marginLeft: '0.5rem'}}>({assignment.clusterId})</span></h3>
           <span style={{ color: 'var(--crystal-cyan)' }}>{assignment.date}</span>
         </div>
+
+        {/* Reading Metadata for Western Classic */}
+        {(assignment.reading || assignment.clusterId === 'western-classic' || assignment.clusterId === '서양고전') && (
+          <div style={{
+            marginBottom: '1rem',
+            padding: '0.85rem 1rem',
+            background: 'rgba(20, 184, 166, 0.12)',
+            border: '1px solid rgba(45, 212, 191, 0.35)',
+            borderRadius: '8px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            flexWrap: 'wrap',
+            gap: '0.6rem'
+          }}>
+            {assignment.reading ? (
+              <>
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: '#5eead4', fontWeight: 800, fontSize: '0.95rem' }}>
+                    <span>📖</span>
+                    <span>{assignment.reading.title}</span>
+                    {assignment.reading.author && (
+                      <span style={{ fontSize: '0.82rem', color: 'rgba(224, 242, 254, 0.65)', fontWeight: 500 }}>
+                        ({assignment.reading.author})
+                      </span>
+                    )}
+                  </div>
+                  <div style={{ fontSize: '0.78rem', color: 'rgba(224, 242, 254, 0.6)', marginTop: 2 }}>
+                    연결된 책 ID: {assignment.reading.bookId}
+                  </div>
+                </div>
+                <div style={{ color: '#5eead4', fontWeight: 900, fontSize: '1.05rem' }}>
+                  {assignment.reading.page}쪽까지 읽음
+                </div>
+              </>
+            ) : (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: '#fbbf24', fontSize: '0.82rem' }}>
+                <span>📖</span>
+                <span>[서양고전 읽기] 책 정보 없음 · 레거시 과제 (서버 정정 지원 대상)</span>
+              </div>
+            )}
+          </div>
+        )}
 
         <div className="markdown-content" style={{ color: 'var(--text-bright)', lineHeight: '1.6', fontSize: '1.05rem', background: 'rgba(0,0,0,0.2)', padding: '1.5rem', borderRadius: '8px' }}>
           <ReactMarkdown>{assignment.content || '내용 없음'}</ReactMarkdown>

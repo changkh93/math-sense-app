@@ -22,7 +22,8 @@ const IMAGE_PLANET_TYPES = new Set([
   'python_project',
   'western_classic_neverland',
   'western_classic_nobel',
-  'western_classic_heritage'
+  'western_classic_heritage',
+  'reading_library'
 ])
 
 function getTexturePathForPlanetType(planetType) {
@@ -52,6 +53,7 @@ function getTexturePathForPlanetType(planetType) {
   if (planetType === 'western_classic_neverland') return '/assets/planets/western-classic-neverland.webp'
   if (planetType === 'western_classic_nobel') return '/assets/planets/western-classic-nobel.webp'
   if (planetType === 'western_classic_heritage') return '/assets/planets/western-classic-heritage.webp'
+  if (planetType === 'reading_library') return '/assets/planets/reading-library.webp'
   return null
 }
 

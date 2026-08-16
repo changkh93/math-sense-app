@@ -4,6 +4,7 @@ import { Stars, CameraControls, Environment, Float, Html } from '@react-three/dr
 import * as THREE from 'three'
 import PlanetMesh from './PlanetMesh'
 import { checkWebGLSupport } from '../../utils/webglSupport'
+import { isWesternClassicCluster, filterWesternClassicRegions } from '../../constants/westernClassicNavigation'
 
 const MIDDLE_MATH_PLANET_STYLES = [
   { planetType: 'middle_math_core', planetColor: '#59c8ff' },
@@ -110,8 +111,10 @@ function CameraFOV({ isBoosting }) {
  */
 function SceneContent({ 
   regions, 
+  clusterId,
   onSelectRegion, 
   onSelectArchive,
+  onSelectReadingLibrary,
   selectedRegionId,
   recentRegionId,
   explorationStatus = {},
@@ -130,6 +133,11 @@ function SceneContent({
   const { camera } = useThree()
   const [warpActive, setWarpActive] = useState(false)
   
+  const isClassic = isWesternClassicCluster(clusterId);
+  const displayedRegions = useMemo(() => {
+    return isClassic ? filterWesternClassicRegions(regions, clusterId) : regions;
+  }, [regions, clusterId, isClassic]);
+
   // Spiral Layout Configuration
   const spiralConfig = {
     radiusStep: 4,   
@@ -141,8 +149,8 @@ function SceneContent({
 
   // Calculate positions
   const planetPositions = useMemo(() => {
-    if (!regions) return []
-    return regions.map((region, i) => {
+    if (!displayedRegions) return []
+    return displayedRegions.map((region, i) => {
       const angle = i * spiralConfig.angleStep
       const radius = spiralConfig.initialRadius + (i * 0.5) // 점차 넓어짐
       
@@ -194,7 +202,7 @@ function SceneContent({
         isLocked: false // Unlocking all planets as requested
       }
     })
-  }, [regions])
+  }, [displayedRegions])
 
   // Camera Animation & Warp Logic
   useEffect(() => {
@@ -340,8 +348,48 @@ function SceneContent({
         </group>
       )}
 
+      {/* Reading Bookshelf Planet for Western Classic */}
+      {(!selectedRegionId && isClassic) && (
+        <group position={[4.8, 0.3, -1.2]}>
+          <Float speed={1.7} rotationIntensity={0.55} floatIntensity={1} floatingRange={[-0.25, 0.25]}>
+            <PlanetMesh
+              color="#0d9488"
+              size={0.7}
+              planetType="reading_library"
+              showSpaceship={false}
+              showFormulas={false}
+              onClick={(e) => {
+                e.stopPropagation();
+                if (onSelectReadingLibrary) onSelectReadingLibrary();
+              }}
+              onPointerOver={() => { document.body.style.cursor = 'pointer' }}
+              onPointerOut={() => { document.body.style.cursor = 'auto' }}
+            />
+            <Html
+              position={[0, 1.25, 0]}
+              center
+              zIndexRange={[100, 0]}
+              style={{
+                color: "#5eead4",
+                fontSize: '1.05rem',
+                fontWeight: '900',
+                fontFamily: 'var(--font-title, sans-serif)',
+                whiteSpace: 'nowrap',
+                textShadow: '0 2px 6px rgba(0,0,0,0.9), 0 0 12px #000',
+                pointerEvents: 'none',
+                textAlign: 'center',
+                lineHeight: '1.3'
+              }}
+            >
+              나의 책장<br/>
+              <span style={{ fontSize: '0.72rem', color: '#ccfbf1', fontWeight: '500' }}>Reading Bookshelf</span>
+            </Html>
+          </Float>
+        </group>
+      )}
+
       {/* Mistake Notebook Planet */}
-      {( !selectedRegionId ) && (
+      {(!selectedRegionId && !isClassic) && (
         <group position={[4.8, 0.3, -1.2]}>
           <Float speed={1.7} rotationIntensity={0.55} floatIntensity={1} floatingRange={[-0.25, 0.25]}>
             <PlanetMesh
@@ -423,7 +471,7 @@ function SceneContent({
       )}
 
       {/* Dark Matter Refinery Planet */}
-      {( !selectedRegionId ) && (
+      {(!selectedRegionId && !isClassic) && (
         <group position={[-6.8, -1.0, -0.5]}>
           <Float speed={1.8} rotationIntensity={0.6} floatIntensity={0.9} floatingRange={[-0.25, 0.25]}>
             <PlanetMesh

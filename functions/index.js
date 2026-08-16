@@ -5739,6 +5739,11 @@ function buildAssignmentShareSnapshot(assignmentData = {}) {
     attachmentCount: attachments.length,
     attachments,
     links,
+    reading: assignmentData.reading ? {
+      title: String(assignmentData.reading.title || "").slice(0, 200),
+      author: String(assignmentData.reading.author || "").slice(0, 120),
+      page: Number(assignmentData.reading.page) || 0,
+    } : null,
   };
 }
 
@@ -6193,6 +6198,17 @@ async function requireAdminUid(context) {
   return uid;
 }
 
+const classicReading = require("./classicReading")({
+  functions,
+  admin,
+  regionalFunctions,
+  costOptimizedDataFunctions,
+  requireAuthUid,
+  requireAdminUid,
+  recordCrystalTransaction,
+});
+Object.assign(exports, classicReading.functions);
+
 function getGlmApiKey() {
   return process.env.GLM_API_KEY || "";
 }
@@ -6534,6 +6550,9 @@ async function deleteUserOwnedData(uid, options = {}) {
     stage = "top-level-doc-cleanup";
     await deleteQueryDocs(db.collection("assignments").where("userId", "==", uid), stats, "assignmentsDeleted");
     await deleteQueryDocs(db.collection("attendance").where("userId", "==", uid), stats, "attendanceDeleted");
+    await deleteQueryDocs(db.collection("readingBooks").where("userId", "==", uid), stats, "readingBooksDeleted");
+    await deleteQueryDocs(db.collection("readingLogs").where("userId", "==", uid), stats, "readingLogsDeleted");
+    await deleteQueryDocs(db.collection("readingCommands").where("userId", "==", uid), stats, "readingCommandsDeleted");
     await deleteQueryDocs(db.collection("notifications").where("recipientId", "==", uid), stats, "notificationsDeleted");
     await deleteQueryDocs(db.collection("directMemos").where("senderId", "==", uid), stats, "directMemosDeleted");
     await deleteQueryDocs(db.collection("directMemos").where("recipientId", "==", uid), stats, "directMemosDeleted");

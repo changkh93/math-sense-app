@@ -329,9 +329,98 @@
         { "fieldPath": "type", "order": "ASCENDING" },
         { "fieldPath": "timestamp", "order": "ASCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "readingBooks",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "userId", "order": "ASCENDING" },
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "updatedAt", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "readingLogs",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "userId", "order": "ASCENDING" },
+        { "fieldPath": "readAt", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "readingLogs",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "userId", "order": "ASCENDING" },
+        { "fieldPath": "bookId", "order": "ASCENDING" },
+        { "fieldPath": "readAt", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "readingLogs",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "userId", "order": "ASCENDING" },
+        { "fieldPath": "eventType", "order": "ASCENDING" },
+        { "fieldPath": "readAt", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "readingLogs",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "userId", "order": "ASCENDING" },
+        { "fieldPath": "source", "order": "ASCENDING" },
+        { "fieldPath": "readAt", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "readingLogs",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "userId", "order": "ASCENDING" },
+        { "fieldPath": "readDateKst", "order": "DESCENDING" },
+        { "fieldPath": "readAt", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "readingLogs",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "userId", "order": "ASCENDING" },
+        { "fieldPath": "bookId", "order": "ASCENDING" },
+        { "fieldPath": "readDateKst", "order": "DESCENDING" },
+        { "fieldPath": "readAt", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "readingLogs",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "userId", "order": "ASCENDING" },
+        { "fieldPath": "eventType", "order": "ASCENDING" },
+        { "fieldPath": "readDateKst", "order": "DESCENDING" },
+        { "fieldPath": "readAt", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "readingLogs",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "userId", "order": "ASCENDING" },
+        { "fieldPath": "source", "order": "ASCENDING" },
+        { "fieldPath": "readDateKst", "order": "DESCENDING" },
+        { "fieldPath": "readAt", "order": "DESCENDING" }
+      ]
     }
   ],
   "fieldOverrides": [
+    {
+      "collectionGroup": "readingCommands",
+      "fieldPath": "expiresAt",
+      "ttl": true,
+      "indexes": []
+    },
     {
       "collectionGroup": "history",
       "fieldPath": "regionId",

@@ -659,11 +659,16 @@ service cloud.firestore {
       allow create, update, delete: if false;
     }
 
+    function isWesternClassicCluster(clusterId) {
+      return clusterId in ['western-classic', '서양고전', '서양고전읽기', 'classic', 'classics'];
+    }
+
     // Assignments (Stellar Archive)
     match /assignments/{assignmentId} {
       allow create: if isAuth() &&
         request.resource.data.userId == request.auth.uid &&
         request.resource.data.status == 'submitted' &&
+        !isWesternClassicCluster(request.resource.data.clusterId) &&
         request.resource.data.keys().hasOnly(assignmentStudentWritableKeys());
       allow read: if isAuth();
       allow update: if isAuth() && (
@@ -672,6 +677,8 @@ service cloud.firestore {
           resource.data.userId == request.auth.uid &&
           request.resource.data.userId == resource.data.userId &&
           request.resource.data.status == 'submitted' &&
+          !isWesternClassicCluster(resource.data.clusterId) &&
+          !isWesternClassicCluster(request.resource.data.clusterId) &&
           request.resource.data.diff(resource.data).affectedKeys().hasOnly(assignmentStudentWritableKeys())
         ) ||
         (
@@ -688,6 +695,29 @@ service cloud.firestore {
         )
       );
       allow delete: if isAdmin();
+    }
+
+    // Western Classic Reading Bookshelf & Logs (Client direct writes blocked, server callable only)
+    match /readingBooks/{bookId} {
+      allow read: if isAuth() && (
+        resource.data.userId == request.auth.uid ||
+        isAdmin() ||
+        isLinkedParentOf(resource.data.userId)
+      );
+      allow write: if false;
+    }
+
+    match /readingLogs/{logId} {
+      allow read: if isAuth() && (
+        resource.data.userId == request.auth.uid ||
+        isAdmin() ||
+        isLinkedParentOf(resource.data.userId)
+      );
+      allow write: if false;
+    }
+
+    match /readingCommands/{commandId} {
+      allow read, write: if false;
     }
 
     // Assignment warning ledger. Admins issue/cancel warnings, students can only

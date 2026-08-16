@@ -635,6 +635,49 @@ export default function AssignmentChronicle({ assignments, warnings = [], onClos
                       </div>
                     )}
 
+                    {/* Reading Metadata Header / Legacy Notice */}
+                    {(currentLog.reading || currentLog.clusterId === 'western-classic' || currentLog.clusterId === '서양고전') && (
+                      <div style={{
+                        marginBottom: '1.5rem',
+                        padding: '0.9rem 1.1rem',
+                        background: 'linear-gradient(135deg, rgba(20, 184, 166, 0.12), rgba(6, 182, 212, 0.08))',
+                        border: '1px solid rgba(45, 212, 191, 0.35)',
+                        borderRadius: '10px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        flexWrap: 'wrap',
+                        gap: '0.6rem'
+                      }}>
+                        {currentLog.reading ? (
+                          <>
+                            <div>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: '#5eead4', fontWeight: 800, fontSize: '0.95rem' }}>
+                                <span>📖</span>
+                                <span>{currentLog.reading.title}</span>
+                                {currentLog.reading.author && (
+                                  <span style={{ fontSize: '0.82rem', color: 'rgba(224, 242, 254, 0.65)', fontWeight: 500 }}>
+                                    ({currentLog.reading.author})
+                                  </span>
+                                )}
+                              </div>
+                              <div style={{ fontSize: '0.78rem', color: 'rgba(224, 242, 254, 0.6)', marginTop: 2 }}>
+                                기록 기준일: {currentLog.date}
+                              </div>
+                            </div>
+                            <div style={{ color: '#5eead4', fontWeight: 900, fontSize: '1.1rem' }}>
+                              {currentLog.reading.page}쪽까지
+                            </div>
+                          </>
+                        ) : (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: 'rgba(224, 242, 254, 0.6)', fontSize: '0.82rem' }}>
+                            <span>📖</span>
+                            <span style={{ fontStyle: 'italic' }}>책 정보 없음 · 기존 기록</span>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
                     {/* Main Written Content */}
                     <div className="markdown-content" style={{ color: 'var(--text-bright)', lineHeight: '1.8', fontSize: '1.05rem', marginBottom: '2rem' }}>
                       <ReactMarkdown>{currentLog.content}</ReactMarkdown>
