@@ -7064,6 +7064,11 @@ const OPEN_STUDY_POOLS = {
   },
 };
 
+// Keep every open-study query on live rows only. Historical rooms are retained
+// for records, so an unqualified query eventually fills its limit with ended
+// rooms and pays for documents that are discarded immediately.
+const OPEN_STUDY_ACTIVE_STATUSES = ["waiting", "live"];
+
 function getOpenStudyPoolIdFromGrade(userData = {}) {
   const gradeValue = userData.grade || userData.schoolGrade || userData.studentGrade || "";
   const text = String(gradeValue || "").replace(/\s+/g, "");
@@ -10308,8 +10313,14 @@ exports.finalizeCrewGrowthEvents = regionalFunctions.pubsub
   .schedule("every 1 hours")
   .timeZone("Asia/Seoul")
   .onRun(async () => {
+    const nowMs = Date.now();
     const snap = await admin.firestore().collection("crews").where("status", "==", "approved").get();
-    await Promise.all(snap.docs.map((docSnap) => reconcileCrewGrowthEvent(docSnap.id, { allowReward: true }).catch((err) => {
+    const dueDocs = snap.docs.filter((docSnap) => {
+      const event = docSnap.data()?.growthEvent2026 || {};
+      const verificationEndsAtMs = Number(event.verificationEndsAtMs || 0);
+      return !event.rewardedAt && verificationEndsAtMs > 0 && verificationEndsAtMs <= nowMs;
+    });
+    await Promise.all(dueDocs.map((docSnap) => reconcileCrewGrowthEvent(docSnap.id, { allowReward: true }).catch((err) => {
       console.warn("Crew growth event reconciliation failed", docSnap.id, err);
     })));
     return null;
@@ -11668,15 +11679,15 @@ exports.deleteDirectMemo = regionalFunctions.https.onCall(async (data, context) 
   return { success: true };
 });
 
+// New memos are delivered immediately. Keep a low-frequency safety drain for
+// legacy rows without paying for an empty query every 15 minutes.
 exports.deliverScheduledDirectMemos = regionalFunctions.pubsub
-  .schedule("every 15 minutes")
+  .schedule("every 24 hours")
   .timeZone("Asia/Seoul")
   .onRun(async () => {
     const db = admin.firestore();
     let deliveredCount = 0;
 
-    // Legacy cleanup: the per-recipient reservation policy was removed. Drain every
-    // memo that was already queued, regardless of its former delivery date.
     while (true) {
       const snap = await db.collection("directMemos")
         .where("status", "==", "scheduled")
@@ -11711,7 +11722,7 @@ exports.deliverScheduledDirectMemos = regionalFunctions.pubsub
       deliveredCount += snap.size;
     }
 
-    console.log("[deliverScheduledDirectMemos] drained legacy scheduled memos", { deliveredCount });
+    console.log("[deliverScheduledDirectMemos] legacy safety drain completed", { deliveredCount });
     return null;
   });
 
@@ -11771,12 +11782,12 @@ exports.sweepOpenStudyRooms = regionalFunctions.pubsub
     const now = new Date();
     const roomSnap = await db.collection("studyRooms")
       .where("roomType", "==", "openStudy")
+      .where("status", "in", OPEN_STUDY_ACTIVE_STATUSES)
       .limit(100)
       .get();
 
     const rooms = roomSnap.docs
-      .map((docSnap) => ({ ref: docSnap.ref, data: docSnap.data() || {} }))
-      .filter((room) => (room.data.status || "waiting") !== "ended");
+      .map((docSnap) => ({ ref: docSnap.ref, data: docSnap.data() || {} }));
 
     for (const room of rooms) {
       await db.runTransaction(async (tx) => {
@@ -12114,8 +12125,9 @@ exports.joinOpenStudyRoom = regionalFunctions.https.onCall(async (data, context)
   const poolConfig = OPEN_STUDY_POOLS[poolId];
   const maxParticipants = Number(poolConfig.maxParticipants || 100);
   const roomQuerySnap = await db.collection("studyRooms")
-    .where("roomType", "==", "openStudy")
-    .limit(100)
+    .where("poolId", "==", poolId)
+    .where("status", "in", OPEN_STUDY_ACTIVE_STATUSES)
+    .limit(10)
     .get();
   const candidateRefs = roomQuerySnap.docs
     .map((docSnap) => {

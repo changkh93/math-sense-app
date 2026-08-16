@@ -1,68 +1,15 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Trophy, Star, Zap, Target } from 'lucide-react';
+import { CircleHelp, Trophy, Star, Zap, Target, X } from 'lucide-react';
 import { useQARanking } from '../../hooks/useQA';
 import soundManager from '../../utils/SoundManager';
+import { calculateExplorerLevel, getExplorerExperience } from '../../utils/explorerLevelUtils';
 import './AgoraMotivationPanel.css';
 
-const EXPLORER_LEVELS = [
-  { level: 1, threshold: 0, title: '수습 항해사' },
-  { level: 2, threshold: 100, title: '별빛 수집가' },
-  { level: 3, threshold: 250, title: '궤도 계산가' },
-  { level: 4, threshold: 500, title: '성운 탐험가' },
-  { level: 5, threshold: 1000, title: '문제 해결 파일럿' },
-  { level: 6, threshold: 2000, title: '블랙홀 전략가' },
-  { level: 7, threshold: 5000, title: '은하계의 뉴턴' },
-  { level: 8, threshold: 9000, title: '별자리의 가우스' },
-  { level: 9, threshold: 15000, title: '차원의 오일러' },
-  { level: 10, threshold: 24000, title: '우주의 아인슈타인' },
-  { level: 11, threshold: 38000, title: '아고라의 아르키메데스' },
-  { level: 12, threshold: 60000, title: '스텔라의 전설' },
-];
-
-/**
- * Calculate level and progress from total crystals.
- * Returns { level, title, progress (0-100), remaining, currentThreshold, nextThreshold }
- */
-function calculateLevel(crystals) {
-  let currentLevel = EXPLORER_LEVELS[0];
-  for (let i = 1; i < EXPLORER_LEVELS.length; i++) {
-    if (crystals >= EXPLORER_LEVELS[i].threshold) {
-      currentLevel = EXPLORER_LEVELS[i];
-    } else {
-      break;
-    }
-  }
-
-  const nextLevel = EXPLORER_LEVELS.find((item) => item.level === currentLevel.level + 1);
-  const isMaxLevel = !nextLevel;
-  const currentThreshold = currentLevel.threshold;
-  const nextThreshold = nextLevel?.threshold || currentThreshold;
-
-  const rangeSize = nextThreshold - currentThreshold;
-  const crystalsInRange = crystals - currentThreshold;
-
-  const progress = isMaxLevel ? 100 : rangeSize > 0
-    ? Math.min(100, Math.round((crystalsInRange / rangeSize) * 100))
-    : 0;
-
-  const remaining = isMaxLevel ? 0 : nextThreshold - crystals;
-
-  return {
-    level: currentLevel.level,
-    title: currentLevel.title,
-    nextTitle: nextLevel?.title || null,
-    progress,
-    remaining,
-    currentThreshold,
-    nextThreshold,
-    isMaxLevel
-  };
-}
-
-export default function AgoraMotivationPanel({ userData, activeCategory, onCategoryChange }) {
+export default function AgoraMotivationPanel({ userData }) {
   const navigate = useNavigate();
   const { data: ranking, isLoading } = useQARanking();
+  const [isExperienceGuideOpen, setIsExperienceGuideOpen] = useState(false);
 
   const openPublicProfile = (event, uid) => {
     event.stopPropagation();
@@ -71,7 +18,7 @@ export default function AgoraMotivationPanel({ userData, activeCategory, onCateg
     navigate(`/profile/${uid}`);
   };
 
-  const crystals = userData?.crystals || 0;
+  const explorerExperience = getExplorerExperience(userData);
 
   const {
     level: explorerLevel,
@@ -80,7 +27,7 @@ export default function AgoraMotivationPanel({ userData, activeCategory, onCateg
     progress,
     remaining,
     isMaxLevel
-  } = calculateLevel(crystals);
+  } = calculateExplorerLevel(explorerExperience);
 
   return (
     <aside className="agora-side-panel">
@@ -114,10 +61,62 @@ export default function AgoraMotivationPanel({ userData, activeCategory, onCateg
       </section>
 
       {/* My Stats */}
-      <section className="motivation-section glass hud-border">
+      <section className="motivation-section glass hud-border explorer-level-section">
         <h3 className="section-title font-title">
           <Zap size={18} className="icon-cyan" /> 나의 탐사 등급
+          <button
+            type="button"
+            className="experience-guide-trigger"
+            aria-label="누적 탐사 XP 안내 열기"
+            aria-controls="explorer-experience-guide"
+            aria-expanded={isExperienceGuideOpen}
+            title="누적 탐사 XP가 무엇인지 알아보기"
+            onClick={() => setIsExperienceGuideOpen((isOpen) => !isOpen)}
+          >
+            <CircleHelp size={16} aria-hidden="true" />
+          </button>
         </h3>
+        {isExperienceGuideOpen && (
+          <div
+            id="explorer-experience-guide"
+            className="experience-guide"
+            role="region"
+            aria-label="누적 탐사 XP 안내"
+          >
+            <div className="experience-guide-heading">
+              <strong>누적 탐사 XP 구성</strong>
+              <button
+                type="button"
+                className="experience-guide-close"
+                aria-label="누적 탐사 XP 안내 닫기"
+                onClick={() => setIsExperienceGuideOpen(false)}
+              >
+                <X size={14} aria-hidden="true" />
+              </button>
+            </div>
+            <div className="experience-formula">
+              <div>
+                <span>퀴즈·학습 보상</span>
+                <b>지급 광석 1개 = 1 XP</b>
+              </div>
+              <div>
+                <span>내 답변 채택</span>
+                <b>20 XP</b>
+              </div>
+              <div>
+                <span>현상금 답변 채택</span>
+                <b>+현상금만큼 XP</b>
+              </div>
+              <div>
+                <span>내 질문 해결</span>
+                <b>5 XP</b>
+              </div>
+            </div>
+            <p className="experience-formula-total">
+              누적 탐사 XP = 위 XP를 모두 더한 누적값
+            </p>
+          </div>
+        )}
         <div className="my-progress">
           <div className="level-info">
             <span className="level-name">{title} (Lv.{explorerLevel})</span>
@@ -130,9 +129,11 @@ export default function AgoraMotivationPanel({ userData, activeCategory, onCateg
             </div>
           </div>
           {isMaxLevel ? (
-            <p className="hint">🎉 최고 등급 달성! 총 광석: {crystals}개</p>
+            <p className="hint">🎉 최고 등급 달성! 누적 탐사 XP {explorerExperience.toLocaleString()}</p>
           ) : (
-            <p className="hint">다음 등급: {nextTitle}까지 광석 {remaining}개 더 필요해요! (보유: {crystals}개)</p>
+            <p className="hint">
+              다음 등급: {nextTitle}까지 탐사 XP {remaining.toLocaleString()} 더 필요해요!
+            </p>
           )}
         </div>
       </section>

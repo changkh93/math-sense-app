@@ -63,6 +63,111 @@
   color: var(--text-bright);
 }
 
+.explorer-level-section .section-title {
+  margin-bottom: 1rem;
+}
+
+.experience-guide-trigger,
+.experience-guide-close {
+  display: inline-grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  color: var(--text-muted);
+  background: transparent;
+  cursor: pointer;
+}
+
+.experience-guide-trigger {
+  width: 28px;
+  height: 28px;
+  margin-left: auto;
+  border: 1px solid rgba(0, 243, 255, 0.18);
+  border-radius: 50%;
+}
+
+.experience-guide-trigger:hover,
+.experience-guide-trigger:focus-visible,
+.experience-guide-trigger[aria-expanded='true'] {
+  color: var(--crystal-cyan);
+  background: rgba(0, 243, 255, 0.1);
+  border-color: rgba(0, 243, 255, 0.5);
+  outline: none;
+}
+
+.experience-guide-trigger:focus-visible,
+.experience-guide-close:focus-visible {
+  box-shadow: 0 0 0 2px rgba(0, 243, 255, 0.28);
+}
+
+.experience-guide {
+  margin: -0.2rem 0 1rem;
+  padding: 0.9rem;
+  border: 1px solid rgba(0, 243, 255, 0.24);
+  border-radius: 12px;
+  color: var(--text-muted);
+  background: rgba(0, 20, 38, 0.76);
+  box-shadow: inset 0 0 18px rgba(0, 243, 255, 0.04);
+  font-family: inherit;
+}
+
+.experience-guide-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.experience-guide-heading strong {
+  color: var(--crystal-cyan);
+  font-size: 0.8rem;
+}
+
+.experience-guide-close {
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+}
+
+.experience-guide-close:hover {
+  color: var(--text-bright);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.experience-formula {
+  display: grid;
+  gap: 0.42rem;
+  margin-top: 0.7rem;
+}
+
+.experience-formula > div {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.7rem;
+  font-size: 0.66rem;
+  line-height: 1.45;
+}
+
+.experience-formula span {
+  color: var(--text-muted);
+}
+
+.experience-formula b {
+  color: var(--text-bright);
+  text-align: right;
+}
+
+.experience-formula-total {
+  margin: 0.7rem 0 0;
+  padding-top: 0.6rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  color: var(--crystal-cyan);
+  font-size: 0.67rem;
+  line-height: 1.45;
+  text-align: center;
+}
+
 .icon-gold { color: var(--star-gold); }
 .icon-cyan { color: var(--crystal-cyan); }
 
