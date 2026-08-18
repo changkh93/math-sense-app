@@ -1762,11 +1762,13 @@ function SubmissionPanel({ clusterId, regionId, dateStr, assignment, warnings = 
         attachments: finalAttachments,
         notebookData,
         status: 'submitted',
-        reading: isClassic ? {
-          bookId: readingBookId,
-          page: Number(readingPage),
-          clockTime: getKSTTimeString(),
-        } : null,
+        ...(isClassic ? {
+          reading: {
+            bookId: readingBookId,
+            page: Number(readingPage),
+            clockTime: getKSTTimeString(),
+          }
+        } : {}),
         revisionCount: (assignment?.revisionCount || 0) + (isNeedsRevision ? 1 : 0)
       };
 
