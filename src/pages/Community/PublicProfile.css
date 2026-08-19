@@ -654,14 +654,15 @@
 .public-profile-bookshelf-scroll {
   overflow-x: auto;
   overflow-y: hidden;
-  padding: 1rem 0.35rem 0;
+  /* Tall books and the hover lift need headroom inside this clipped scroller. */
+  padding: 1.4rem 0.35rem 0;
   scrollbar-width: thin;
   scrollbar-color: rgba(217, 179, 103, 0.42) rgba(255, 255, 255, 0.035);
 }
 
 .public-profile-bookshelf-books {
   min-width: min-content;
-  height: 228px;
+  height: 244px;
   display: flex;
   align-items: flex-end;
   gap: 3px;
@@ -1614,7 +1615,7 @@
   }
 
   .public-profile-bookshelf-books {
-    height: 218px;
+    height: 234px;
   }
 
   .public-profile-bookshelf-empty {
