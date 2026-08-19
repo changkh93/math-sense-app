@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { motion as Motion, AnimatePresence, useDragControls } from 'framer-motion';
-import { BlockMath } from 'react-katex';
+import { BlockMath, InlineMath } from 'react-katex';
 import { deleteField, doc, getDoc, serverTimestamp, setDoc } from 'firebase/firestore';
 import soundManager from '../../utils/SoundManager';
 import MathKeypad from './MathKeypad';
@@ -22,7 +22,7 @@ import { auth, db } from '../../firebase';
 import { areElementaryAnswersEquivalent, splitFractionDisplayValue } from '../../utils/elementaryMathAnswer';
 import { shuffleWorkbookOptions } from '../../utils/workbookOptionUtils';
 import { resolveWorkbookInputMode } from '../../utils/workbookInputModeUtils';
-import { isWorkbookMathDisplayValue, normalizeWorkbookMathForKatex } from '../../utils/workbookMathDisplayUtils';
+import { isWorkbookMathDisplayValue, normalizeWorkbookMathForKatex, parseWorkbookSimpleFraction } from '../../utils/workbookMathDisplayUtils';
 import {
   WORKBOOK_GRADABLE_TYPES,
   WORKBOOK_INTERACTION_TYPES,
@@ -74,9 +74,31 @@ const WorkbookChoiceContent = ({ value, keyPrefix }) => {
     return parseInlineFormatting(value, { keyPrefix });
   }
 
+  const simpleFraction = parseWorkbookSimpleFraction(value);
+  if (simpleFraction) {
+    const renderFractionPart = (part) => part.mode === 'text'
+      ? <span className="workbook-choice-simple-fraction-text">{part.value}</span>
+      : (
+        <InlineMath
+          math={sanitizeLaTeX(part.value)}
+          renderError={() => <span className="workbook-choice-math-fallback">{part.value}</span>}
+        />
+      );
+    return (
+      <span
+        className="workbook-choice-simple-fraction"
+        aria-label={`분자 ${simpleFraction.numerator.value}, 분모 ${simpleFraction.denominator.value}`}
+      >
+        <span className="workbook-choice-simple-fraction-numerator">{renderFractionPart(simpleFraction.numerator)}</span>
+        <span className="workbook-choice-simple-fraction-denominator">{renderFractionPart(simpleFraction.denominator)}</span>
+      </span>
+    );
+  }
+
   const math = sanitizeLaTeX(normalizeWorkbookMathForKatex(value));
+  const mathDensity = math.length > 90 ? 'dense' : (math.length > 45 ? 'compact' : 'normal');
   return (
-    <span className="workbook-choice-math" aria-label={String(value)}>
+    <span className={`workbook-choice-math ${mathDensity}`} aria-label={String(value)}>
       <BlockMath
         math={math}
         renderError={() => <span className="workbook-choice-math-fallback">수식을 표시할 수 없습니다.</span>}

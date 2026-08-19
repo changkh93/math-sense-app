@@ -88,21 +88,73 @@
 }
 
 .workbook-choice-math {
-  display: inline-flex;
+  display: flex;
+  width: 100%;
+  min-width: 0;
   max-width: 100%;
   align-items: center;
   justify-content: center;
-  overflow-x: auto;
-  overflow-y: hidden;
+  overflow: visible;
   color: inherit;
 }
 
+.workbook-choice-simple-fraction {
+  display: inline-grid;
+  grid-template-rows: auto auto;
+  min-width: 2.2em;
+  padding: 0.18em 0.28em;
+  color: inherit;
+  font-size: 1.25em;
+  font-style: normal;
+  font-weight: 600;
+  line-height: 1.18;
+  text-align: center;
+  vertical-align: middle;
+}
+
+.workbook-choice-simple-fraction-numerator,
+.workbook-choice-simple-fraction-denominator {
+  display: block;
+  min-height: 1.18em;
+  padding-inline: 0.24em;
+  white-space: nowrap;
+}
+
+.workbook-choice-simple-fraction-numerator {
+  padding-bottom: 0.14em;
+  border-bottom: 2px solid currentColor;
+}
+
+.workbook-choice-simple-fraction-denominator {
+  padding-top: 0.14em;
+}
+
+.workbook-choice-simple-fraction .katex {
+  font-size: 1em;
+}
+
+.workbook-choice-simple-fraction-text {
+  font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Noto Sans KR", sans-serif;
+  font-style: normal;
+  font-weight: 600;
+}
+
 .workbook-choice-math .katex-display {
+  width: 100%;
   margin: 0;
+  overflow: visible;
 }
 
 .workbook-choice-option .workbook-choice-math .katex {
   font-size: 1.35em;
+}
+
+.workbook-choice-option .workbook-choice-math.compact .katex {
+  font-size: 1.05em;
+}
+
+.workbook-choice-option .workbook-choice-math.dense .katex {
+  font-size: 0.82em;
 }
 
 .wb-mc .workbook-choice-math .katex {
@@ -346,6 +398,14 @@
 
   .workbook-choice-option .workbook-choice-math .katex {
     font-size: 1.12em;
+  }
+
+  .workbook-choice-option .workbook-choice-math.compact .katex {
+    font-size: 0.92em;
+  }
+
+  .workbook-choice-option .workbook-choice-math.dense .katex {
+    font-size: 0.74em;
   }
 
   .workbook-choice-close {

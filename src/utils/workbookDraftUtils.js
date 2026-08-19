@@ -96,8 +96,8 @@ export const normalizeWorkbookAnalysisPayload = (rawPayload, { unitId, pageId } 
   if (payload.pageId && pageId && payload.pageId !== pageId) {
     throw new Error(`페이지 ID가 일치하지 않습니다. 기대값: ${pageId}, 입력값: ${payload.pageId}`);
   }
-  if (!Array.isArray(payload.elements) || payload.elements.length === 0) {
-    throw new Error('elements 배열에 하나 이상의 요소가 필요합니다.');
+  if (!Array.isArray(payload.elements)) {
+    throw new Error('elements 배열이 필요합니다.');
   }
   if (payload.elements.length > 200) {
     throw new Error('한 페이지에는 최대 200개의 요소만 가져올 수 있습니다.');
