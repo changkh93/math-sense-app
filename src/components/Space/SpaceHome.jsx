@@ -2,7 +2,7 @@ import { lazy, useState, useEffect, Suspense, useMemo, useRef, useCallback } fro
 import { useQueries } from '@tanstack/react-query'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { auth, googleProvider, db, functions } from '../../firebase'
-import { signInWithPopup, signInWithEmailAndPassword, signOut } from 'firebase/auth'
+import { signInWithEmailAndPassword, signOut } from 'firebase/auth'
 import { collection, addDoc, serverTimestamp, query, orderBy, onSnapshot, doc, where, getDocs, getDoc, writeBatch, increment, limit, runTransaction, Timestamp, documentId, updateDoc } from 'firebase/firestore'
 import { useClusters, useRegions, useRegion, useChapters, useChapter, useUnits, useUnit, useQuizzes } from '../../hooks/useContent'
 import { useAuth } from '../../hooks/useAuth'
@@ -41,6 +41,12 @@ import { StreakCelebrationModal, StreakToast } from './StreakCelebration'
 import { getAttendanceDockingStatus } from '../../utils/attendanceUtils'
 import { mergeSummaryWithRecentHistory } from '../../utils/learningSummaryUtils'
 import { checkWebGLSupport } from '../../utils/webglSupport'
+import {
+  consumeGoogleRedirect,
+  getGoogleAuthErrorMessage,
+  signInWithGooglePopup,
+  startGoogleRedirect,
+} from '../../utils/googleAuthFlow'
 import { hasPythonMissionSetForUnit, isMissionLabRequired, PYTHON_PROTOCOL_ENTRY_UNITS } from '../PythonWorld/pythonMissionCatalog'
 
 import soundManager from '../../utils/SoundManager'
@@ -640,6 +646,10 @@ function SpaceHome() {
   const [loginPassword, setLoginPassword] = useState('')
   const [loginLoading, setLoginLoading] = useState(false)
   const [loginError, setLoginError] = useState('')
+  const [googlePopupPending, setGooglePopupPending] = useState(false)
+  const [googlePopupSlow, setGooglePopupSlow] = useState(false)
+  const googleRedirectStartedRef = useRef(false)
+  const loginBusy = loginLoading || googlePopupPending
   const [guestInvitePanelOpen, setGuestInvitePanelOpen] = useState(false)
   const [guestInviteLink, setGuestInviteLink] = useState('')
   const [guestInviteError, setGuestInviteError] = useState('')
@@ -1565,7 +1575,7 @@ function SpaceHome() {
     return data?.isDeleted !== true && data?.accountStatus !== 'deleted' && !data?.deletedAt
   }
 
-  const routeAfterAuth = async (uid) => {
+  const routeAfterAuth = useCallback(async (uid) => {
     const parentSnap = await getDoc(doc(db, 'parents', uid))
     if (isActiveMemberDoc(parentSnap)) {
       navigate('/parent/dashboard')
@@ -1577,23 +1587,74 @@ function SpaceHome() {
     persistSignupPrompt({ reason: 'missing-membership', email: auth.currentUser?.email || '' })
     await signOut(auth)
     return false
-  }
+  }, [navigate, persistSignupPrompt])
+
+  useEffect(() => {
+    let active = true
+
+    consumeGoogleRedirect(auth)
+      .then(async ({ intent, result }) => {
+        if (!active || !intent) return
+        if (!result?.user) {
+          setLoginPanelOpen(true)
+          setLoginError('Google 로그인이 완료되지 않았습니다. 다시 시도해 주세요.')
+          return
+        }
+
+        setLoginLoading(true)
+        await routeAfterAuth(result.user.uid)
+      })
+      .catch((error) => {
+        if (!active) return
+        console.error('Google redirect login failed:', error)
+        setLoginPanelOpen(true)
+        setLoginError(getGoogleAuthErrorMessage(error))
+      })
+      .finally(() => {
+        if (active) setLoginLoading(false)
+      })
+
+    return () => {
+      active = false
+    }
+  }, [routeAfterAuth])
 
   const handleGoogleLogin = async () => {
     setLoginError('')
-    setLoginLoading(true)
+    setGooglePopupSlow(false)
+    setGooglePopupPending(true)
+    googleRedirectStartedRef.current = false
     try {
       soundManager.playClick()
-      const cred = await signInWithPopup(auth, googleProvider)
+      const cred = await signInWithGooglePopup(auth, googleProvider, {
+        onSlow: () => setGooglePopupSlow(true),
+      })
       const allowed = await routeAfterAuth(cred.user.uid)
       if (!allowed) return
     } catch (error) {
+      if (googleRedirectStartedRef.current && error?.code === 'auth/cancelled-popup-request') return
       console.error("Google login failed:", error)
-      const errorMsg = error.code === 'auth/popup-blocked'
-        ? '팝업이 차단되었습니다. 브라우저 설정에서 팝업을 허용해 주세요.'
-        : 'Google 로그인에 실패했습니다. 다시 시도해 주세요.'
-      setLoginError(errorMsg)
+      setLoginError(getGoogleAuthErrorMessage(error))
     } finally {
+      setGooglePopupPending(false)
+      setGooglePopupSlow(false)
+    }
+  }
+
+  const handleGoogleRedirectLogin = async () => {
+    setLoginError('')
+    setLoginLoading(true)
+    googleRedirectStartedRef.current = true
+    try {
+      soundManager.playClick()
+      await startGoogleRedirect(auth, googleProvider, {
+        path: `${location.pathname}${location.search}${location.hash}`,
+        purpose: 'login',
+      })
+    } catch (error) {
+      googleRedirectStartedRef.current = false
+      console.error('Google redirect login failed:', error)
+      setLoginError(getGoogleAuthErrorMessage(error))
       setLoginLoading(false)
     }
   }
@@ -3516,7 +3577,7 @@ function SpaceHome() {
                   )}
                   <button
                     type="submit"
-                    disabled={loginLoading}
+                    disabled={loginBusy}
                     className="font-tech"
                     style={{
                       border: 'none',
@@ -3525,7 +3586,7 @@ function SpaceHome() {
                       color: '#04111f',
                       padding: '0.82rem 1rem',
                       fontWeight: 900,
-                      cursor: loginLoading ? 'not-allowed' : 'pointer',
+                      cursor: loginBusy ? 'not-allowed' : 'pointer',
                       fontSize: '1rem'
                     }}
                   >
@@ -3538,7 +3599,7 @@ function SpaceHome() {
                   </div>
                   <button
                     type="button"
-                    disabled={loginLoading}
+                    disabled={loginBusy}
                     onClick={handleGoogleLogin}
                     className="font-tech"
                     style={{
@@ -3548,12 +3609,45 @@ function SpaceHome() {
                       color: 'white',
                       padding: '0.8rem 1rem',
                       fontWeight: 800,
-                      cursor: loginLoading ? 'not-allowed' : 'pointer',
+                      cursor: loginBusy ? 'not-allowed' : 'pointer',
                       fontSize: '0.98rem'
                     }}
                   >
-                    Google 계정 로그인
+                    {googlePopupPending ? 'Google 계정 선택 대기 중...' : 'Google 계정 로그인'}
                   </button>
+                  {googlePopupSlow && (
+                    <div style={{
+                      display: 'grid',
+                      gap: 8,
+                      border: '1px solid rgba(103, 232, 249, 0.32)',
+                      background: 'rgba(8, 145, 178, 0.12)',
+                      borderRadius: 10,
+                      padding: '0.78rem 0.85rem',
+                      color: '#cffafe',
+                      fontSize: '0.86rem',
+                      lineHeight: 1.5,
+                      textAlign: 'left'
+                    }}>
+                      <span>계정 선택 창이 보이지 않으면 현재 화면에서 Google 로그인으로 이동할 수 있습니다.</span>
+                      <button
+                        type="button"
+                        onClick={handleGoogleRedirectLogin}
+                        disabled={loginLoading}
+                        className="font-tech"
+                        style={{
+                          border: '1px solid rgba(103, 232, 249, 0.48)',
+                          borderRadius: 8,
+                          background: 'rgba(6, 182, 212, 0.2)',
+                          color: '#ecfeff',
+                          padding: '0.68rem 0.8rem',
+                          fontWeight: 900,
+                          cursor: loginLoading ? 'not-allowed' : 'pointer'
+                        }}
+                      >
+                        새 창 없이 Google 로그인 계속
+                      </button>
+                    </div>
+                  )}
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10, color: 'rgba(255,255,255,0.38)', fontSize: '0.8rem' }}>
                     <span style={{ flex: 1, height: 1, background: 'rgba(255,255,255,0.12)' }} />
                     <span className="font-tech">GUEST</span>
@@ -3561,7 +3655,7 @@ function SpaceHome() {
                   </div>
                   <button
                     type="button"
-                    disabled={loginLoading}
+                    disabled={loginBusy}
                     onClick={() => {
                       setGuestInvitePanelOpen((open) => !open)
                       setGuestInviteError('')
@@ -3574,7 +3668,7 @@ function SpaceHome() {
                       color: '#bbf7d0',
                       padding: '0.8rem 1rem',
                       fontWeight: 900,
-                      cursor: loginLoading ? 'not-allowed' : 'pointer',
+                      cursor: loginBusy ? 'not-allowed' : 'pointer',
                       fontSize: '0.98rem'
                     }}
                   >

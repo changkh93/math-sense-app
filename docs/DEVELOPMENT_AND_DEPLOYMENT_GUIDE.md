@@ -58,6 +58,21 @@ firebase deploy
 ```
 *   배포가 완료되면 콘솔에 `Hosting URL`이 표시됩니다.
 
+### Google 로그인 배포 전 확인
+
+`msense.me`에서는 Firebase 인증 도우미를 같은 출처로 제공해 인앱 브라우저의
+서드파티 저장소 차단을 피합니다. Google 로그인 변경을 배포하기 전에 다음 설정을
+한 번 확인해야 합니다.
+
+1. Firebase Authentication의 승인된 도메인에 `msense.me`가 등록되어 있어야 합니다.
+2. Google OAuth 웹 클라이언트의 승인된 리디렉션 URI에
+   `https://msense.me/__/auth/handler`가 등록되어 있어야 합니다.
+3. 다른 운영 도메인을 사용할 경우 빌드 환경의 `VITE_FIREBASE_AUTH_DOMAIN`을 그
+   도메인으로 지정하고 동일한 `/__/auth/handler` URI를 Google OAuth에 등록합니다.
+
+이 설정 없이 운영 `authDomain`만 변경하면 Google 화면에서
+`redirect_uri_mismatch`가 발생할 수 있습니다.
+
 ## 4. Git 작업 흐름 (Workflow)
 
 코드를 수정할 때마다 버전 관리를 위해 Git을 사용합니다.

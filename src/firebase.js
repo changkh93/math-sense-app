@@ -10,9 +10,17 @@ import {
 import { getStorage } from "firebase/storage";
 import { connectFunctionsEmulator, getFunctions } from "firebase/functions";
 
+const defaultAuthDomain = "math-sense-1f6a8.firebaseapp.com";
+const browserAuthDomain = typeof window !== "undefined" && window.location.hostname === "msense.me"
+  ? window.location.hostname
+  : defaultAuthDomain;
+
 const firebaseConfig = {
   apiKey: "AIzaSyAn1TdeM6XArdnf82bOk1BTQMIfkh7kXvQ",
-  authDomain: "math-sense-1f6a8.firebaseapp.com",
+  // Keep the auth helper on the same origin in production. Embedded browsers
+  // commonly block the cross-origin storage used by Firebase popup/redirect
+  // helpers when this remains on *.firebaseapp.com.
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || browserAuthDomain,
   databaseURL: "https://math-sense-1f6a8-default-rtdb.asia-southeast1.firebasedatabase.app",
   projectId: "math-sense-1f6a8",
   storageBucket: "math-sense-1f6a8.firebasestorage.app",

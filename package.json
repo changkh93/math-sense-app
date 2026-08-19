@@ -10,6 +10,7 @@
     "lint": "eslint .",
     "test:streak": "node scripts/test-streak-utils.mjs",
     "test:pdf-url": "node scripts/test-pdf-url-utils.mjs",
+    "test:google-auth": "node scripts/test-google-auth-flow.mjs",
     "test:referral": "node scripts/test-referral-billing-core.cjs",
     "test:learning-summary": "node scripts/test-learning-summary-utils.mjs",
     "test:explorer-level": "node scripts/test-explorer-level-utils.mjs",
