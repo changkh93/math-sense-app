@@ -11,8 +11,8 @@ import { getStorage } from "firebase/storage";
 import { connectFunctionsEmulator, getFunctions } from "firebase/functions";
 
 const defaultAuthDomain = "math-sense-1f6a8.firebaseapp.com";
-const browserAuthDomain = typeof window !== "undefined" && window.location.hostname === "msense.me"
-  ? window.location.hostname
+const browserAuthDomain = typeof window !== "undefined" && (window.location.hostname === "msense.me" || window.location.hostname === "www.msense.me" || window.location.hostname.endsWith(".msense.me"))
+  ? "msense.me"
   : defaultAuthDomain;
 
 const firebaseConfig = {
