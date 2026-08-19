@@ -518,9 +518,10 @@
 
 .public-profile-bookshelf-title-row h2 {
   margin: 0;
-  font-family: Georgia, 'Times New Roman', serif;
-  font-size: 1.08rem;
-  letter-spacing: 0.02em;
+  font-family: inherit;
+  font-size: 1rem;
+  font-weight: 800;
+  letter-spacing: -0.015em;
 }
 
 .public-profile-bookshelf-heading p {
@@ -598,7 +599,7 @@
 .public-profile-bookshelf-summary .is-preview {
   border-color: rgba(217, 179, 103, 0.2);
   color: rgba(248, 223, 159, 0.72);
-  font-family: Georgia, 'Times New Roman', serif;
+  font-family: inherit;
 }
 
 .public-profile-bookshelf-summary i {
@@ -644,7 +645,7 @@
   gap: 0.4rem;
   transform: translateX(-50%);
   color: rgba(248, 223, 159, 0.68);
-  font-family: Georgia, 'Times New Roman', serif;
+  font-family: inherit;
   font-size: 0.62rem;
   font-weight: 800;
   letter-spacing: 0.14em;
@@ -711,8 +712,9 @@
   max-height: 112px;
   overflow: hidden;
   color: #fffdf7;
-  font-family: Georgia, 'Times New Roman', serif;
+  font-family: inherit;
   font-size: 0.72rem;
+  font-weight: 700;
   line-height: 1.28;
   letter-spacing: 0.04em;
   writing-mode: vertical-rl;
@@ -737,7 +739,8 @@
   bottom: 0.52rem;
   left: 0.25rem;
   color: var(--profile-book-foil);
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-family: inherit;
+  font-variant-numeric: tabular-nums;
   font-size: 0.54rem;
   font-style: normal;
   font-weight: 900;
@@ -846,7 +849,7 @@
 }
 
 .public-profile-books-dialog {
-  width: min(900px, calc(100vw - 2rem));
+  width: min(1120px, calc(100vw - 2rem));
   max-height: min(820px, calc(100vh - 2rem));
   display: grid;
   grid-template-rows: auto minmax(0, 1fr) auto;
@@ -870,7 +873,7 @@
 
 .public-profile-books-dialog-head > div > span {
   color: rgba(248, 223, 159, 0.52);
-  font-family: Georgia, 'Times New Roman', serif;
+  font-family: inherit;
   font-size: 0.64rem;
   font-weight: 800;
   letter-spacing: 0.14em;
@@ -882,8 +885,10 @@
   gap: 0.5rem;
   margin: 0.35rem 0 0;
   color: #fff8e8;
-  font-family: Georgia, 'Times New Roman', serif;
+  font-family: inherit;
   font-size: 1.3rem;
+  font-weight: 800;
+  letter-spacing: -0.015em;
 }
 
 .public-profile-books-dialog-head p {
@@ -911,79 +916,44 @@
 }
 
 .public-profile-books-dialog-list {
+  position: relative;
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 0.7rem;
+  grid-template-columns: repeat(auto-fill, 76px);
+  grid-auto-rows: 270px;
+  align-content: start;
+  align-items: end;
+  justify-content: start;
+  column-gap: 4px;
+  min-height: 290px;
   overflow-y: auto;
-  padding: 1rem 1.35rem 1.25rem;
+  padding: 0 2.2rem;
+  border-right: 1px solid rgba(217, 179, 103, 0.2);
+  border-left: 1px solid rgba(217, 179, 103, 0.2);
+  background:
+    linear-gradient(90deg, rgba(38, 21, 18, 0.5), transparent 3.5%, transparent 96.5%, rgba(38, 21, 18, 0.5)),
+    repeating-linear-gradient(
+      to bottom,
+      rgba(3, 6, 18, 0.94) 0,
+      rgba(10, 9, 20, 0.98) 248px,
+      rgba(239, 203, 133, 0.38) 248px,
+      rgba(239, 203, 133, 0.38) 250px,
+      rgba(143, 82, 34, 0.98) 250px,
+      rgba(59, 29, 20, 0.99) 266px,
+      rgba(2, 6, 23, 0.94) 270px
+    );
+  box-shadow:
+    inset 18px 0 22px rgba(0, 0, 0, 0.28),
+    inset -18px 0 22px rgba(0, 0, 0, 0.28);
   scrollbar-color: rgba(217, 179, 103, 0.42) rgba(255, 255, 255, 0.04);
 }
 
-.public-profile-books-dialog-card {
-  position: relative;
-  min-height: 112px;
-  display: grid;
-  grid-template-columns: 13px minmax(0, 1fr) auto;
-  gap: 0.75rem;
-  align-items: center;
-  overflow: hidden;
-  padding: 0.85rem 0.8rem 0.85rem 0;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 12px;
-  background: rgba(255, 255, 255, 0.045);
-}
-
-.public-profile-books-dialog-card:hover {
-  border-color: rgba(217, 179, 103, 0.28);
-  background: rgba(255, 255, 255, 0.065);
-}
-
-.public-profile-books-dialog-card-spine {
-  align-self: stretch;
-  background: linear-gradient(180deg, var(--profile-book-cover), var(--profile-book-shade));
-  border-right: 1px solid var(--profile-book-edge);
-  box-shadow: 2px 0 8px rgba(0, 0, 0, 0.3);
-}
-
-.public-profile-books-dialog-status {
-  color: #5eead4;
-  font-size: 0.68rem;
-  font-weight: 900;
-}
-
-.public-profile-books-dialog-card.is-completed .public-profile-books-dialog-status {
-  color: #fbbf24;
-}
-
-.public-profile-books-dialog-card.is-paused .public-profile-books-dialog-status {
-  color: #d8b4fe;
-}
-
-.public-profile-books-dialog-card h3 {
-  margin: 0.35rem 0 0;
-  overflow: hidden;
-  color: #fffdf7;
-  font-family: Georgia, 'Times New Roman', serif;
-  font-size: 0.94rem;
-  line-height: 1.35;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.public-profile-books-dialog-card p {
-  margin: 0.25rem 0 0;
-  overflow: hidden;
-  color: rgba(255, 255, 255, 0.5);
-  font-size: 0.72rem;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.public-profile-books-dialog-card > strong {
-  color: rgba(248, 223, 159, 0.78);
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 0.7rem;
-  white-space: nowrap;
+.public-profile-books-dialog-list > .public-profile-book-spine.is-dialog {
+  justify-self: start;
+  margin-bottom: 20px;
+  box-shadow:
+    5px 10px 15px rgba(0, 0, 0, 0.46),
+    0 0 13px color-mix(in srgb, var(--profile-book-edge) 18%, transparent),
+    inset 0 0 18px rgba(255, 255, 255, 0.035);
 }
 
 .public-profile-books-dialog-foot {
@@ -1628,9 +1598,6 @@
     margin-left: 0;
   }
 
-  .public-profile-books-dialog-list {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
 }
 
 @media (max-width: 520px) {
@@ -1650,8 +1617,8 @@
   }
 
   .public-profile-books-dialog-list {
-    grid-template-columns: 1fr;
-    padding: 0.8rem;
+    grid-template-columns: repeat(auto-fill, 72px);
+    padding: 0 1rem;
   }
 
   .public-profile-books-dialog-foot {

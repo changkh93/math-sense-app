@@ -179,6 +179,29 @@ async function fetchProfileBookshelfPage({ userId, cursor = null, pageSize = PRO
   }
 }
 
+function ProfileBookSpine({ book, variant = 'preview' }) {
+  const status = PROFILE_BOOK_STATUS_META[book.status] || PROFILE_BOOK_STATUS_META.reading;
+  const label = `${book.title}, ${book.author}, ${status.label}${book.currentPage > 0 ? `, ${book.currentPage}쪽` : ''}`;
+
+  return (
+    <motion.div
+      role="listitem"
+      className={`public-profile-book-spine is-${book.status || 'reading'} is-${variant}`}
+      style={getProfileBookStyle(book)}
+      whileHover={{ y: -12, rotate: -0.7 }}
+      aria-label={label}
+      title={label}
+    >
+      <span className="public-profile-book-spine-status" aria-hidden="true">{status.icon}</span>
+      <span className="public-profile-book-spine-band is-top" aria-hidden="true" />
+      <strong>{book.title}</strong>
+      <small>{book.author}</small>
+      {book.currentPage > 0 && <em>{book.currentPage}p</em>}
+      <span className="public-profile-book-spine-band is-bottom" aria-hidden="true" />
+    </motion.div>
+  );
+}
+
 function ProfileBookshelf({ books = [], hasMore, isOwnProfile, onOpenLibrary, onShowAll }) {
   const statusCounts = books.reduce((counts, book) => {
     const status = PROFILE_BOOK_STATUS_META[book.status] ? book.status : 'reading';
@@ -226,28 +249,9 @@ function ProfileBookshelf({ books = [], hasMore, isOwnProfile, onOpenLibrary, on
             </div>
             <div className="public-profile-bookshelf-scroll">
               <div className="public-profile-bookshelf-books" role="list" aria-label="등록한 책 목록">
-                {books.map((book) => {
-                  const status = PROFILE_BOOK_STATUS_META[book.status] || PROFILE_BOOK_STATUS_META.reading;
-                  const label = `${book.title}, ${book.author}, ${status.label}${book.currentPage > 0 ? `, ${book.currentPage}쪽` : ''}`;
-                  return (
-                    <motion.div
-                      role="listitem"
-                      key={book.id || `${book.title}-${book.author}`}
-                      className={`public-profile-book-spine is-${book.status || 'reading'}`}
-                      style={getProfileBookStyle(book)}
-                      whileHover={{ y: -12, rotate: -0.7 }}
-                      aria-label={label}
-                      title={label}
-                    >
-                      <span className="public-profile-book-spine-status" aria-hidden="true">{status.icon}</span>
-                      <span className="public-profile-book-spine-band is-top" aria-hidden="true" />
-                      <strong>{book.title}</strong>
-                      <small>{book.author}</small>
-                      {book.currentPage > 0 && <em>{book.currentPage}p</em>}
-                      <span className="public-profile-book-spine-band is-bottom" aria-hidden="true" />
-                    </motion.div>
-                  );
-                })}
+                {books.map((book) => (
+                  <ProfileBookSpine key={book.id || `${book.title}-${book.author}`} book={book} />
+                ))}
               </div>
             </div>
             <div className="public-profile-bookshelf-shelf" aria-hidden="true" />
@@ -299,20 +303,13 @@ function PublicBookshelfDialog({ books, hasMore, isLoadingMore, onLoadMore, onCl
         </div>
 
         <div className="public-profile-books-dialog-list" role="list" aria-label="전체 등록 도서">
-          {books.map((book) => {
-            const status = PROFILE_BOOK_STATUS_META[book.status] || PROFILE_BOOK_STATUS_META.reading;
-            return (
-              <article key={book.id || `${book.title}-${book.author}`} role="listitem" className={`public-profile-books-dialog-card is-${book.status}`}>
-                <span className="public-profile-books-dialog-card-spine" style={getProfileBookStyle(book)} aria-hidden="true" />
-                <div>
-                  <span className="public-profile-books-dialog-status">{status.icon} {status.shortLabel}</span>
-                  <h3>{book.title}</h3>
-                  <p>{book.author}</p>
-                </div>
-                <strong>{book.currentPage > 0 ? `${book.currentPage}쪽` : '첫 기록 전'}</strong>
-              </article>
-            );
-          })}
+          {books.map((book) => (
+            <ProfileBookSpine
+              key={book.id || `${book.title}-${book.author}`}
+              book={book}
+              variant="dialog"
+            />
+          ))}
         </div>
 
         <div className="public-profile-books-dialog-foot">
