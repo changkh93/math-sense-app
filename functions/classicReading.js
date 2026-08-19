@@ -2,6 +2,8 @@ const policy = require("./classicReadingPolicy");
 
 const SUBMISSION_LOOKBACK_DAYS = 7;
 const COMMAND_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
+const PUBLIC_BOOKSHELF_PREVIEW_SIZE = 12;
+const PUBLIC_BOOKSHELF_MAX_PAGE_SIZE = 24;
 
 module.exports = function ({ functions, admin, costOptimizedDataFunctions, requireAuthUid, requireAdminUid, recordCrystalTransaction }) {
   const db = admin.firestore();
@@ -97,6 +99,79 @@ module.exports = function ({ functions, admin, costOptimizedDataFunctions, requi
   function isWesternClassicCluster(clusterId) {
     return ["western-classic", "서양고전", "서양고전읽기", "classic", "classics"].includes(clusterId);
   }
+
+  /**
+   * Public-profile bookshelf projection.
+   *
+   * The source readingBooks documents remain private. This callable returns
+   * only the small, presentation-safe subset used by an enabled public
+   * profile; reading logs, notes, assignment text and lifecycle timestamps
+   * never leave the server through this endpoint.
+   */
+  const getPublicReadingBookshelf = costOptimizedDataFunctions.https.onCall(async (data, context) => {
+    const requesterUid = await requireAuthUid(context);
+    const targetUserId = String(data?.userId || "").trim();
+    const requestedLimit = Number(data?.limit || PUBLIC_BOOKSHELF_PREVIEW_SIZE);
+    const pageSize = Number.isInteger(requestedLimit)
+      ? Math.min(PUBLIC_BOOKSHELF_MAX_PAGE_SIZE, Math.max(1, requestedLimit))
+      : PUBLIC_BOOKSHELF_PREVIEW_SIZE;
+    const cursorCreatedAtMs = Number(data?.cursor?.createdAtMs || 0);
+    const cursorBookId = String(data?.cursor?.bookId || "").trim();
+
+    if (!targetUserId || targetUserId.length > 160 || targetUserId.includes("/")) {
+      throw new functions.https.HttpsError("invalid-argument", "프로필 사용자 정보가 올바르지 않습니다.");
+    }
+
+    const profileSnap = await db.collection("users").doc(targetUserId).get();
+    if (!profileSnap.exists) {
+      throw new functions.https.HttpsError("not-found", "프로필을 찾을 수 없습니다.");
+    }
+
+    const profile = profileSnap.data() || {};
+    const isOwner = requesterUid === targetUserId;
+    if (!isOwner && profile.publicProfileEnabled === false) {
+      throw new functions.https.HttpsError("permission-denied", "공개 설정이 꺼진 프로필입니다.");
+    }
+
+    let booksQuery = db.collection("readingBooks")
+      .where("userId", "==", targetUserId)
+      .where("archivedAt", "==", null)
+      .orderBy("createdAt", "desc")
+      .orderBy(admin.firestore.FieldPath.documentId(), "desc");
+
+    if (cursorCreatedAtMs > 0 || cursorBookId) {
+      if (!Number.isFinite(cursorCreatedAtMs) || cursorCreatedAtMs <= 0 || !cursorBookId || cursorBookId.includes("/")) {
+        throw new functions.https.HttpsError("invalid-argument", "책장 페이지 정보가 올바르지 않습니다.");
+      }
+      booksQuery = booksQuery.startAfter(Timestamp.fromMillis(cursorCreatedAtMs), cursorBookId);
+    }
+
+    const booksSnap = await booksQuery.limit(pageSize + 1).get();
+    const pageDocs = booksSnap.docs.slice(0, pageSize);
+    const hasMore = booksSnap.docs.length > pageSize;
+
+    const books = pageDocs
+      .map((bookDoc) => ({ id: bookDoc.id, ...(bookDoc.data() || {}) }))
+      .map((book) => ({
+        id: book.id,
+        title: String(book.title || "").slice(0, 200),
+        author: String(book.author || "").slice(0, 120),
+        status: Object.values(policy.BOOK_STATUSES).includes(book.status)
+          ? book.status
+          : policy.BOOK_STATUSES.READING,
+        currentPage: policy.validatePage(book.progress?.furthestPage || book.progress?.latestReadPage || 0).valid
+          ? Number(book.progress?.furthestPage || book.progress?.latestReadPage)
+          : 0,
+      }));
+
+    const lastDoc = pageDocs[pageDocs.length - 1];
+    const nextCursor = hasMore && lastDoc ? {
+      createdAtMs: lastDoc.data()?.createdAt?.toMillis?.() || 0,
+      bookId: lastDoc.id,
+    } : null;
+
+    return { books, hasMore, nextCursor };
+  });
 
   /**
    * 1. createReadingBook
@@ -972,6 +1047,7 @@ module.exports = function ({ functions, admin, costOptimizedDataFunctions, requi
   return {
     rebuildReadingBookProgress,
     functions: {
+      getPublicReadingBookshelf,
       createReadingBook,
       updateReadingBookStatus,
       updateReadingBookDetails,

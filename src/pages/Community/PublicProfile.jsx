@@ -1,9 +1,10 @@
 import React from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { ArrowLeft, Award, CalendarDays, Flame, Map as MapIcon, MessageCircle, PenLine, Shield, Sparkles, Star, Trophy, TrendingUp, Zap } from 'lucide-react';
-import { collection, doc, getDoc, getDocs, limit, query, where } from 'firebase/firestore';
-import { db } from '../../firebase';
+import { ArrowLeft, Award, BookOpen, CalendarDays, ChevronRight, Flame, LibraryBig, LoaderCircle, Map as MapIcon, MessageCircle, PenLine, Shield, Sparkles, Star, Trophy, TrendingUp, X, Zap } from 'lucide-react';
+import { collection, doc, documentId, getDoc, getDocs, limit, orderBy, query, startAfter, Timestamp, where } from 'firebase/firestore';
+import { httpsCallable } from 'firebase/functions';
+import { db, functions } from '../../firebase';
 import { useAuth } from '../../hooks/useAuth';
 import SpaceNavbar from '../../components/Space/SpaceNavbar';
 import StarField from '../../components/Space/StarField';
@@ -33,6 +34,26 @@ const CONCEPT_STATUS_META = {
   refining: { label: '재정제 필요', icon: '🔧', tone: '#f59e0b' },
   learning: { label: '학습 중', icon: '🛰️', tone: '#38bdf8' },
 };
+
+const PROFILE_BOOK_STATUS_META = {
+  reading: { label: '읽고 있어요', shortLabel: '읽는 중', icon: '✦' },
+  completed: { label: '완독했어요', shortLabel: '완독', icon: '★' },
+  paused: { label: '읽기 중단 중입니다', shortLabel: '잠시 멈춤', icon: 'Ⅱ' },
+};
+
+const PROFILE_BOOK_PALETTES = [
+  { cover: '#7f1d35', shade: '#3f0718', edge: '#fda4af', foil: '#fde68a' },
+  { cover: '#1e3a8a', shade: '#0f172a', edge: '#93c5fd', foil: '#dbeafe' },
+  { cover: '#065f46', shade: '#022c22', edge: '#6ee7b7', foil: '#fef3c7' },
+  { cover: '#92400e', shade: '#451a03', edge: '#fcd34d', foil: '#fef3c7' },
+  { cover: '#6b21a8', shade: '#2e1065', edge: '#d8b4fe', foil: '#fef3c7' },
+  { cover: '#115e59', shade: '#042f2e', edge: '#5eead4', foil: '#ccfbf1' },
+  { cover: '#9a3412', shade: '#431407', edge: '#fdba74', foil: '#ffedd5' },
+  { cover: '#334155', shade: '#0f172a', edge: '#cbd5e1', foil: '#f8fafc' },
+];
+
+const PROFILE_BOOKSHELF_PREVIEW_SIZE = 12;
+const PROFILE_BOOKSHELF_PAGE_SIZE = 24;
 
 const KST_DATE_FORMATTER = new Intl.DateTimeFormat('en-CA', {
   timeZone: 'Asia/Seoul',
@@ -85,6 +106,230 @@ function getTimeMs(value) {
   if (value?.seconds) return value.seconds * 1000;
   const parsed = new Date(value).getTime();
   return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function getProfileBookStyle(book = {}) {
+  const seed = String(book.id || `${book.title}-${book.author}` || 'classic');
+  let hash = 0;
+  for (let index = 0; index < seed.length; index += 1) {
+    hash = ((hash << 5) - hash + seed.charCodeAt(index)) | 0;
+  }
+  const palette = PROFILE_BOOK_PALETTES[Math.abs(hash) % PROFILE_BOOK_PALETTES.length];
+  const titleLength = Array.from(String(book.title || '')).length;
+  return {
+    '--profile-book-cover': palette.cover,
+    '--profile-book-shade': palette.shade,
+    '--profile-book-edge': palette.edge,
+    '--profile-book-foil': palette.foil,
+    '--profile-book-width': `${54 + (Math.abs(hash) % 4) * 5}px`,
+    '--profile-book-height': `${190 + (titleLength % 5) * 8}px`,
+  };
+}
+
+function normalizeProfileBook(book = {}, id = '') {
+  const rawPage = Number(book.currentPage || book.progress?.furthestPage || book.progress?.latestReadPage || 0);
+  return {
+    id: id || book.id,
+    title: String(book.title || '').slice(0, 200),
+    author: String(book.author || '').slice(0, 120),
+    status: PROFILE_BOOK_STATUS_META[book.status] ? book.status : 'reading',
+    currentPage: Number.isInteger(rawPage) && rawPage > 0 && rawPage <= 99999 ? rawPage : 0,
+  };
+}
+
+async function fetchProfileBookshelfPage({ userId, cursor = null, pageSize = PROFILE_BOOKSHELF_PREVIEW_SIZE, allowOwnerFallback = false }) {
+  try {
+    const getPublicReadingBookshelf = httpsCallable(functions, 'getPublicReadingBookshelf');
+    const response = await getPublicReadingBookshelf({ userId, cursor, limit: pageSize });
+    return {
+      books: Array.isArray(response.data?.books) ? response.data.books.map((book) => normalizeProfileBook(book)) : [],
+      hasMore: response.data?.hasMore === true,
+      nextCursor: response.data?.nextCursor || null,
+    };
+  } catch (error) {
+    if (!allowOwnerFallback) throw error;
+
+    // Owner-only transitional fallback for client-first deployments. It uses
+    // the same bounded index/cursor strategy, so a callable outage cannot
+    // accidentally turn a profile visit into an unbounded collection read.
+    const fallbackConstraints = [
+      where('userId', '==', userId),
+      where('archivedAt', '==', null),
+      orderBy('createdAt', 'desc'),
+      orderBy(documentId(), 'desc'),
+    ];
+    if (cursor?.createdAtMs && cursor?.bookId) {
+      fallbackConstraints.push(startAfter(Timestamp.fromMillis(Number(cursor.createdAtMs)), cursor.bookId));
+    }
+    fallbackConstraints.push(limit(pageSize + 1));
+
+    const booksSnap = await getDocs(query(collection(db, 'readingBooks'), ...fallbackConstraints));
+    const pageDocs = booksSnap.docs.slice(0, pageSize);
+    const page = pageDocs.map((bookDoc) => ({ id: bookDoc.id, ...bookDoc.data() }));
+    const lastBookDoc = pageDocs[pageDocs.length - 1];
+    const hasMore = booksSnap.docs.length > pageSize;
+    return {
+      books: page.map((book) => normalizeProfileBook(book)),
+      hasMore,
+      nextCursor: hasMore && lastBookDoc ? {
+        createdAtMs: getTimeMs(lastBookDoc.data()?.createdAt),
+        bookId: lastBookDoc.id,
+      } : null,
+    };
+  }
+}
+
+function ProfileBookshelf({ books = [], hasMore, isOwnProfile, onOpenLibrary, onShowAll }) {
+  const statusCounts = books.reduce((counts, book) => {
+    const status = PROFILE_BOOK_STATUS_META[book.status] ? book.status : 'reading';
+    counts[status] += 1;
+    return counts;
+  }, { reading: 0, completed: 0, paused: 0 });
+
+  return (
+    <section className="public-profile-panel public-profile-bookshelf">
+      <div className="public-profile-bookshelf-heading">
+        <div>
+          <div className="public-profile-bookshelf-title-row">
+            <LibraryBig size={19} />
+            <h2>개인 독서 아카이브</h2>
+            <span className="public-profile-section-count">{hasMore ? `${books.length}+` : books.length}</span>
+          </div>
+          <p>가장 최근에 등록한 책부터 보여주는 나만의 서가입니다.</p>
+        </div>
+        <div className="public-profile-bookshelf-actions">
+          {(hasMore || books.length > 0) && (
+            <button type="button" className="public-profile-bookshelf-open" onClick={onShowAll}>
+              전체 책 보기 <ChevronRight size={16} />
+            </button>
+          )}
+          {isOwnProfile && (
+            <button type="button" className="public-profile-bookshelf-open is-secondary" onClick={onOpenLibrary}>
+              책장 관리
+            </button>
+          )}
+        </div>
+      </div>
+
+      {books.length > 0 ? (
+        <>
+          <div className="public-profile-bookshelf-summary" aria-label="최근 등록 도서 상태 요약">
+            <span className="is-preview">최근 {books.length}권 중</span>
+            <span className="is-reading"><i /> 읽는 중 <strong>{statusCounts.reading}</strong></span>
+            <span className="is-completed"><i /> 완독 <strong>{statusCounts.completed}</strong></span>
+            <span className="is-paused"><i /> 잠시 멈춤 <strong>{statusCounts.paused}</strong></span>
+          </div>
+
+          <div className="public-profile-bookshelf-cabinet">
+            <div className="public-profile-bookshelf-plaque">
+              <BookOpen size={14} /> THE PERSONAL ARCHIVE
+            </div>
+            <div className="public-profile-bookshelf-scroll">
+              <div className="public-profile-bookshelf-books" role="list" aria-label="등록한 책 목록">
+                {books.map((book) => {
+                  const status = PROFILE_BOOK_STATUS_META[book.status] || PROFILE_BOOK_STATUS_META.reading;
+                  const label = `${book.title}, ${book.author}, ${status.label}${book.currentPage > 0 ? `, ${book.currentPage}쪽` : ''}`;
+                  return (
+                    <motion.div
+                      role="listitem"
+                      key={book.id || `${book.title}-${book.author}`}
+                      className={`public-profile-book-spine is-${book.status || 'reading'}`}
+                      style={getProfileBookStyle(book)}
+                      whileHover={{ y: -12, rotate: -0.7 }}
+                      aria-label={label}
+                      title={label}
+                    >
+                      <span className="public-profile-book-spine-status" aria-hidden="true">{status.icon}</span>
+                      <span className="public-profile-book-spine-band is-top" aria-hidden="true" />
+                      <strong>{book.title}</strong>
+                      <small>{book.author}</small>
+                      {book.currentPage > 0 && <em>{book.currentPage}p</em>}
+                      <span className="public-profile-book-spine-band is-bottom" aria-hidden="true" />
+                    </motion.div>
+                  );
+                })}
+              </div>
+            </div>
+            <div className="public-profile-bookshelf-shelf" aria-hidden="true" />
+          </div>
+        </>
+      ) : (
+        <div className="public-profile-bookshelf-empty">
+          <span><BookOpen size={26} /></span>
+          <div>
+            <strong>첫 책을 기다리는 서가</strong>
+            <p>{isOwnProfile ? '고전 읽기에서 책을 등록하면 이곳에 멋진 책등으로 나타납니다.' : '아직 이 서가에 등록된 책이 없습니다.'}</p>
+          </div>
+          {isOwnProfile && (
+            <button type="button" onClick={onOpenLibrary}>책 등록하러 가기</button>
+          )}
+        </div>
+      )}
+    </section>
+  );
+}
+
+function PublicBookshelfDialog({ books, hasMore, isLoadingMore, onLoadMore, onClose, isOwnProfile, onOpenLibrary }) {
+  React.useEffect(() => {
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [onClose]);
+
+  return (
+    <div className="public-profile-books-dialog-backdrop" role="presentation" onMouseDown={onClose}>
+      <motion.div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="public-bookshelf-dialog-title"
+        className="public-profile-books-dialog"
+        initial={{ opacity: 0, y: 18, scale: 0.98 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        onMouseDown={(event) => event.stopPropagation()}
+      >
+        <div className="public-profile-books-dialog-head">
+          <div>
+            <span>PERSONAL READING ARCHIVE</span>
+            <h2 id="public-bookshelf-dialog-title"><LibraryBig size={20} /> 전체 책장</h2>
+            <p>최신 등록순으로 {books.length}권을 불러왔습니다.</p>
+          </div>
+          <button type="button" onClick={onClose} aria-label="전체 책장 닫기"><X size={20} /></button>
+        </div>
+
+        <div className="public-profile-books-dialog-list" role="list" aria-label="전체 등록 도서">
+          {books.map((book) => {
+            const status = PROFILE_BOOK_STATUS_META[book.status] || PROFILE_BOOK_STATUS_META.reading;
+            return (
+              <article key={book.id || `${book.title}-${book.author}`} role="listitem" className={`public-profile-books-dialog-card is-${book.status}`}>
+                <span className="public-profile-books-dialog-card-spine" style={getProfileBookStyle(book)} aria-hidden="true" />
+                <div>
+                  <span className="public-profile-books-dialog-status">{status.icon} {status.shortLabel}</span>
+                  <h3>{book.title}</h3>
+                  <p>{book.author}</p>
+                </div>
+                <strong>{book.currentPage > 0 ? `${book.currentPage}쪽` : '첫 기록 전'}</strong>
+              </article>
+            );
+          })}
+        </div>
+
+        <div className="public-profile-books-dialog-foot">
+          {hasMore ? (
+            <button type="button" onClick={onLoadMore} disabled={isLoadingMore}>
+              {isLoadingMore ? <><LoaderCircle size={17} className="is-spinning" /> 불러오는 중</> : `다음 ${PROFILE_BOOKSHELF_PAGE_SIZE}권 보기`}
+            </button>
+          ) : (
+            <span>등록된 책을 모두 확인했습니다.</span>
+          )}
+          {isOwnProfile && (
+            <button type="button" className="is-manage" onClick={onOpenLibrary}>나의 책장에서 관리</button>
+          )}
+        </div>
+      </motion.div>
+    </div>
+  );
 }
 
 function getKSTDateKey(value) {
@@ -498,6 +743,14 @@ export default function PublicProfile() {
   const [answers, setAnswers] = React.useState([]);
   const [history, setHistory] = React.useState([]);
   const [refinementSignals, setRefinementSignals] = React.useState([]);
+  const [readingBooks, setReadingBooks] = React.useState([]);
+  const [readingShelfHasMore, setReadingShelfHasMore] = React.useState(false);
+  const [readingShelfCursor, setReadingShelfCursor] = React.useState(null);
+  const [isBookshelfDialogOpen, setIsBookshelfDialogOpen] = React.useState(false);
+  const [dialogBooks, setDialogBooks] = React.useState([]);
+  const [dialogHasMore, setDialogHasMore] = React.useState(false);
+  const [dialogCursor, setDialogCursor] = React.useState(null);
+  const [isLoadingMoreBooks, setIsLoadingMoreBooks] = React.useState(false);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState('');
 
@@ -516,6 +769,9 @@ export default function PublicProfile() {
             setProfile(null);
             setAnswers([]);
             setHistory([]);
+            setReadingBooks([]);
+            setReadingShelfHasMore(false);
+            setReadingShelfCursor(null);
             setError('프로필을 찾을 수 없습니다.');
           }
           return;
@@ -525,6 +781,17 @@ export default function PublicProfile() {
         let answerItems = [];
         let historyItems = [];
         let refinementItems = [];
+        let readingShelfPage = { books: [], hasMore: false, nextCursor: null };
+
+        try {
+          readingShelfPage = await fetchProfileBookshelfPage({
+            userId: uid,
+            pageSize: PROFILE_BOOKSHELF_PREVIEW_SIZE,
+            allowOwnerFallback: user?.uid === uid,
+          });
+        } catch (bookshelfError) {
+          console.warn('공개 프로필 책장 조회 실패:', bookshelfError);
+        }
 
         try {
           const answerSnap = await getDocs(query(
@@ -572,6 +839,9 @@ export default function PublicProfile() {
           setAnswers(answerItems);
           setHistory(historyItems);
           setRefinementSignals(refinementItems);
+          setReadingBooks(readingShelfPage.books);
+          setReadingShelfHasMore(readingShelfPage.hasMore);
+          setReadingShelfCursor(readingShelfPage.nextCursor);
         }
       } catch (err) {
         console.error('Public profile load failed:', err);
@@ -581,6 +851,9 @@ export default function PublicProfile() {
           setAnswers([]);
           setHistory([]);
           setRefinementSignals([]);
+          setReadingBooks([]);
+          setReadingShelfHasMore(false);
+          setReadingShelfCursor(null);
         }
       } finally {
         if (!cancelled) setLoading(false);
@@ -640,6 +913,40 @@ export default function PublicProfile() {
   const handleSendMemo = () => {
     if (!uid || isOwnProfile) return;
     window.dispatchEvent(new CustomEvent('directmemo:compose', { detail: { uid } }));
+  };
+
+  const handleOpenReadingLibrary = () => {
+    navigate('/?view=reading_library', { state: { view: 'reading_library' } });
+  };
+
+  const handleShowAllBooks = () => {
+    setDialogBooks(readingBooks);
+    setDialogHasMore(readingShelfHasMore);
+    setDialogCursor(readingShelfCursor);
+    setIsBookshelfDialogOpen(true);
+  };
+
+  const handleLoadMoreBooks = async () => {
+    if (!uid || !dialogHasMore || !dialogCursor || isLoadingMoreBooks) return;
+    setIsLoadingMoreBooks(true);
+    try {
+      const nextPage = await fetchProfileBookshelfPage({
+        userId: uid,
+        cursor: dialogCursor,
+        pageSize: PROFILE_BOOKSHELF_PAGE_SIZE,
+        allowOwnerFallback: isOwnProfile,
+      });
+      setDialogBooks((current) => {
+        const knownIds = new Set(current.map((book) => book.id));
+        return [...current, ...nextPage.books.filter((book) => !knownIds.has(book.id))];
+      });
+      setDialogHasMore(nextPage.hasMore);
+      setDialogCursor(nextPage.nextCursor);
+    } catch (loadError) {
+      console.warn('공개 프로필 전체 책장 추가 조회 실패:', loadError);
+    } finally {
+      setIsLoadingMoreBooks(false);
+    }
   };
 
   return (
@@ -789,6 +1096,16 @@ export default function PublicProfile() {
               </div>
 
             </section>
+
+            {(isOwnProfile || readingBooks.length > 0) && (
+              <ProfileBookshelf
+                books={readingBooks}
+                hasMore={readingShelfHasMore}
+                isOwnProfile={isOwnProfile}
+                onOpenLibrary={handleOpenReadingLibrary}
+                onShowAll={handleShowAllBooks}
+              />
+            )}
 
             <section className="public-profile-panel public-profile-learning-stats">
               <h2>
@@ -948,6 +1265,18 @@ export default function PublicProfile() {
                   기지 꾸미기
                 </button>
               </div>
+            )}
+
+            {isBookshelfDialogOpen && (
+              <PublicBookshelfDialog
+                books={dialogBooks}
+                hasMore={dialogHasMore}
+                isLoadingMore={isLoadingMoreBooks}
+                isOwnProfile={isOwnProfile}
+                onLoadMore={handleLoadMoreBooks}
+                onOpenLibrary={handleOpenReadingLibrary}
+                onClose={() => setIsBookshelfDialogOpen(false)}
+              />
             )}
           </>
         ) : null}
