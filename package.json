@@ -42,7 +42,9 @@
     "video:render:remote": "remotion render video/index.jsx MetasenseRemoteShort out/metasense-remote-promo-raw.mp4 --codec=h264 --pixel-format=yuv420p",
     "video:still:remote": "remotion still video/index.jsx MetasenseRemoteShort out/metasense-remote-thumbnail.png --frame=315",
     "video:render:docu": "remotion render video/index.jsx MetasenseDocuBrandFilm out/metasense-docu-brand-film-raw.mp4 --codec=h264 --pixel-format=yuv420p",
-    "video:still:docu": "remotion still video/index.jsx MetasenseDocuBrandFilm out/metasense-docu-brand-film-still.png --frame=2250"
+    "video:still:docu": "remotion still video/index.jsx MetasenseDocuBrandFilm out/metasense-docu-brand-film-still.png --frame=2250",
+    "video:render:source-promo": "remotion render video/index.jsx MetasenseSourceBrandFilm out/metasense-source-brand-film.mp4 --codec=h264 --pixel-format=yuv420p",
+    "video:still:source-promo": "remotion still video/index.jsx MetasenseSourceBrandFilm out/metasense-source-brand-film-still.png --frame=1000"
   },
   "dependencies": {
     "@codemirror/commands": "^6.10.4",

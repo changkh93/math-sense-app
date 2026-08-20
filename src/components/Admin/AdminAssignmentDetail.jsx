@@ -25,6 +25,80 @@ const WARNING_TYPE_LABELS = {
   consecutive_missing_assignment: '연속 3회 미제출',
 };
 
+const CLASSIC_READING_RUBRIC_LABELS = {
+  bookAndPage: '책·쪽수 기록',
+  continuity: '독서 연속성',
+  quizActivity: '독서 퀴즈',
+  readingNote: '오늘 읽은 내용',
+};
+
+const CLASSIC_READING_COMPARISON_LABELS = {
+  advanced: '직전 제출보다 진행',
+  same_page: '같은 쪽 재독·재확인',
+  lower_page: '낮은 쪽수 기록(확인 필요)',
+  first_for_book: '이 책의 첫 기준점',
+  book_changed: '새 책의 첫 기준점',
+  legacy_or_missing: '비교 자료 없음',
+};
+
+const isFiniteNumber = (value) => typeof value === 'number' && Number.isFinite(value);
+
+function RubricScoreCard({ label, value, denominator = 3 }) {
+  const displayValue = ['string', 'number', 'boolean'].includes(typeof value) ? String(value) : '-';
+  return (
+    <div style={{ padding: '0.45rem 0.55rem', borderRadius: 6, background: 'rgba(255,255,255,0.04)', color: 'var(--text-muted)', fontSize: '0.75rem' }}>
+      {label}: <span style={{ color: 'var(--crystal-cyan)', fontWeight: 700 }}>{displayValue}/{denominator}</span>
+    </div>
+  );
+}
+
+function ClassicReadingRubric({ scores }) {
+  const previousPage = scores.previousSubmittedPage;
+  const currentPage = scores.currentSubmittedPage;
+  const advancedPages = scores.pagesAdvancedSincePreviousSubmission;
+  const pageComparison = isFiniteNumber(previousPage) && isFiniteNumber(currentPage)
+    ? `${previousPage}쪽 → ${currentPage}쪽${isFiniteNumber(advancedPages) && advancedPages > 0 ? ` (+${advancedPages}쪽)` : ''}`
+    : isFiniteNumber(currentPage)
+      ? `현재 ${currentPage}쪽`
+      : '유효한 쪽수 비교 자료 없음';
+  const comparisonLabel = CLASSIC_READING_COMPARISON_LABELS[scores.comparisonState]
+    || scores.comparisonState
+    || '비교 상태 미확인';
+
+  return (
+    <div style={{ gridColumn: '1 / -1', display: 'grid', gap: '0.45rem', padding: '0.65rem', borderRadius: 8, background: 'rgba(0, 212, 255, 0.05)', border: '1px solid rgba(0, 212, 255, 0.14)' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
+        <strong style={{ color: 'var(--crystal-cyan)', fontSize: '0.8rem' }}>고전 읽기 평가</strong>
+        <span style={{ color: 'var(--star-gold)', fontWeight: 800, fontSize: '0.8rem' }}>
+          총점 {isFiniteNumber(scores.total) ? scores.total : '-'}/40
+        </span>
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '0.4rem' }}>
+        {Object.entries(CLASSIC_READING_RUBRIC_LABELS).map(([key, label]) => (
+          <RubricScoreCard key={key} label={label} value={scores[key]} denominator={10} />
+        ))}
+      </div>
+      <div style={{ color: 'var(--text-muted)', fontSize: '0.75rem', lineHeight: 1.45 }}>
+        {pageComparison} · {comparisonLabel}
+      </div>
+    </div>
+  );
+}
+
+function RubricScores({ scores }) {
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '0.4rem' }}>
+      {Object.entries(scores).map(([key, value]) => {
+        if (key === 'classicReading' && value && typeof value === 'object' && !Array.isArray(value)) {
+          return <ClassicReadingRubric key={key} scores={value} />;
+        }
+
+        return <RubricScoreCard key={key} label={key} value={value} />;
+      })}
+    </div>
+  );
+}
+
 const getDefaultWarningMessage = (assignment) => {
   if (assignment?.aiFeedbackPayload?.revisionRequest) {
     return assignment.aiFeedbackPayload.revisionRequest;
@@ -614,13 +688,7 @@ export default function AdminAssignmentDetail({ assignment, onReviewed }) {
               )}
 
               {aiFeedback.rubricScores && Object.keys(aiFeedback.rubricScores).length > 0 && (
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '0.4rem' }}>
-                  {Object.entries(aiFeedback.rubricScores).map(([key, value]) => (
-                    <div key={key} style={{ padding: '0.45rem 0.55rem', borderRadius: 6, background: 'rgba(255,255,255,0.04)', color: 'var(--text-muted)', fontSize: '0.75rem' }}>
-                      {key}: <span style={{ color: 'var(--crystal-cyan)', fontWeight: 700 }}>{value}/3</span>
-                    </div>
-                  ))}
-                </div>
+                <RubricScores scores={aiFeedback.rubricScores} />
               )}
             </div>
           )}
