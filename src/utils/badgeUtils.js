@@ -17,6 +17,8 @@ import stellarWindSurferBadge from '../assets/badge/stellar_wind_surfer.png';
 import supernovaBurstBadge from '../assets/badge/supernova_burst.png';
 import eternalVoyagerBadge from '../assets/badge/eternal_voyager.png';
 
+import { getExplorerExperience, calculateExplorerLevel } from './explorerLevelUtils.js';
+
 import masterRegAdditionBadge from '../assets/badge/master_reg_addition.png';
 import masterRegMultiplicationBadge from '../assets/badge/master_reg_multiplication.png';
 import masterRegDivisionBadge from '../assets/badge/master_reg_division.png';
@@ -202,34 +204,171 @@ export function calculateCollectionBadgeStats(history = [], userData = {}) {
   };
 }
 
-export function buildSocialBadges(userData = {}) {
+export function buildAgoraBadges(userData = {}) {
   const profile = userData || {};
+  const stats = profile.agoraStats || {};
+  const readCount = (value) => {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? Math.max(0, Math.floor(parsed)) : 0;
+  };
+
+  const answeredQuestionCount = readCount(stats.answeredQuestionCount ?? 0);
+  const acceptedAnswerCount = readCount(stats.acceptedAnswerCount ?? profile.helpCount ?? 0);
+  const questionCount = readCount(stats.questionCount ?? profile.questionCount ?? 0);
+
+  const explorerExp = getExplorerExperience(profile);
+  const explorerLvl = calculateExplorerLevel(explorerExp).level;
+
   return [
+    // --- 1. 기존 아고라 배지 (3종) ---
     {
       id: 'agora_helper',
       title: '아고라 조력자',
       icon: '🤝',
-      category: 'social',
-      unlocked: (profile.helpCount || 0) >= 1,
+      category: 'agora',
+      requirements: [
+        { key: 'accepted', label: '채택 답변', current: acceptedAnswerCount, target: 1, unit: '개', completed: acceptedAnswerCount >= 1 }
+      ],
+      unlocked: acceptedAnswerCount >= 1,
       desc: '채택된 답변을 보유했습니다.'
     },
     {
       id: 'kind_solver',
       title: '친절한 해결사',
       icon: '🌟',
-      category: 'social',
-      unlocked: (profile.helpCount || 0) >= 5,
-      desc: '도움 5회 이상을 달성했습니다.'
+      category: 'agora',
+      requirements: [
+        { key: 'accepted', label: '채택 답변', current: acceptedAnswerCount, target: 5, unit: '개', completed: acceptedAnswerCount >= 5 }
+      ],
+      unlocked: acceptedAnswerCount >= 5,
+      desc: '도움 5회(채택 답변 5개) 이상을 달성했습니다.'
     },
     {
       id: 'question_pioneer',
       title: '질문 개척자',
       icon: '💬',
-      category: 'social',
-      unlocked: (profile.questionCount || 0) >= 10,
+      category: 'agora',
+      requirements: [
+        { key: 'question', label: '등록 질문', current: questionCount, target: 10, unit: '개', completed: questionCount >= 10 }
+      ],
+      unlocked: questionCount >= 10,
       desc: '질문 10개 이상을 남겼습니다.'
     },
+
+    // --- 2. 1차 출시 배지 (6종) ---
+    {
+      id: 'first_contact',
+      title: '첫 번째 교신',
+      icon: '📡',
+      category: 'agora',
+      requirements: [
+        { key: 'answer', label: '답변한 질문', current: answeredQuestionCount, target: 1, unit: '개', completed: answeredQuestionCount >= 1 }
+      ],
+      unlocked: answeredQuestionCount >= 1,
+      desc: '친구의 질문에 첫 번째 유효 답변을 남겼습니다.'
+    },
+    {
+      id: 'stellar_responder',
+      title: '별빛 응답자',
+      icon: '✨',
+      category: 'agora',
+      requirements: [
+        { key: 'answer', label: '답변한 질문', current: answeredQuestionCount, target: 10, unit: '개', completed: answeredQuestionCount >= 10 }
+      ],
+      unlocked: answeredQuestionCount >= 10,
+      desc: '10개 이상의 질문에 성실히 답변을 남겼습니다.'
+    },
+    {
+      id: 'knowledge_relay',
+      title: '지식 중계자',
+      icon: '🛰️',
+      category: 'agora',
+      requirements: [
+        { key: 'answer', label: '답변한 질문', current: answeredQuestionCount, target: 30, unit: '개', completed: answeredQuestionCount >= 30 }
+      ],
+      unlocked: answeredQuestionCount >= 30,
+      desc: '30개 이상의 질문에 지식을 나누어 준 우수 답변자입니다.'
+    },
+    {
+      id: 'trusted_guide',
+      title: '신뢰받는 길잡이',
+      icon: '🧭',
+      category: 'agora',
+      requirements: [
+        { key: 'accepted', label: '채택 답변', current: acceptedAnswerCount, target: 15, unit: '개', completed: acceptedAnswerCount >= 15 }
+      ],
+      unlocked: acceptedAnswerCount >= 15,
+      desc: '15개 이상의 답변이 친구들에게 채택된 신뢰받는 길잡이입니다.'
+    },
+    {
+      id: 'problem_solver_pilot',
+      title: '문제 해결 파일럿',
+      icon: '🚀',
+      category: 'agora',
+      requirements: [
+        { key: 'answer', label: '답변한 질문', current: answeredQuestionCount, target: 20, unit: '개', completed: answeredQuestionCount >= 20 },
+        { key: 'accepted', label: '채택 답변', current: acceptedAnswerCount, target: 5, unit: '개', completed: acceptedAnswerCount >= 5 },
+        { key: 'level', label: '탐사 등급', current: explorerLvl, target: 5, unit: 'Lv.', prefix: 'Lv.', completed: explorerLvl >= 5 }
+      ],
+      unlocked: answeredQuestionCount >= 20 && acceptedAnswerCount >= 5 && explorerLvl >= 5,
+      desc: '답변 20개 + 채택 5개 + 탐사 Lv.5를 달성한 만능 파일럿입니다.'
+    },
+    {
+      id: 'galaxy_mentor',
+      title: '은하 멘토',
+      icon: '🌌',
+      category: 'agora',
+      requirements: [
+        { key: 'answer', label: '답변한 질문', current: answeredQuestionCount, target: 50, unit: '개', completed: answeredQuestionCount >= 50 },
+        { key: 'accepted', label: '채택 답변', current: acceptedAnswerCount, target: 15, unit: '개', completed: acceptedAnswerCount >= 15 },
+        { key: 'level', label: '탐사 등급', current: explorerLvl, target: 7, unit: 'Lv.', prefix: 'Lv.', completed: explorerLvl >= 7 }
+      ],
+      unlocked: answeredQuestionCount >= 50 && acceptedAnswerCount >= 15 && explorerLvl >= 7,
+      desc: '답변 50개 + 채택 15개 + 탐사 Lv.7을 달성한 핵심 아고라 멘토입니다.'
+    },
+
+    // --- 3. 2차 전설 등급 배지 (3종) ---
+    {
+      id: 'hundred_answers_navigator',
+      title: '백답 항해사',
+      icon: '🌠',
+      category: 'agora',
+      requirements: [
+        { key: 'answer', label: '답변한 질문', current: answeredQuestionCount, target: 100, unit: '개', completed: answeredQuestionCount >= 100 }
+      ],
+      unlocked: answeredQuestionCount >= 100,
+      desc: '100개 이상의 질문에 답변을 남긴 전설의 항해사입니다.'
+    },
+    {
+      id: 'agora_sage',
+      title: '아고라 현자',
+      icon: '📜',
+      category: 'agora',
+      requirements: [
+        { key: 'accepted', label: '채택 답변', current: acceptedAnswerCount, target: 50, unit: '개', completed: acceptedAnswerCount >= 50 }
+      ],
+      unlocked: acceptedAnswerCount >= 50,
+      desc: '50개의 답변이 채택된 아고라의 위대한 현자입니다.'
+    },
+    {
+      id: 'agora_archimedes',
+      title: '아고라의 아르키메데스',
+      icon: '👑',
+      category: 'agora',
+      requirements: [
+        { key: 'answer', label: '답변한 질문', current: answeredQuestionCount, target: 100, unit: '개', completed: answeredQuestionCount >= 100 },
+        { key: 'accepted', label: '채택 답변', current: acceptedAnswerCount, target: 50, unit: '개', completed: acceptedAnswerCount >= 50 },
+        { key: 'level', label: '탐사 등급', current: explorerLvl, target: 11, unit: 'Lv.', prefix: 'Lv.', completed: explorerLvl >= 11 }
+      ],
+      unlocked: answeredQuestionCount >= 100 && acceptedAnswerCount >= 50 && explorerLvl >= 11,
+      desc: '답변 100개 + 채택 50개 + 탐사 Lv.11을 달성한 최고의 수학 현자입니다.'
+    }
   ];
+}
+
+// 레거시 호환용 alias: buildSocialBadges는 buildAgoraBadges를 호출
+export function buildSocialBadges(userData = {}) {
+  return buildAgoraBadges(userData);
 }
 
 export function buildCollectionBadges(userData = {}, history = []) {
@@ -267,7 +406,7 @@ export function buildCollectionBadges(userData = {}, history = []) {
   };
 
   const badges = [
-    ...buildSocialBadges(userData),
+    ...buildAgoraBadges(userData),
     { id: 'cosmos_initiate', title: '코스모스 입문', icon: '🌌', category: 'general', unlocked: quizStats.uniqueQuizUnits > 0, desc: '첫 번째 수학 탐사를 성공적으로 마쳤습니다.' },
     { id: 'crystal_collector', title: '광석 수집가', icon: '💎', category: 'general', unlocked: (userData?.crystals || 0) >= 500, desc: '광석을 500개 이상 모았습니다. (중급 대원)' },
     { id: 'galaxy_scholar', title: '은하 학자', icon: '📜', category: 'general', unlocked: quizStats.averageScore >= 95, desc: '평균 정답률 95% 이상을 유지 중인 엘리트 대원입니다.' },

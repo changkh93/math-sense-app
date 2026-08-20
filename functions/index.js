@@ -680,6 +680,27 @@ function getLockedBountyAmount(questionData = {}) {
     : 0;
 }
 
+function sanitizeAgoraQuizContext(value) {
+  const source = value && typeof value === "object" && !Array.isArray(value) ? value : {};
+  const text = (key, maxLength = 200) => (
+    typeof source[key] === "string" ? source[key].slice(0, maxLength) : ""
+  );
+  const wrongAnswer = ["string", "number", "boolean"].includes(typeof source.wrongAnswer)
+    ? String(source.wrongAnswer).slice(0, 1000)
+    : null;
+  const rawStartTime = Number(source.startTime);
+  return {
+    chapterId: text("chapterId"),
+    unitId: text("unitId"),
+    questionId: text("questionId"),
+    wrongAnswer,
+    quizTitle: text("quizTitle", 300),
+    transmissionTitle: text("transmissionTitle", 300),
+    videoId: text("videoId"),
+    startTime: Number.isFinite(rawStartTime) ? Math.max(0, rawStartTime) : null,
+  };
+}
+
 function makeQuizQuestionStatId(unitId, questionId) {
   return encodeURIComponent(`${unitId || "unknown"}__${questionId || "unknown"}`);
 }
@@ -5545,14 +5566,548 @@ exports.resetChildPasswordForParent = regionalFunctions.https.onCall(async (data
   }
 });
 
+// Server-authoritative Agora mutations. Direct question/answer creation and
+// deletion are closed in Firestore rules, so counters, bounty escrow, and
+// contribution credits remain atomic and tamper resistant.
+exports.createAgoraQuestion = regionalFunctions.https.onCall(async (data, context) => {
+  const userId = await requireAuthUid(context);
+  const content = typeof data?.content === "string" ? data.content.trim() : "";
+  const type = typeof data?.type === "string" ? data.type.trim().slice(0, 40) : "general";
+  const category = typeof data?.category === "string" ? data.category.trim().slice(0, 40) : "general";
+  const isPublic = Boolean(data?.isPublic);
+  const rawBountyAmount = Number(data?.bountyAmount || 0);
+  const bountyAmount = Number.isFinite(rawBountyAmount)
+    ? Math.max(0, Math.floor(rawBountyAmount))
+    : 0;
+  const drawingUrl = typeof data?.drawingUrl === "string" ? data.drawingUrl.slice(0, 2048) : null;
+  const quizId = typeof data?.quizId === "string" ? data.quizId.slice(0, 200) : null;
+  const quizContext = sanitizeAgoraQuizContext(data?.quizContext);
+
+  if (!content || content.length > 10000) {
+    throw new functions.https.HttpsError("invalid-argument", "질문 내용을 입력해주세요.");
+  }
+
+  const db = admin.firestore();
+  const banDoc = await db.collection("agoraBannedUsers").doc(userId).get();
+  if (banDoc.exists) {
+    throw new functions.https.HttpsError("permission-denied", "아고라 활동이 제한된 계정입니다.");
+  }
+
+  const userRef = db.collection("users").doc(userId);
+  const questionRef = db.collection("questions").doc();
+  const now = FieldValue.serverTimestamp();
+
+  await db.runTransaction(async (transaction) => {
+    const userSnap = await transaction.get(userRef);
+    if (!userSnap.exists) {
+      throw new functions.https.HttpsError("not-found", "사용자 정보를 찾을 수 없습니다.");
+    }
+    const userData = userSnap.data() || {};
+    const currentCrystals = Number(userData.crystals || 0);
+
+    if (bountyAmount > 0 && currentCrystals < bountyAmount) {
+      throw new functions.https.HttpsError("failed-precondition", "현상금에 필요한 광석이 부족합니다.");
+    }
+
+    const resolvedName = userData.studentName || userData.name || userData.displayName || "익명 대원";
+    const anonymousLabel = typeof data?.anonymousLabel === "string"
+      ? data.anonymousLabel.trim().slice(0, 80)
+      : "별빛을 따라온 익명의 탐험가";
+
+    const questionData = {
+      userId,
+      userName: resolvedName,
+      content,
+      type,
+      category,
+      isPublic,
+      isAnonymous: isPublic,
+      anonymousLabel,
+      anonymousLabelVersion: 2,
+      quizId,
+      quizContext: quizContext || {
+        chapterId: "",
+        unitId: "",
+        questionId: "",
+        wrongAnswer: null,
+        quizTitle: "",
+        transmissionTitle: "",
+        videoId: null,
+        startTime: null
+      },
+      drawingUrl,
+      status: "open",
+      bountyAmount,
+      bountyStatus: bountyAmount > 0 ? "locked" : "none",
+      bountyAwardedToAnswerId: null,
+      bountyLockedAt: bountyAmount > 0 ? now : null,
+      upvotes: 0,
+      upvotedBy: [],
+      answerCount: 0,
+      createdAt: now,
+      updatedAt: now
+    };
+
+    transaction.set(questionRef, questionData);
+
+    const prevQuestionCount = Number(userData.agoraStats?.questionCount ?? userData.questionCount ?? 0);
+    transaction.update(userRef, {
+      questionCount: prevQuestionCount + 1,
+      "agoraStats.questionCount": prevQuestionCount + 1,
+      crystals: currentCrystals - bountyAmount
+    });
+
+    if (bountyAmount > 0) {
+      recordCrystalTransaction(transaction, userId, `agora-bounty-lock-${questionRef.id}`, {
+        amount: -bountyAmount,
+        type: "agora_bounty_lock",
+        description: "현상금 질문 등록",
+        metadata: { questionId: questionRef.id, bountyAmount }
+      });
+    }
+  });
+
+  return { id: questionRef.id };
+});
+
+exports.deleteAgoraQuestion = regionalFunctions.https.onCall(async (data, context) => {
+  const callerUid = await requireAuthUid(context);
+  const questionId = typeof data?.questionId === "string" ? data.questionId.trim() : "";
+  if (!questionId) {
+    throw new functions.https.HttpsError("invalid-argument", "질문 ID가 올바르지 않습니다.");
+  }
+
+  const db = admin.firestore();
+  const questionRef = db.collection("questions").doc(questionId);
+
+  await db.runTransaction(async (transaction) => {
+    const questionSnap = await transaction.get(questionRef);
+    if (!questionSnap.exists) {
+      return;
+    }
+    const questionData = questionSnap.data() || {};
+    if (questionData.isDeleted) return;
+
+    const ownerUid = questionData.userId;
+    if (!ownerUid) {
+      throw new functions.https.HttpsError("failed-precondition", "질문 작성자 정보가 없습니다.");
+    }
+
+    const callerRef = db.collection("users").doc(callerUid);
+    const ownerRef = db.collection("users").doc(ownerUid);
+    const callerSnap = await transaction.get(callerRef);
+    const ownerSnap = ownerUid === callerUid ? callerSnap : await transaction.get(ownerRef);
+
+    if (ownerUid !== callerUid && callerSnap.data()?.role !== "admin") {
+      throw new functions.https.HttpsError("permission-denied", "질문 작성자만 삭제할 수 있습니다.");
+    }
+
+    const lockedBounty = getLockedBountyAmount(questionData);
+    const answerCount = Number(questionData.answerCount || 0);
+    const ownerData = ownerSnap.exists ? ownerSnap.data() || {} : {};
+    const now = FieldValue.serverTimestamp();
+
+    // All transaction reads are complete above. Firestore transactions reject
+    // any read performed after the first write.
+
+    if (answerCount > 0) {
+      // 소프트 삭제: 답변이 달린 질문은 답변자의 기여와 채택 이력을 보호하기 위해 마스킹 처리
+      transaction.set(questionRef, {
+        isDeleted: true,
+        status: "deleted",
+        content: "작성자에 의해 삭제된 질문입니다.",
+        drawingUrl: null,
+        deletedAt: now,
+        deletedBy: callerUid,
+        updatedAt: now,
+        bountyStatus: lockedBounty > 0 ? "refunded" : (questionData.bountyStatus || "none"),
+        refundedBountyAmount: lockedBounty
+      }, { merge: true });
+    } else {
+      // 물리 삭제: 답변이 없는 질문은 완전 삭제
+      transaction.delete(questionRef);
+    }
+
+    if (lockedBounty > 0 && ownerSnap.exists) {
+      transaction.update(ownerRef, {
+        crystals: Number(ownerData.crystals || 0) + lockedBounty
+      });
+
+      recordCrystalTransaction(transaction, ownerUid, `agora-bounty-delete-refund-${questionId}`, {
+        amount: lockedBounty,
+        type: "agora_bounty_refund",
+        description: "삭제된 질문의 현상금이 환불되었습니다",
+        metadata: { questionId, deletedBy: callerUid }
+      });
+    }
+  });
+
+  return { success: true };
+});
+
+exports.createAgoraAnswer = regionalFunctions.https.onCall(async (data, context) => {
+  const userId = await requireAuthUid(context);
+  const questionId = typeof data?.questionId === "string" ? data.questionId.trim() : "";
+  const content = typeof data?.content === "string" ? data.content.trim() : "";
+  const parentAnswerId = typeof data?.parentAnswerId === "string" && data.parentAnswerId.trim() ? data.parentAnswerId.trim() : null;
+  const isReply = Boolean(parentAnswerId);
+
+  if (!questionId || !content || content.length > 10000) {
+    throw new functions.https.HttpsError("invalid-argument", "답변 내용을 입력해주세요.");
+  }
+
+  const db = admin.firestore();
+  const banDoc = await db.collection("agoraBannedUsers").doc(userId).get();
+  if (banDoc.exists) {
+    throw new functions.https.HttpsError("permission-denied", "아고라 활동이 제한된 계정입니다.");
+  }
+
+  const questionRef = db.collection("questions").doc(questionId);
+  const answerRef = db.collection("answers").doc();
+  const userRef = db.collection("users").doc(userId);
+  const creditRef = db.collection("users").doc(userId).collection("agoraAnswerCredits").doc(questionId);
+  const now = FieldValue.serverTimestamp();
+
+  await db.runTransaction(async (transaction) => {
+    const questionSnap = await transaction.get(questionRef);
+    const userSnap = await transaction.get(userRef);
+    if (!questionSnap.exists) {
+      throw new functions.https.HttpsError("not-found", "질문을 찾을 수 없습니다.");
+    }
+    if (!userSnap.exists) {
+      throw new functions.https.HttpsError("not-found", "사용자 정보를 찾을 수 없습니다.");
+    }
+    const questionData = questionSnap.data() || {};
+    if (questionData.isDeleted || ["deleted", "resolved"].includes(questionData.status)) {
+      throw new functions.https.HttpsError("failed-precondition", "종료되거나 삭제된 질문에는 답변을 작성할 수 없습니다.");
+    }
+
+    let parentAnswerData = null;
+    if (isReply) {
+      const parentAnswerRef = db.collection("answers").doc(parentAnswerId);
+      const parentSnap = await transaction.get(parentAnswerRef);
+      if (!parentSnap.exists) {
+        throw new functions.https.HttpsError("not-found", "원본 답변을 찾을 수 없습니다.");
+      }
+      parentAnswerData = parentSnap.data() || {};
+      if (parentAnswerData.questionId !== questionId) {
+        throw new functions.https.HttpsError("failed-precondition", "질문과 답변 정보가 일치하지 않습니다.");
+      }
+      if (parentAnswerData.parentAnswerId) {
+        throw new functions.https.HttpsError("failed-precondition", "답글에는 다시 답글을 달 수 없습니다.");
+      }
+    }
+
+    const userData = userSnap.data() || {};
+    // Never trust the client-provided isTeacher flag. It controls visual authority
+    // and whether an answer is eligible for Agora contribution credit.
+    const isTeacher = userData.role === "admin" || userData.role === "teacher";
+    const isCreditEligible = !isReply && !isTeacher && questionData.userId !== userId;
+    const creditSnap = isCreditEligible ? await transaction.get(creditRef) : null;
+    const resolvedName = userData.studentName || userData.name || userData.displayName || "익명 학생";
+
+    // All reads are complete before any transaction write.
+    const answerData = {
+      questionId,
+      userId,
+      userName: resolvedName,
+      isTeacher,
+      content,
+      isAccepted: false,
+      agoraCreditEligible: isCreditEligible,
+      publicProfileSnapshot: buildAnswerProfileSnapshotForUser(userData),
+      createdAt: now,
+      updatedAt: now
+    };
+
+    if (isReply) {
+      answerData.parentAnswerId = parentAnswerId;
+      answerData.replyToUserId = parentAnswerData?.userId || null;
+      answerData.replyToUserName = parentAnswerData?.userName || "";
+    }
+
+    transaction.set(answerRef, answerData);
+
+    const questionUpdates = {
+      updatedAt: now
+    };
+    if (!isReply) {
+      questionUpdates.answerCount = Number(questionData.answerCount || 0) + 1;
+      if (isTeacher) {
+        questionUpdates.status = "answered";
+      }
+    }
+    transaction.set(questionRef, questionUpdates, { merge: true });
+
+    // 유효 답변 수 인정: 다른 사람의 질문에 작성한 최상위 답변이며 교사/관리자가 아닌 경우
+    if (isCreditEligible) {
+      if (!creditSnap.exists) {
+        transaction.set(creditRef, {
+          questionId,
+          firstAnswerId: answerRef.id,
+          answerCount: 1,
+          creditedAt: now
+        });
+        const currentAnswered = Number(userData.agoraStats?.answeredQuestionCount ?? 0);
+        transaction.update(userRef, {
+          "agoraStats.answeredQuestionCount": currentAnswered + 1
+        });
+      } else {
+        transaction.update(creditRef, {
+          answerCount: Math.max(1, Number(creditSnap.data()?.answerCount || 1)) + 1,
+          updatedAt: now
+        });
+      }
+    }
+  });
+
+  return { id: answerRef.id };
+});
+
+exports.deleteAgoraAnswer = regionalFunctions.https.onCall(async (data, context) => {
+  const callerUid = await requireAuthUid(context);
+  const requestedQuestionId = typeof data?.questionId === "string" ? data.questionId.trim() : "";
+  const answerId = typeof data?.answerId === "string" ? data.answerId.trim() : "";
+
+  if (!requestedQuestionId || !answerId) {
+    throw new functions.https.HttpsError("invalid-argument", "질문과 답변 정보가 올바르지 않습니다.");
+  }
+
+  const db = admin.firestore();
+  const answerRef = db.collection("answers").doc(answerId);
+
+  await db.runTransaction(async (transaction) => {
+    const answerSnap = await transaction.get(answerRef);
+    if (!answerSnap.exists) {
+      return;
+    }
+    const answerData = answerSnap.data() || {};
+    const ownerUid = answerData.userId;
+    const questionId = answerData.questionId;
+    if (!ownerUid || !questionId || questionId !== requestedQuestionId) {
+      throw new functions.https.HttpsError("failed-precondition", "질문과 답변 정보가 일치하지 않습니다.");
+    }
+    if (answerData.isAccepted) {
+      throw new functions.https.HttpsError("failed-precondition", "채택된 답변은 삭제할 수 없습니다.");
+    }
+
+    const callerRef = db.collection("users").doc(callerUid);
+    const ownerRef = db.collection("users").doc(ownerUid);
+    const questionRef = db.collection("questions").doc(questionId);
+    const creditRef = ownerRef.collection("agoraAnswerCredits").doc(questionId);
+    const questionSnap = !answerData.parentAnswerId ? await transaction.get(questionRef) : null;
+    const isCreditEligible = !answerData.parentAnswerId
+      && answerData.isTeacher !== true
+      && questionSnap?.data()?.userId !== ownerUid
+      && answerData.agoraCreditEligible !== false;
+    const creditSnap = isCreditEligible ? await transaction.get(creditRef) : null;
+    const callerSnap = ownerUid !== callerUid ? await transaction.get(callerRef) : null;
+    const ownerSnap = isCreditEligible && creditSnap?.exists ? await transaction.get(ownerRef) : null;
+
+    if (ownerUid !== callerUid && callerSnap?.data()?.role !== "admin") {
+      throw new functions.https.HttpsError("permission-denied", "본인 답변만 삭제할 수 있습니다.");
+    }
+
+    // 최상위 답변인 경우 질문의 answerCount 차감 및 인정 문서 확인
+    // All reads are complete before the delete below.
+    transaction.delete(answerRef);
+    if (!answerData.parentAnswerId) {
+      if (questionSnap.exists) {
+        const qData = questionSnap.data() || {};
+        const nextCount = Math.max(0, Number(qData.answerCount || 0) - 1);
+        transaction.set(questionRef, {
+          answerCount: nextCount,
+          updatedAt: FieldValue.serverTimestamp()
+        }, { merge: true });
+      }
+
+      if (creditSnap?.exists) {
+        const creditAnswerCount = Math.max(1, Number(creditSnap.data()?.answerCount || 1));
+        if (creditAnswerCount > 1) {
+          transaction.update(creditRef, {
+            answerCount: creditAnswerCount - 1,
+            updatedAt: FieldValue.serverTimestamp()
+          });
+        } else {
+          transaction.delete(creditRef);
+          if (ownerSnap?.exists) {
+            const ownerData = ownerSnap.data() || {};
+            const currentAnswered = Number(ownerData.agoraStats?.answeredQuestionCount ?? 0);
+            transaction.update(ownerRef, {
+              "agoraStats.answeredQuestionCount": Math.max(0, currentAnswered - 1)
+            });
+          }
+        }
+      }
+    }
+  });
+
+  return { success: true };
+});
+
+exports.updateAgoraQuestion = regionalFunctions.https.onCall(async (data, context) => {
+  const userId = await requireAuthUid(context);
+  const questionId = typeof data?.questionId === "string" ? data.questionId.trim() : "";
+  const content = typeof data?.content === "string" ? data.content.trim() : "";
+  const hasBountyUpdate = data?.bountyAmount !== undefined;
+  const rawBountyAmount = Number(data?.bountyAmount || 0);
+  const nextBounty = Number.isFinite(rawBountyAmount)
+    ? Math.max(0, Math.floor(rawBountyAmount))
+    : 0;
+
+  if (!questionId || !content || content.length > 10000) {
+    throw new functions.https.HttpsError("invalid-argument", "질문 정보가 올바르지 않습니다.");
+  }
+
+  const db = admin.firestore();
+  const questionRef = db.collection("questions").doc(questionId);
+  const userRef = db.collection("users").doc(userId);
+
+  await db.runTransaction(async (transaction) => {
+    const questionSnap = await transaction.get(questionRef);
+    const userSnap = hasBountyUpdate ? await transaction.get(userRef) : null;
+    if (!questionSnap.exists) {
+      throw new functions.https.HttpsError("not-found", "질문을 찾을 수 없습니다.");
+    }
+
+    const questionData = questionSnap.data() || {};
+    if (questionData.userId !== userId) {
+      throw new functions.https.HttpsError("permission-denied", "질문 작성자만 수정할 수 있습니다.");
+    }
+    if (questionData.isDeleted) {
+      throw new functions.https.HttpsError("failed-precondition", "삭제된 질문은 수정할 수 없습니다.");
+    }
+
+    if (!hasBountyUpdate) {
+      transaction.update(questionRef, { content, updatedAt: FieldValue.serverTimestamp() });
+      return;
+    }
+
+    if (!userSnap?.exists) {
+      throw new functions.https.HttpsError("not-found", "사용자 정보를 찾을 수 없습니다.");
+    }
+    const isBountyFinalized = ["awarded", "forfeited", "refunded"].includes(questionData.bountyStatus)
+      || Boolean(questionData.acceptedAnswerId);
+    if (isBountyFinalized) {
+      throw new functions.https.HttpsError("failed-precondition", "이미 정산된 현상금은 수정할 수 없습니다.");
+    }
+
+    const lockedBounty = getLockedBountyAmount(questionData);
+    const delta = nextBounty - lockedBounty;
+    const userData = userSnap.data() || {};
+    const currentCrystals = Number(userData.crystals || 0);
+    if (delta > currentCrystals) {
+      throw new functions.https.HttpsError("failed-precondition", "현상금에 필요한 광석이 부족합니다.");
+    }
+
+    const nextRevision = Math.max(0, Number(questionData.bountyRevision || 0)) + 1;
+    transaction.update(questionRef, {
+      content,
+      bountyAmount: nextBounty,
+      bountyStatus: nextBounty > 0 ? "locked" : "none",
+      bountyLockedAt: nextBounty > 0 ? FieldValue.serverTimestamp() : null,
+      bountyRevision: nextRevision,
+      updatedAt: FieldValue.serverTimestamp()
+    });
+
+    if (delta !== 0) {
+      transaction.update(userRef, { crystals: currentCrystals - delta });
+      recordCrystalTransaction(transaction, userId, `agora-bounty-update-${questionId}-${nextRevision}`, {
+        amount: -delta,
+        type: delta > 0 ? "agora_bounty_lock" : "agora_bounty_refund",
+        description: delta > 0 ? "현상금 질문 수정 (추가 잠금)" : "현상금 질문 수정 (잔액 환불)",
+        metadata: { questionId, bountyAmount: nextBounty, delta, revision: nextRevision }
+      });
+    }
+  });
+
+  return { success: true };
+});
+
+exports.selfResolveAgoraQuestion = regionalFunctions.https.onCall(async (data, context) => {
+  const userId = await requireAuthUid(context);
+  const questionId = typeof data?.questionId === "string" ? data.questionId.trim() : "";
+  const reason = typeof data?.reason === "string" ? data.reason.trim().slice(0, 100) : "self_solved";
+  if (!questionId) {
+    throw new functions.https.HttpsError("invalid-argument", "질문 ID가 올바르지 않습니다.");
+  }
+
+  const questionRef = admin.firestore().collection("questions").doc(questionId);
+  await admin.firestore().runTransaction(async (transaction) => {
+    const questionSnap = await transaction.get(questionRef);
+    if (!questionSnap.exists) {
+      throw new functions.https.HttpsError("not-found", "질문을 찾을 수 없습니다.");
+    }
+    const questionData = questionSnap.data() || {};
+    if (questionData.userId !== userId) {
+      throw new functions.https.HttpsError("permission-denied", "질문 작성자만 해결 처리할 수 있습니다.");
+    }
+    if (["resolved", "deleted"].includes(questionData.status) || questionData.isDeleted) {
+      throw new functions.https.HttpsError("failed-precondition", "이미 종료된 질문입니다.");
+    }
+    const lockedBounty = getLockedBountyAmount(questionData);
+    transaction.update(questionRef, {
+      status: "resolved",
+      resolutionType: "self",
+      resolutionReason: reason,
+      updatedAt: FieldValue.serverTimestamp(),
+      bountyStatus: lockedBounty > 0 ? "forfeited" : (questionData.bountyStatus || "none"),
+      forfeitedBountyAmount: lockedBounty,
+      refundedBountyAmount: 0
+    });
+  });
+
+  return { success: true };
+});
+
+exports.verifyAgoraAnswer = regionalFunctions.https.onCall(async (data, context) => {
+  await requireAdminUid(context);
+  const answerId = typeof data?.answerId === "string" ? data.answerId.trim() : "";
+  if (!answerId) {
+    throw new functions.https.HttpsError("invalid-argument", "답변 ID가 올바르지 않습니다.");
+  }
+
+  const db = admin.firestore();
+  const answerRef = db.collection("answers").doc(answerId);
+  await db.runTransaction(async (transaction) => {
+    const answerSnap = await transaction.get(answerRef);
+    if (!answerSnap.exists) {
+      throw new functions.https.HttpsError("not-found", "답변을 찾을 수 없습니다.");
+    }
+    const answerData = answerSnap.data() || {};
+    if (answerData.isVerified) return;
+
+    const answererUid = answerData.userId;
+    const answererRef = answererUid && answererUid !== "admin" && answerData.isTeacher !== true
+      ? db.collection("users").doc(answererUid)
+      : null;
+    const answererSnap = answererRef ? await transaction.get(answererRef) : null;
+
+    transaction.update(answerRef, {
+      isVerified: true,
+      verifiedAt: FieldValue.serverTimestamp()
+    });
+
+    if (answererRef && answererSnap?.exists) {
+      const answererData = answererSnap.data() || {};
+      transaction.update(answererRef, {
+        crystals: Number(answererData.crystals || 0) + 10,
+        ...calculateGrowthUpdates(answererData, 10)
+      });
+      recordCrystalTransaction(transaction, answererUid, `teacher-verify-${answerId}`, {
+        amount: 10,
+        type: "teacher_verify",
+        description: "교사 검증 보너스",
+        metadata: { answerId, questionId: answerData.questionId || "", source: "teacher_verify_callable" }
+      });
+    }
+  });
+
+  return { success: true };
+});
+
 /**
- * acceptAgoraAnswer
- *
- * Atomically marks an Agora answer as accepted and transfers the base reward
- * from the asker to the answerer. Any bounty was already escrowed when the
- * question was created and is paid in addition to the asker-funded base reward.
- * This must run with Admin SDK privileges because the asker cannot directly
- * update another student's user balance under Firestore security rules.
+ * Atomically accepts an Agora answer and settles its base/bounty rewards.
  */
 exports.acceptAgoraAnswer = regionalFunctions.https.onCall(async (data, context) => {
   const askerUid = await requireAuthUid(context);
@@ -5588,7 +6143,7 @@ exports.acceptAgoraAnswer = regionalFunctions.https.onCall(async (data, context)
       if (questionData.userId !== askerUid) {
         throw new functions.https.HttpsError("permission-denied", "질문 작성자만 답변을 채택할 수 있습니다.");
       }
-      if (questionData.status === "resolved") {
+      if (["resolved", "deleted"].includes(questionData.status) || questionData.isDeleted) {
         throw new functions.https.HttpsError("failed-precondition", "이미 해결된 질문입니다.");
       }
       if (answerData.questionId !== questionId) {
@@ -5597,10 +6152,13 @@ exports.acceptAgoraAnswer = regionalFunctions.https.onCall(async (data, context)
       if (answerData.isAccepted === true) {
         throw new functions.https.HttpsError("failed-precondition", "이미 채택된 답변입니다.");
       }
+      if (answerData.parentAnswerId) {
+        throw new functions.https.HttpsError("failed-precondition", "최상위 답변만 채택할 수 있습니다.");
+      }
 
       let answererRef = null;
       let answererSnap = null;
-      if (answererUid && answererUid !== askerUid && answererUid !== "admin") {
+      if (answererUid && answererUid !== askerUid && answererUid !== "admin" && answerData.isTeacher !== true) {
         answererRef = db.collection("users").doc(answererUid);
         answererSnap = await transaction.get(answererRef);
       }
@@ -5610,10 +6168,6 @@ exports.acceptAgoraAnswer = regionalFunctions.https.onCall(async (data, context)
       const askerData = askerSnap.exists ? askerSnap.data() || {} : {};
       const askerCrystals = Number(askerData.crystals || 0);
 
-      // The asker pays AGORA_ASKER_ACCEPT_COST (10), while the answerer receives
-      // AGORA_BASE_ACCEPT_REWARD (20) with system covering the 10 ore difference.
-      // Teacher/admin answers and the asker's own answer do not receive the student reward,
-      // so they do not charge the asker either.
       if (answererRef && askerCrystals < AGORA_ASKER_ACCEPT_COST) {
         throw new functions.https.HttpsError(
           "failed-precondition",
@@ -5638,11 +6192,13 @@ exports.acceptAgoraAnswer = regionalFunctions.https.onCall(async (data, context)
 
       if (answererRef) {
         const answererData = answererSnap?.exists ? answererSnap.data() || {} : {};
-        transaction.set(answererRef, {
+        const prevAccepted = Number(answererData.agoraStats?.acceptedAnswerCount ?? answererData.helpCount ?? 0);
+        transaction.update(answererRef, {
           crystals: Number(answererData.crystals || 0) + totalAnswerReward,
           helpCount: Number(answererData.helpCount || 0) + 1,
+          "agoraStats.acceptedAnswerCount": prevAccepted + 1,
           ...calculateGrowthUpdates(answererData, totalAnswerReward),
-        }, { merge: true });
+        });
 
         recordCrystalTransaction(transaction, answererUid, `answer-accepted-${questionId}`, {
           amount: AGORA_BASE_ACCEPT_REWARD,

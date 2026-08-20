@@ -22,7 +22,8 @@ export default function SpaceCollection({ userData, history }) {
     setOpenRegions((prev) => ({ ...prev, [key]: !prev[key] }));
   };
 
-  const generalBadges = badges.filter((b) => b.category === 'social' || b.category === 'general');
+  const agoraBadges = badges.filter((b) => b.category === 'agora' || b.category === 'social');
+  const generalBadges = badges.filter((b) => b.category === 'general');
   const courseMasterBadges = badges.filter((b) => b.category === 'course_master');
   const regionMasterBadges = badges.filter((b) => b.category === 'region_master');
 
@@ -82,6 +83,8 @@ export default function SpaceCollection({ userData, history }) {
             <img
               src={badge.premiumImage}
               alt={badge.title}
+              loading="lazy"
+              decoding="async"
               style={{
                 width: 'min(100%, 205px)',
                 height: 268,
@@ -215,7 +218,18 @@ export default function SpaceCollection({ userData, history }) {
         </div>
       </div>
 
-      {/* 3. 일반 & 업적 배지 Section */}
+      {/* 3. 스텔라 아고라 배지 Section */}
+      <div style={{ marginBottom: '3rem' }}>
+        <h3 style={{ color: 'var(--text-bright)', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <span>💬 스텔라 아고라 배지</span>
+          <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 400 }}>(질문·답변·채택 및 탐사 등급 달성)</span>
+        </h3>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1.2rem' }}>
+          {agoraBadges.map(renderBadgeCard)}
+        </div>
+      </div>
+
+      {/* 4. 일반 & 업적 배지 Section */}
       <div style={{ marginBottom: '3rem' }}>
         <h3 style={{ color: 'var(--text-bright)', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
           <span>🏅 일반 탐사 & 활동 배지</span>

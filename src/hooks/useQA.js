@@ -11,7 +11,6 @@ import {
   serverTimestamp,
   increment,
   getDoc,
-  deleteDoc,
   arrayUnion,
   arrayRemove,
   limit,
@@ -21,8 +20,6 @@ import {
 } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
 import { db, auth, functions } from '../firebase';
-import { recordCrystalTransaction } from '../utils/crystalLedger';
-import { calculateGrowthUpdates } from '../utils/rankingUtils';
 import {
   buildAnswerProfileSnapshot
 } from '../utils/socialUtils';
@@ -197,9 +194,6 @@ export function useQARanking() {
 // --- Q&A Mutations ---
 // Lock map to prevent concurrent upvote mutations on the same question
 const _upvoteLocks = new Map();
-const getLockedBountyAmount = (questionData = {}) =>
-  questionData?.bountyStatus === 'locked' ? Math.max(0, questionData?.bountyAmount || 0) : 0;
-
 export function useQAMutations() {
   const queryClient = useQueryClient();
 
@@ -325,69 +319,31 @@ export function useQAMutations() {
       mutationFn: async ({ questionId, content, isTeacher = false, parentAnswerId = null }) => {
         const user = auth.currentUser;
         if (!user) throw new Error('로그인이 필요합니다.');
-        const isReply = Boolean(parentAnswerId);
 
-        let parentAnswerData = null;
-        if (isReply) {
-          const parentAnswerSnap = await getDoc(doc(db, 'answers', parentAnswerId));
-          if (!parentAnswerSnap.exists()) throw new Error('원본 답변을 찾을 수 없습니다.');
+        // The callable reads the authoritative profile once. Avoid a duplicate
+        // client Firestore read; this snapshot is only for the optimistic row.
+        const resolvedName = user.displayName || '익명 학생';
+        const answererProfile = buildAnswerProfileSnapshot({}, resolvedName);
 
-          parentAnswerData = parentAnswerSnap.data();
-          if (parentAnswerData.questionId !== questionId) {
-            throw new Error('질문과 답변 정보가 일치하지 않습니다.');
-          }
-          if (parentAnswerData.parentAnswerId) {
-            throw new Error('답글에는 다시 답글을 달 수 없습니다.');
-          }
-        }
+        const createAgoraAnswer = httpsCallable(functions, 'createAgoraAnswer');
+        const res = await createAgoraAnswer({
+          questionId,
+          content,
+          parentAnswerId
+        });
 
-        // Fetch studentName from profile for correct display
-        let resolvedName = user.displayName || '익명 학생';
-        let answererProfile = buildAnswerProfileSnapshot({}, resolvedName);
-        try {
-          const userSnap = await getDoc(doc(db, 'users', user.uid));
-          if (userSnap.exists()) {
-            const ud = userSnap.data();
-            resolvedName = ud.studentName || ud.name || resolvedName;
-            answererProfile = buildAnswerProfileSnapshot(ud, resolvedName);
-          }
-        } catch (e) { /* fallback to displayName */ }
-
-        const answerData = {
+        return {
+          id: res.data.id,
           questionId,
           userId: user.uid,
           userName: resolvedName,
           isTeacher,
           content,
           isAccepted: false,
+          parentAnswerId,
           publicProfileSnapshot: answererProfile,
-          createdAt: serverTimestamp()
+          createdAt: new Date()
         };
-
-        if (isReply) {
-          answerData.parentAnswerId = parentAnswerId;
-          answerData.replyToUserId = parentAnswerData.userId || null;
-          answerData.replyToUserName = parentAnswerData.userName || '';
-        }
-
-        const answerRef = await addDoc(collection(db, 'answers'), answerData);
-
-        const updateData = isReply
-          ? {
-              updatedAt: serverTimestamp()
-            }
-          : {
-              answerCount: increment(1),
-              updatedAt: serverTimestamp()
-            };
-
-        if (!isReply && isTeacher) {
-          updateData.status = 'answered';
-        }
-
-        await updateDoc(doc(db, 'questions', questionId), updateData);
-
-        return { id: answerRef.id, ...answerData, createdAt: new Date() };
       },
       onMutate: async (newAnswer) => {
         const { questionId } = newAnswer;
@@ -448,31 +404,8 @@ export function useQAMutations() {
       mutationFn: async ({ questionId, reason }) => {
         const user = auth.currentUser;
         if (!user) throw new Error('로그인이 필요합니다.');
-
-        await runTransaction(db, async (transaction) => {
-          const questionRef = doc(db, 'questions', questionId);
-          const questionSnap = await transaction.get(questionRef);
-
-          if (!questionSnap.exists()) throw new Error('질문을 찾을 수 없습니다.');
-
-          const questionData = questionSnap.data();
-          if (questionData.userId !== user.uid) throw new Error('질문 작성자만 해결 처리를 할 수 있습니다.');
-          if (questionData.status === 'resolved') throw new Error('이미 해결된 질문입니다.');
-
-          const lockedBounty = getLockedBountyAmount(questionData);
-
-          transaction.set(questionRef, {
-            status: 'resolved',
-            resolutionType: 'self',
-            resolutionReason: reason,
-            updatedAt: serverTimestamp(),
-            bountyStatus: lockedBounty > 0
-              ? 'forfeited'
-              : (questionData.bountyStatus || 'none'),
-            forfeitedBountyAmount: lockedBounty,
-            refundedBountyAmount: 0,
-          }, { merge: true });
-        });
+        const selfResolveAgoraQuestion = httpsCallable(functions, 'selfResolveAgoraQuestion');
+        await selfResolveAgoraQuestion({ questionId, reason });
       },
       onSuccess: (_, variables) => {
         queryClient.invalidateQueries({ queryKey: ['question', variables.questionId] });
@@ -483,40 +416,8 @@ export function useQAMutations() {
     // Teacher Verification (Bonus Reward)
     verifyAnswer: useMutation({
       mutationFn: async ({ questionId, answerId }) => {
-        await runTransaction(db, async (transaction) => {
-          const answerRef = doc(db, 'answers', answerId);
-          const answerSnap = await transaction.get(answerRef);
-          if (!answerSnap.exists()) throw new Error('답변을 찾을 수 없습니다.');
-
-          const answerData = answerSnap.data() || {};
-          if (answerData.isVerified) return;
-
-          const answererUid = answerData.userId;
-          const answererRef = answererUid && answererUid !== 'admin'
-            ? doc(db, 'users', answererUid)
-            : null;
-          const answererSnap = answererRef ? await transaction.get(answererRef) : null;
-
-          transaction.set(answerRef, {
-            isVerified: true,
-            verifiedAt: serverTimestamp(),
-          }, { merge: true });
-
-          if (!answererRef || !answererSnap?.exists()) return;
-
-          const answererData = answererSnap.data() || {};
-          transaction.set(answererRef, {
-            crystals: Number(answererData.crystals || 0) + 10,
-            ...calculateGrowthUpdates(answererData, 10),
-          }, { merge: true });
-
-          recordCrystalTransaction(answererUid, {
-            amount: 10,
-            type: 'teacher_verify',
-            description: '교사 검증 보너스',
-            metadata: { questionId, answerId, source: 'teacher_verify_transaction' }
-          }, transaction, `teacher-verify-${answerId}`);
-        });
+        const verifyAgoraAnswer = httpsCallable(functions, 'verifyAgoraAnswer');
+        await verifyAgoraAnswer({ questionId, answerId });
       },
       onSuccess: (_, variables) => {
         queryClient.invalidateQueries({ queryKey: ['answers', variables.questionId] });
@@ -550,33 +451,14 @@ export function useQAMutations() {
       }
     }),
 
-    // Delete Answer / Reply (본인 작성 + 미채택만, 부모 답변인 경우 answerCount 감소)
+    // Delete Answer / Reply (본인 작성 + 미채택만, 서버 Callable로 안전하게 처리)
     deleteAnswer: useMutation({
       mutationFn: async ({ questionId, answerId }) => {
         const user = auth.currentUser;
         if (!user) throw new Error('로그인이 필요합니다.');
 
-        await runTransaction(db, async (transaction) => {
-          const answerRef = doc(db, 'answers', answerId);
-          const answerSnap = await transaction.get(answerRef);
-
-          if (!answerSnap.exists()) throw new Error('답변을 찾을 수 없습니다.');
-
-          const answerData = answerSnap.data();
-          if (answerData.userId !== user.uid) throw new Error('본인 답변만 삭제할 수 있습니다.');
-          if (answerData.isAccepted) throw new Error('채택된 답변은 삭제할 수 없습니다.');
-
-          transaction.delete(answerRef);
-
-          // 최상위 답변(답글이 아닌)인 경우에만 question.answerCount 감소
-          if (!answerData.parentAnswerId) {
-            const questionRef = doc(db, 'questions', questionId);
-            transaction.set(questionRef, {
-              answerCount: increment(-1),
-              updatedAt: serverTimestamp()
-            }, { merge: true });
-          }
-        });
+        const deleteAgoraAnswer = httpsCallable(functions, 'deleteAgoraAnswer');
+        await deleteAgoraAnswer({ questionId, answerId });
       },
       onSuccess: (_, variables) => {
         queryClient.invalidateQueries({ queryKey: ['answers', variables.questionId] });
@@ -584,41 +466,14 @@ export function useQAMutations() {
       }
     }),
 
-    // Delete Question
+    // Delete Question (서버 Callable로 안전하게 소프트/물리 삭제 분기 처리)
     deleteQuestion: useMutation({
       mutationFn: async (questionId) => {
         const user = auth.currentUser;
         if (!user) throw new Error('로그인이 필요합니다.');
 
-        await runTransaction(db, async (transaction) => {
-          const questionRef = doc(db, 'questions', questionId);
-          const userRef = doc(db, 'users', user.uid);
-          const questionSnap = await transaction.get(questionRef);
-          const userSnap = await transaction.get(userRef);
-
-          if (!questionSnap.exists()) return;
-
-          const questionData = questionSnap.data();
-          if (questionData.userId !== user.uid) throw new Error('질문 작성자만 삭제할 수 있습니다.');
-
-          const lockedBounty = getLockedBountyAmount(questionData);
-          const userData = userSnap.exists() ? userSnap.data() : {};
-
-          transaction.delete(questionRef);
-
-          if (lockedBounty > 0) {
-            transaction.set(userRef, {
-              crystals: (userData?.crystals || 0) + lockedBounty,
-            }, { merge: true });
-
-            recordCrystalTransaction(user.uid, {
-              amount: lockedBounty,
-              type: 'agora_bounty_refund',
-              description: '삭제된 질문의 현상금이 환불되었습니다',
-              metadata: { questionId }
-            }, transaction, `agora-bounty-delete-refund-${questionId}`);
-          }
-        });
+        const deleteAgoraQuestion = httpsCallable(functions, 'deleteAgoraQuestion');
+        await deleteAgoraQuestion({ questionId });
       },
       onSuccess: () => {
         queryClient.invalidateQueries({ queryKey: ['publicQuestions'] });
@@ -630,68 +485,19 @@ export function useQAMutations() {
       mutationFn: async ({ questionId, content, bountyAmount }) => {
         const user = auth.currentUser;
         if (!user) throw new Error('로그인이 필요합니다.');
-
-        // Bounty field omitted → legacy content-only update (no balance impact)
-        if (bountyAmount === undefined) {
-          await updateDoc(doc(db, 'questions', questionId), {
+        const updateAgoraQuestion = httpsCallable(functions, 'updateAgoraQuestion');
+        try {
+          await updateAgoraQuestion({
+            questionId,
             content,
-            updatedAt: serverTimestamp()
+            ...(bountyAmount === undefined ? {} : { bountyAmount })
           });
-          return;
+        } catch (error) {
+          const message = String(error?.message || '');
+          if (message.includes('광석이 부족')) throw new Error('INSUFFICIENT_BOUNTY');
+          if (message.includes('이미 정산된 현상금')) throw new Error('BOUNTY_FINALIZED');
+          throw error;
         }
-
-        const nextBounty = Math.max(0, Number(bountyAmount) || 0);
-
-        await runTransaction(db, async (transaction) => {
-          const questionRef = doc(db, 'questions', questionId);
-          const userRef = doc(db, 'users', user.uid);
-          const questionSnap = await transaction.get(questionRef);
-          const userSnap = await transaction.get(userRef);
-
-          if (!questionSnap.exists()) throw new Error('질문을 찾을 수 없습니다.');
-
-          const questionData = questionSnap.data();
-          if (questionData.userId !== user.uid) throw new Error('질문 작성자만 수정할 수 있습니다.');
-
-          // Already awarded/forfeited bounties are finalized and cannot be changed
-          const isBountyFinalized =
-            questionData.bountyStatus === 'awarded' ||
-            questionData.bountyStatus === 'forfeited' ||
-            Boolean(questionData.acceptedAnswerId);
-          if (isBountyFinalized) throw new Error('BOUNTY_FINALIZED');
-
-          const lockedBounty = getLockedBountyAmount(questionData);
-          const delta = nextBounty - lockedBounty;
-
-          const questionUpdate = {
-            content,
-            bountyAmount: nextBounty,
-            bountyStatus: nextBounty > 0 ? 'locked' : 'none',
-            bountyLockedAt: nextBounty > 0 ? serverTimestamp() : null,
-            updatedAt: serverTimestamp()
-          };
-          transaction.set(questionRef, questionUpdate, { merge: true });
-
-          if (delta === 0) return;
-
-          const userData = userSnap.exists() ? userSnap.data() : {};
-          const currentCrystals = userData?.crystals || 0;
-
-          if (delta > 0 && delta > currentCrystals) {
-            throw new Error('INSUFFICIENT_BOUNTY');
-          }
-
-          transaction.set(userRef, {
-            crystals: currentCrystals - delta
-          }, { merge: true });
-
-          recordCrystalTransaction(user.uid, {
-            amount: -delta,
-            type: delta > 0 ? 'agora_bounty_lock' : 'agora_bounty_refund',
-            description: delta > 0 ? '현상금 질문 수정 (추가 잠금)' : '현상금 질문 수정 (잔액 환불)',
-            metadata: { questionId, bountyAmount: nextBounty, delta }
-          }, transaction, `agora-bounty-update-${questionId}`);
-        });
       },
       onSuccess: (_, variables) => {
         queryClient.invalidateQueries({ queryKey: ['question', variables.questionId] });
@@ -740,7 +546,7 @@ export function useStarMessages() {
             const ud = userSnap.data();
             resolvedName = ud.studentName || ud.name || resolvedName;
           }
-        } catch (e) { /* fallback to displayName */ }
+        } catch { /* fallback to displayName */ }
 
         // Get user data for level/tier if possible
         const msgData = {

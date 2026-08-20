@@ -73,6 +73,9 @@ service cloud.firestore {
         'isGuest',
         'isDeleted',
         'accountStatus',
+        'agoraStats',
+        'helpCount',
+        'questionCount',
         'galaxyLearningLedgerVersion',
         'galaxyLearningLedgerComplete',
         'galaxyLearningBackfillCursor',
@@ -95,6 +98,9 @@ service cloud.firestore {
              (!('isDeleted' in request.resource.data) || request.resource.data.isDeleted == false) &&
              (!('accountStatus' in request.resource.data) || request.resource.data.accountStatus == 'active') &&
              !request.resource.data.keys().hasAny([
+               'agoraStats',
+               'helpCount',
+               'questionCount',
                'galaxyLearningLedgerVersion',
                'galaxyLearningLedgerComplete',
                'galaxyLearningBackfillCursor',
@@ -112,7 +118,26 @@ service cloud.firestore {
     // or pre-creation from changing a backfill result.
     function isServerManagedUserSubcollection(collectionId) {
       return collectionId == 'galaxyLearningOreEvents' ||
-             collectionId == 'galaxyOperations';
+             collectionId == 'galaxyOperations' ||
+             collectionId == 'agoraAnswerCredits';
+    }
+
+    function isValidAgoraUpvoteToggle() {
+      let oldVotes = resource.data.upvotedBy;
+      let newVotes = request.resource.data.upvotedBy;
+      let oldSet = oldVotes.toSet();
+      let newSet = newVotes.toSet();
+      return oldVotes is list &&
+             newVotes is list &&
+             request.resource.data.upvotes is int &&
+             request.resource.data.upvotes == newVotes.size() &&
+             newSet.size() == newVotes.size() &&
+             newSet.difference(oldSet).hasOnly([request.auth.uid]) &&
+             oldSet.difference(newSet).hasOnly([request.auth.uid]) &&
+             (
+               newVotes.size() == oldVotes.size() + 1 ||
+               newVotes.size() == oldVotes.size() - 1
+             );
     }
 
     function assignmentStudentWritableKeys() {
@@ -222,28 +247,39 @@ service cloud.firestore {
       allow write: if false;
     }
 
-    // Questions: Authenticated users can list/read public questions
+    // Questions: Authenticated users can list/read public questions.
+    // Creation and deletion are server-authoritative (Callable functions).
+    // Client updates are restricted strictly to author editing content, or upvotes array toggle.
     match /questions/{questionId} {
-      allow create: if isAuth() && !isAgoraBanned(request.auth.uid);
+      allow create, delete: if isAdmin();
       allow read: if isAuth();
       allow update: if isAuth() && (
-        resource.data.userId == request.auth.uid || 
         isAdmin() ||
-        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['answerCount', 'updatedAt'])
+        (
+          resource.data.userId == request.auth.uid &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['content', 'updatedAt'])
+        ) ||
+        (
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['upvotes', 'upvotedBy']) &&
+          isValidAgoraUpvoteToggle()
+        )
       );
-      allow delete: if isAuth() && (resource.data.userId == request.auth.uid || isAdmin());
     }
 
-    // Answers: Authenticated users can read
+    // Answers: Authenticated users can read.
+    // Creation and deletion are server-authoritative (Callable functions).
+    // Client updates are restricted strictly to author editing content.
     match /answers/{answerId} {
-      allow create: if isAuth();
+      allow create, delete: if isAdmin();
       allow read: if isAuth();
       allow update: if isAuth() && (
-        request.auth.uid == resource.data.userId || 
-        isAdmin() || 
-        request.auth.uid == get(/databases/$(database)/documents/questions/$(resource.data.questionId)).data.userId
+        isAdmin() ||
+        (
+          resource.data.userId == request.auth.uid &&
+          !resource.data.isAccepted &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['content', 'updatedAt'])
+        )
       );
-      allow delete: if isAuth() && (request.auth.uid == resource.data.userId || isAdmin());
     }
 
     // Agora write bans: admins manage the ban list; students can read only their own ban

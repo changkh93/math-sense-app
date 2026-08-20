@@ -4,12 +4,12 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useQueryClient } from '@tanstack/react-query';
 import { ReactSketchCanvas } from 'react-sketch-canvas'; // KEEP FOR NOW IF NEEDED ELSEWHERE OR REMOVE
 import * as htmlToImage from 'html-to-image';
-import { db, auth } from '../firebase';
-import { collection, updateDoc, doc, increment, serverTimestamp, getDoc, runTransaction } from 'firebase/firestore';
+import { db, auth, functions } from '../firebase';
+import { httpsCallable } from 'firebase/functions';
+import { doc, getDoc } from 'firebase/firestore';
 import { ImageService } from '../services/imageService';
 import AnnotationCanvas from './AnnotationCanvas';
 import { useSpeechToText } from '../hooks/useSpeechToText';
-import { recordCrystalTransaction } from '../utils/crystalLedger';
 import { AGORA_BOUNTY_OPTIONS, getAnonymousLabel } from '../utils/socialUtils';
 import './QuestionModal.css';
 
@@ -738,21 +738,10 @@ export default function QuestionModal({ isOpen, onClose, quizContext, contextDat
     try {
       const user = auth.currentUser;
       if (!user) throw new Error('로그인이 필요합니다.');
-      const userRef = doc(db, 'users', user.uid);
       const banRef = doc(db, 'agoraBannedUsers', user.uid);
 
       const banSnap = await getDoc(banRef);
       if (banSnap.exists()) throw new Error('AGORA_BANNED');
-
-      // Fetch studentName from profile for correct display
-      let resolvedName = user.displayName || '익명 학생';
-      try {
-        const userSnap = await getDoc(userRef);
-        if (userSnap.exists()) {
-          const ud = userSnap.data();
-          resolvedName = ud.studentName || ud.name || resolvedName;
-        }
-      } catch (e) { /* fallback to displayName */ }
 
       let drawingUrl = null;
 
@@ -769,17 +758,15 @@ export default function QuestionModal({ isOpen, onClose, quizContext, contextDat
       }
 
       const bountyAmount = isPublic ? selectedBounty : 0;
-      const questionRef = doc(collection(db, 'questions'));
-      const questionData = {
-        userId: user.uid,
-        userName: resolvedName,
+      const createAgoraQuestion = httpsCallable(functions, 'createAgoraQuestion');
+      await createAgoraQuestion({
         content,
         type: activeContext?.type || type,
-        category: 'general', 
+        category: 'general',
         isPublic,
-        isAnonymous: isPublic,
+        bountyAmount,
+        drawingUrl,
         anonymousLabel: getAnonymousLabel(user.uid),
-        anonymousLabelVersion: 2,
         quizId: activeContext?.quizId || null,
         quizContext: {
           chapterId: activeContext?.chapterId || '',
@@ -790,46 +777,6 @@ export default function QuestionModal({ isOpen, onClose, quizContext, contextDat
           transmissionTitle: activeContext?.transmissionTitle || '',
           videoId: activeContext?.videoId || null,
           startTime: activeContext?.startTime || null
-        },
-        drawingUrl,
-        status: 'open',
-        bountyAmount,
-        bountyStatus: bountyAmount > 0 ? 'locked' : 'none',
-        bountyAwardedToAnswerId: null,
-        bountyLockedAt: bountyAmount > 0 ? serverTimestamp() : null,
-        upvotes: 0,
-        upvotedBy: [],
-        answerCount: 0,
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp()
-      };
-
-      await runTransaction(db, async (transaction) => {
-        const userSnap = await transaction.get(userRef);
-        const freshBanSnap = await transaction.get(banRef);
-        if (!userSnap.exists()) throw new Error('USER_NOT_FOUND');
-        if (freshBanSnap.exists()) throw new Error('AGORA_BANNED');
-
-        const freshUserData = userSnap.data();
-        const currentCrystals = freshUserData?.crystals || 0;
-
-        if (bountyAmount > currentCrystals) {
-          throw new Error('INSUFFICIENT_BOUNTY');
-        }
-
-        transaction.set(questionRef, questionData);
-        transaction.set(userRef, {
-          questionCount: (freshUserData?.questionCount || 0) + 1,
-          crystals: currentCrystals - bountyAmount
-        }, { merge: true });
-
-        if (bountyAmount > 0) {
-          recordCrystalTransaction(user.uid, {
-            amount: -bountyAmount,
-            type: 'agora_bounty_lock',
-            description: '현상금 질문 등록',
-            metadata: { questionId: questionRef.id, bountyAmount }
-          }, transaction, `agora-bounty-lock-${questionRef.id}`);
         }
       });
       
@@ -852,10 +799,12 @@ export default function QuestionModal({ isOpen, onClose, quizContext, contextDat
       );
     } catch (err) {
       console.error('Error submitting question:', err);
+      const errorCode = String(err?.code || '');
+      const errorMessage = String(err?.message || '');
       setError(
-        err.message === 'AGORA_BANNED'
+        err.message === 'AGORA_BANNED' || errorCode.includes('permission-denied')
           ? '현재 아고라 게시글 작성이 제한되어 있습니다.'
-          : err.message === 'INSUFFICIENT_BOUNTY'
+          : err.message === 'INSUFFICIENT_BOUNTY' || errorMessage.includes('광석이 부족')
           ? `현상금 ${selectedBounty}광석을 걸기에는 보유 광석이 부족합니다.`
           : '질문 등록에 실패했습니다. 다시 시도해주세요.'
       );

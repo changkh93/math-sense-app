@@ -1680,6 +1680,8 @@ function BadgeShowcaseSection({ userData, history, purchasing, badgeUpgradeTarge
         <img
           src={badge.premiumImage}
           alt={badge.title}
+          loading="lazy"
+          decoding="async"
           style={{
             width: options.large ? 'min(100%, 340px)' : 'min(100%, 235px)',
             height: options.large ? 430 : 315,
@@ -1883,9 +1885,10 @@ function BadgeShowcaseSection({ userData, history, purchasing, badgeUpgradeTarge
 }
 
 function StoreChallengeAccordionSection({ challengeBadges = [] }) {
+  // Agora and General section initial state: OPEN (true)
   // Course section initial state: CLOSED (false)
-  // General section initial state: OPEN (true)
   const [openSections, setOpenSections] = React.useState({
+    'agora': true,
     'cluster_elementary': false,
     'middle-math': false,
     'python': false,
@@ -1898,6 +1901,7 @@ function StoreChallengeAccordionSection({ challengeBadges = [] }) {
   };
 
   const sections = [
+    { key: 'agora', title: '💬 스텔라 아고라 배지' },
     { key: 'cluster_elementary', title: '🏫 초등수학 성역 배지' },
     { key: 'middle-math', title: '📐 중등수학 성역 배지' },
     { key: 'python', title: '🐍 파이썬 코딩 성역 배지' },
@@ -1913,7 +1917,11 @@ function StoreChallengeAccordionSection({ challengeBadges = [] }) {
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
         {sections.map(({ key, title }) => {
-          const regionBadges = challengeBadges.filter(b => key === 'general' ? (!b.clusterId && b.category !== 'region_master') : b.clusterId === key);
+          const regionBadges = challengeBadges.filter(b => {
+            if (key === 'agora') return b.category === 'agora';
+            if (key === 'general') return !b.clusterId && b.category !== 'region_master' && b.category !== 'agora';
+            return b.clusterId === key;
+          });
           if (regionBadges.length === 0) return null;
           const isOpen = openSections[key] ?? false;
 
@@ -1953,9 +1961,8 @@ function StoreChallengeAccordionSection({ challengeBadges = [] }) {
                       style={{
                         padding: '1rem',
                         textAlign: 'center',
-                        opacity: 0.6,
-                        filter: 'grayscale(70%)',
-                        minHeight: 206,
+                        opacity: 0.8,
+                        minHeight: 220,
                         display: 'flex',
                         flexDirection: 'column',
                         alignItems: 'center',
@@ -1963,7 +1970,7 @@ function StoreChallengeAccordionSection({ challengeBadges = [] }) {
                         border: '1px solid var(--glass-border)',
                       }}
                     >
-                      <div>
+                      <div style={{ width: '100%' }}>
                         <div style={{ fontSize: '2.75rem', lineHeight: 1, marginBottom: '0.75rem' }}>{badge.icon}</div>
                         <div style={{ fontWeight: 900, color: 'var(--text-muted)', fontSize: '0.88rem' }}>
                           {badge.title}
@@ -1972,9 +1979,32 @@ function StoreChallengeAccordionSection({ challengeBadges = [] }) {
                           {badge.desc}
                         </div>
                       </div>
-                      <div style={{ marginTop: '0.9rem', fontSize: '0.72rem', color: 'var(--text-muted)' }}>
-                        🔒 조건 미달성
-                      </div>
+
+                      {badge.requirements && badge.requirements.length > 0 ? (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', width: '100%', marginTop: '0.6rem' }}>
+                          {badge.requirements.map((req, idx) => (
+                            <div key={idx} style={{
+                              fontSize: '0.72rem',
+                              padding: '3px 8px',
+                              borderRadius: '6px',
+                              background: req.completed ? 'rgba(80, 200, 120, 0.15)' : 'rgba(255, 255, 255, 0.06)',
+                              color: req.completed ? 'var(--planet-green)' : 'var(--text-muted)',
+                              display: 'flex',
+                              justifyContent: 'space-between',
+                              alignItems: 'center'
+                            }}>
+                              <span>{req.completed ? '✓ ' : ''}{req.label}</span>
+                              <span style={{ fontWeight: 700, color: req.completed ? 'var(--planet-green)' : 'var(--crystal-cyan)' }}>
+                                {req.prefix || ''}{req.current} / {req.prefix || ''}{req.target}{req.prefix ? '' : (req.unit || '')}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div style={{ marginTop: '0.9rem', fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                          🔒 조건 미달성
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -1986,4 +2016,3 @@ function StoreChallengeAccordionSection({ challengeBadges = [] }) {
     </section>
   );
 }
-

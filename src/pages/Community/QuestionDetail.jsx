@@ -4,8 +4,6 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowLeft, CheckCircle, Clock, Heart, User, Trash2, Edit3, X, Save, Sparkles, Reply, Send } from 'lucide-react';
 import { LinkPreviewList, normalizeEscapedNewlines, parseInlineFormatting } from '../../utils/formatUtils';
 import 'katex/dist/katex.min.css';
-import { db } from '../../firebase';
-import { updateDoc, doc } from 'firebase/firestore';
 import { useQuestionDetail, useQuestionAnswers, useQAMutations } from '../../hooks/useQA';
 import { AGORA_BOUNTY_OPTIONS, buildAnswerProfileSnapshot, getProfileFrame, getQuestionAnonymousLabel } from '../../utils/socialUtils';
 import { useAuth } from '../../hooks/useAuth';
@@ -139,19 +137,6 @@ export default function QuestionDetail() {
 
     setTimeout(() => setShowRewardMask(false), 4000);
   };
-
-  // --- SELF-HEALING: Sync answerCount if out of sync ---
-  React.useEffect(() => {
-    if (question && answers && !loadingQ && !loadingA) {
-      const actualCount = topLevelAnswers.length;
-      if (question.answerCount !== actualCount) {
-        console.log(`🧹 Self-healing: Syncing answerCount for question ${questionId}. Expected: ${actualCount}, Found: ${question.answerCount}`);
-        updateDoc(doc(db, 'questions', questionId), {
-          answerCount: actualCount
-        }).catch(err => console.warn('Failed self-healing sync:', err));
-      }
-    }
-  }, [question, answers, topLevelAnswers.length, loadingQ, loadingA, questionId]);
 
   const isOwner = question && sessionUser && question.userId === sessionUser.uid;
   const isResolved = question?.status === 'resolved';
