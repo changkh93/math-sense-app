@@ -1,116 +1,190 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1920 1080" width="1920" height="1080">
   <defs>
-    <linearGradient id="quantumBg" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#05081c"/>
-      <stop offset="50%" stop-color="#0b102f"/>
-      <stop offset="100%" stop-color="#040616"/>
+    <!-- Deep Space Station Gradients -->
+    <linearGradient id="quantumBgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#030514"/>
+      <stop offset="40%" stop-color="#080c29"/>
+      <stop offset="75%" stop-color="#111244"/>
+      <stop offset="100%" stop-color="#040614"/>
     </linearGradient>
-    <radialGradient id="cyberGlowL" cx="15%" cy="50%" r="45%">
-      <stop offset="0%" stop-color="#818cf8" stop-opacity="0.32"/>
-      <stop offset="60%" stop-color="#4f46e5" stop-opacity="0.12"/>
-      <stop offset="100%" stop-color="#05081c" stop-opacity="0"/>
+    <linearGradient id="neonLaserBlue" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#818cf8"/>
+      <stop offset="50%" stop-color="#38bdf8"/>
+      <stop offset="100%" stop-color="#6366f1"/>
+    </linearGradient>
+    <linearGradient id="neonLaserPink" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#ec4899"/>
+      <stop offset="50%" stop-color="#f472b6"/>
+      <stop offset="100%" stop-color="#a855f7"/>
+    </linearGradient>
+
+    <!-- Glowing Cryo-Core Gradients -->
+    <linearGradient id="cryoTubeGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#38bdf8"/>
+      <stop offset="30%" stop-color="#818cf8"/>
+      <stop offset="70%" stop-color="#ec4899"/>
+      <stop offset="100%" stop-color="#38bdf8"/>
+    </linearGradient>
+
+    <radialGradient id="cyberGlowL" cx="15%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#818cf8" stop-opacity="0.6"/>
+      <stop offset="45%" stop-color="#4f46e5" stop-opacity="0.25"/>
+      <stop offset="80%" stop-color="#030514" stop-opacity="0"/>
     </radialGradient>
-    <radialGradient id="cyberGlowR" cx="85%" cy="50%" r="45%">
-      <stop offset="0%" stop-color="#ec4899" stop-opacity="0.28"/>
-      <stop offset="60%" stop-color="#9333ea" stop-opacity="0.12"/>
-      <stop offset="100%" stop-color="#05081c" stop-opacity="0"/>
+    <radialGradient id="cyberGlowR" cx="85%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#ec4899" stop-opacity="0.55"/>
+      <stop offset="45%" stop-color="#9333ea" stop-opacity="0.25"/>
+      <stop offset="80%" stop-color="#030514" stop-opacity="0"/>
     </radialGradient>
-    <pattern id="cyberGrid" width="60" height="60" patternUnits="userSpaceOnUse">
-      <path d="M 60 0 L 0 0 0 60" fill="none" stroke="#6366f1" stroke-width="0.75" opacity="0.15"/>
+
+    <!-- Perspective Grid Pattern -->
+    <pattern id="cyberGridDense" width="40" height="40" patternUnits="userSpaceOnUse">
+      <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#6366f1" stroke-width="0.8" opacity="0.22"/>
     </pattern>
-    <filter id="glow" x="-30%" y="-30%" width="160%" height="160%">
-      <feGaussianBlur stdDeviation="6" result="blur"/>
+
+    <!-- Filters -->
+    <filter id="glowHeavy" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="12" result="blur"/>
+      <feComposite in="SourceGraphic" in2="blur" operator="over"/>
+    </filter>
+    <filter id="glowSoft" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="5" result="blur"/>
       <feComposite in="SourceGraphic" in2="blur" operator="over"/>
     </filter>
   </defs>
 
-  <!-- Background Base & Cyber Grid -->
-  <rect width="1920" height="1080" fill="url(#quantumBg)"/>
-  <rect width="1920" height="1080" fill="url(#cyberGrid)"/>
+  <!-- 1. Background Base & Cyber Grid -->
+  <rect width="1920" height="1080" fill="url(#quantumBgGrad)"/>
+  <rect width="1920" height="1080" fill="url(#cyberGridDense)"/>
   <rect width="1920" height="1080" fill="url(#cyberGlowL)"/>
   <rect width="1920" height="1080" fill="url(#cyberGlowR)"/>
 
-  <!-- Background Laser Wave Guides -->
-  <g opacity="0.3" stroke="#818cf8" stroke-width="1.5" fill="none">
-    <path d="M0,280 C480,240 960,340 1920,260"/>
-    <path d="M0,340 C480,380 960,260 1920,360" stroke="#ec4899"/>
-    <path d="M0,780 C480,820 960,740 1920,800"/>
-    <path d="M0,840 C480,760 960,860 1920,820" stroke="#a855f7"/>
+  <!-- Distant Cosmos & Starfield (Through Observation Bay) -->
+  <g opacity="0.8">
+    <ellipse cx="960" cy="220" rx="420" ry="140" fill="#4f46e5" opacity="0.18" filter="url(#glowHeavy)"/>
+    <ellipse cx="960" cy="220" rx="260" ry="90" fill="#ec4899" opacity="0.15" filter="url(#glowHeavy)"/>
+    <circle cx="780" cy="160" r="1.5" fill="#fff"/>
+    <circle cx="890" cy="110" r="2.2" fill="#c084fc"/>
+    <circle cx="1040" cy="170" r="1.8" fill="#818cf8"/>
+    <circle cx="1150" cy="120" r="1.4" fill="#fff"/>
+    <circle cx="950" cy="210" r="2" fill="#f472b6"/>
   </g>
 
-  <!-- Left Server Mainframe & Quantum Terminal Stack -->
-  <g id="leftTerminal">
-    <!-- Mainframe Pillar 1 -->
-    <rect x="80" y="160" width="120" height="780" fill="#090d28" stroke="#4f46e5" stroke-width="1.5" rx="8"/>
-    <rect x="95" y="200" width="90" height="20" fill="#1e1b4b"/>
-    <rect x="95" y="240" width="90" height="20" fill="#1e1b4b"/>
-    <rect x="95" y="280" width="90" height="20" fill="#1e1b4b"/>
-    <circle cx="110" cy="210" r="4" fill="#4ade80" filter="url(#glow)"/>
-    <circle cx="110" cy="250" r="4" fill="#818cf8" filter="url(#glow)"/>
-    <circle cx="110" cy="290" r="4" fill="#ec4899" filter="url(#glow)"/>
+  <!-- Giant Laser Optical Waveguide Beams (Top to Bottom) -->
+  <g opacity="0.55" filter="url(#glowSoft)">
+    <path d="M0,240 C480,180 960,320 1920,220" stroke="url(#neonLaserBlue)" stroke-width="3" fill="none"/>
+    <path d="M0,320 C480,380 960,240 1920,340" stroke="url(#neonLaserPink)" stroke-width="3" fill="none"/>
+    <path d="M0,740 C480,800 960,680 1920,760" stroke="url(#neonLaserBlue)" stroke-width="3.5" fill="none"/>
+    <path d="M0,820 C480,720 960,860 1920,790" stroke="url(#neonLaserPink)" stroke-width="3" fill="none"/>
+  </g>
 
-    <!-- Left HUD Matrix Interface -->
-    <g transform="translate(230, 260)" opacity="0.85" filter="url(#glow)">
-      <rect x="0" y="0" width="220" height="260" fill="rgba(15, 23, 42, 0.75)" stroke="#818cf8" stroke-width="1.5" rx="10"/>
-      <line x1="0" y1="36" x2="220" y2="36" stroke="#818cf8" stroke-width="1"/>
-      <text x="16" y="24" fill="#a5b4fc" font-family="monospace" font-size="13" font-weight="bold">QUANTUM_STATE // Q0</text>
-      <text x="16" y="70" fill="#818cf8" font-family="monospace" font-size="14">|ψ⟩ = α|0⟩ + β|1⟩</text>
-      <text x="16" y="105" fill="#c084fc" font-family="monospace" font-size="13">|α|² + |β|² = 1</text>
-      <text x="16" y="140" fill="#e0e7ff" font-family="monospace" font-size="13">H = 1/√2 [1  1]</text>
-      <text x="75" y="160" fill="#e0e7ff" font-family="monospace" font-size="13">[1 -1]</text>
-      <text x="16" y="195" fill="#34d399" font-family="monospace" font-size="13">FIDELITY: 99.98%</text>
-      <text x="16" y="230" fill="#38bdf8" font-family="monospace" font-size="13">ENTANGLED: TRUE</text>
+  <!-- 2. Left Superconducting Quantum Mainframe Tower & HUD -->
+  <g id="leftMainframe">
+    <!-- Server Pillar 1 Structure -->
+    <rect x="60" y="120" width="160" height="820" fill="#080c24" stroke="#4f46e5" stroke-width="2.5" rx="10"/>
+    <rect x="80" y="150" width="120" height="30" fill="#1e1b4b" rx="4"/>
+    <rect x="80" y="200" width="120" height="30" fill="#1e1b4b" rx="4"/>
+    <rect x="80" y="250" width="120" height="30" fill="#1e1b4b" rx="4"/>
+    <rect x="80" y="300" width="120" height="30" fill="#1e1b4b" rx="4"/>
+
+    <!-- Status Indicator LED Array -->
+    <g filter="url(#glowSoft)">
+      <circle cx="100" cy="165" r="5" fill="#4ade80"/>
+      <circle cx="120" cy="165" r="5" fill="#818cf8"/>
+      <circle cx="100" cy="215" r="5" fill="#ec4899"/>
+      <circle cx="120" cy="215" r="5" fill="#38bdf8"/>
+      <circle cx="100" cy="265" r="5" fill="#4ade80"/>
+      <circle cx="120" cy="265" r="5" fill="#818cf8"/>
     </g>
 
-    <!-- Superconducting Quantum Processor Core Ring -->
-    <g transform="translate(260, 680)" opacity="0.8" filter="url(#glow)">
-      <circle cx="0" cy="0" r="60" fill="none" stroke="#6366f1" stroke-width="2" stroke-dasharray="6 4"/>
-      <circle cx="0" cy="0" r="42" fill="none" stroke="#ec4899" stroke-width="1.8"/>
-      <circle cx="0" cy="0" r="24" fill="#312e81" stroke="#818cf8" stroke-width="2"/>
-      <circle cx="0" cy="0" r="10" fill="#a5b4fc"/>
-      <line x1="-70" y1="0" x2="70" y2="0" stroke="#818cf8" stroke-width="1.5"/>
-      <line x1="0" y1="-70" x2="0" y2="70" stroke="#818cf8" stroke-width="1.5"/>
+    <!-- Superconducting Dilution Refrigerator Cryo Tube (Left) -->
+    <rect x="110" y="370" width="60" height="420" fill="url(#cryoTubeGrad)" opacity="0.8" rx="8" filter="url(#glowHeavy)"/>
+    <rect x="125" y="370" width="30" height="420" fill="#e0f2fe" opacity="0.95"/>
+
+    <!-- Left Giant Holographic Interface Matrix HUD -->
+    <g transform="translate(260, 240)" opacity="0.92" filter="url(#glowSoft)">
+      <rect x="0" y="0" width="280" height="320" fill="rgba(15, 23, 42, 0.85)" stroke="#818cf8" stroke-width="2" rx="12"/>
+      <rect x="0" y="0" width="280" height="42" fill="rgba(79, 70, 229, 0.35)" rx="12"/>
+      <line x1="0" y1="42" x2="280" y2="42" stroke="#818cf8" stroke-width="1.5"/>
+      <text x="18" y="28" fill="#e0e7ff" font-family="monospace" font-size="14" font-weight="bold">QUANTUM_STATE // QUBIT-ARRAY</text>
+      
+      <text x="18" y="80" fill="#818cf8" font-family="monospace" font-size="16" font-weight="bold">|ψ⟩ = α|0⟩ + β|1⟩</text>
+      <text x="18" y="118" fill="#c084fc" font-family="monospace" font-size="14">|α|² + |β|² = 1.0000</text>
+      <text x="18" y="156" fill="#e0e7ff" font-family="monospace" font-size="14">H = 1/√2 [[1, 1], [1, -1]]</text>
+      <text x="18" y="196" fill="#38bdf8" font-family="monospace" font-size="14">BELL_STATE: (|00⟩+|11⟩)/√2</text>
+      <text x="18" y="238" fill="#4ade80" font-family="monospace" font-size="14" font-weight="bold">QUANTUM COHERENCE: 99.99%</text>
+      <text x="18" y="278" fill="#f472b6" font-family="monospace" font-size="14">ENTANGLEMENT: ACTIVE</text>
+    </g>
+
+    <!-- Left Qubit Processor Ring Core -->
+    <g transform="translate(320, 680)" opacity="0.9" filter="url(#glowHeavy)">
+      <circle cx="0" cy="0" r="70" fill="none" stroke="#6366f1" stroke-width="2.5" stroke-dasharray="8 6"/>
+      <circle cx="0" cy="0" r="50" fill="none" stroke="#ec4899" stroke-width="2"/>
+      <circle cx="0" cy="0" r="28" fill="#312e81" stroke="#818cf8" stroke-width="2.5"/>
+      <circle cx="0" cy="0" r="12" fill="#e0e7ff"/>
+      <line x1="-80" y1="0" x2="80" y2="0" stroke="#818cf8" stroke-width="2"/>
+      <line x1="0" y1="-80" x2="0" y2="80" stroke="#818cf8" stroke-width="2"/>
     </g>
   </g>
 
-  <!-- Right Server Mainframe & Wavefunction Terminal Stack -->
-  <g id="rightTerminal">
-    <!-- Mainframe Pillar 2 -->
-    <rect x="1720" y="160" width="120" height="780" fill="#090d28" stroke="#9333ea" stroke-width="1.5" rx="8"/>
-    <rect x="1735" y="200" width="90" height="20" fill="#1e1b4b"/>
-    <rect x="1735" y="240" width="90" height="20" fill="#1e1b4b"/>
-    <rect x="1735" y="280" width="90" height="20" fill="#1e1b4b"/>
-    <circle cx="1750" cy="210" r="4" fill="#ec4899" filter="url(#glow)"/>
-    <circle cx="1750" cy="250" r="4" fill="#818cf8" filter="url(#glow)"/>
-    <circle cx="1750" cy="290" r="4" fill="#38bdf8" filter="url(#glow)"/>
+  <!-- 3. Right Superconducting Quantum Mainframe Tower & HUD -->
+  <g id="rightMainframe">
+    <!-- Server Pillar 2 Structure -->
+    <rect x="1700" y="120" width="160" height="820" fill="#080c24" stroke="#9333ea" stroke-width="2.5" rx="10"/>
+    <rect x="1720" y="150" width="120" height="30" fill="#1e1b4b" rx="4"/>
+    <rect x="1720" y="200" width="120" height="30" fill="#1e1b4b" rx="4"/>
+    <rect x="1720" y="250" width="120" height="30" fill="#1e1b4b" rx="4"/>
+    <rect x="1720" y="300" width="120" height="30" fill="#1e1b4b" rx="4"/>
 
-    <!-- Right HUD Matrix Interface -->
-    <g transform="translate(1470, 260)" opacity="0.85" filter="url(#glow)">
-      <rect x="0" y="0" width="220" height="260" fill="rgba(15, 23, 42, 0.75)" stroke="#ec4899" stroke-width="1.5" rx="10"/>
-      <line x1="0" y1="36" x2="220" y2="36" stroke="#ec4899" stroke-width="1"/>
-      <text x="16" y="24" fill="#f472b6" font-family="monospace" font-size="13" font-weight="bold">WAVEFUNCTION // SCHRÖDINGER</text>
-      <text x="16" y="70" fill="#ec4899" font-family="monospace" font-size="14">iℏ ∂Ψ/∂t = ĤΨ</text>
-      <text x="16" y="105" fill="#818cf8" font-family="monospace" font-size="13">Δx · Δp ≥ ℏ/2</text>
-      <text x="16" y="140" fill="#a78bfa" font-family="monospace" font-size="13">CNOT |x, y⟩ = |x, x⊕y⟩</text>
-      <text x="16" y="180" fill="#fbbf24" font-family="monospace" font-size="13">QUBITS: 1024</text>
-      <text x="16" y="220" fill="#34d399" font-family="monospace" font-size="13">COHERENCE: OPTIMAL</text>
+    <!-- Status Indicator LED Array (Right) -->
+    <g filter="url(#glowSoft)">
+      <circle cx="1740" cy="165" r="5" fill="#ec4899"/>
+      <circle cx="1760" cy="165" r="5" fill="#818cf8"/>
+      <circle cx="1740" cy="215" r="5" fill="#4ade80"/>
+      <circle cx="1760" cy="215" r="5" fill="#38bdf8"/>
+      <circle cx="1740" cy="265" r="5" fill="#ec4899"/>
+      <circle cx="1760" cy="265" r="5" fill="#818cf8"/>
+    </g>
+
+    <!-- Superconducting Dilution Refrigerator Cryo Tube (Right) -->
+    <rect x="1750" y="370" width="60" height="420" fill="url(#cryoTubeGrad)" opacity="0.8" rx="8" filter="url(#glowHeavy)"/>
+    <rect x="1765" y="370" width="30" height="420" fill="#e0f2fe" opacity="0.95"/>
+
+    <!-- Right Giant Holographic Interface Matrix HUD -->
+    <g transform="translate(1380, 240)" opacity="0.92" filter="url(#glowSoft)">
+      <rect x="0" y="0" width="280" height="320" fill="rgba(15, 23, 42, 0.85)" stroke="#ec4899" stroke-width="2" rx="12"/>
+      <rect x="0" y="0" width="280" height="42" fill="rgba(236, 72, 153, 0.35)" rx="12"/>
+      <line x1="0" y1="42" x2="280" y2="42" stroke="#ec4899" stroke-width="1.5"/>
+      <text x="18" y="28" fill="#fce7f3" font-family="monospace" font-size="14" font-weight="bold">SCHRÖDINGER // WAVE_ENGINE</text>
+      
+      <text x="18" y="80" fill="#f472b6" font-family="monospace" font-size="16" font-weight="bold">iℏ ∂Ψ/∂t = ĤΨ</text>
+      <text x="18" y="118" fill="#818cf8" font-family="monospace" font-size="14">Δx · Δp ≥ ℏ/2</text>
+      <text x="18" y="156" fill="#c084fc" font-family="monospace" font-size="14">CNOT |x, y⟩ = |x, x⊕y⟩</text>
+      <text x="18" y="196" fill="#fde047" font-family="monospace" font-size="14" font-weight="bold">ACTIVE QUBITS: 4096</text>
+      <text x="18" y="238" fill="#4ade80" font-family="monospace" font-size="14">GATE ERROR RATE: 0.001%</text>
+      <text x="18" y="278" fill="#38bdf8" font-family="monospace" font-size="14">SYSTEM STATUS: OPTIMAL</text>
     </g>
 
     <!-- Right Qubit Bloch Sphere Simulation -->
-    <g transform="translate(1600, 680)" opacity="0.85" filter="url(#glow)">
-      <circle cx="0" cy="0" r="55" fill="none" stroke="#ec4899" stroke-width="1.8"/>
-      <ellipse cx="0" cy="0" rx="55" ry="18" fill="none" stroke="#818cf8" stroke-dasharray="4 3" stroke-width="1.4"/>
-      <line x1="0" y1="-65" x2="0" y2="65" stroke="#a5b4fc" stroke-width="1.5"/>
-      <line x1="0" y1="0" x2="35" y2="-35" stroke="#f472b6" stroke-width="2.2"/>
-      <circle cx="35" cy="-35" r="5" fill="#f472b6"/>
-      <text x="-6" y="-72" fill="#e0e7ff" font-family="monospace" font-size="12">|0⟩</text>
-      <text x="-6" y="82" fill="#e0e7ff" font-family="monospace" font-size="12">|1⟩</text>
+    <g transform="translate(1560, 680)" opacity="0.9" filter="url(#glowHeavy)">
+      <circle cx="0" cy="0" r="65" fill="none" stroke="#ec4899" stroke-width="2"/>
+      <ellipse cx="0" cy="0" rx="65" ry="22" fill="none" stroke="#818cf8" stroke-dasharray="6 4" stroke-width="1.8"/>
+      <line x1="0" y1="-78" x2="0" y2="78" stroke="#a5b4fc" stroke-width="2"/>
+      <line x1="0" y1="0" x2="42" y2="-42" stroke="#f472b6" stroke-width="3"/>
+      <circle cx="42" cy="-42" r="7" fill="#f472b6"/>
+      <text x="-8" y="-86" fill="#e0e7ff" font-family="monospace" font-size="14" font-weight="bold">|0⟩</text>
+      <text x="-8" y="98" fill="#e0e7ff" font-family="monospace" font-size="14" font-weight="bold">|1⟩</text>
     </g>
   </g>
 
-  <!-- Cyber Platform Floor Base -->
-  <path d="M0,920 L1920,920 L1920,1080 L0,1080 Z" fill="#040718" opacity="0.95"/>
-  <line x1="0" y1="920" x2="1920" y2="920" stroke="#6366f1" stroke-width="2" opacity="0.8"/>
-  <ellipse cx="300" cy="980" rx="200" ry="16" fill="#818cf8" opacity="0.16" filter="url(#glow)"/>
-  <ellipse cx="1620" cy="980" rx="200" ry="16" fill="#ec4899" opacity="0.14" filter="url(#glow)"/>
+  <!-- 4. Station Promenade Deck Floor & Laser Lines -->
+  <path d="M0,860 L1920,860 L1920,1080 L0,1080 Z" fill="#040618" opacity="0.95"/>
+  <path d="M0,910 L1920,910 L1920,1080 L0,1080 Z" fill="#02030d"/>
+
+  <line x1="0" y1="860" x2="1920" y2="860" stroke="#818cf8" stroke-width="4" opacity="0.9" filter="url(#glowSoft)"/>
+  <line x1="0" y1="910" x2="1920" y2="910" stroke="#ec4899" stroke-width="3" opacity="0.8" filter="url(#glowSoft)"/>
+
+  <!-- Deck Floor Neon Glow Radiance -->
+  <ellipse cx="320" cy="940" rx="260" ry="24" fill="#818cf8" opacity="0.25" filter="url(#glowHeavy)"/>
+  <ellipse cx="1560" cy="940" rx="260" ry="24" fill="#ec4899" opacity="0.25" filter="url(#glowHeavy)"/>
 </svg>

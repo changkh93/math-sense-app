@@ -25,14 +25,14 @@
   z-index: 0;
   pointer-events: none;
   background-image:
-    linear-gradient(180deg, rgba(2, 6, 23, 0.08) 0%, rgba(2, 6, 23, 0.44) 68%, rgba(2, 6, 23, 0.7) 100%),
-    linear-gradient(90deg, rgba(2, 6, 23, 0.32) 0%, rgba(2, 6, 23, 0.08) 45%, rgba(2, 6, 23, 0.22) 100%),
+    linear-gradient(180deg, rgba(2, 6, 23, 0.05) 0%, rgba(2, 6, 23, 0.32) 68%, rgba(2, 6, 23, 0.6) 100%),
+    linear-gradient(90deg, rgba(2, 6, 23, 0.22) 0%, rgba(2, 6, 23, 0.04) 50%, rgba(2, 6, 23, 0.22) 100%),
     var(--public-profile-base-image);
   background-size: cover;
   background-position: center top;
   background-repeat: no-repeat;
-  opacity: 0.62;
-  filter: saturate(1.14) contrast(1.04);
+  opacity: 0.86;
+  filter: saturate(1.18) contrast(1.08);
 }
 
 .public-profile-theme-glow {
@@ -60,7 +60,7 @@
 }
 
 .public-profile-page--aurora_observatory .public-profile-base-image {
-  opacity: 0.74;
+  opacity: 0.88;
   background-position: center 8%;
 }
 
@@ -80,9 +80,9 @@
 }
 
 .public-profile-page--solar_archive .public-profile-base-image {
-  opacity: 0.7;
+  opacity: 0.86;
   background-position: center 12%;
-  filter: saturate(1.08) contrast(1.06) brightness(0.92);
+  filter: saturate(1.12) contrast(1.08) brightness(0.95);
 }
 
 .public-profile-page--solar_archive .public-profile-theme-glow {
@@ -108,9 +108,9 @@
 }
 
 .public-profile-page--deep_lab .public-profile-base-image {
-  opacity: 0.76;
+  opacity: 0.88;
   background-position: center 10%;
-  filter: saturate(1.12) contrast(1.08) brightness(0.86);
+  filter: saturate(1.16) contrast(1.1) brightness(0.92);
 }
 
 .public-profile-page--deep_lab .public-profile-theme-glow {
@@ -136,9 +136,9 @@
   opacity: 0.16;
 }
 .public-profile-page--lunar_library .public-profile-base-image {
-  opacity: 0.72;
+  opacity: 0.9;
   background-position: center 8%;
-  filter: saturate(1.1) contrast(1.06) brightness(0.9);
+  filter: saturate(1.15) contrast(1.08) brightness(0.95);
 }
 .public-profile-page--lunar_library .public-profile-theme-glow {
   background:
@@ -162,9 +162,9 @@
   opacity: 0.18;
 }
 .public-profile-page--crystal_cavern .public-profile-base-image {
-  opacity: 0.76;
-  background-position: center 10%;
-  filter: saturate(1.14) contrast(1.06) brightness(0.88);
+  opacity: 0.92;
+  background-position: center 12%;
+  filter: saturate(1.22) contrast(1.12) brightness(0.95);
 }
 .public-profile-page--crystal_cavern .public-profile-theme-glow {
   background:
@@ -188,15 +188,15 @@
   opacity: 0.14;
 }
 .public-profile-page--mars_greenhouse .public-profile-base-image {
-  opacity: 0.72;
-  background-position: center 10%;
-  filter: saturate(1.1) contrast(1.05) brightness(0.9);
+  opacity: 0.92;
+  background-position: center 15%;
+  filter: saturate(1.24) contrast(1.12) brightness(0.96);
 }
 .public-profile-page--mars_greenhouse .public-profile-theme-glow {
   background:
-    linear-gradient(90deg, rgba(194, 65, 12, 0.22), transparent 42%, rgba(251, 146, 60, 0.18)),
+    linear-gradient(90deg, rgba(194, 65, 12, 0.24), transparent 42%, rgba(251, 146, 60, 0.2)),
     linear-gradient(180deg, rgba(2, 6, 23, 0.04) 0%, rgba(2, 6, 23, 0.48) 100%);
-  opacity: 0.62;
+  opacity: 0.65;
 }
 .public-profile-page--mars_greenhouse .public-profile-hero::before {
   content: "";
@@ -214,9 +214,9 @@
   opacity: 0.15;
 }
 .public-profile-page--quantum_terminal .public-profile-base-image {
-  opacity: 0.75;
-  background-position: center 8%;
-  filter: saturate(1.16) contrast(1.08) brightness(0.9);
+  opacity: 0.92;
+  background-position: center 10%;
+  filter: saturate(1.22) contrast(1.12) brightness(0.95);
 }
 .public-profile-page--quantum_terminal .public-profile-theme-glow {
   background:
@@ -240,9 +240,9 @@
   opacity: 0.2;
 }
 .public-profile-page--comet_camp .public-profile-base-image {
-  opacity: 0.74;
-  background-position: center 10%;
-  filter: saturate(1.12) contrast(1.06) brightness(0.92);
+  opacity: 0.92;
+  background-position: center 12%;
+  filter: saturate(1.2) contrast(1.1) brightness(0.96);
 }
 .public-profile-page--comet_camp .public-profile-theme-glow {
   background:
@@ -266,9 +266,9 @@
   opacity: 0.18;
 }
 .public-profile-page--infinity_garden .public-profile-base-image {
-  opacity: 0.75;
-  background-position: center 8%;
-  filter: saturate(1.18) contrast(1.08) brightness(0.88);
+  opacity: 0.92;
+  background-position: center 10%;
+  filter: saturate(1.24) contrast(1.14) brightness(0.95);
 }
 .public-profile-page--infinity_garden .public-profile-theme-glow {
   background:

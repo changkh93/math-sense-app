@@ -1,134 +1,186 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1920 1080" width="1920" height="1080">
   <defs>
-    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#020d12"/>
-      <stop offset="40%" stop-color="#051c22"/>
-      <stop offset="80%" stop-color="#07131d"/>
-      <stop offset="100%" stop-color="#010609"/>
+    <!-- Deep Subterranean Cavern Gradients -->
+    <linearGradient id="cavernBaseGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#02080d"/>
+      <stop offset="35%" stop-color="#03161c"/>
+      <stop offset="70%" stop-color="#04232b"/>
+      <stop offset="90%" stop-color="#02141a"/>
+      <stop offset="100%" stop-color="#01070a"/>
     </linearGradient>
-    <radialGradient id="cavernGlowL" cx="15%" cy="60%" r="50%">
-      <stop offset="0%" stop-color="#2dd4bf" stop-opacity="0.35"/>
-      <stop offset="50%" stop-color="#0d9488" stop-opacity="0.15"/>
-      <stop offset="100%" stop-color="#020d12" stop-opacity="0"/>
+
+    <!-- Crystal Crystal Lighting Gradients -->
+    <linearGradient id="crystalShineCyan" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#e0f2fe"/>
+      <stop offset="25%" stop-color="#38bdf8"/>
+      <stop offset="60%" stop-color="#0284c7"/>
+      <stop offset="100%" stop-color="#082f49"/>
+    </linearGradient>
+    <linearGradient id="crystalShineTeal" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ccfbf1"/>
+      <stop offset="30%" stop-color="#2dd4bf"/>
+      <stop offset="70%" stop-color="#0d9488"/>
+      <stop offset="100%" stop-color="#042f2e"/>
+    </linearGradient>
+    <linearGradient id="crystalShineEmerald" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#d1fae5"/>
+      <stop offset="35%" stop-color="#34d399"/>
+      <stop offset="75%" stop-color="#059669"/>
+      <stop offset="100%" stop-color="#064e3b"/>
+    </linearGradient>
+
+    <radialGradient id="cavernCenterGlow" cx="50%" cy="45%" r="60%">
+      <stop offset="0%" stop-color="#2dd4bf" stop-opacity="0.32"/>
+      <stop offset="40%" stop-color="#0284c7" stop-opacity="0.18"/>
+      <stop offset="80%" stop-color="#03161c" stop-opacity="0.05"/>
+      <stop offset="100%" stop-color="#01070a" stop-opacity="0"/>
     </radialGradient>
-    <radialGradient id="cavernGlowR" cx="85%" cy="55%" r="50%">
-      <stop offset="0%" stop-color="#00f3ff" stop-opacity="0.32"/>
-      <stop offset="50%" stop-color="#0284c7" stop-opacity="0.14"/>
-      <stop offset="100%" stop-color="#020d12" stop-opacity="0"/>
+    <radialGradient id="leftPillarGlow" cx="15%" cy="55%" r="45%">
+      <stop offset="0%" stop-color="#00f3ff" stop-opacity="0.6"/>
+      <stop offset="45%" stop-color="#0d9488" stop-opacity="0.3"/>
+      <stop offset="80%" stop-color="#02080d" stop-opacity="0"/>
     </radialGradient>
-    <radialGradient id="crystalGlow" cx="50%" cy="50%" r="50%">
-      <stop offset="0%" stop-color="#a7f3d0" stop-opacity="0.9"/>
-      <stop offset="40%" stop-color="#2dd4bf" stop-opacity="0.6"/>
-      <stop offset="100%" stop-color="#0f766e" stop-opacity="0"/>
+    <radialGradient id="rightPillarGlow" cx="85%" cy="55%" r="45%">
+      <stop offset="0%" stop-color="#34d399" stop-opacity="0.6"/>
+      <stop offset="45%" stop-color="#0284c7" stop-opacity="0.3"/>
+      <stop offset="80%" stop-color="#02080d" stop-opacity="0"/>
     </radialGradient>
-    <filter id="glow" x="-30%" y="-30%" width="160%" height="160%">
-      <feGaussianBlur stdDeviation="8" result="blur"/>
+
+    <!-- Filters -->
+    <filter id="glowHeavy" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="14" result="blur"/>
       <feComposite in="SourceGraphic" in2="blur" operator="over"/>
     </filter>
-    <filter id="subtleGlow" x="-20%" y="-20%" width="140%" height="140%">
-      <feGaussianBlur stdDeviation="4" result="blur"/>
+    <filter id="glowSoft" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="6" result="blur"/>
       <feComposite in="SourceGraphic" in2="blur" operator="over"/>
     </filter>
   </defs>
 
-  <!-- Background base -->
-  <rect width="1920" height="1080" fill="url(#bgGrad)"/>
+  <!-- 1. Background Base & Atmospheric Haze -->
+  <rect width="1920" height="1080" fill="url(#cavernBaseGrad)"/>
+  <rect width="1920" height="1080" fill="url(#cavernCenterGlow)"/>
+  <rect width="1920" height="1080" fill="url(#leftPillarGlow)"/>
+  <rect width="1920" height="1080" fill="url(#rightPillarGlow)"/>
 
-  <!-- Distant cosmic cavern opening stars -->
+  <!-- Celestial Skylight Opening (Center High) -->
   <g opacity="0.65">
-    <circle cx="750" cy="180" r="1.2" fill="#e0f2fe"/>
-    <circle cx="890" cy="120" r="1.8" fill="#a7f3d0"/>
-    <circle cx="1020" cy="220" r="1.5" fill="#bae6fd"/>
-    <circle cx="1180" cy="150" r="1" fill="#f0fdf4"/>
-    <circle cx="960" cy="90" r="2.2" fill="#38bdf8"/>
-    <circle cx="840" cy="260" r="1" fill="#a7f3d0"/>
-    <circle cx="1080" cy="280" r="1.4" fill="#e0f2fe"/>
+    <ellipse cx="960" cy="180" rx="360" ry="120" fill="#00f3ff" opacity="0.15" filter="url(#glowHeavy)"/>
+    <circle cx="820" cy="140" r="1.5" fill="#e0f2fe"/>
+    <circle cx="940" cy="110" r="2.2" fill="#a7f3d0"/>
+    <circle cx="1060" cy="160" r="1.8" fill="#bae6fd"/>
+    <circle cx="900" cy="190" r="1.2" fill="#f0fdf4"/>
+    <circle cx="1020" cy="210" r="1.6" fill="#e0f2fe"/>
   </g>
 
-  <!-- Ambient light blobs -->
-  <rect width="1920" height="1080" fill="url(#cavernGlowL)"/>
-  <rect width="1920" height="1080" fill="url(#cavernGlowR)"/>
-
-  <!-- Left Cavern Rocky Outcrops & Crystals -->
-  <g id="leftCavern">
-    <!-- Rock silhouette -->
-    <path d="M0,0 L320,0 Q240,280 280,480 Q180,680 340,880 L380,1080 L0,1080 Z" fill="#041217" opacity="0.95"/>
-    <path d="M0,150 L200,260 L140,520 L260,780 L180,1080 L0,1080 Z" fill="#061e24" opacity="0.8"/>
-
-    <!-- Left Crystal Cluster 1 (Top) -->
-    <polygon points="180,180 220,120 235,260 195,300" fill="#2dd4bf" opacity="0.75" filter="url(#subtleGlow)"/>
-    <polygon points="220,120 250,140 235,260" fill="#a7f3d0" opacity="0.9"/>
-    <polygon points="140,240 180,180 195,300 155,340" fill="#0d9488" opacity="0.7"/>
-
-    <!-- Left Crystal Cluster 2 (Mid-Large) -->
-    <polygon points="220,540 290,420 320,680 250,760" fill="#2dd4bf" opacity="0.8" filter="url(#glow)"/>
-    <polygon points="290,420 340,460 320,680" fill="#e6fffa" opacity="0.95"/>
-    <polygon points="160,600 220,540 250,760 190,800" fill="#0f766e" opacity="0.85"/>
-    <polygon points="260,660 320,580 350,740 290,800" fill="#00f3ff" opacity="0.7" filter="url(#subtleGlow)"/>
-
-    <!-- Floating Formula Holograms (Left) -->
-    <g opacity="0.75" transform="translate(180, 480)" filter="url(#glow)">
-      <text x="0" y="0" fill="#a7f3d0" font-family="sans-serif" font-size="18" font-weight="bold">∫ e^(-x²) dx = √π</text>
-      <text x="20" y="32" fill="#38bdf8" font-family="sans-serif" font-size="15">∇ × E = -∂B/∂t</text>
-      <text x="-10" y="68" fill="#5eead4" font-family="sans-serif" font-size="16">ζ(s) = ∑ n^(-s)</text>
-    </g>
-
-    <!-- Left Polyhedron Hologram -->
-    <g transform="translate(240, 320)" opacity="0.8" filter="url(#glow)">
-      <polygon points="0,-40 35,-15 35,25 0,45 -35,25 -35,-15" fill="none" stroke="#2dd4bf" stroke-width="1.8"/>
-      <line x1="0" y1="-40" x2="35" y2="25" stroke="#a7f3d0" stroke-width="1.2"/>
-      <line x1="0" y1="-40" x2="-35" y2="25" stroke="#a7f3d0" stroke-width="1.2"/>
-      <line x1="-35" y1="-15" x2="35" y2="-15" stroke="#2dd4bf" stroke-width="1.2"/>
-      <line x1="0" y1="45" x2="35" y2="-15" stroke="#38bdf8" stroke-width="1.2"/>
-      <line x1="0" y1="45" x2="-35" y2="-15" stroke="#38bdf8" stroke-width="1.2"/>
-    </g>
+  <!-- Distant Underground Crystal Stalactites (Ceiling) -->
+  <g fill="#05242c" stroke="#0d9488" stroke-width="1" opacity="0.8">
+    <polygon points="380,0 410,0 395,180"/>
+    <polygon points="560,0 600,0 580,240"/>
+    <polygon points="760,0 800,0 780,160"/>
+    <polygon points="1120,0 1160,0 1140,190"/>
+    <polygon points="1320,0 1360,0 1340,260"/>
+    <polygon points="1520,0 1550,0 1535,170"/>
   </g>
 
-  <!-- Right Cavern Rocky Outcrops & Crystals -->
-  <g id="rightCavern">
-    <!-- Rock silhouette -->
-    <path d="M1920,0 L1600,0 Q1680,260 1620,460 Q1740,680 1560,880 L1520,1080 L1920,1080 Z" fill="#041217" opacity="0.95"/>
-    <path d="M1920,120 L1720,240 L1780,500 L1640,760 L1740,1080 L1920,1080 Z" fill="#061e24" opacity="0.8"/>
+  <!-- 2. Left Colossal Crystal Formations & Pillars -->
+  <g id="leftCrystals">
+    <!-- Dark Cave Wall Silhouette (Left) -->
+    <path d="M0,0 L420,0 Q320,320 380,560 Q260,780 440,940 L400,1080 L0,1080 Z" fill="#020d13" opacity="0.95"/>
 
-    <!-- Right Crystal Cluster (Main Giant) -->
-    <polygon points="1680,480 1600,340 1560,640 1640,740" fill="#00f3ff" opacity="0.8" filter="url(#glow)"/>
-    <polygon points="1600,340 1550,390 1560,640" fill="#e0f2fe" opacity="0.95"/>
-    <polygon points="1740,560 1680,480 1640,740 1700,790" fill="#0284c7" opacity="0.85"/>
-    
-    <!-- Right Secondary Crystal -->
-    <polygon points="1760,260 1710,180 1680,340 1730,400" fill="#2dd4bf" opacity="0.75" filter="url(#subtleGlow)"/>
-    <polygon points="1710,180 1670,220 1680,340" fill="#a7f3d0" opacity="0.9"/>
+    <!-- Giant Main Crystal 1 (Tall Turquoise) -->
+    <polygon points="180,680 260,220 330,640 240,780" fill="url(#crystalShineTeal)" filter="url(#glowSoft)"/>
+    <polygon points="260,220 310,280 330,640 260,680" fill="#a7f3d0" opacity="0.85"/>
+    <polygon points="140,720 180,680 240,780 180,820" fill="#042f2e"/>
 
-    <!-- Lower Right Crystal Shards -->
-    <polygon points="1620,820 1560,720 1520,920 1580,980" fill="#38bdf8" opacity="0.8" filter="url(#subtleGlow)"/>
-    <polygon points="1560,720 1510,760 1520,920" fill="#bae6fd" opacity="0.9"/>
+    <!-- Crystal Spire 2 (Cyan Cluster) -->
+    <polygon points="280,720 380,360 440,760 340,840" fill="url(#crystalShineCyan)" filter="url(#glowHeavy)"/>
+    <polygon points="380,360 430,420 440,760" fill="#e0f2fe" opacity="0.9"/>
+    <polygon points="240,760 280,720 340,840 280,880" fill="#0c4a6e"/>
 
-    <!-- Floating Formula Holograms (Right) -->
-    <g opacity="0.75" transform="translate(1620, 520)" filter="url(#glow)">
-      <text x="0" y="0" fill="#38bdf8" font-family="sans-serif" font-size="18" font-weight="bold">e^(iπ) + 1 = 0</text>
-      <text x="-20" y="32" fill="#5eead4" font-family="sans-serif" font-size="16">∑ 1/n² = π²/6</text>
-      <text x="10" y="68" fill="#a7f3d0" font-family="sans-serif" font-size="15">H|ψ⟩ = E|ψ⟩</text>
+    <!-- Crystal Spire 3 (Emerald Low Spike) -->
+    <polygon points="80,780 140,520 200,820 120,890" fill="url(#crystalShineEmerald)" filter="url(#glowSoft)"/>
+    <polygon points="140,520 180,560 200,820" fill="#6ee7b7" opacity="0.85"/>
+
+    <!-- Floating Luminous Formula Glyphs (Left) -->
+    <g opacity="0.85" transform="translate(180, 440)" filter="url(#glowSoft)">
+      <rect x="-10" y="-24" width="220" height="96" fill="rgba(2, 20, 26, 0.7)" rx="8" stroke="#2dd4bf" stroke-width="1.2"/>
+      <text x="10" y="0" fill="#a7f3d0" font-family="monospace" font-size="16" font-weight="bold">∫ e^(-x²) dx = √π</text>
+      <text x="10" y="30" fill="#38bdf8" font-family="monospace" font-size="15">∇ × E = -∂B/∂t</text>
+      <text x="10" y="58" fill="#5eead4" font-family="monospace" font-size="15">ζ(s) = ∑ 1/nˢ</text>
     </g>
 
-    <!-- Right Polyhedron Hologram (Dodecahedron-like) -->
-    <g transform="translate(1660, 360)" opacity="0.85" filter="url(#glow)">
-      <circle cx="0" cy="0" r="38" fill="none" stroke="#38bdf8" stroke-dasharray="4 3" stroke-width="1.2"/>
-      <polygon points="0,-35 32,-12 20,30 -20,30 -32,-12" fill="none" stroke="#2dd4bf" stroke-width="1.8"/>
-      <polygon points="0,-18 16,-6 10,15 -10,15 -16,-6" fill="none" stroke="#00f3ff" stroke-width="1.4"/>
-      <line x1="0" y1="-35" x2="0" y2="-18" stroke="#a7f3d0" stroke-width="1.2"/>
-      <line x1="32" y1="-12" x2="16" y2="-6" stroke="#a7f3d0" stroke-width="1.2"/>
-      <line x1="20" y1="30" x2="10" y2="15" stroke="#a7f3d0" stroke-width="1.2"/>
-      <line x1="-20" y1="30" x2="-10" y2="15" stroke="#a7f3d0" stroke-width="1.2"/>
-      <line x1="-32" y1="-12" x2="-16" y2="-6" stroke="#a7f3d0" stroke-width="1.2"/>
+    <!-- Floating 3D Mathematical Polyhedron (Left) -->
+    <g transform="translate(260, 260)" opacity="0.9" filter="url(#glowHeavy)">
+      <polygon points="0,-45 42,-15 42,30 0,55 -42,30 -42,-15" fill="rgba(45, 212, 191, 0.25)" stroke="#00f3ff" stroke-width="2"/>
+      <line x1="0" y1="-45" x2="42" y2="30" stroke="#a7f3d0" stroke-width="1.5"/>
+      <line x1="0" y1="-45" x2="-42" y2="30" stroke="#a7f3d0" stroke-width="1.5"/>
+      <line x1="-42" y1="-15" x2="42" y2="-15" stroke="#2dd4bf" stroke-width="1.5"/>
+      <line x1="0" y1="55" x2="42" y2="-15" stroke="#38bdf8" stroke-width="1.5"/>
+      <line x1="0" y1="55" x2="-42" y2="-15" stroke="#38bdf8" stroke-width="1.5"/>
+      <circle cx="0" cy="5" r="8" fill="#f0fdf4"/>
     </g>
   </g>
 
-  <!-- Subterranean Water Surface Reflection (Bottom) -->
-  <path d="M0,920 Q480,880 960,910 Q1440,940 1920,900 L1920,1080 L0,1080 Z" fill="#02141a" opacity="0.9"/>
-  <path d="M0,970 Q480,940 960,960 Q1440,980 1920,950 L1920,1080 L0,1080 Z" fill="#010c10"/>
-  <ellipse cx="280" cy="980" rx="180" ry="16" fill="#2dd4bf" opacity="0.18" filter="url(#glow)"/>
-  <ellipse cx="1600" cy="960" rx="190" ry="18" fill="#00f3ff" opacity="0.16" filter="url(#glow)"/>
+  <!-- 3. Right Colossal Crystal Formations & Pillars -->
+  <g id="rightCrystals">
+    <!-- Dark Cave Wall Silhouette (Right) -->
+    <path d="M1920,0 L1500,0 Q1600,320 1540,560 Q1660,780 1480,940 L1520,1080 L1920,1080 Z" fill="#020d13" opacity="0.95"/>
 
-  <!-- Center Cavern Arch Ceiling (Subtle Frame) -->
-  <path d="M280,0 Q960,160 1640,0 L1920,0 L1920,60 Q960,220 0,60 L0,0 Z" fill="#030f14" opacity="0.9"/>
+    <!-- Giant Main Crystal 4 (Colossal Cyan Right) -->
+    <polygon points="1640,680 1560,180 1480,640 1580,780" fill="url(#crystalShineCyan)" filter="url(#glowHeavy)"/>
+    <polygon points="1560,180 1520,240 1480,640" fill="#e0f2fe" opacity="0.9"/>
+    <polygon points="1700,720 1640,680 1580,780 1660,820" fill="#0c4a6e"/>
+
+    <!-- Crystal Spire 5 (Teal Cluster) -->
+    <polygon points="1540,720 1440,320 1380,760 1480,840" fill="url(#crystalShineTeal)" filter="url(#glowSoft)"/>
+    <polygon points="1440,320 1400,380 1380,760" fill="#a7f3d0" opacity="0.9"/>
+    <polygon points="1600,760 1540,720 1480,840 1560,880" fill="#042f2e"/>
+
+    <!-- Crystal Spire 6 (Emerald Low Spike Right) -->
+    <polygon points="1760,780 1700,480 1640,820 1720,890" fill="url(#crystalShineEmerald)" filter="url(#glowSoft)"/>
+    <polygon points="1700,480 1660,530 1640,820" fill="#6ee7b7" opacity="0.85"/>
+
+    <!-- Floating Luminous Formula Glyphs (Right) -->
+    <g opacity="0.85" transform="translate(1480, 440)" filter="url(#glowSoft)">
+      <rect x="-10" y="-24" width="220" height="96" fill="rgba(2, 20, 26, 0.7)" rx="8" stroke="#00f3ff" stroke-width="1.2"/>
+      <text x="10" y="0" fill="#38bdf8" font-family="monospace" font-size="16" font-weight="bold">e^(iπ) + 1 = 0</text>
+      <text x="10" y="30" fill="#5eead4" font-family="monospace" font-size="15">∑ 1/n² = π²/6</text>
+      <text x="10" y="58" fill="#a7f3d0" font-family="monospace" font-size="15">H|ψ⟩ = E|ψ⟩</text>
+    </g>
+
+    <!-- Floating 3D Icosahedron/Dodecahedron Polyhedron (Right) -->
+    <g transform="translate(1640, 260)" opacity="0.9" filter="url(#glowHeavy)">
+      <polygon points="0,-42 38,-12 24,36 -24,36 -38,-12" fill="rgba(56, 189, 248, 0.25)" stroke="#2dd4bf" stroke-width="2"/>
+      <polygon points="0,-22 20,-6 12,20 -12,20 -20,-6" fill="none" stroke="#a7f3d0" stroke-width="1.5"/>
+      <line x1="0" y1="-42" x2="0" y2="-22" stroke="#00f3ff" stroke-width="1.5"/>
+      <line x1="38" y1="-12" x2="20" y2="-6" stroke="#00f3ff" stroke-width="1.5"/>
+      <line x1="24" y1="36" x2="12" y2="20" stroke="#00f3ff" stroke-width="1.5"/>
+      <line x1="-24" y1="36" x2="-12" y2="20" stroke="#00f3ff" stroke-width="1.5"/>
+      <line x1="-38" y1="-12" x2="-20" y2="-6" stroke="#00f3ff" stroke-width="1.5"/>
+      <circle cx="0" cy="5" r="8" fill="#e0f2fe"/>
+    </g>
+  </g>
+
+  <!-- 4. Subterranean Bioluminescent Lake (Floor) -->
+  <path d="M0,860 Q480,820 960,840 Q1440,860 1920,830 L1920,1080 L0,1080 Z" fill="#011820" opacity="0.95"/>
+  <path d="M0,910 Q480,880 960,890 Q1440,900 1920,880 L1920,1080 L0,1080 Z" fill="#010e14"/>
+
+  <!-- Shimmering Teal/Cyan Water Surface Reflections -->
+  <ellipse cx="280" cy="920" rx="220" ry="24" fill="#00f3ff" opacity="0.25" filter="url(#glowHeavy)"/>
+  <ellipse cx="1580" cy="920" rx="240" ry="26" fill="#2dd4bf" opacity="0.25" filter="url(#glowHeavy)"/>
+  <ellipse cx="960" cy="940" rx="420" ry="18" fill="#38bdf8" opacity="0.18" filter="url(#glowSoft)"/>
+
+  <!-- Crystal Pathway Promenade Edges -->
+  <path d="M0,860 Q480,820 960,840 Q1440,860 1920,830" stroke="#2dd4bf" stroke-width="3.5" fill="none" opacity="0.8" filter="url(#glowSoft)"/>
+  <path d="M0,910 Q480,880 960,890 Q1440,900 1920,880" stroke="#00f3ff" stroke-width="2.5" fill="none" opacity="0.7" filter="url(#glowSoft)"/>
+
+  <!-- Glowing Mineral Crystal Clusters on Water Edge -->
+  <g fill="#2dd4bf" filter="url(#glowSoft)">
+    <polygon points="420,860 435,820 445,865"/>
+    <polygon points="445,865 455,830 465,868"/>
+    <polygon points="940,850 955,815 970,855"/>
+    <polygon points="1480,860 1495,825 1510,865"/>
+    <polygon points="1510,865 1525,835 1535,868"/>
+  </g>
 </svg>

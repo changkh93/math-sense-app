@@ -1,106 +1,164 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1920 1080" width="1920" height="1080">
   <defs>
-    <linearGradient id="gardenCosmos" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#0e0417"/>
-      <stop offset="45%" stop-color="#1d092d"/>
-      <stop offset="85%" stop-color="#150624"/>
-      <stop offset="100%" stop-color="#090210"/>
+    <!-- Cosmic Fractal Realm Gradients -->
+    <linearGradient id="infinityBgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0b0212"/>
+      <stop offset="35%" stop-color="#180424"/>
+      <stop offset="70%" stop-color="#2d083e"/>
+      <stop offset="90%" stop-color="#1c0528"/>
+      <stop offset="100%" stop-color="#07010c"/>
     </linearGradient>
-    <radialGradient id="fractalGlowL" cx="18%" cy="55%" r="45%">
-      <stop offset="0%" stop-color="#e879f9" stop-opacity="0.35"/>
-      <stop offset="50%" stop-color="#a855f7" stop-opacity="0.14"/>
-      <stop offset="100%" stop-color="#0e0417" stop-opacity="0"/>
+
+    <!-- Fractal Flower Petal Gradients -->
+    <linearGradient id="petalGradMagenta" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#fdf4ff"/>
+      <stop offset="30%" stop-color="#f472b6"/>
+      <stop offset="70%" stop-color="#e879f9"/>
+      <stop offset="100%" stop-color="#9333ea"/>
+    </linearGradient>
+    <linearGradient id="petalGradViolet" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#fae8ff"/>
+      <stop offset="35%" stop-color="#c084fc"/>
+      <stop offset="75%" stop-color="#a855f7"/>
+      <stop offset="100%" stop-color="#581c87"/>
+    </linearGradient>
+
+    <radialGradient id="fractalGlowL" cx="18%" cy="52%" r="50%">
+      <stop offset="0%" stop-color="#e879f9" stop-opacity="0.65"/>
+      <stop offset="40%" stop-color="#a855f7" stop-opacity="0.3"/>
+      <stop offset="80%" stop-color="#0b0212" stop-opacity="0"/>
     </radialGradient>
-    <radialGradient id="fractalGlowR" cx="82%" cy="55%" r="45%">
-      <stop offset="0%" stop-color="#c084fc" stop-opacity="0.32"/>
-      <stop offset="50%" stop-color="#f472b6" stop-opacity="0.14"/>
-      <stop offset="100%" stop-color="#0e0417" stop-opacity="0"/>
+    <radialGradient id="fractalGlowR" cx="82%" cy="52%" r="50%">
+      <stop offset="0%" stop-color="#f472b6" stop-opacity="0.6"/>
+      <stop offset="40%" stop-color="#c084fc" stop-opacity="0.3"/>
+      <stop offset="80%" stop-color="#0b0212" stop-opacity="0"/>
     </radialGradient>
-    <filter id="glow" x="-30%" y="-30%" width="160%" height="160%">
-      <feGaussianBlur stdDeviation="8" result="blur"/>
+    <radialGradient id="centerNebulaGlow" cx="50%" cy="40%" r="55%">
+      <stop offset="0%" stop-color="#d946ef" stop-opacity="0.35"/>
+      <stop offset="40%" stop-color="#8b5cf6" stop-opacity="0.18"/>
+      <stop offset="80%" stop-color="#0b0212" stop-opacity="0"/>
+    </radialGradient>
+
+    <!-- Filters -->
+    <filter id="glowHeavy" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="15" result="blur"/>
       <feComposite in="SourceGraphic" in2="blur" operator="over"/>
     </filter>
-    <filter id="softGlow" x="-20%" y="-20%" width="140%" height="140%">
-      <feGaussianBlur stdDeviation="4" result="blur"/>
+    <filter id="glowSoft" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="6" result="blur"/>
       <feComposite in="SourceGraphic" in2="blur" operator="over"/>
     </filter>
   </defs>
 
-  <!-- Deep Cosmos Garden Base -->
-  <rect width="1920" height="1080" fill="url(#gardenCosmos)"/>
+  <!-- 1. Background Base & Cosmic Nebula Atmosphere -->
+  <rect width="1920" height="1080" fill="url(#infinityBgGrad)"/>
+  <rect width="1920" height="1080" fill="url(#centerNebulaGlow)"/>
   <rect width="1920" height="1080" fill="url(#fractalGlowL)"/>
   <rect width="1920" height="1080" fill="url(#fractalGlowR)"/>
 
-  <!-- Celestial Nebula Clouds & Starlight -->
-  <g opacity="0.6">
-    <ellipse cx="400" cy="200" rx="300" ry="120" fill="#a855f7" opacity="0.12" filter="url(#glow)"/>
-    <ellipse cx="1500" cy="220" rx="280" ry="140" fill="#e879f9" opacity="0.1" filter="url(#glow)"/>
-    <circle cx="280" cy="120" r="1.5" fill="#fdf4ff"/>
-    <circle cx="480" cy="90" r="2.2" fill="#f0abfc"/>
-    <circle cx="720" cy="180" r="1.2" fill="#fff"/>
-    <circle cx="1200" cy="100" r="1.8" fill="#f5d0fe"/>
-    <circle cx="1450" cy="160" r="2" fill="#fff"/>
-    <circle cx="1680" cy="120" r="1.4" fill="#e879f9"/>
+  <!-- Celestial Nebula Clouds & Star Dust -->
+  <g opacity="0.8">
+    <ellipse cx="960" cy="240" rx="460" ry="160" fill="#a855f7" opacity="0.16" filter="url(#glowHeavy)"/>
+    <ellipse cx="960" cy="240" rx="280" ry="90" fill="#f472b6" opacity="0.14" filter="url(#glowHeavy)"/>
+    <circle cx="240" cy="140" r="1.8" fill="#fff"/>
+    <circle cx="480" cy="90" r="2.4" fill="#fdf4ff"/>
+    <circle cx="720" cy="180" r="1.5" fill="#f0abfc"/>
+    <circle cx="940" cy="110" r="2.2" fill="#fff"/>
+    <circle cx="1180" cy="170" r="1.6" fill="#f5d0fe"/>
+    <circle cx="1440" cy="80" r="2.5" fill="#fff"/>
+    <circle cx="1680" cy="130" r="1.8" fill="#f0abfc"/>
   </g>
 
-  <!-- Left Side: Mandelbrot & Julia Fractal Lotus Blossom -->
-  <g id="leftFractal" transform="translate(240, 520)" filter="url(#glow)">
-    <!-- Central Infinity Symbol (Floating) -->
-    <path d="M-60,0 C-60,-28 -25,-28 0,0 C25,28 60,28 60,0 C60,-28 25,-28 0,0 C-25,28 -60,28 -60,0 Z" fill="none" stroke="#e879f9" stroke-width="4.5" opacity="0.9"/>
-    <path d="M-60,0 C-60,-28 -25,-28 0,0 C25,28 60,28 60,0 C60,-28 25,-28 0,0 C-25,28 -60,28 -60,0 Z" fill="none" stroke="#ffffff" stroke-width="1.5"/>
+  <!-- 2. Left Side: Colossal Mandelbrot/Julia Fractal Lotus Tree -->
+  <g id="leftFractalSanctuary">
+    <!-- Grand Levitating Infinity Aura Ring -->
+    <g transform="translate(260, 480)" filter="url(#glowHeavy)">
+      <path d="M-90,0 C-90,-45 -35,-45 0,0 C35,45 90,45 90,0 C90,-45 35,-45 0,0 C-35,45 -90,45 -90,0 Z" fill="none" stroke="#e879f9" stroke-width="7" opacity="0.95"/>
+      <path d="M-90,0 C-90,-45 -35,-45 0,0 C35,45 90,45 90,0 C90,-45 35,-45 0,0 C-35,45 -90,45 -90,0 Z" fill="none" stroke="#ffffff" stroke-width="2.5"/>
+    </g>
 
-    <!-- Concentric Golden Ratio Petal Orbits -->
-    <ellipse cx="0" cy="0" rx="140" ry="60" fill="none" stroke="#c084fc" stroke-width="1.8" opacity="0.6"/>
-    <ellipse cx="0" cy="0" rx="140" ry="60" fill="none" stroke="#f472b6" stroke-width="1.8" opacity="0.6" transform="rotate(45)"/>
-    <ellipse cx="0" cy="0" rx="140" ry="60" fill="none" stroke="#e879f9" stroke-width="1.8" opacity="0.6" transform="rotate(90)"/>
-    <ellipse cx="0" cy="0" rx="140" ry="60" fill="none" stroke="#a855f7" stroke-width="1.8" opacity="0.6" transform="rotate(135)"/>
+    <!-- Concentric Golden Ratio Fractal Flower Petals -->
+    <g transform="translate(260, 480)" filter="url(#glowSoft)">
+      <!-- Petal Rings -->
+      <ellipse cx="0" cy="0" rx="220" ry="80" fill="url(#petalGradMagenta)" opacity="0.4" transform="rotate(0)"/>
+      <ellipse cx="0" cy="0" rx="220" ry="80" fill="url(#petalGradViolet)" opacity="0.4" transform="rotate(30)"/>
+      <ellipse cx="0" cy="0" rx="220" ry="80" fill="url(#petalGradMagenta)" opacity="0.4" transform="rotate(60)"/>
+      <ellipse cx="0" cy="0" rx="220" ry="80" fill="url(#petalGradViolet)" opacity="0.4" transform="rotate(90)"/>
+      <ellipse cx="0" cy="0" rx="220" ry="80" fill="url(#petalGradMagenta)" opacity="0.4" transform="rotate(120)"/>
+      <ellipse cx="0" cy="0" rx="220" ry="80" fill="url(#petalGradViolet)" opacity="0.4" transform="rotate(150)"/>
 
-    <!-- Levitating Crystal Nodes on Petals -->
-    <circle cx="140" cy="0" r="6" fill="#fdf4ff"/>
-    <circle cx="-140" cy="0" r="6" fill="#fdf4ff"/>
-    <circle cx="0" cy="140" r="6" fill="#f0abfc"/>
-    <circle cx="0" cy="-140" r="6" fill="#f0abfc"/>
+      <!-- Inner Glowing Core Sphere -->
+      <circle cx="0" cy="0" r="35" fill="#fdf4ff" filter="url(#glowHeavy)"/>
+      <circle cx="0" cy="0" r="18" fill="#ffffff"/>
+    </g>
 
-    <!-- Mathematical Fractal Annotations (Left) -->
-    <g transform="translate(-160, 220)">
-      <text x="0" y="0" fill="#f5d0fe" font-family="sans-serif" font-size="16" font-weight="bold">z_(n+1) = z_n² + c</text>
-      <text x="15" y="28" fill="#e879f9" font-family="sans-serif" font-size="14">lim (n→∞) |z_n| &lt; ∞</text>
+    <!-- Floating Fractal Equation HUD (Left) -->
+    <g opacity="0.9" transform="translate(140, 720)" filter="url(#glowSoft)">
+      <rect x="-10" y="-24" width="260" height="96" fill="rgba(18, 4, 28, 0.85)" rx="10" stroke="#e879f9" stroke-width="1.5"/>
+      <text x="12" y="4" fill="#f5d0fe" font-family="monospace" font-size="16" font-weight="bold">z_(n+1) = z_n² + c</text>
+      <text x="12" y="32" fill="#f472b6" font-family="monospace" font-size="14">MANDELBROT SET // D = 2.0</text>
+      <text x="12" y="58" fill="#c084fc" font-family="monospace" font-size="14">lim (n→∞) |z_n| &lt; ∞</text>
     </g>
   </g>
 
-  <!-- Right Side: Fibonacci Golden Spiral Portal -->
-  <g id="rightSpiral" transform="translate(1620, 520)" filter="url(#glow)">
-    <!-- Golden Spiral Curve -->
-    <path d="M 0,0 
-             A 10,10 0 0,1 10,-10 
-             A 20,20 0 0,1 30,10 
-             A 40,40 0 0,1 -10,50 
-             A 70,70 0 0,1 -80,-20 
-             A 120,120 0 0,1 40,-140 
-             A 200,200 0 0,1 240,60" 
-          fill="none" stroke="#e879f9" stroke-width="3" opacity="0.85"/>
-    <path d="M 0,0 
-             A 10,10 0 0,1 10,-10 
-             A 20,20 0 0,1 30,10 
-             A 40,40 0 0,1 -10,50 
-             A 70,70 0 0,1 -80,-20 
-             A 120,120 0 0,1 40,-140 
-             A 200,200 0 0,1 240,60" 
-          fill="none" stroke="#ffffff" stroke-width="1.2"/>
+  <!-- 3. Right Side: Colossal Fibonacci Golden Spiral Celestial Portal -->
+  <g id="rightSpiralSanctuary">
+    <!-- Golden Spiral Luminous Curve -->
+    <g transform="translate(1620, 480)" filter="url(#glowHeavy)">
+      <path d="M 0,0 
+               A 15,15 0 0,1 15,-15 
+               A 30,30 0 0,1 45,15 
+               A 60,60 0 0,1 -15,75 
+               A 110,110 0 0,1 -125,-35 
+               A 180,180 0 0,1 55,-215 
+               A 300,300 0 0,1 355,85" 
+            fill="none" stroke="#f472b6" stroke-width="5.5" opacity="0.95"/>
+      <path d="M 0,0 
+               A 15,15 0 0,1 15,-15 
+               A 30,30 0 0,1 45,15 
+               A 60,60 0 0,1 -15,75 
+               A 110,110 0 0,1 -125,-35 
+               A 180,180 0 0,1 55,-215 
+               A 300,300 0 0,1 355,85" 
+            fill="none" stroke="#ffffff" stroke-width="2"/>
 
-    <!-- Levitating Infinity Prism -->
-    <polygon points="0,-40 35,-15 35,25 0,45 -35,25 -35,-15" fill="rgba(232, 121, 249, 0.25)" stroke="#f472b6" stroke-width="2"/>
-    <circle cx="0" cy="0" r="10" fill="#fdf4ff"/>
+      <!-- Levitating Sacred Geometric Polyhedron -->
+      <polygon points="0,-60 52,-20 52,40 0,75 -52,40 -52,-20" fill="rgba(244, 114, 182, 0.35)" stroke="#e879f9" stroke-width="2.5"/>
+      <circle cx="0" cy="5" r="16" fill="#fdf4ff"/>
+    </g>
 
-    <!-- Fractal Math Annotations (Right) -->
-    <g transform="translate(-160, 220)">
-      <text x="0" y="0" fill="#f0abfc" font-family="sans-serif" font-size="16" font-weight="bold">F_n = (φⁿ - ψⁿ) / √5</text>
-      <text x="15" y="28" fill="#c084fc" font-family="sans-serif" font-size="14">D = log(N) / log(1/s)</text>
+    <!-- Floating Fibonacci Equation HUD (Right) -->
+    <g opacity="0.9" transform="translate(1480, 720)" filter="url(#glowSoft)">
+      <rect x="-10" y="-24" width="260" height="96" fill="rgba(18, 4, 28, 0.85)" rx="10" stroke="#f472b6" stroke-width="1.5"/>
+      <text x="12" y="4" fill="#fce7f3" font-family="monospace" font-size="16" font-weight="bold">F_n = (φⁿ - ψⁿ) / √5</text>
+      <text x="12" y="32" fill="#e879f9" font-family="monospace" font-size="14">GOLDEN RATIO φ ≈ 1.618033</text>
+      <text x="12" y="58" fill="#c084fc" font-family="monospace" font-size="14">D_HAUSDORFF = log(N)/log(1/s)</text>
     </g>
   </g>
 
-  <!-- Garden Sanctuary Terrace Base -->
-  <path d="M0,900 Q960,880 1920,900 L1920,1080 L0,1080 Z" fill="#08020d"/>
-  <ellipse cx="240" cy="960" rx="200" ry="18" fill="#e879f9" opacity="0.15" filter="url(#glow)"/>
-  <ellipse cx="1620" cy="960" rx="200" ry="18" fill="#c084fc" opacity="0.15" filter="url(#glow)"/>
+  <!-- 4. Floating Petal Particle Clouds -->
+  <g fill="#fdf4ff" filter="url(#glowSoft)">
+    <circle cx="280" cy="340" r="5"/>
+    <circle cx="380" cy="280" r="4" fill="#f472b6"/>
+    <circle cx="480" cy="380" r="6" fill="#e879f9"/>
+    <circle cx="1440" cy="340" r="5" fill="#f472b6"/>
+    <circle cx="1540" cy="280" r="6" fill="#e879f9"/>
+    <circle cx="1680" cy="380" r="4"/>
+  </g>
+
+  <!-- 5. Ethereal Garden Sanctuary Terrace Floor -->
+  <path d="M0,840 Q960,800 1920,840 L1920,1080 L0,1080 Z" fill="#0c0214" opacity="0.95"/>
+  <path d="M0,900 Q960,860 1920,900 L1920,1080 L0,1080 Z" fill="#06010a"/>
+
+  <path d="M0,840 Q960,800 1920,840" stroke="#e879f9" stroke-width="4" fill="none" opacity="0.85" filter="url(#glowSoft)"/>
+  <path d="M0,900 Q960,860 1920,900" stroke="#f472b6" stroke-width="3" fill="none" opacity="0.75" filter="url(#glowSoft)"/>
+
+  <!-- Terrace Lotus Floor Beacons -->
+  <g fill="#fdf4ff" filter="url(#glowSoft)">
+    <circle cx="260" cy="850" r="7" fill="#e879f9"/>
+    <circle cx="580" cy="825" r="6"/>
+    <circle cx="960" cy="810" r="8" fill="#f472b6"/>
+    <circle cx="1340" cy="825" r="6"/>
+    <circle cx="1660" cy="850" r="7" fill="#e879f9"/>
+  </g>
 </svg>
