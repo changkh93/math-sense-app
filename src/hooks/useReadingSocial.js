@@ -93,6 +93,35 @@ export function useReadingShareFeed({ ownerId = null } = {}) {
 }
 
 /**
+ * Fetch only the newest public share for the all-questions feature slot.
+ * This intentionally avoids mounting the 13-read lounge feed query.
+ */
+export function useLatestReadingShare({ enabled = true } = {}) {
+  const { user } = useAuth();
+
+  return useQuery({
+    queryKey: ['readingShareFeatured', 'latest'],
+    queryFn: async () => {
+      const latestQuery = query(
+        collection(db, 'readingShares'),
+        where('status', '==', 'active'),
+        orderBy('publishedAt', 'desc'),
+        orderBy('__name__', 'desc'),
+        limit(1)
+      );
+      const snap = await getDocs(latestQuery);
+      const latest = snap.docs[0];
+      return latest ? { id: latest.id, ...latest.data() } : null;
+    },
+    enabled: Boolean(user && enabled),
+    staleTime: 5 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+  });
+}
+
+/**
  * 2. useReadingShare
  * Fetch single reading share document
  */
@@ -245,6 +274,7 @@ export function usePublishReadingShare() {
     onSuccess: () => {
       // Invalidate feed only when publishing new share
       queryClient.invalidateQueries({ queryKey: ['readingShareFeed'] });
+      queryClient.invalidateQueries({ queryKey: ['readingShareFeatured', 'latest'] });
       queryClient.invalidateQueries({ queryKey: ['readingBooks'] });
       queryClient.invalidateQueries({ queryKey: ['readingBook'] });
     },
@@ -319,6 +349,24 @@ export function useUpdateReadingShare() {
           })),
         };
       });
+
+      queryClient.setQueryData(['readingShareFeatured', 'latest'], (old) => {
+        if (!old || old.id !== variables.shareId) return old;
+        return {
+          ...old,
+          review: {
+            ...old.review,
+            oneLine: variables.oneLine,
+            reason: variables.reason || '',
+            question: variables.question || '',
+            hasSpoiler: Boolean(variables.hasSpoiler),
+          },
+          bookSnapshot: {
+            ...old.bookSnapshot,
+            page: variables.isPagePublic ? variables.page : null,
+          },
+        };
+      });
     },
   });
 }
@@ -336,6 +384,7 @@ export function useWithdrawReadingShare() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['readingShareFeed'] });
+      queryClient.invalidateQueries({ queryKey: ['readingShareFeatured', 'latest'] });
       queryClient.invalidateQueries({ queryKey: ['readingBooks'] });
       queryClient.invalidateQueries({ queryKey: ['readingBook'] });
     },
@@ -388,6 +437,11 @@ export function useSetReadingShareReaction() {
           })),
         };
       });
+
+      queryClient.setQueryData(['readingShareFeatured', 'latest'], (old) => {
+        if (!old || old.id !== shareId) return old;
+        return { ...old, reactionCounts };
+      });
     },
   });
 }
@@ -439,6 +493,11 @@ export function useCommentReadingShare() {
             }),
           })),
         };
+      });
+
+      queryClient.setQueryData(['readingShareFeatured', 'latest'], (old) => {
+        if (!old || old.id !== shareId) return old;
+        return { ...old, commentCount };
       });
     },
   });
@@ -502,6 +561,14 @@ export function useDeleteReadingShareComment() {
               };
             }),
           })),
+        };
+      });
+
+      queryClient.setQueryData(['readingShareFeatured', 'latest'], (old) => {
+        if (!old || old.id !== shareId) return old;
+        return {
+          ...old,
+          commentCount: data.commentCount ?? Math.max(0, (old.commentCount || 0) - 1),
         };
       });
     },

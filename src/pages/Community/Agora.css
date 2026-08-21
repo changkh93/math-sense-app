@@ -170,6 +170,133 @@
   min-width: 0;
 }
 
+.agora-reading-feature {
+  position: relative;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 1rem;
+  width: 100%;
+  margin-bottom: 1.4rem;
+  padding: 1.1rem 1.2rem;
+  overflow: hidden;
+  box-sizing: border-box;
+  border: 1px solid rgba(251, 191, 36, 0.4);
+  border-radius: 18px;
+  background:
+    radial-gradient(circle at 0 0, rgba(251, 191, 36, 0.16), transparent 40%),
+    linear-gradient(135deg, rgba(16, 24, 43, 0.96), rgba(7, 17, 31, 0.96));
+  box-shadow: 0 14px 34px rgba(3, 7, 18, 0.3);
+}
+
+.agora-reading-feature::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 10%;
+  width: 150px;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(56, 189, 248, 0.8), transparent);
+}
+
+.agora-reading-feature-icon {
+  display: grid;
+  width: 46px;
+  height: 46px;
+  flex: 0 0 auto;
+  place-items: center;
+  border: 1px solid rgba(251, 191, 36, 0.38);
+  border-radius: 14px;
+  color: #fcd34d;
+  background: rgba(251, 191, 36, 0.1);
+}
+
+.agora-reading-feature-copy {
+  min-width: 0;
+}
+
+.agora-reading-feature-kicker {
+  display: block;
+  margin-bottom: 0.3rem;
+  color: #fcd34d;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+}
+
+.agora-reading-feature-book {
+  display: flex;
+  min-width: 0;
+  align-items: baseline;
+  gap: 0.55rem;
+}
+
+.agora-reading-feature-book strong {
+  overflow: hidden;
+  color: #f8fafc;
+  font-size: 1rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.agora-reading-feature-book span {
+  overflow: hidden;
+  color: rgba(226, 232, 240, 0.62);
+  font-size: 0.8rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.agora-reading-feature-copy p {
+  display: -webkit-box;
+  margin: 0.4rem 0 0;
+  overflow: hidden;
+  color: rgba(241, 245, 249, 0.86);
+  font-size: 0.88rem;
+  line-height: 1.5;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.agora-reading-feature-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 0.8rem;
+  margin-top: 0.55rem;
+  color: rgba(148, 163, 184, 0.8);
+  font-size: 0.72rem;
+}
+
+.agora-reading-feature-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  min-height: 42px;
+  padding: 0.65rem 0.9rem;
+  border: 1px solid rgba(56, 189, 248, 0.35);
+  border-radius: 12px;
+  color: #7dd3fc;
+  background: rgba(14, 116, 144, 0.16);
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 800;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: border-color 0.2s ease, background 0.2s ease, transform 0.2s ease;
+}
+
+.agora-reading-feature-action:hover {
+  border-color: rgba(56, 189, 248, 0.68);
+  background: rgba(14, 116, 144, 0.28);
+  transform: translateY(-1px);
+}
+
+.agora-reading-feature-action:focus-visible {
+  outline: 2px solid #38bdf8;
+  outline-offset: 3px;
+}
+
 .questions-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
@@ -1161,6 +1288,17 @@
     width: 100%;
     max-width: 100%;
     min-width: 0;
+  }
+
+  .agora-reading-feature {
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: 0.8rem;
+    padding: 1rem;
+  }
+
+  .agora-reading-feature-action {
+    grid-column: 1 / -1;
+    width: 100%;
   }
 
   .questions-grid {

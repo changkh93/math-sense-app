@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Heart, MessageCircle, ArrowLeft, Plus, Search, Telescope, X, ChevronDown, Loader, Megaphone } from 'lucide-react';
+import { Heart, MessageCircle, ArrowLeft, Plus, Search, Telescope, X, ChevronDown, Loader, Megaphone, BookOpen, ArrowRight } from 'lucide-react';
 import { usePublicQuestions, useQAMutations } from '../../hooks/useQA';
 import { getQuestionAnonymousLabel } from '../../utils/socialUtils';
 import QuestionModal from '../../components/QuestionModal';
@@ -12,11 +12,47 @@ import StarMessageInput from '../../components/Community/StarMessageInput';
 import AgoraMotivationPanel from '../../components/Community/AgoraMotivationPanel';
 import AssignmentShareFeed from '../../components/Community/AssignmentShareFeed';
 import ReadingLoungeView from '../../components/Community/ReadingLounge/ReadingLoungeView';
+import { useLatestReadingShare } from '../../hooks/useReadingSocial';
 import { useAuth } from '../../hooks/useAuth';
 import { LinkPreviewList, parseInlineFormatting } from '../../utils/formatUtils';
 import './Agora.css';
 
 const MotionDiv = motion.div;
+
+function FeaturedReadingShare({ share, onOpen }) {
+  if (!share) return null;
+
+  const reactionCount = Object.values(share.reactionCounts || {})
+    .reduce((total, count) => total + (Number(count) || 0), 0);
+  const oneLine = share.review?.hasSpoiler
+    ? '스포일러가 포함된 추천 글입니다. 독서 라운지에서 안전하게 확인해 보세요.'
+    : share.review?.oneLine || '새로운 독서 추천이 도착했습니다.';
+
+  return (
+    <section className="agora-reading-feature" aria-label="독서 라운지 최신 추천">
+      <div className="agora-reading-feature-icon" aria-hidden="true">
+        <BookOpen size={23} />
+      </div>
+      <div className="agora-reading-feature-copy">
+        <span className="agora-reading-feature-kicker">독서 라운지에서 도착한 최신 추천</span>
+        <div className="agora-reading-feature-book">
+          <strong>{share.bookSnapshot?.title || '제목 없는 책'}</strong>
+          {share.bookSnapshot?.author && <span>{share.bookSnapshot.author}</span>}
+        </div>
+        <p>{oneLine}</p>
+        <div className="agora-reading-feature-meta">
+          <span>{share.ownerSnapshot?.displayName || '익명의 독서가'}</span>
+          <span>공감 {reactionCount}</span>
+          <span>이야기 {Number(share.commentCount) || 0}</span>
+        </div>
+      </div>
+      <button type="button" className="agora-reading-feature-action" onClick={onOpen}>
+        추천 글 보기
+        <ArrowRight size={17} aria-hidden="true" />
+      </button>
+    </section>
+  );
+}
 
 export default function Agora() {
   const navigate = useNavigate();
@@ -43,6 +79,10 @@ export default function Agora() {
     // Dedicated archive/reading feeds render instead of the question board.
     // Disabling this query avoids 20 unrelated question reads on every visit.
     enabled: filter !== 'reading' && filter !== 'archive',
+  });
+  const shouldFeatureReading = filter === 'all' && !searchTerm.trim();
+  const { data: featuredReadingShare } = useLatestReadingShare({
+    enabled: shouldFeatureReading,
   });
   const { upvote } = useQAMutations();
 
@@ -107,6 +147,18 @@ export default function Agora() {
     upvote.mutate(id);
   };
 
+  const handleOpenFeaturedReading = () => {
+    if (!featuredReadingShare?.id) return;
+    setSearchTerm('');
+    setSearchParams(prev => {
+      const next = new URLSearchParams(prev);
+      next.set('filter', 'reading');
+      next.set('highlight', featuredReadingShare.id);
+      next.delete('search');
+      return next;
+    });
+  };
+
   return (
     <div className={`agora-container space-bg fadeIn`}>
       <StarField />
@@ -168,6 +220,12 @@ export default function Agora() {
         </div>
         <div className="agora-layout-grid">
           <main className="agora-main">
+            {shouldFeatureReading && featuredReadingShare && (
+              <FeaturedReadingShare
+                share={featuredReadingShare}
+                onOpen={handleOpenFeaturedReading}
+              />
+            )}
             {filter === 'reading' ? (
               <ReadingLoungeView />
             ) : filter === 'archive' ? (
