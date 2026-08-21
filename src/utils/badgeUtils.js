@@ -72,9 +72,20 @@ import crewOpVeteranBadge from '../assets/badge/crew_op_veteran.png';
 import crewTeamIgnitionBadge from '../assets/badge/crew_team_ignition.png';
 import crewOreContributorBadge from '../assets/badge/crew_ore_contributor.png';
 import crewBoxEngineerBadge from '../assets/badge/crew_box_engineer.png';
+import crewQuartermasterBadge from '../assets/badge/crew_quartermaster.png';
 import crewTeamCoreBadge from '../assets/badge/crew_team_core.png';
+import crewStellarCaptainBadge from '../assets/badge/crew_stellar_captain.png';
 import crewGalaxyVanguardBadge from '../assets/badge/crew_galaxy_vanguard.png';
+
+import firstBookmarkBadge from '../assets/badge/first_bookmark.png';
+import weekReadingVoyageBadge from '../assets/badge/week_reading_voyage.png';
+import moonlightReaderBadge from '../assets/badge/moonlight_reader.png';
+import hundredDayScribeBadge from '../assets/badge/hundred_day_scribe.png';
+import unfadingReadingLampBadge from '../assets/badge/unfading_reading_lamp.png';
+import galaxyReadingHabitBadge from '../assets/badge/galaxy_reading_habit.png';
+import firstLogbookBadge from '../assets/badge/first_logbook.png';
 import oneBookUniverseBadge from '../assets/badge/one_book_universe.png';
+import classicSmallLibraryBadge from '../assets/badge/classic_small_library.png';
 import galacticArchivistBadge from '../assets/badge/galactic_archivist.png';
 
 // 배지 외형 업그레이드 1종(프리미엄)의 광석 가격.
@@ -104,9 +115,19 @@ const BADGE_PREMIUM_IMAGES = {
   crew_team_ignition: crewTeamIgnitionBadge,
   crew_ore_contributor: crewOreContributorBadge,
   crew_box_engineer: crewBoxEngineerBadge,
+  crew_quartermaster: crewQuartermasterBadge,
   crew_team_core: crewTeamCoreBadge,
+  crew_stellar_captain: crewStellarCaptainBadge,
   crew_galaxy_vanguard: crewGalaxyVanguardBadge,
+  first_bookmark: firstBookmarkBadge,
+  week_reading_voyage: weekReadingVoyageBadge,
+  moonlight_reader: moonlightReaderBadge,
+  hundred_day_scribe: hundredDayScribeBadge,
+  unfading_reading_lamp: unfadingReadingLampBadge,
+  galaxy_reading_habit: galaxyReadingHabitBadge,
+  first_logbook: firstLogbookBadge,
   one_book_universe: oneBookUniverseBadge,
+  classic_small_library: classicSmallLibraryBadge,
   galactic_archivist: galacticArchivistBadge,
   cosmos_initiate: cosmosInitiateBadge,
   crystal_collector: crystalCollectorBadge,
