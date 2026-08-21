@@ -1,14 +1,18 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { BOOK_STATUSES, BOOK_STATUS_LABELS, BOOK_STATUS_COLORS } from '../../../utils/readingDomain';
 import { formatKSTFullDateTime, formatKSTShortDate } from '../../../utils/readingTime';
 import { useReadingBook, useReadingLogs, useUpdateReadingBookStatus, useArchiveReadingBook } from '../../../hooks/useReadingLibrary';
-import { X, BookOpen, Clock, Calendar, CheckCircle2, PauseCircle, PlayCircle, Archive, RotateCcw } from 'lucide-react';
+import { X, BookOpen, Clock, Calendar, CheckCircle2, PauseCircle, PlayCircle, Archive, RotateCcw, Share2, Sparkles } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import ReadingShareComposer from '../../Community/ReadingLounge/ReadingShareComposer';
 import './ReadingLibrary.css';
 
 const MotionDiv = motion.div;
 
 export default function ReadingBookDetailDrawer({ isOpen, onClose, book, onOpenProgress }) {
+  const navigate = useNavigate();
+  const [isComposerOpen, setIsComposerOpen] = useState(false);
   const updateStatusMutation = useUpdateReadingBookStatus();
   const archiveBookMutation = useArchiveReadingBook();
   const { data: refreshedBook } = useReadingBook(book?.id);
@@ -195,6 +199,45 @@ export default function ReadingBookDetailDrawer({ isOpen, onClose, book, onOpenP
                 </button>
               )}
 
+              {/* Recommendation Actions */}
+              {currentBook.publicShare?.status === 'active' ? (
+                <div style={{ display: 'flex', gap: '0.4rem' }}>
+                  <button
+                    type="button"
+                    className="bookshelf-add-btn font-tech"
+                    style={{ fontSize: '0.82rem', padding: '0.45rem 0.85rem', background: 'rgba(56, 189, 248, 0.2)', borderColor: '#38bdf8', color: '#38bdf8' }}
+                    onClick={() => {
+                      onClose();
+                      navigate(`/?view=agora&filter=reading&highlight=${currentBook.publicShare.shareId}`);
+                    }}
+                  >
+                    <Sparkles size={14} />
+                    추천 글 보기
+                  </button>
+                  <button
+                    type="button"
+                    className="space-nav-link font-tech"
+                    style={{ fontSize: '0.82rem', padding: '0.45rem 0.85rem' }}
+                    onClick={() => {
+                      onClose();
+                      navigate(`/?view=agora&filter=reading&highlight=${currentBook.publicShare.shareId}`);
+                    }}
+                  >
+                    수정
+                  </button>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  className="bookshelf-add-btn font-tech"
+                  onClick={() => setIsComposerOpen(true)}
+                  style={{ fontSize: '0.82rem', padding: '0.45rem 0.85rem', background: 'rgba(56, 189, 248, 0.15)', borderColor: 'rgba(56, 189, 248, 0.4)', color: '#38bdf8' }}
+                >
+                  <Share2 size={14} />
+                  이 책 추천하기
+                </button>
+              )}
+
               <button
                 type="button"
                 className="space-nav-link font-tech"
@@ -251,6 +294,14 @@ export default function ReadingBookDetailDrawer({ isOpen, onClose, book, onOpenP
           </div>
         </MotionDiv>
       </div>
+
+      {isComposerOpen && (
+        <ReadingShareComposer
+          isOpen={isComposerOpen}
+          onClose={() => setIsComposerOpen(false)}
+          initialBook={currentBook}
+        />
+      )}
     </AnimatePresence>
   );
 }

@@ -6723,6 +6723,16 @@ const classicReading = require("./classicReading")({
 });
 Object.assign(exports, classicReading.functions);
 
+const classicReadingSocial = require("./classicReadingSocial")({
+  functions,
+  admin,
+  regionalFunctions,
+  costOptimizedDataFunctions,
+  requireAuthUid,
+  requireAdminUid,
+});
+Object.assign(exports, classicReadingSocial.functions);
+
 function getGlmApiKey() {
   return process.env.GLM_API_KEY || "";
 }
@@ -6834,6 +6844,81 @@ async function deleteQueryDocs(queryRef, stats, key) {
 
   stats[key] = (stats[key] || 0) + deleted;
   return deleted;
+}
+
+async function cleanupReadingSocialContributions(db, uid, stats) {
+  let reactionsDeleted = 0;
+  let commentsDeleted = 0;
+
+  while (true) {
+    const snap = await db.collectionGroup("reactions")
+      .where("kind", "==", "reading_share")
+      .where("userId", "==", uid)
+      .limit(200)
+      .get();
+    if (snap.empty) break;
+
+    const byShare = new Map();
+    for (const reactionDoc of snap.docs) {
+      const shareRef = reactionDoc.ref.parent.parent;
+      if (!shareRef || shareRef.parent.id !== "readingShares") continue;
+      const group = byShare.get(shareRef.path) || { shareRef, docs: [] };
+      group.docs.push(reactionDoc);
+      byShare.set(shareRef.path, group);
+    }
+
+    for (const { shareRef, docs } of byShare.values()) {
+      await db.runTransaction(async (tx) => {
+        const shareSnap = await tx.get(shareRef);
+        for (const reactionDoc of docs) tx.delete(reactionDoc.ref);
+        if (!shareSnap.exists) return;
+
+        const counts = shareSnap.data()?.reactionCounts || {};
+        const wantToReadRemoved = docs.filter((docSnap) => docSnap.data()?.type === "want_to_read").length;
+        const resonatedRemoved = docs.filter((docSnap) => docSnap.data()?.type === "resonated").length;
+        tx.update(shareRef, {
+          "reactionCounts.wantToRead": Math.max(0, Number(counts.wantToRead || 0) - wantToReadRemoved),
+          "reactionCounts.resonated": Math.max(0, Number(counts.resonated || 0) - resonatedRemoved),
+        });
+      });
+      reactionsDeleted += docs.length;
+    }
+  }
+
+  while (true) {
+    const snap = await db.collectionGroup("comments")
+      .where("kind", "==", "reading_share")
+      .where("authorId", "==", uid)
+      .limit(200)
+      .get();
+    if (snap.empty) break;
+
+    const byShare = new Map();
+    for (const commentDoc of snap.docs) {
+      const shareRef = commentDoc.ref.parent.parent;
+      if (!shareRef || shareRef.parent.id !== "readingShares") continue;
+      const group = byShare.get(shareRef.path) || { shareRef, docs: [] };
+      group.docs.push(commentDoc);
+      byShare.set(shareRef.path, group);
+    }
+
+    for (const { shareRef, docs } of byShare.values()) {
+      await db.runTransaction(async (tx) => {
+        const shareSnap = await tx.get(shareRef);
+        for (const commentDoc of docs) tx.delete(commentDoc.ref);
+        if (!shareSnap.exists) return;
+
+        const visibleRemoved = docs.filter((docSnap) => docSnap.data()?.status === "visible").length;
+        tx.update(shareRef, {
+          commentCount: Math.max(0, Number(shareSnap.data()?.commentCount || 0) - visibleRemoved),
+        });
+      });
+      commentsDeleted += docs.length;
+    }
+  }
+
+  stats.readingShareReactionsDeleted = (stats.readingShareReactionsDeleted || 0) + reactionsDeleted;
+  stats.readingShareCommentsDeleted = (stats.readingShareCommentsDeleted || 0) + commentsDeleted;
 }
 
 // galaxyBlocks/{ownerUid}/blocked/{targetUid} 서브컬렉션에서 targetUid가 uid인 차단
@@ -7061,12 +7146,24 @@ async function deleteUserOwnedData(uid, options = {}) {
       await recalculateQuestionAnswerCount(db, questionId, stats);
     }
 
+    stage = "reading-social-contribution-cleanup";
+    await cleanupReadingSocialContributions(db, uid, stats);
+
     stage = "top-level-doc-cleanup";
     await deleteQueryDocs(db.collection("assignments").where("userId", "==", uid), stats, "assignmentsDeleted");
     await deleteQueryDocs(db.collection("attendance").where("userId", "==", uid), stats, "attendanceDeleted");
     await deleteQueryDocs(db.collection("readingBooks").where("userId", "==", uid), stats, "readingBooksDeleted");
     await deleteQueryDocs(db.collection("readingLogs").where("userId", "==", uid), stats, "readingLogsDeleted");
     await deleteQueryDocs(db.collection("readingCommands").where("userId", "==", uid), stats, "readingCommandsDeleted");
+    await deleteQueryDocs(db.collection("readingSocialUsage").where("userId", "==", uid), stats, "readingSocialUsageDeleted");
+    // Clean up readingShares recursively (including subcollection reactions and comments)
+    const readingSharesSnap = await db.collection("readingShares").where("ownerId", "==", uid).get();
+    for (const shareDoc of readingSharesSnap.docs) {
+      await db.recursiveDelete(shareDoc.ref);
+    }
+    await deleteQueryDocs(db.collection("readingShareReports").where("reporterId", "==", uid), stats, "readingShareReportsDeleted");
+    await deleteQueryDocs(db.collection("readingShareReports").where("ownerId", "==", uid), stats, "readingShareReportsDeleted");
+    await deleteQueryDocs(db.collection("notifications").where("actorId", "==", uid), stats, "notificationsDeleted");
     await deleteQueryDocs(db.collection("notifications").where("recipientId", "==", uid), stats, "notificationsDeleted");
     await deleteQueryDocs(db.collection("directMemos").where("senderId", "==", uid), stats, "directMemosDeleted");
     await deleteQueryDocs(db.collection("directMemos").where("recipientId", "==", uid), stats, "directMemosDeleted");

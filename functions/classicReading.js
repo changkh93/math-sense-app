@@ -290,6 +290,9 @@ module.exports = function ({ functions, admin, costOptimizedDataFunctions, requi
         currentPage: policy.validatePage(book.progress?.furthestPage || book.progress?.latestReadPage || 0).valid
           ? Number(book.progress?.furthestPage || book.progress?.latestReadPage)
           : 0,
+        publicShareId: book.publicShare?.status === "active" && typeof book.publicShare?.shareId === "string"
+          ? book.publicShare.shareId
+          : null,
       }));
 
     const lastDoc = pageDocs[pageDocs.length - 1];

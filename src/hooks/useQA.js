@@ -27,7 +27,7 @@ import {
 // --- Fetch Public Questions (Agora Board) with Cursor Pagination ---
 const PAGE_SIZE = 20;
 
-export function usePublicQuestions(filter = 'all') {
+export function usePublicQuestions(filter = 'all', options = {}) {
   return useInfiniteQuery({
     queryKey: ['publicQuestions', filter],
     queryFn: async ({ pageParam }) => {
@@ -74,6 +74,7 @@ export function usePublicQuestions(filter = 'all') {
       if (!lastPage?.lastDoc || lastPage.items.length < PAGE_SIZE) return undefined;
       return lastPage.lastDoc;
     },
+    enabled: options.enabled !== false,
     staleTime: 1000 * 60, // 1 minute
   });
 }

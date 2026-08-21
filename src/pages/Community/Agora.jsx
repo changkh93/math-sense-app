@@ -11,6 +11,7 @@ import AgoraLiveTicker from '../../components/Community/AgoraLiveTicker';
 import StarMessageInput from '../../components/Community/StarMessageInput';
 import AgoraMotivationPanel from '../../components/Community/AgoraMotivationPanel';
 import AssignmentShareFeed from '../../components/Community/AssignmentShareFeed';
+import ReadingLoungeView from '../../components/Community/ReadingLounge/ReadingLoungeView';
 import { useAuth } from '../../hooks/useAuth';
 import { LinkPreviewList, parseInlineFormatting } from '../../utils/formatUtils';
 import './Agora.css';
@@ -38,7 +39,11 @@ export default function Agora() {
     fetchNextPage, 
     hasNextPage, 
     isFetchingNextPage 
-  } = usePublicQuestions(filter);
+  } = usePublicQuestions(filter, {
+    // Dedicated archive/reading feeds render instead of the question board.
+    // Disabling this query avoids 20 unrelated question reads on every visit.
+    enabled: filter !== 'reading' && filter !== 'archive',
+  });
   const { upvote } = useQAMutations();
 
   // Flatten all pages into a single array
@@ -92,6 +97,7 @@ export default function Agora() {
     { id: 'unanswered', label: '대기 중', icon: '🚨' },
     { id: 'solved', label: '해결됨', icon: '✅' },
     { id: 'archive', label: '기록 공개', icon: '📖' },
+    { id: 'reading', label: '독서 라운지', icon: '📚' },
     { id: 'my', label: '내 질문', icon: '🧑‍🚀' }
   ];
 
@@ -125,7 +131,7 @@ export default function Agora() {
           </div>
           <div>
             <strong>아고라 운영 원칙</strong>
-            <p>아고라는 수학 질문과 풀이를 나누는 공간이에요. 특정 친구에게 현상금을 전달하기 위한 글은 등록할 수 없습니다. 궁금한 문제와 막힌 부분을 구체적으로 작성해 주세요.</p>
+            <p>아고라는 수학 질문과 독서 감상을 나누는 공간이에요. 특정 친구에게 현상금을 전달하기 위한 글은 등록할 수 없습니다. 궁금한 문제와 막힌 부분을 구체적으로 작성해 주세요.</p>
           </div>
         </aside>
 
@@ -143,24 +149,28 @@ export default function Agora() {
             ))}
           </div>
           
-          <div className="agora-search-bar glass">
-            <Search size={18} className="search-icon" />
-            <input 
-              type="text" 
-              placeholder="궁금한 키워드로 검색해보세요..." 
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
-            {searchTerm && (
-              <button className="clear-btn" onClick={() => setSearchTerm('')}>
-                <X size={16} />
-              </button>
-            )}
-          </div>
+          {filter !== 'reading' && (
+            <div className="agora-search-bar glass">
+              <Search size={18} className="search-icon" />
+              <input
+                type="text"
+                placeholder="궁금한 키워드로 검색해보세요..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+              {searchTerm && (
+                <button className="clear-btn" onClick={() => setSearchTerm('')}>
+                  <X size={16} />
+                </button>
+              )}
+            </div>
+          )}
         </div>
         <div className="agora-layout-grid">
           <main className="agora-main">
-            {filter === 'archive' ? (
+            {filter === 'reading' ? (
+              <ReadingLoungeView />
+            ) : filter === 'archive' ? (
               <AssignmentShareFeed highlightId={highlightId} />
             ) : isLoading ? (
               <div className="loading-state">질문을 불러오는 중...</div>

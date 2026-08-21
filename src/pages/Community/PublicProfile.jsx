@@ -146,6 +146,9 @@ function normalizeProfileBook(book = {}, id = '') {
     author: String(book.author || '').slice(0, 120),
     status: PROFILE_BOOK_STATUS_META[book.status] ? book.status : 'reading',
     currentPage: Number.isInteger(rawPage) && rawPage > 0 && rawPage <= 99999 ? rawPage : 0,
+    publicShareId: typeof book.publicShareId === 'string'
+      ? book.publicShareId
+      : (book.publicShare?.status === 'active' && typeof book.publicShare?.shareId === 'string' ? book.publicShare.shareId : null),
   };
 }
 
@@ -192,23 +195,51 @@ async function fetchProfileBookshelfPage({ userId, cursor = null, pageSize = PRO
 }
 
 function ProfileBookSpine({ book, variant = 'preview' }) {
+  const navigate = useNavigate();
   const status = PROFILE_BOOK_STATUS_META[book.status] || PROFILE_BOOK_STATUS_META.reading;
-  const label = `${book.title}, ${book.author}, ${status.label}${book.currentPage > 0 ? `, ${book.currentPage}쪽` : ''}`;
+  const label = `${book.title}, ${book.author}, ${status.label}${book.currentPage > 0 ? `, ${book.currentPage}쪽` : ''}${book.publicShareId ? ' (독서 추천 글 있음)' : ''}`;
+
+  const handleClick = () => {
+    if (book.publicShareId) {
+      navigate(`/?view=agora&filter=reading&highlight=${book.publicShareId}`);
+    }
+  };
 
   return (
     <motion.div
       role="listitem"
-      className={`public-profile-book-spine is-${book.status || 'reading'} is-${variant}`}
-      style={getProfileBookStyle(book)}
+      className={`public-profile-book-spine is-${book.status || 'reading'} is-${variant} ${book.publicShareId ? 'has-share' : ''}`}
+      style={{
+        ...getProfileBookStyle(book),
+        cursor: book.publicShareId ? 'pointer' : 'default',
+      }}
       whileHover={{ y: -12, rotate: -0.7 }}
+      onClick={handleClick}
       aria-label={label}
       title={label}
     >
-      <span className="public-profile-book-spine-status" aria-hidden="true">{status.icon}</span>
+      <span className="public-profile-book-spine-status" aria-hidden="true">
+        {book.publicShareId ? '✨' : status.icon}
+      </span>
       <span className="public-profile-book-spine-band is-top" aria-hidden="true" />
       <strong>{book.title}</strong>
       <small>{book.author}</small>
       {book.currentPage > 0 && <em>{book.currentPage}p</em>}
+      {book.publicShareId && (
+        <span
+          style={{
+            fontSize: '0.68rem',
+            color: '#38bdf8',
+            fontWeight: 800,
+            background: 'rgba(0,0,0,0.4)',
+            padding: '2px 4px',
+            borderRadius: '4px',
+            marginTop: '2px',
+          }}
+        >
+          추천 글
+        </span>
+      )}
       <span className="public-profile-book-spine-band is-bottom" aria-hidden="true" />
     </motion.div>
   );

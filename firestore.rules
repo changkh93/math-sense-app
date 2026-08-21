@@ -764,6 +764,48 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
+    // Western Classic Reading Social Recommendations (Reading Lounge)
+    match /readingShares/{shareId} {
+      allow read: if isAuth() && (
+        resource.data.status == 'active' ||
+        resource.data.ownerId == request.auth.uid ||
+        isAdmin()
+      );
+      allow write: if false;
+
+      match /reactions/{userId} {
+        allow read: if isAuth() && (
+          (
+            request.auth.uid == userId &&
+            get(/databases/$(database)/documents/readingShares/$(shareId)).data.status == 'active'
+          ) ||
+          get(/databases/$(database)/documents/readingShares/$(shareId)).data.ownerId == request.auth.uid ||
+          isAdmin()
+        );
+        allow write: if false;
+      }
+
+      match /comments/{commentId} {
+        allow read: if isAuth() && (
+          get(/databases/$(database)/documents/readingShares/$(shareId)).data.status == 'active' ||
+          get(/databases/$(database)/documents/readingShares/$(shareId)).data.ownerId == request.auth.uid ||
+          isAdmin()
+        ) && (
+          resource.data.status == 'visible' ||
+          resource.data.status == 'deleted'
+        );
+        allow write: if false;
+      }
+    }
+
+    match /readingShareReports/{reportId} {
+      allow read, write: if false;
+    }
+
+    match /readingSocialUsage/{usageId} {
+      allow read, write: if false;
+    }
+
     // Assignment warning ledger. Admins issue/cancel warnings, students can only
     // submit one immutable appeal for their own active warning.
     match /assignmentWarnings/{warningId} {

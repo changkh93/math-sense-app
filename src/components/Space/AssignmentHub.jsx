@@ -29,6 +29,7 @@ import { formatFeedbackForDisplay } from '../../utils/feedbackFormatting';
 import { isWesternClassicCluster } from '../../constants/westernClassicNavigation';
 import { useReadingBooks } from '../../hooks/useReadingLibrary';
 import ReadingBookFormModal from './ReadingLibrary/ReadingBookFormModal';
+import ReadingShareComposer from '../Community/ReadingLounge/ReadingShareComposer';
 import './ReadingLibrary/ReadingLibrary.css';
 
 const MotionDiv = motion.div;
@@ -279,6 +280,7 @@ export default function AssignmentHub({ clusterId, regionId, initialDateStr, onC
   const [penaltyCheckNow, setPenaltyCheckNow] = useState(0);
   const [optimisticAssignmentsByDate, setOptimisticAssignmentsByDate] = useState({});
   const [submissionNotice, setSubmissionNotice] = useState(null);
+  const [shareModalBook, setShareModalBook] = useState(null);
   const unsentDraftRef = useRef({ dirty: false });
   const previousTodayRef = useRef(todayKST);
   const penaltySweepKeyRef = useRef('');
@@ -546,7 +548,8 @@ export default function AssignmentHub({ clusterId, regionId, initialDateStr, onC
     setSelectedDateStr(submittedAssignment.date);
     setSubmissionNotice({
       date: submittedAssignment.date,
-      status: submittedAssignment.status || 'submitted'
+      status: submittedAssignment.status || 'submitted',
+      reading: submittedAssignment.reading || null,
     });
   };
 
@@ -1015,10 +1018,20 @@ export default function AssignmentHub({ clusterId, regionId, initialDateStr, onC
         {submissionNotice && (
           <SubmissionSuccessModal
             dateStr={submissionNotice.date}
+            reading={submissionNotice.reading}
             onClose={() => setSubmissionNotice(null)}
+            onOpenReadingShare={(book) => setShareModalBook(book)}
           />
         )}
       </AnimatePresence>
+
+      {shareModalBook && (
+        <ReadingShareComposer
+          isOpen={Boolean(shareModalBook)}
+          onClose={() => setShareModalBook(null)}
+          initialBook={shareModalBook}
+        />
+      )}
     </div>
   );
 }
@@ -1121,7 +1134,7 @@ function AssignmentWarningPolicyCard({ activeWarningCount = 0 }) {
   );
 }
 
-function SubmissionSuccessModal({ dateStr, onClose }) {
+function SubmissionSuccessModal({ dateStr, reading, onClose, onOpenReadingShare }) {
   return (
     <MotionDiv
       initial={{ opacity: 0 }}
@@ -1162,14 +1175,41 @@ function SubmissionSuccessModal({ dateStr, onClose }) {
           <br />
           제출된 기록 화면으로 전환했습니다.
         </p>
-        <button
-          type="button"
-          className="space-btn cosmic-btn font-tech"
-          onClick={onClose}
-          style={{ minWidth: '120px' }}
-        >
-          확인
-        </button>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem', alignItems: 'center' }}>
+          {reading?.bookId && (
+            <button
+              type="button"
+              className="space-btn cosmic-btn font-tech"
+              onClick={() => {
+                onClose();
+                onOpenReadingShare?.({
+                  id: reading.bookId,
+                  title: reading.title,
+                  author: reading.author,
+                  progress: { furthestPage: reading.page }
+                });
+              }}
+              style={{
+                width: '100%',
+                background: 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)',
+                border: '1px solid rgba(56, 189, 248, 0.5)',
+                color: '#fff'
+              }}
+            >
+              📚 오늘의 독서를 라운지에 공유할까요?
+            </button>
+          )}
+
+          <button
+            type="button"
+            className="space-nav-link font-tech"
+            onClick={onClose}
+            style={{ minWidth: '120px', padding: '0.5rem 1rem' }}
+          >
+            확인
+          </button>
+        </div>
       </MotionDiv>
     </MotionDiv>
   );
