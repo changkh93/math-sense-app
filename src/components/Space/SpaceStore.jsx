@@ -1,7 +1,7 @@
 import React from 'react'
 import { createPortal } from 'react-dom'
 import { motion as Motion } from 'framer-motion'
-import { collection, doc, getDoc, getDocs, query, runTransaction, serverTimestamp, where, writeBatch } from 'firebase/firestore'
+import { collection, doc, getDoc, getDocs, limit, query, runTransaction, serverTimestamp, where, writeBatch } from 'firebase/firestore'
 import { httpsCallable } from 'firebase/functions'
 import { Gift, Search, Send, UserRound, X } from 'lucide-react'
 import { db, functions } from '../../firebase'
@@ -47,10 +47,11 @@ export default function SpaceStore({ userData, user, shouldScrollToBottom, histo
   const [purchasing, setPurchasing] = React.useState(false)
   const [purchaseMessage, setPurchaseMessage] = React.useState(null)
   const [recipients, setRecipients] = React.useState([])
+  const [giftRecipientsLoading, setGiftRecipientsLoading] = React.useState(false)
+  const [selectedGiftRecipient, setSelectedGiftRecipient] = React.useState(null)
   const [giftItem, setGiftItem] = React.useState(null)
   const [giftMode, setGiftMode] = React.useState('purchase')
   const [giftRecipientSearch, setGiftRecipientSearch] = React.useState('')
-  const [giftRecipientId, setGiftRecipientId] = React.useState('')
   const [giftBusy, setGiftBusy] = React.useState(false)
   const [giftMessage, setGiftMessage] = React.useState(null)
   const [badgeUpgradeTarget, setBadgeUpgradeTarget] = React.useState(null)
@@ -69,23 +70,62 @@ export default function SpaceStore({ userData, user, shouldScrollToBottom, histo
   React.useEffect(() => {
     if (!user?.uid || !giftItem) {
       setRecipients([])
+      setGiftRecipientsLoading(false)
       return undefined
     }
+
+    const keyword = giftRecipientSearch.trim()
+    if (!keyword || selectedGiftRecipient) {
+      setRecipients([])
+      setGiftRecipientsLoading(false)
+      return undefined
+    }
+
     let cancelled = false
-    getDocs(collection(db, 'users')).then((snapshot) => {
-      if (cancelled) return
-      const list = snapshot.docs
-        .map(docSnap => ({ uid: docSnap.id, ...docSnap.data() }))
-        .filter(profile => profile.uid !== user.uid && profile.role !== 'parent' && profile.role !== 'admin')
-        .sort((a, b) => getProfileName(a).localeCompare(getProfileName(b), 'ko'))
-      setRecipients(list)
-      setGiftRecipientId(prev => (prev && list.some(item => item.uid === prev) ? prev : ''))
-    }).catch((error) => {
-      console.error('Store gift recipients error:', error)
-      if (!cancelled) setRecipients([])
-    })
-    return () => { cancelled = true }
-  }, [giftItem, user?.uid])
+    setGiftRecipientsLoading(true)
+    const timer = setTimeout(async () => {
+      try {
+        const term = keyword
+        const termLower = keyword.toLowerCase()
+        const usersRef = collection(db, 'users')
+
+        const [snap1, snap2, snap3, snap4, snap5] = await Promise.all([
+          getDocs(query(usersRef, where('publicDisplayName', '>=', term), where('publicDisplayName', '<=', term + '\uf8ff'), limit(10))),
+          getDocs(query(usersRef, where('studentName', '>=', term), where('studentName', '<=', term + '\uf8ff'), limit(10))),
+          getDocs(query(usersRef, where('name', '>=', term), where('name', '<=', term + '\uf8ff'), limit(10))),
+          getDocs(query(usersRef, where('displayName', '>=', term), where('displayName', '<=', term + '\uf8ff'), limit(10))),
+          getDocs(query(usersRef, where('email', '>=', termLower), where('email', '<=', termLower + '\uf8ff'), limit(10))),
+        ])
+
+        if (cancelled) return
+
+        const resultMap = new Map()
+        ;[snap1, snap2, snap3, snap4, snap5].forEach((snap) => {
+          snap.docs.forEach((docSnap) => {
+            if (docSnap.id !== user.uid) {
+              const data = docSnap.data()
+              if (data.role !== 'parent' && data.role !== 'admin') {
+                resultMap.set(docSnap.id, { uid: docSnap.id, ...data })
+              }
+            }
+          })
+        })
+
+        const list = Array.from(resultMap.values()).sort((a, b) => getProfileName(a).localeCompare(getProfileName(b), 'ko'))
+        setRecipients(list)
+      } catch (error) {
+        console.error('Store gift recipients error:', error)
+        if (!cancelled) setRecipients([])
+      } finally {
+        if (!cancelled) setGiftRecipientsLoading(false)
+      }
+    }, 250)
+
+    return () => {
+      cancelled = true
+      clearTimeout(timer)
+    }
+  }, [giftItem, giftRecipientSearch, selectedGiftRecipient, user?.uid])
 
   const cryoCooldownRemainingMs = getStreakFreezePurchaseCooldownRemainingMs(userData)
   const cryoCooldownRemainingDays = cryoCooldownRemainingMs > 0 ? Math.ceil(cryoCooldownRemainingMs / DAY_MS) : 0
@@ -147,11 +187,6 @@ export default function SpaceStore({ userData, user, shouldScrollToBottom, histo
     return false
   }
 
-  const selectedGiftRecipient = React.useMemo(
-    () => recipients.find(recipient => recipient.uid === giftRecipientId) || null,
-    [recipients, giftRecipientId]
-  )
-
   const filteredGiftRecipients = React.useMemo(() => {
     const term = giftRecipientSearch.trim().toLowerCase()
     if (!term || selectedGiftRecipient) return []
@@ -200,6 +235,12 @@ export default function SpaceStore({ userData, user, shouldScrollToBottom, histo
     if (item.id === 'frame_solar' && recipientFrames.includes('solar')) {
       return `${getProfileName(recipient)}님은 이미 ${item.name}을 보유 중입니다.`
     }
+    if (item.type === 'base' && item.themeId) {
+      const recipientThemes = normalizeOwnedBaseThemes(recipient)
+      if (recipientThemes.includes(item.themeId)) {
+        return `${getProfileName(recipient)}님은 이미 ${item.name}을 보유 중입니다.`
+      }
+    }
     return ''
   }
 
@@ -220,7 +261,9 @@ export default function SpaceStore({ userData, user, shouldScrollToBottom, histo
     setGiftItem(item)
     setGiftMode(ownedAvailable ? 'owned' : 'purchase')
     setGiftRecipientSearch('')
-    setGiftRecipientId('')
+    setSelectedGiftRecipient(null)
+    setRecipients([])
+    setGiftRecipientsLoading(false)
     setGiftMessage(null)
   }
 
@@ -228,7 +271,9 @@ export default function SpaceStore({ userData, user, shouldScrollToBottom, histo
     if (giftBusy) return
     setGiftItem(null)
     setGiftRecipientSearch('')
-    setGiftRecipientId('')
+    setSelectedGiftRecipient(null)
+    setRecipients([])
+    setGiftRecipientsLoading(false)
     setGiftMessage(null)
   }
 
@@ -258,7 +303,9 @@ export default function SpaceStore({ userData, user, shouldScrollToBottom, histo
       })
       setGiftItem(null)
       setGiftRecipientSearch('')
-      setGiftRecipientId('')
+      setSelectedGiftRecipient(null)
+      setRecipients([])
+      setGiftRecipientsLoading(false)
       setTimeout(() => setPurchaseMessage(null), 3000)
     } catch (err) {
       console.error('Store gift failed:', err)
@@ -791,7 +838,7 @@ export default function SpaceStore({ userData, user, shouldScrollToBottom, histo
     <button
       type="button"
       className="space-nav-link"
-      disabled={giftBusy}
+      disabled={giftBusy || purchasing}
       style={{
         flex: '0 0 auto',
         whiteSpace: 'nowrap',
@@ -805,8 +852,8 @@ export default function SpaceStore({ userData, user, shouldScrollToBottom, histo
         background: 'rgba(0, 243, 255, 0.05)',
         border: '1px solid rgba(0, 243, 255, 0.3)',
         color: 'var(--text-bright)',
-        cursor: giftBusy ? 'not-allowed' : 'pointer',
-        opacity: giftBusy ? 0.7 : 1,
+        cursor: giftBusy || purchasing ? 'not-allowed' : 'pointer',
+        opacity: giftBusy || purchasing ? 0.7 : 1,
       }}
       onClick={() => openGiftModal(item)}
     >
@@ -918,8 +965,10 @@ export default function SpaceStore({ userData, user, shouldScrollToBottom, histo
                 <button
                   type="button"
                   onClick={() => {
-                    setGiftRecipientId('')
+                    setSelectedGiftRecipient(null)
                     setGiftRecipientSearch('')
+                    setRecipients([])
+                    setGiftRecipientsLoading(false)
                     setGiftMessage(null)
                   }}
                   disabled={giftBusy}
@@ -952,7 +1001,7 @@ export default function SpaceStore({ userData, user, shouldScrollToBottom, histo
                       setGiftRecipientSearch(event.target.value)
                       setGiftMessage(null)
                     }}
-                    placeholder="친구 이름, 칭호, 이메일 검색"
+                    placeholder="친구 이름 또는 이메일 검색"
                     disabled={giftBusy}
                     style={{
                       width: '100%',
@@ -982,8 +1031,10 @@ export default function SpaceStore({ userData, user, shouldScrollToBottom, histo
                         key={recipient.uid}
                         type="button"
                         onClick={() => {
-                          setGiftRecipientId(recipient.uid)
+                          setSelectedGiftRecipient(recipient)
                           setGiftRecipientSearch('')
+                          setRecipients([])
+                          setGiftRecipientsLoading(false)
                           setGiftMessage(null)
                         }}
                         style={{
@@ -1011,6 +1062,16 @@ export default function SpaceStore({ userData, user, shouldScrollToBottom, histo
                         </span>
                       </button>
                     ))}
+                  </div>
+                )}
+                {giftRecipientsLoading && (
+                  <div style={{ marginTop: '0.45rem', color: 'var(--text-muted)', fontSize: '0.8rem' }}>
+                    친구를 검색하는 중...
+                  </div>
+                )}
+                {!giftRecipientsLoading && giftRecipientSearch.trim() && filteredGiftRecipients.length === 0 && (
+                  <div style={{ marginTop: '0.45rem', color: 'var(--text-muted)', fontSize: '0.8rem' }}>
+                    일치하는 학생을 찾지 못했습니다.
                   </div>
                 )}
               </div>
@@ -1041,7 +1102,9 @@ export default function SpaceStore({ userData, user, shouldScrollToBottom, histo
               >
                 <strong>보유분 선물</strong>
                 <span style={{ display: 'block', marginTop: 4, fontSize: '0.78rem', color: 'var(--text-muted)' }}>
-                  보유 가능 수량: {getOwnedGiftUnitCount(giftItem)} · {getGiftUnitLabel(giftItem)}
+                  {giftItem?.type === 'base' || giftItem?.type === 'profile' || giftItem?.id === 'radar'
+                    ? '영구 해금 아이템은 구매해서 선물만 가능'
+                    : `보유 가능 수량: ${getOwnedGiftUnitCount(giftItem)} · ${getGiftUnitLabel(giftItem)}`}
                 </span>
               </button>
               <button
@@ -1471,42 +1534,48 @@ export default function SpaceStore({ userData, user, shouldScrollToBottom, histo
                 <div style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.62)', marginBottom: '1rem' }}>
                   {isSelected ? '현재 공개 탐험기지에 장착 중' : isOwned ? '해금됨 · 여기서 바로 장착 가능' : theme.description}
                 </div>
-                <button
-                  className="space-nav-link"
-                  disabled={purchasing || isSelected || (!isOwned && !canAfford)}
-                  style={{
-                    width: '100%',
-                    fontSize: '0.85rem',
-                    padding: '0.7rem',
-                    fontWeight: 800,
-                    background: isSelected
-                      ? 'rgba(107, 114, 128, 0.2)'
-                      : (!isOwned && !canAfford)
-                        ? 'rgba(239, 68, 68, 0.1)'
-                        : `${theme.accent}24`,
-                    border: isSelected
-                      ? '1px solid rgba(107, 114, 128, 0.3)'
-                      : `1px solid ${theme.accent}66`,
-                    color: isSelected ? '#9ca3af' : theme.accent,
-                    cursor: (isSelected || purchasing || (!isOwned && !canAfford)) ? 'not-allowed' : 'pointer',
-                    opacity: purchasing ? 0.7 : 1
-                  }}
-                  onClick={() => {
-                    if (isOwned) {
-                      handleEquipBaseTheme(theme.id)
-                    } else if (item) {
-                      handlePurchase(item)
-                    }
-                  }}
-                >
-                  {isSelected
-                    ? '장착 중'
-                    : isOwned
-                      ? '장착하기'
-                      : !canAfford
-                        ? `광석 부족 (${cost - (userData?.crystals || 0)}개 더 필요)`
-                        : '구매하고 장착하기'}
-                </button>
+                <div style={{ display: 'flex', alignItems: 'stretch', gap: '0.5rem', flexWrap: 'nowrap' }}>
+                  <button
+                    className="space-nav-link"
+                    disabled={purchasing || isSelected || (!isOwned && !canAfford)}
+                    style={{
+                      width: 'auto',
+                      minWidth: 0,
+                      flex: '1 1 0',
+                      whiteSpace: 'nowrap',
+                      fontSize: '0.8rem',
+                      padding: '0.65rem 0.5rem',
+                      fontWeight: 800,
+                      background: isSelected
+                        ? 'rgba(107, 114, 128, 0.2)'
+                        : (!isOwned && !canAfford)
+                          ? 'rgba(239, 68, 68, 0.1)'
+                          : `${theme.accent}24`,
+                      border: isSelected
+                        ? '1px solid rgba(107, 114, 128, 0.3)'
+                        : `1px solid ${theme.accent}66`,
+                      color: isSelected ? '#9ca3af' : theme.accent,
+                      cursor: (isSelected || purchasing || (!isOwned && !canAfford)) ? 'not-allowed' : 'pointer',
+                      opacity: purchasing ? 0.7 : 1
+                    }}
+                    onClick={() => {
+                      if (isOwned) {
+                        handleEquipBaseTheme(theme.id)
+                      } else if (item) {
+                        handlePurchase(item)
+                      }
+                    }}
+                  >
+                    {isSelected
+                      ? '장착 중'
+                      : isOwned
+                        ? '장착하기'
+                        : !canAfford
+                          ? `광석 부족 (${cost - (userData?.crystals || 0)}개 더 필요)`
+                          : '구매하고 장착하기'}
+                  </button>
+                  {item ? renderGiftButton(item) : null}
+                </div>
               </div>
             </div>
           )

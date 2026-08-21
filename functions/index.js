@@ -61,66 +61,12 @@ Object.assign(exports, require("./galaxyGame")({
 }));
 const DIRECT_MEMO_MAX_LENGTH = 2000;
 const CRYSTAL_GIFT_DAILY_LIMIT = 100;
-const STORE_RADAR_DURATION_DAYS = 7;
 const QUIZ_BATTLE_TIE_TOLERANCE_MS = 3000;
-const STORE_PHOTON_SHIELD_CHARGES_PER_GIFT = 10;
-const STORE_ITEM_GIFT_CATALOG = {
-  cryo_core: {
-    name: "크라이오 코어",
-    cost: 100,
-    ownedMode: "count",
-    senderField: "streakFreezeCount",
-    recipientField: "streakFreezeCount",
-    transferAmount: 1,
-  },
-  photon_shield: {
-    name: "광자 실드",
-    cost: 20,
-    ownedMode: "count",
-    senderField: "shieldCharges",
-    recipientField: "shieldCharges",
-    transferAmount: STORE_PHOTON_SHIELD_CHARGES_PER_GIFT,
-  },
-  radar: {
-    name: "첨단 마이닝 스캐너",
-    cost: 100,
-    ownedMode: "purchase_only",
-  },
-  signature_unlock: {
-    name: "시그니처 해금",
-    cost: 30,
-    ownedMode: "purchase_only",
-    uniqueField: "profileSignatureUnlocked",
-  },
-  frame_nebula: {
-    name: "네뷸라 프레임",
-    cost: 50,
-    ownedMode: "purchase_only",
-    frameId: "nebula",
-  },
-  frame_solar: {
-    name: "솔라 프레임",
-    cost: 150,
-    ownedMode: "purchase_only",
-    frameId: "solar",
-  },
-  hall_showcase_credit: {
-    name: "명예의 전당 쇼케이스",
-    cost: 50,
-    ownedMode: "count",
-    senderField: "hallShowcaseCredits",
-    recipientField: "hallShowcaseCredits",
-    transferAmount: 1,
-  },
-  crew_creation_pass: {
-    name: "스터디 크루 창설권",
-    cost: 1000,
-    ownedMode: "count",
-    senderField: "crewCreationPasses",
-    recipientField: "crewCreationPasses",
-    transferAmount: 1,
-  },
-};
+const {
+  STORE_ITEM_GIFT_CATALOG,
+  validateGiftRequest,
+  calculateGiftRecipientUpdates,
+} = require("./storeGiftPolicy.cjs");
 const OPERATOR_GIFT_EMAIL = "paul@dulcine.net";
 const ASSIGNMENT_MISSING_LOOKBACK_DAYS = 7;
 const ASSIGNMENT_MISSING_GRACE_MS = 12 * 60 * 60 * 1000;
@@ -7845,10 +7791,6 @@ async function syncOpenStudyRoomParticipantsTransaction(tx, db, roomRef, roomDat
   return { activeIds, staleIds, status: nextStatus };
 }
 
-function getOwnedProfileFrames(userData = {}) {
-  const owned = Array.isArray(userData.ownedProfileFrames) ? userData.ownedProfileFrames : [];
-  return Array.from(new Set(["starter", ...owned]));
-}
 
 function getProfileFrameMeta(frameId = "starter") {
   if (frameId === "nebula") {
@@ -11106,31 +11048,30 @@ exports.giftStoreItem = regionalFunctions.https.onCall(async (data, context) => 
 
     const senderData = senderSnap.data() || {};
     const recipientData = recipientSnap.data() || {};
-    if (!canOperatorGift(senderData, context) && (senderData.role === "parent" || senderData.role === "admin")) {
-      throw new functions.https.HttpsError("permission-denied", "학생 계정만 상점 아이템을 선물할 수 있습니다.");
-    }
-    if (recipientData.role === "parent" || recipientData.role === "admin") {
-      throw new functions.https.HttpsError("failed-precondition", "학생 계정에게만 상점 아이템을 선물할 수 있습니다.");
+    const isOperator = canOperatorGift(senderData, context);
+
+    const validation = validateGiftRequest({
+      senderId,
+      recipientId,
+      itemId,
+      mode,
+      senderData,
+      recipientData,
+      isOperator,
+    });
+    if (!validation.valid) {
+      throw new functions.https.HttpsError(validation.code, validation.error);
     }
 
     const senderUpdates = {};
-    const recipientUpdates = {};
     const senderCrystals = Math.max(0, Number(senderData.crystals || 0));
     const senderName = getDisplayNameFromUser(senderData);
     const recipientName = getDisplayNameFromUser(recipientData);
-    let shouldSyncRecipientAnswers = false;
 
     if (mode === "purchase") {
-      if (senderCrystals < item.cost) {
-        throw new functions.https.HttpsError("failed-precondition", "보유 광석이 부족합니다.");
-      }
       senderUpdates.crystals = senderCrystals - item.cost;
     } else {
       const senderOwned = Math.max(0, Number(senderData[item.senderField] || 0));
-      if (senderOwned < item.transferAmount) {
-        const unitLabel = itemId === "photon_shield" ? `${item.transferAmount}회 방어` : `${item.transferAmount}개`;
-        throw new functions.https.HttpsError("failed-precondition", `${item.name} 보유분이 부족합니다. (${unitLabel} 필요)`);
-      }
       senderUpdates[item.senderField] = senderOwned - item.transferAmount;
       if (itemId === "cryo_core") {
         senderUpdates.streakWriteAudit = buildServerStreakGiftAudit({
@@ -11144,44 +11085,29 @@ exports.giftStoreItem = regionalFunctions.https.onCall(async (data, context) => 
       }
     }
 
-    if (itemId === "radar") {
-      if (isRadarActiveServer(recipientData, nowMs)) {
-        throw new functions.https.HttpsError("failed-precondition", `${recipientName}님은 이미 ${item.name}를 활성화 중입니다.`);
-      }
-      recipientUpdates.hasRadar = true;
-      recipientUpdates.radarActivatedAtMs = nowMs;
-      recipientUpdates.radarExpiresAtMs = nowMs + STORE_RADAR_DURATION_DAYS * 24 * 60 * 60 * 1000;
-    } else if (item.uniqueField) {
-      if (recipientData[item.uniqueField]) {
-        throw new functions.https.HttpsError("failed-precondition", `${recipientName}님은 이미 ${item.name}를 보유 중입니다.`);
-      }
-      recipientUpdates[item.uniqueField] = true;
-      shouldSyncRecipientAnswers = true;
-    } else if (item.frameId) {
-      const recipientFrames = getOwnedProfileFrames(recipientData);
-      if (recipientFrames.includes(item.frameId)) {
-        throw new functions.https.HttpsError("failed-precondition", `${recipientName}님은 이미 ${item.name}를 보유 중입니다.`);
-      }
-      recipientUpdates.ownedProfileFrames = [...recipientFrames, item.frameId];
-      recipientUpdates.selectedProfileFrame = item.frameId;
-      shouldSyncRecipientAnswers = true;
-    } else {
-      const currentRecipientOwned = Math.max(0, Number(recipientData[item.recipientField] || 0));
-      const nextRecipientOwned = currentRecipientOwned + item.transferAmount;
-      if (item.maxRecipientValue && nextRecipientOwned > item.maxRecipientValue) {
-        throw new functions.https.HttpsError("failed-precondition", `${recipientName}님은 ${item.name}를 더 받을 수 없습니다.`);
-      }
-      recipientUpdates[item.recipientField] = nextRecipientOwned;
-      if (itemId === "cryo_core") {
-        recipientUpdates.streakWriteAudit = buildServerStreakGiftAudit({
-          source: "space_store_gift_receive_cryo_core",
-          writerUid: senderId,
-          prevState: recipientData,
-          nextFreezeCount: nextRecipientOwned,
-          writtenAt: nowTimestamp,
-          note: giftRef.id,
-        });
-      }
+    const recipientCalc = calculateGiftRecipientUpdates({
+      itemId,
+      recipientData,
+      nowMs,
+      isRadarActiveFn: isRadarActiveServer,
+    });
+    if (!recipientCalc.ok) {
+      throw new functions.https.HttpsError(
+        recipientCalc.code || "failed-precondition",
+        `${recipientName}님은 ${recipientCalc.error}`
+      );
+    }
+
+    const recipientUpdates = { ...recipientCalc.recipientUpdates };
+    if (itemId === "cryo_core") {
+      recipientUpdates.streakWriteAudit = buildServerStreakGiftAudit({
+        source: "space_store_gift_receive_cryo_core",
+        writerUid: senderId,
+        prevState: recipientData,
+        nextFreezeCount: recipientUpdates.streakFreezeCount,
+        writtenAt: nowTimestamp,
+        note: giftRef.id,
+      });
     }
 
     const giftData = {
@@ -11194,6 +11120,7 @@ exports.giftStoreItem = regionalFunctions.https.onCall(async (data, context) => 
       mode,
       cost: mode === "purchase" ? item.cost : 0,
       transferAmount: item.transferAmount || 1,
+      ...(item.baseThemeId ? { baseThemeId: item.baseThemeId } : {}),
       createdAt: nowTimestamp,
     };
 
@@ -11211,6 +11138,7 @@ exports.giftStoreItem = regionalFunctions.https.onCall(async (data, context) => 
         itemId,
         itemName: item.name,
         giftMode: mode,
+        ...(item.baseThemeId ? { baseThemeId: item.baseThemeId } : {}),
       },
       timestamp: nowTimestamp,
     });
@@ -11225,6 +11153,7 @@ exports.giftStoreItem = regionalFunctions.https.onCall(async (data, context) => 
         itemId,
         itemName: item.name,
         giftMode: mode,
+        ...(item.baseThemeId ? { baseThemeId: item.baseThemeId } : {}),
       },
       timestamp: nowTimestamp,
     });
@@ -11234,7 +11163,7 @@ exports.giftStoreItem = regionalFunctions.https.onCall(async (data, context) => 
       recipientName,
       itemName: item.name,
       mode,
-      shouldSyncRecipientAnswers,
+      shouldSyncRecipientAnswers: recipientCalc.shouldSyncRecipientAnswers,
     };
   });
 
