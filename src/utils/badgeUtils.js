@@ -52,6 +52,13 @@ import masterClusterMiddleBadge from '../assets/badge/master_cluster_middle.png'
 import masterClusterPythonBadge from '../assets/badge/master_cluster_python.png';
 import masterClusterClassicBadge from '../assets/badge/master_cluster_classic.png';
 
+import firstContactBadge from '../assets/badge/first_contact.png';
+import agoraArchimedesBadge from '../assets/badge/agora_archimedes.png';
+import crewTeamCoreBadge from '../assets/badge/crew_team_core.png';
+import crewGalaxyVanguardBadge from '../assets/badge/crew_galaxy_vanguard.png';
+import oneBookUniverseBadge from '../assets/badge/one_book_universe.png';
+import galacticArchivistBadge from '../assets/badge/galactic_archivist.png';
+
 // 배지 외형 업그레이드 1종(프리미엄)의 광석 가격.
 export const BADGE_UPGRADE_COST = 100;
 
@@ -60,6 +67,12 @@ const BADGE_PREMIUM_IMAGES = {
   agora_helper: agoraHelperBadge,
   kind_solver: kindSolverBadge,
   question_pioneer: questionPioneerBadge,
+  first_contact: firstContactBadge,
+  agora_archimedes: agoraArchimedesBadge,
+  crew_team_core: crewTeamCoreBadge,
+  crew_galaxy_vanguard: crewGalaxyVanguardBadge,
+  one_book_universe: oneBookUniverseBadge,
+  galactic_archivist: galacticArchivistBadge,
   cosmos_initiate: cosmosInitiateBadge,
   crystal_collector: crystalCollectorBadge,
   galaxy_scholar: galaxyScholarBadge,
