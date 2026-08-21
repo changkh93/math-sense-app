@@ -108,25 +108,41 @@ const BADGE_PREMIUM_IMAGES = {
   curiosity_beacon: curiosityBeaconBadge,
   agora_lighthouse: agoraLighthouseBadge,
   agora_archimedes: agoraArchimedesBadge,
+  // 스터디 크루 계열 배지 (crewBadgeUtils ID 및 별칭 모두 매핑)
+  crew_first_boarding: crewFirstBoardBadge,
   crew_first_board: crewFirstBoardBadge,
+  crew_first_mission: crewFirstOpBadge,
   crew_first_op: crewFirstOpBadge,
+  crew_weekly_navigator: crewWeekSailorBadge,
   crew_week_sailor: crewWeekSailorBadge,
+  crew_mission_veteran: crewOpVeteranBadge,
   crew_op_veteran: crewOpVeteranBadge,
+  crew_team_signal: crewTeamIgnitionBadge,
   crew_team_ignition: crewTeamIgnitionBadge,
+  crew_team_core: crewTeamCoreBadge,
+  crew_chest_contributor: crewOreContributorBadge,
   crew_ore_contributor: crewOreContributorBadge,
+  crew_chest_engineer: crewBoxEngineerBadge,
   crew_box_engineer: crewBoxEngineerBadge,
   crew_quartermaster: crewQuartermasterBadge,
-  crew_team_core: crewTeamCoreBadge,
+  crew_commander: crewStellarCaptainBadge,
   crew_stellar_captain: crewStellarCaptainBadge,
   crew_galaxy_vanguard: crewGalaxyVanguardBadge,
+
+  // 서양 고전 독서 계열 배지 (readingBadgeUtils ID 및 별칭 모두 매핑)
   first_bookmark: firstBookmarkBadge,
+  weekly_reading_voyager: weekReadingVoyageBadge,
   week_reading_voyage: weekReadingVoyageBadge,
   moonlight_reader: moonlightReaderBadge,
+  hundred_reading_days: hundredDayScribeBadge,
   hundred_day_scribe: hundredDayScribeBadge,
   unfading_reading_lamp: unfadingReadingLampBadge,
+  galactic_reading_habit: galaxyReadingHabitBadge,
   galaxy_reading_habit: galaxyReadingHabitBadge,
+  first_reading_logbook: firstLogbookBadge,
   first_logbook: firstLogbookBadge,
   one_book_universe: oneBookUniverseBadge,
+  classic_bookshelf_keeper: classicSmallLibraryBadge,
   classic_small_library: classicSmallLibraryBadge,
   galactic_archivist: galacticArchivistBadge,
   cosmos_initiate: cosmosInitiateBadge,
@@ -435,6 +451,41 @@ export function buildAgoraBadges(userData = {}) {
       ],
       unlocked: answeredQuestionCount >= 100 && acceptedAnswerCount >= 50 && explorerLvl >= 11,
       desc: '답변 100개 + 채택 50개 + 탐사 Lv.11을 달성한 최고의 수학 현자입니다.'
+    },
+    {
+      id: 'curiosity_beacon',
+      title: '호기심의 등대',
+      icon: '🏮',
+      category: 'agora',
+      requirements: [
+        { key: 'question', label: '등록 질문', current: questionCount, target: 25, unit: '개', completed: questionCount >= 25 }
+      ],
+      unlocked: questionCount >= 25,
+      desc: '질문 25개 이상을 밝혀 지식의 바다를 비추는 등대가 되었습니다.'
+    },
+    {
+      id: 'agora_lighthouse',
+      title: '아고라 등대지기',
+      icon: '🗼',
+      category: 'agora',
+      requirements: [
+        { key: 'question', label: '등록 질문', current: questionCount, target: 50, unit: '개', completed: questionCount >= 50 }
+      ],
+      unlocked: questionCount >= 50,
+      desc: '질문 50개를 밝혀 은하의 등대지기가 되었습니다.'
+    },
+    {
+      id: 'exploration_legend',
+      title: '탐사 전설',
+      icon: '🪐',
+      category: 'agora',
+      requirements: [
+        { key: 'question', label: '등록 질문', current: questionCount, target: 20, unit: '개', completed: questionCount >= 20 },
+        { key: 'answer', label: '답변한 질문', current: answeredQuestionCount, target: 50, unit: '개', completed: answeredQuestionCount >= 50 },
+        { key: 'level', label: '탐사 등급', current: explorerLvl, target: 9, unit: 'Lv.', prefix: 'Lv.', completed: explorerLvl >= 9 }
+      ],
+      unlocked: questionCount >= 20 && answeredQuestionCount >= 50 && explorerLvl >= 9,
+      desc: '질문 20개 + 답변 50개 + 탐사 Lv.9를 달성한 전설의 아고라 탐험가입니다.'
     }
   ];
 }
