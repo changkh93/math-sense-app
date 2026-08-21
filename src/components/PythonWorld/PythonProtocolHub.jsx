@@ -131,12 +131,10 @@ function LegacyProtocolHub({ unitProgressMap, onEnterMission, onBack }) {
   )
 }
 
-export default function PythonProtocolHub({ unitProgressMap = {}, onEnterMission, onEnterVerticalSlice, onBack, v2Enabled = false }) {
+export default function PythonProtocolHub({ unitProgressMap = {}, onEnterMission, onEnterVerticalSlice, onBack, v2Enabled = true }) {
   const [verticalSliceOpen, setVerticalSliceOpen] = useState(false)
-  const isV2 = v2Enabled
-    || import.meta.env.DEV
-    || import.meta.env.VITE_LUMI_PROTOCOL_V2 === 'true'
-    || isLocalV2Enabled()
+  const isLegacy = typeof localStorage !== 'undefined' && localStorage.getItem('lumiProtocolLegacy') === 'true'
+  const isV2 = v2Enabled && !isLegacy
   const missionSet = getLumiVerticalSliceSet()
   const course = getLumiCourseCatalog()
   const startVerticalSlice = () => onEnterVerticalSlice ? onEnterVerticalSlice(missionSet) : setVerticalSliceOpen(true)
