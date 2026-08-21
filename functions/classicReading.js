@@ -579,7 +579,7 @@ module.exports = function ({ functions, admin, costOptimizedDataFunctions, requi
         ? { docs: [] }
         : await tx.get(
           creditRefs.userRef.collection("readingDayCredits")
-            .orderBy(admin.firestore.FieldPath.documentId(), "desc")
+            .orderBy("dateKey", "desc")
             .limit(31)
         );
 
@@ -995,7 +995,7 @@ module.exports = function ({ functions, admin, costOptimizedDataFunctions, requi
           ? { docs: [] }
           : await tx.get(
             creditRefs.userRef.collection("readingDayCredits")
-              .orderBy(admin.firestore.FieldPath.documentId(), "desc")
+              .orderBy("dateKey", "desc")
               .limit(31)
           );
 

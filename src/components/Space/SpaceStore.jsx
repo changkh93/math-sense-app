@@ -14,6 +14,7 @@ import {
   RADAR_DURATION_DAYS,
   getRadarTimeRemainingMs,
   getStreakFreezePurchaseCooldownRemainingMs,
+  getTodayKST,
   isRadarActive,
 } from '../../utils/streakUtils'
 import { BASE_THEMES, buildAnswerProfileSnapshot, getBaseTheme, normalizeOwnedBaseThemes, normalizeOwnedFrames, SOCIAL_STORE_ITEMS } from '../../utils/socialUtils'
@@ -55,6 +56,7 @@ export default function SpaceStore({ userData, user, shouldScrollToBottom, histo
   const [giftBusy, setGiftBusy] = React.useState(false)
   const [giftMessage, setGiftMessage] = React.useState(null)
   const [badgeUpgradeTarget, setBadgeUpgradeTarget] = React.useState(null)
+  const [baseThemeFilter, setBaseThemeFilter] = React.useState('all')
 
   React.useEffect(() => {
     if (shouldScrollToBottom) {
@@ -169,11 +171,16 @@ export default function SpaceStore({ userData, user, shouldScrollToBottom, histo
   ]
 
   const profileItems = SOCIAL_STORE_ITEMS.filter(item => item.type === 'profile')
-  const baseItems = SOCIAL_STORE_ITEMS.filter(item => item.type === 'base')
-  const baseThemeStoreCards = BASE_THEMES.map(theme => ({
-    theme,
-    item: baseItems.find(item => item.themeId === theme.id) || null,
-  }))
+  const baseThemeStoreCards = React.useMemo(() => {
+    const itemsByThemeId = new Map(
+      SOCIAL_STORE_ITEMS
+        .filter(item => item.type === 'base')
+        .map(item => [item.themeId, item])
+    )
+    return [...BASE_THEMES]
+      .sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0))
+      .map(theme => ({ theme, item: itemsByThemeId.get(theme.id) || null }))
+  }, [])
   const hallItems = SOCIAL_STORE_ITEMS.filter(item => item.type === 'hall')
   const crewItems = SOCIAL_STORE_ITEMS.filter(item => item.type === 'crew')
   const ownedFrames = normalizeOwnedFrames(userData)
@@ -186,6 +193,41 @@ export default function SpaceStore({ userData, user, shouldScrollToBottom, histo
     if (item.type === 'base') return ownedBaseThemes.includes(item.themeId)
     return false
   }
+
+  const isThemeNew = React.useCallback((theme) => {
+    if (!theme?.releasedAt || !theme?.newUntil) return false
+    const todayKST = getTodayKST()
+    return theme.releasedAt <= todayKST && todayKST <= theme.newUntil
+  }, [])
+
+  const baseThemeCardsWithOwnership = React.useMemo(() => {
+    return baseThemeStoreCards.map(({ theme, item }) => {
+      const isOwned = ownedBaseThemes.includes(theme.id)
+      const isSelected = (userData?.selectedBaseTheme || 'orbital') === theme.id
+      const isNew = isThemeNew(theme)
+      return { theme, item, isOwned, isSelected, isNew }
+    })
+  }, [baseThemeStoreCards, ownedBaseThemes, userData?.selectedBaseTheme, isThemeNew])
+
+  const baseThemeCounts = React.useMemo(() => {
+    const total = baseThemeCardsWithOwnership.length
+    const owned = baseThemeCardsWithOwnership.filter(c => c.isOwned).length
+    return {
+      total,
+      owned,
+      unowned: total - owned,
+    }
+  }, [baseThemeCardsWithOwnership])
+
+  const filteredBaseThemeCards = React.useMemo(() => {
+    if (baseThemeFilter === 'owned') {
+      return baseThemeCardsWithOwnership.filter(c => c.isOwned)
+    }
+    if (baseThemeFilter === 'unowned') {
+      return baseThemeCardsWithOwnership.filter(c => !c.isOwned)
+    }
+    return baseThemeCardsWithOwnership
+  }, [baseThemeCardsWithOwnership, baseThemeFilter])
 
   const filteredGiftRecipients = React.useMemo(() => {
     const term = giftRecipientSearch.trim().toLowerCase()
@@ -322,6 +364,53 @@ export default function SpaceStore({ userData, user, shouldScrollToBottom, histo
     if (purchasing || !user) return
 
     setPurchasing(true)
+
+    // Permanent cosmetics and radar must fail closed through the authoritative
+    // server catalog. Falling back to a client transaction would bypass server
+    // pricing and role checks when the callable rejects a request.
+    if (item.type === 'base' || item.type === 'profile' || item.id === 'radar') {
+      try {
+        const purchaseCallable = httpsCallable(functions, 'purchaseStoreItem')
+        const result = await purchaseCallable({ itemId: item.id })
+        if (!result?.data?.success) {
+          throw new Error('구매 처리 결과를 확인할 수 없습니다.')
+        }
+        soundManager.playCrystal()
+        if (item.type === 'base') {
+          setPurchaseMessage({
+            type: 'success',
+            text: `${item.name} 해금 완료! 공개 탐험기지 배경으로 장착되었습니다.`,
+          })
+        } else if (item.id === 'signature_unlock') {
+          setPurchaseMessage({
+            type: 'success',
+            text: '한 줄 시그니처 기능이 해금되었습니다.',
+          })
+        } else if (item.id === 'frame_nebula' || item.id === 'frame_solar') {
+          setPurchaseMessage({
+            type: 'success',
+            text: `${item.name} 해금 완료! 프로필 명함에서 선택할 수 있습니다.`,
+          })
+        } else if (item.id === 'radar') {
+          setPurchaseMessage({
+            type: 'success',
+            text: `${item.name} 활성화 완료! ${RADAR_DURATION_DAYS}일 동안 유지됩니다.`,
+          })
+        }
+        setTimeout(() => setPurchaseMessage(null), 3000)
+      } catch (callableError) {
+        console.error('purchaseStoreItem callable failed:', callableError)
+        setPurchaseMessage({
+          type: 'error',
+          text: callableError?.message || '구매에 실패했습니다. 다시 시도해주세요.',
+        })
+        setTimeout(() => setPurchaseMessage(null), 3000)
+      } finally {
+        setPurchasing(false)
+      }
+      return
+    }
+
     const userRef = doc(db, 'users', user.uid)
     const nowMs = Date.now()
 
@@ -1491,96 +1580,179 @@ export default function SpaceStore({ userData, user, shouldScrollToBottom, histo
         ))}
       </div>
 
-      <h3 style={{ color: 'var(--text-bright)', marginBottom: '1.5rem' }}>🛖 나의 탐험기지 배경</h3>
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
-        gap: '1.5rem',
-        marginBottom: '4rem'
-      }}>
-        {baseThemeStoreCards.map(({ theme, item }) => {
-          const isOwned = ownedBaseThemes.includes(theme.id)
-          const isSelected = (userData?.selectedBaseTheme || 'orbital') === theme.id
-          const cost = item?.cost || 0
-          const canAfford = (userData?.crystals || 0) >= cost
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem', marginBottom: '1.5rem' }}>
+        <h3 style={{ color: 'var(--text-bright)', margin: 0 }}>🛖 나의 탐험기지 배경</h3>
+        <div role="group" aria-label="탐험기지 배경 필터" style={{ display: 'inline-flex', gap: '0.35rem', background: 'rgba(15, 23, 42, 0.65)', padding: '0.3rem', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.08)' }}>
+          {[
+            { key: 'all', label: `전체 (${baseThemeCounts.total})` },
+            { key: 'owned', label: `보유 중 (${baseThemeCounts.owned})` },
+            { key: 'unowned', label: `미보유 (${baseThemeCounts.unowned})` },
+          ].map(tab => {
+            const isActive = baseThemeFilter === tab.key
+            return (
+              <button
+                key={tab.key}
+                aria-pressed={isActive}
+                type="button"
+                onClick={() => setBaseThemeFilter(tab.key)}
+                style={{
+                  border: 'none',
+                  background: isActive ? 'rgba(0, 243, 255, 0.2)' : 'transparent',
+                  color: isActive ? '#00f3ff' : 'var(--text-muted)',
+                  fontWeight: isActive ? 800 : 600,
+                  fontSize: '0.82rem',
+                  padding: '0.45rem 0.85rem',
+                  borderRadius: '8px',
+                  cursor: 'pointer',
+                  transition: 'all 0.15s ease',
+                }}
+              >
+                {tab.label}
+              </button>
+            )
+          })}
+        </div>
+      </div>
 
-          return (
-            <div key={theme.id} className="glass-card" style={{
-              padding: '1.5rem',
-              border: isSelected ? `1px solid ${theme.accent}` : '1px solid rgba(255,255,255,0.12)',
-              background: theme.pageBackground,
-              overflow: 'hidden',
-              position: 'relative'
-            }}>
-              <div style={{
-                position: 'absolute',
-                inset: 0,
-                background: 'rgba(2, 6, 23, 0.42)',
-                pointerEvents: 'none'
-              }} />
-              <div style={{ position: 'relative', zIndex: 1 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1rem' }}>
-                  <div style={{ fontSize: '2.5rem' }}>{theme.icon}</div>
-                  <div>
-                    <div style={{ fontWeight: 800, color: 'var(--text-bright)' }}>{theme.name}</div>
-                    <div style={{ fontSize: '0.8rem', color: theme.accent }}>
-                      {cost > 0 ? `💰 ${cost} 광석` : '기본 제공'}
+      {filteredBaseThemeCards.length === 0 ? (
+        <div className="glass-card" style={{ padding: '3rem 1.5rem', textAlign: 'center', color: 'var(--text-muted)', marginBottom: '4rem' }}>
+          <p style={{ margin: 0, fontSize: '0.95rem' }}>
+            {baseThemeFilter === 'owned'
+              ? '아직 해금한 탐험기지 배경이 없습니다. 마음에 드는 배경을 해금해보세요!'
+              : '모든 탐험기지 배경을 보유 중입니다! 🎉'}
+          </p>
+        </div>
+      ) : (
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+          gap: '1.5rem',
+          marginBottom: '4rem'
+        }}>
+          {filteredBaseThemeCards.map(({ theme, item, isOwned, isSelected, isNew }) => {
+            const cost = item?.cost || 0
+            const canAfford = (userData?.crystals || 0) >= cost
+
+            return (
+              <div key={theme.id} className="glass-card" style={{
+                padding: '1.5rem',
+                border: isSelected ? `1px solid ${theme.accent}` : '1px solid rgba(255,255,255,0.12)',
+                background: theme.pageBackground,
+                overflow: 'hidden',
+                position: 'relative'
+              }}>
+                <div style={{
+                  position: 'absolute',
+                  inset: 0,
+                  background: 'rgba(2, 6, 23, 0.42)',
+                  pointerEvents: 'none'
+                }} />
+                <div style={{ position: 'relative', zIndex: 1 }}>
+                  <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '0.75rem', marginBottom: '1rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem' }}>
+                      <div style={{ fontSize: '2.5rem', lineHeight: 1 }}>{theme.icon}</div>
+                      <div>
+                        <div style={{ fontWeight: 800, color: 'var(--text-bright)', fontSize: '1.05rem' }}>{theme.name}</div>
+                        <div style={{ fontSize: '0.8rem', color: theme.accent, marginTop: 2 }}>
+                          {cost > 0 ? `💰 ${cost} 광석` : '기본 제공'}
+                        </div>
+                      </div>
                     </div>
+                    {isSelected ? (
+                      <span style={{
+                        background: 'rgba(52, 211, 153, 0.2)',
+                        color: '#34d399',
+                        border: '1px solid rgba(52, 211, 153, 0.5)',
+                        borderRadius: 6,
+                        fontSize: '0.72rem',
+                        padding: '0.18rem 0.5rem',
+                        fontWeight: 800,
+                        whiteSpace: 'nowrap'
+                      }}>
+                        장착 중
+                      </span>
+                    ) : isOwned ? (
+                      <span style={{
+                        background: 'rgba(245, 158, 11, 0.2)',
+                        color: '#fbbf24',
+                        border: '1px solid rgba(245, 158, 11, 0.5)',
+                        borderRadius: 6,
+                        fontSize: '0.72rem',
+                        padding: '0.18rem 0.5rem',
+                        fontWeight: 800,
+                        whiteSpace: 'nowrap'
+                      }}>
+                        보유 중
+                      </span>
+                    ) : isNew ? (
+                      <span style={{
+                        background: 'rgba(232, 121, 249, 0.25)',
+                        color: '#f472b6',
+                        border: '1px solid rgba(232, 121, 249, 0.6)',
+                        borderRadius: 6,
+                        fontSize: '0.72rem',
+                        padding: '0.18rem 0.5rem',
+                        fontWeight: 800,
+                        whiteSpace: 'nowrap'
+                      }}>
+                        NEW
+                      </span>
+                    ) : null}
+                  </div>
+                  <p style={{ fontSize: '0.82rem', color: 'rgba(255,255,255,0.72)', marginBottom: '1rem', lineHeight: 1.6 }}>
+                    {item?.description || theme.description}
+                  </p>
+                  <div style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.62)', marginBottom: '1rem' }}>
+                    {isSelected ? '현재 공개 탐험기지에 장착 중' : isOwned ? '해금됨 · 여기서 바로 장착 가능' : theme.description}
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'stretch', gap: '0.5rem', flexWrap: 'nowrap' }}>
+                    <button
+                      className="space-nav-link"
+                      disabled={purchasing || isSelected || (!isOwned && !canAfford)}
+                      style={{
+                        width: 'auto',
+                        minWidth: 0,
+                        flex: '1 1 0',
+                        whiteSpace: 'nowrap',
+                        fontSize: '0.8rem',
+                        padding: '0.65rem 0.5rem',
+                        fontWeight: 800,
+                        background: isSelected
+                          ? 'rgba(107, 114, 128, 0.2)'
+                          : (!isOwned && !canAfford)
+                            ? 'rgba(239, 68, 68, 0.1)'
+                            : `${theme.accent}24`,
+                        border: isSelected
+                          ? '1px solid rgba(107, 114, 128, 0.3)'
+                          : `1px solid ${theme.accent}66`,
+                        color: isSelected ? '#9ca3af' : theme.accent,
+                        cursor: (isSelected || purchasing || (!isOwned && !canAfford)) ? 'not-allowed' : 'pointer',
+                        opacity: purchasing ? 0.7 : 1
+                      }}
+                      onClick={() => {
+                        if (isOwned) {
+                          handleEquipBaseTheme(theme.id)
+                        } else if (item) {
+                          handlePurchase(item)
+                        }
+                      }}
+                    >
+                      {isSelected
+                        ? '장착 중'
+                        : isOwned
+                          ? '장착하기'
+                          : !canAfford
+                            ? `광석 부족 (${cost - (userData?.crystals || 0)}개 더 필요)`
+                            : '구매하고 장착하기'}
+                    </button>
+                    {item ? renderGiftButton(item) : null}
                   </div>
                 </div>
-                <p style={{ fontSize: '0.82rem', color: 'rgba(255,255,255,0.72)', marginBottom: '1rem', lineHeight: 1.6 }}>
-                  {item?.description || theme.description}
-                </p>
-                <div style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.62)', marginBottom: '1rem' }}>
-                  {isSelected ? '현재 공개 탐험기지에 장착 중' : isOwned ? '해금됨 · 여기서 바로 장착 가능' : theme.description}
-                </div>
-                <div style={{ display: 'flex', alignItems: 'stretch', gap: '0.5rem', flexWrap: 'nowrap' }}>
-                  <button
-                    className="space-nav-link"
-                    disabled={purchasing || isSelected || (!isOwned && !canAfford)}
-                    style={{
-                      width: 'auto',
-                      minWidth: 0,
-                      flex: '1 1 0',
-                      whiteSpace: 'nowrap',
-                      fontSize: '0.8rem',
-                      padding: '0.65rem 0.5rem',
-                      fontWeight: 800,
-                      background: isSelected
-                        ? 'rgba(107, 114, 128, 0.2)'
-                        : (!isOwned && !canAfford)
-                          ? 'rgba(239, 68, 68, 0.1)'
-                          : `${theme.accent}24`,
-                      border: isSelected
-                        ? '1px solid rgba(107, 114, 128, 0.3)'
-                        : `1px solid ${theme.accent}66`,
-                      color: isSelected ? '#9ca3af' : theme.accent,
-                      cursor: (isSelected || purchasing || (!isOwned && !canAfford)) ? 'not-allowed' : 'pointer',
-                      opacity: purchasing ? 0.7 : 1
-                    }}
-                    onClick={() => {
-                      if (isOwned) {
-                        handleEquipBaseTheme(theme.id)
-                      } else if (item) {
-                        handlePurchase(item)
-                      }
-                    }}
-                  >
-                    {isSelected
-                      ? '장착 중'
-                      : isOwned
-                        ? '장착하기'
-                        : !canAfford
-                          ? `광석 부족 (${cost - (userData?.crystals || 0)}개 더 필요)`
-                          : '구매하고 장착하기'}
-                  </button>
-                  {item ? renderGiftButton(item) : null}
-                </div>
               </div>
-            </div>
-          )
-        })}
-      </div>
+            )
+          })}
+        </div>
+      )}
 
       <h3 style={{ color: 'var(--text-bright)', marginBottom: '1.5rem' }}>🏆 주간 명예의 전당</h3>
       <div style={{

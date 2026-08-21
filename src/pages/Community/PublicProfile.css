@@ -131,6 +131,162 @@
   opacity: 0.88;
 }
 
+/* 📚 Lunar Library */
+.public-profile-page--lunar_library .nebula-bg {
+  opacity: 0.16;
+}
+.public-profile-page--lunar_library .public-profile-base-image {
+  opacity: 0.72;
+  background-position: center 8%;
+  filter: saturate(1.1) contrast(1.06) brightness(0.9);
+}
+.public-profile-page--lunar_library .public-profile-theme-glow {
+  background:
+    linear-gradient(90deg, rgba(124, 58, 237, 0.22), transparent 42%, rgba(167, 139, 250, 0.18)),
+    linear-gradient(180deg, rgba(2, 6, 23, 0.04) 0%, rgba(2, 6, 23, 0.48) 100%);
+  opacity: 0.65;
+}
+.public-profile-page--lunar_library .public-profile-hero::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(90deg, rgba(76, 29, 149, 0.3), transparent 55%),
+    radial-gradient(circle at 80% 0%, rgba(167, 139, 250, 0.22), transparent 34%);
+  opacity: 0.88;
+}
+
+/* 🔮 Crystal Cavern */
+.public-profile-page--crystal_cavern .nebula-bg {
+  opacity: 0.18;
+}
+.public-profile-page--crystal_cavern .public-profile-base-image {
+  opacity: 0.76;
+  background-position: center 10%;
+  filter: saturate(1.14) contrast(1.06) brightness(0.88);
+}
+.public-profile-page--crystal_cavern .public-profile-theme-glow {
+  background:
+    linear-gradient(90deg, rgba(13, 148, 136, 0.24), transparent 40%, rgba(45, 212, 191, 0.18)),
+    linear-gradient(180deg, rgba(2, 6, 23, 0.06) 0%, rgba(2, 6, 23, 0.5) 100%);
+  opacity: 0.68;
+}
+.public-profile-page--crystal_cavern .public-profile-hero::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(90deg, rgba(17, 94, 89, 0.32), transparent 54%),
+    radial-gradient(circle at 78% 0%, rgba(45, 212, 191, 0.24), transparent 32%);
+  opacity: 0.88;
+}
+
+/* 🌿 Mars Greenhouse */
+.public-profile-page--mars_greenhouse .nebula-bg {
+  opacity: 0.14;
+}
+.public-profile-page--mars_greenhouse .public-profile-base-image {
+  opacity: 0.72;
+  background-position: center 10%;
+  filter: saturate(1.1) contrast(1.05) brightness(0.9);
+}
+.public-profile-page--mars_greenhouse .public-profile-theme-glow {
+  background:
+    linear-gradient(90deg, rgba(194, 65, 12, 0.22), transparent 42%, rgba(251, 146, 60, 0.18)),
+    linear-gradient(180deg, rgba(2, 6, 23, 0.04) 0%, rgba(2, 6, 23, 0.48) 100%);
+  opacity: 0.62;
+}
+.public-profile-page--mars_greenhouse .public-profile-hero::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(90deg, rgba(124, 45, 18, 0.32), transparent 56%),
+    radial-gradient(circle at 80% 0%, rgba(251, 146, 60, 0.22), transparent 34%);
+  opacity: 0.88;
+}
+
+/* ⚡ Quantum Terminal */
+.public-profile-page--quantum_terminal .nebula-bg {
+  opacity: 0.15;
+}
+.public-profile-page--quantum_terminal .public-profile-base-image {
+  opacity: 0.75;
+  background-position: center 8%;
+  filter: saturate(1.16) contrast(1.08) brightness(0.9);
+}
+.public-profile-page--quantum_terminal .public-profile-theme-glow {
+  background:
+    linear-gradient(90deg, rgba(79, 70, 229, 0.24), transparent 40%, rgba(236, 72, 153, 0.18)),
+    linear-gradient(180deg, rgba(2, 6, 23, 0.05) 0%, rgba(2, 6, 23, 0.5) 100%);
+  opacity: 0.7;
+}
+.public-profile-page--quantum_terminal .public-profile-hero::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(90deg, rgba(49, 46, 129, 0.34), transparent 54%),
+    radial-gradient(circle at 82% 0%, rgba(129, 140, 248, 0.24), transparent 32%);
+  opacity: 0.9;
+}
+
+/* ⛺ Comet Camp */
+.public-profile-page--comet_camp .nebula-bg {
+  opacity: 0.2;
+}
+.public-profile-page--comet_camp .public-profile-base-image {
+  opacity: 0.74;
+  background-position: center 10%;
+  filter: saturate(1.12) contrast(1.06) brightness(0.92);
+}
+.public-profile-page--comet_camp .public-profile-theme-glow {
+  background:
+    linear-gradient(90deg, rgba(2, 132, 199, 0.22), transparent 42%, rgba(245, 158, 11, 0.16)),
+    linear-gradient(180deg, rgba(2, 6, 23, 0.04) 0%, rgba(2, 6, 23, 0.46) 100%);
+  opacity: 0.65;
+}
+.public-profile-page--comet_camp .public-profile-hero::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(90deg, rgba(3, 105, 161, 0.3), transparent 55%),
+    radial-gradient(circle at 80% 0%, rgba(56, 189, 248, 0.22), transparent 34%);
+  opacity: 0.88;
+}
+
+/* 🌸 Infinity Garden */
+.public-profile-page--infinity_garden .nebula-bg {
+  opacity: 0.18;
+}
+.public-profile-page--infinity_garden .public-profile-base-image {
+  opacity: 0.75;
+  background-position: center 8%;
+  filter: saturate(1.18) contrast(1.08) brightness(0.88);
+}
+.public-profile-page--infinity_garden .public-profile-theme-glow {
+  background:
+    linear-gradient(90deg, rgba(168, 85, 247, 0.24), transparent 40%, rgba(232, 121, 249, 0.2)),
+    linear-gradient(180deg, rgba(2, 6, 23, 0.06) 0%, rgba(2, 6, 23, 0.5) 100%);
+  opacity: 0.72;
+}
+.public-profile-page--infinity_garden .public-profile-hero::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(90deg, rgba(107, 33, 168, 0.34), transparent 54%),
+    radial-gradient(circle at 78% 0%, rgba(232, 121, 249, 0.24), transparent 32%);
+  opacity: 0.9;
+}
+
 .public-profile-shell {
   width: min(1120px, calc(100vw - 2rem));
   margin: 0 auto;

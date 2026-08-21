@@ -66,6 +66,9 @@ const {
   STORE_ITEM_GIFT_CATALOG,
   validateGiftRequest,
   calculateGiftRecipientUpdates,
+  validatePurchaseRequest,
+  calculatePurchaseUserUpdates,
+  getPurchaseTransactionType,
 } = require("./storeGiftPolicy.cjs");
 const OPERATOR_GIFT_EMAIL = "paul@dulcine.net";
 const ASSIGNMENT_MISSING_LOOKBACK_DAYS = 7;
@@ -11175,6 +11178,94 @@ exports.giftStoreItem = regionalFunctions.https.onCall(async (data, context) => 
       }
     } catch (error) {
       console.error("giftStoreItem answer profile sync failed:", error);
+    }
+  }
+
+  return {
+    success: true,
+    ...result,
+  };
+});
+
+exports.purchaseStoreItem = regionalFunctions.https.onCall(async (data, context) => {
+  const userId = await requireAuthUid(context);
+  const itemId = String(data?.itemId || "").trim();
+  const item = STORE_ITEM_GIFT_CATALOG[itemId];
+
+  if (!item) {
+    throw new functions.https.HttpsError("invalid-argument", "구매할 수 없는 아이템입니다.");
+  }
+
+  const db = admin.firestore();
+  const now = new Date();
+  const nowMs = now.getTime();
+  const nowTimestamp = admin.firestore.Timestamp.fromDate(now);
+  const userRef = db.collection("users").doc(userId);
+  const purchaseRef = userRef.collection("crystal_transactions").doc();
+
+  const result = await db.runTransaction(async (tx) => {
+    const userSnap = await tx.get(userRef);
+    if (!userSnap.exists) {
+      throw new functions.https.HttpsError("failed-precondition", "사용자 프로필을 찾지 못했습니다.");
+    }
+
+    const userData = userSnap.data() || {};
+    const isOperator = canOperatorGift(userData, context);
+
+    const validation = validatePurchaseRequest({
+      userId,
+      itemId,
+      userData,
+      isOperator,
+    });
+    if (!validation.valid) {
+      throw new functions.https.HttpsError(validation.code, validation.error);
+    }
+
+    const purchaseCalc = calculatePurchaseUserUpdates({
+      itemId,
+      userData,
+      nowMs,
+      isRadarActiveFn: isRadarActiveServer,
+    });
+    if (!purchaseCalc.ok) {
+      throw new functions.https.HttpsError(purchaseCalc.code || "failed-precondition", purchaseCalc.error);
+    }
+
+    const userUpdates = { ...purchaseCalc.userUpdates };
+    tx.set(userRef, userUpdates, { merge: true });
+
+    tx.set(purchaseRef, {
+      amount: -item.cost,
+      type: getPurchaseTransactionType(itemId),
+      description: `${item.name} 상점 구매`,
+      metadata: {
+        purchaseId: purchaseRef.id,
+        itemId,
+        itemName: item.name,
+        cost: item.cost,
+        ...(item.baseThemeId ? { baseThemeId: item.baseThemeId } : {}),
+      },
+      timestamp: nowTimestamp,
+    });
+
+    return {
+      itemId,
+      itemName: item.name,
+      cost: item.cost,
+      purchaseId: purchaseRef.id,
+      shouldSyncAnswers: purchaseCalc.shouldSyncAnswers,
+    };
+  });
+
+  if (result.shouldSyncAnswers) {
+    try {
+      const freshUserSnap = await userRef.get();
+      if (freshUserSnap.exists) {
+        await syncAnswerProfileSnapshotsForUser(userId, freshUserSnap.data() || {});
+      }
+    } catch (error) {
+      console.error("purchaseStoreItem answer profile sync failed:", error);
     }
   }
 

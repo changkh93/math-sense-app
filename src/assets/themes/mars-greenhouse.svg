@@ -1,0 +1,118 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1920 1080" width="1920" height="1080">
+  <defs>
+    <linearGradient id="marsSky" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#0a0818"/>
+      <stop offset="35%" stop-color="#1f101e"/>
+      <stop offset="70%" stop-color="#3b1716"/>
+      <stop offset="100%" stop-color="#240c0c"/>
+    </linearGradient>
+    <linearGradient id="marsDunes" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#9a3412"/>
+      <stop offset="50%" stop-color="#c2410c"/>
+      <stop offset="100%" stop-color="#7c2d12"/>
+    </linearGradient>
+    <radialGradient id="sunGlow" cx="80%" cy="25%" r="35%">
+      <stop offset="0%" stop-color="#fdba74" stop-opacity="0.45"/>
+      <stop offset="40%" stop-color="#fb923c" stop-opacity="0.2"/>
+      <stop offset="100%" stop-color="#0a0818" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="bioPlantGlow" cx="20%" cy="75%" r="40%">
+      <stop offset="0%" stop-color="#4ade80" stop-opacity="0.3"/>
+      <stop offset="50%" stop-color="#22c55e" stop-opacity="0.12"/>
+      <stop offset="100%" stop-color="#0a0818" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="glow" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="7" result="blur"/>
+      <feComposite in="SourceGraphic" in2="blur" operator="over"/>
+    </filter>
+  </defs>
+
+  <!-- Sky Base -->
+  <rect width="1920" height="1080" fill="url(#marsSky)"/>
+  <rect width="1920" height="1080" fill="url(#sunGlow)"/>
+  <rect width="1920" height="1080" fill="url(#bioPlantGlow)"/>
+
+  <!-- Distant Stars & Phobos/Deimos -->
+  <g opacity="0.6">
+    <circle cx="280" cy="120" r="1.4" fill="#fed7aa"/>
+    <circle cx="450" cy="180" r="1.2" fill="#fff"/>
+    <circle cx="960" cy="90" r="1.5" fill="#fef08a"/>
+    <circle cx="1200" cy="160" r="1.2" fill="#fed7aa"/>
+    <circle cx="1480" cy="110" r="1.6" fill="#fff"/>
+    <circle cx="1680" cy="80" r="1.2" fill="#fed7aa"/>
+  </g>
+  <!-- Phobos Moon -->
+  <circle cx="1520" cy="220" r="18" fill="#e2e8f0" opacity="0.85" filter="url(#glow)"/>
+  <circle cx="1524" cy="216" r="16" fill="#94a3b8" opacity="0.4"/>
+  <!-- Deimos Moon -->
+  <circle cx="1640" cy="180" r="7" fill="#cbd5e1" opacity="0.75"/>
+
+  <!-- Distant Martian Craters & Dunes -->
+  <path d="M0,580 Q320,530 680,560 Q1100,590 1500,530 Q1760,500 1920,540 L1920,1080 L0,1080 Z" fill="#431407" opacity="0.85"/>
+  <path d="M0,640 Q480,590 980,630 Q1480,670 1920,610 L1920,1080 L0,1080 Z" fill="#2e1005" opacity="0.95"/>
+
+  <!-- Geodesic Glass Dome Struts (Curving Across Scene) -->
+  <g stroke="#ea580c" stroke-width="2.5" opacity="0.45" fill="none">
+    <!-- Main outer dome arches -->
+    <path d="M0,320 Q960,80 1920,320"/>
+    <path d="M0,480 Q960,180 1920,480"/>
+    <path d="M0,640 Q960,280 1920,640"/>
+    <!-- Vertical geodesic rib lines -->
+    <path d="M300,1080 Q420,500 680,180"/>
+    <path d="M600,1080 Q720,450 880,130"/>
+    <path d="M1620,1080 Q1500,500 1240,180"/>
+    <path d="M1320,1080 Q1200,450 1040,130"/>
+  </g>
+
+  <!-- Left Side Botanical Greenhouse Area -->
+  <g id="leftBotanicals">
+    <!-- Hydroponic tower structure -->
+    <rect x="60" y="380" width="80" height="700" fill="#18181b" opacity="0.9"/>
+    <rect x="75" y="400" width="50" height="660" fill="#27272a"/>
+    <line x1="60" y1="460" x2="140" y2="460" stroke="#fb923c" stroke-width="2"/>
+    <line x1="60" y1="560" x2="140" y2="560" stroke="#fb923c" stroke-width="2"/>
+    <line x1="60" y1="660" x2="140" y2="660" stroke="#fb923c" stroke-width="2"/>
+
+    <!-- Lush Bioluminescent Leaves & Plants (Left) -->
+    <path d="M120,440 Q240,400 320,460 Q220,520 120,440 Z" fill="#22c55e" opacity="0.8" filter="url(#glow)"/>
+    <path d="M100,540 Q280,480 360,560 Q240,640 100,540 Z" fill="#16a34a" opacity="0.85"/>
+    <path d="M120,640 Q300,600 380,680 Q260,760 120,640 Z" fill="#4ade80" opacity="0.75" filter="url(#glow)"/>
+    <path d="M80,740 Q260,700 340,800 Q200,880 80,740 Z" fill="#22c55e" opacity="0.9"/>
+
+    <!-- Spiral Botanical Math Curves (Fibonacci phyllotaxis) -->
+    <g transform="translate(240, 780)" opacity="0.75" filter="url(#glow)">
+      <circle cx="0" cy="0" r="3" fill="#86efac"/>
+      <circle cx="12" cy="8" r="4" fill="#4ade80"/>
+      <circle cx="-14" cy="18" r="5" fill="#22c55e"/>
+      <circle cx="24" cy="-18" r="6" fill="#86efac"/>
+      <circle cx="-28" cy="-24" r="7" fill="#4ade80"/>
+      <circle cx="40" cy="22" r="8" fill="#16a34a"/>
+    </g>
+  </g>
+
+  <!-- Right Side Solar Harvester & Botanical Pods -->
+  <g id="rightBotanicals">
+    <!-- Solar array frame -->
+    <rect x="1780" y="380" width="80" height="700" fill="#18181b" opacity="0.9"/>
+    <rect x="1795" y="400" width="50" height="660" fill="#27272a"/>
+    
+    <!-- Giant Glowing Canopy Leaves (Right) -->
+    <path d="M1800,440 Q1680,400 1600,460 Q1700,520 1800,440 Z" fill="#fb923c" opacity="0.8" filter="url(#glow)"/>
+    <path d="M1820,540 Q1640,480 1560,560 Q1680,640 1820,540 Z" fill="#22c55e" opacity="0.85"/>
+    <path d="M1800,640 Q1620,600 1540,680 Q1660,760 1800,640 Z" fill="#4ade80" opacity="0.8" filter="url(#glow)"/>
+    <path d="M1840,740 Q1660,700 1580,800 Q1720,880 1840,740 Z" fill="#15803d" opacity="0.9"/>
+
+    <!-- Plant Growth Formula HUD (Right) -->
+    <g opacity="0.75" transform="translate(1580, 500)" filter="url(#glow)">
+      <text x="0" y="0" fill="#fdba74" font-family="sans-serif" font-size="17" font-weight="bold">6CO₂ + 6H₂O → C₆H₁₂O₆ + 6O₂</text>
+      <text x="20" y="32" fill="#86efac" font-family="sans-serif" font-size="15">Φ = (1 + √5)/2 ≈ 1.618</text>
+      <text x="-10" y="68" fill="#fb923c" font-family="sans-serif" font-size="15">N(t) = N₀ · e^(rt)</text>
+    </g>
+  </g>
+
+  <!-- Greenhouse Floor Platform -->
+  <path d="M0,900 L1920,900 L1920,1080 L0,1080 Z" fill="#1c0b06" opacity="0.95"/>
+  <line x1="0" y1="900" x2="1920" y2="900" stroke="#fb923c" stroke-width="2.5" opacity="0.7"/>
+  <ellipse cx="280" cy="980" rx="200" ry="18" fill="#22c55e" opacity="0.14" filter="url(#glow)"/>
+  <ellipse cx="1640" cy="980" rx="200" ry="18" fill="#fb923c" opacity="0.16" filter="url(#glow)"/>
+</svg>

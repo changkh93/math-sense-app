@@ -75,7 +75,57 @@ const STORE_ITEM_GIFT_CATALOG = {
     ownedMode: "purchase_only",
     baseThemeId: "deep_lab",
   },
+  base_lunar_library: {
+    name: "달빛 수학 서재",
+    cost: 130,
+    ownedMode: "purchase_only",
+    baseThemeId: "lunar_library",
+  },
+  base_crystal_cavern: {
+    name: "수정 공식 동굴",
+    cost: 150,
+    ownedMode: "purchase_only",
+    baseThemeId: "crystal_cavern",
+  },
+  base_mars_greenhouse: {
+    name: "화성 생태 온실",
+    cost: 140,
+    ownedMode: "purchase_only",
+    baseThemeId: "mars_greenhouse",
+  },
+  base_quantum_terminal: {
+    name: "양자 연산 실험실",
+    cost: 170,
+    ownedMode: "purchase_only",
+    baseThemeId: "quantum_terminal",
+  },
+  base_comet_camp: {
+    name: "혜성 관측 캠프",
+    cost: 110,
+    ownedMode: "purchase_only",
+    baseThemeId: "comet_camp",
+  },
+  base_infinity_garden: {
+    name: "무한의 정원",
+    cost: 180,
+    ownedMode: "purchase_only",
+    baseThemeId: "infinity_garden",
+  },
 };
+
+// The callable purchase path intentionally covers only the permanent cosmetics
+// and radar that have complete server-side purchase semantics. Consumables such
+// as cryo_core keep their existing cooldown/audit-aware client path until those
+// rules are migrated in full.
+const SERVER_PURCHASE_ITEM_IDS = new Set([
+  "radar",
+  "signature_unlock",
+  "frame_nebula",
+  "frame_solar",
+  ...Object.entries(STORE_ITEM_GIFT_CATALOG)
+    .filter(([, item]) => Boolean(item.baseThemeId))
+    .map(([itemId]) => itemId),
+]);
 
 function getOwnedProfileFrames(userData = {}) {
   const safe = userData && typeof userData === "object" ? userData : {};
@@ -231,12 +281,119 @@ function calculateGiftRecipientUpdates({
   };
 }
 
+function validatePurchaseRequest({
+  userId,
+  itemId,
+  userData = {},
+  isOperator = false,
+}) {
+  if (!userId) {
+    return { valid: false, code: "unauthenticated", error: "로그인이 필요합니다." };
+  }
+  const item = STORE_ITEM_GIFT_CATALOG[itemId];
+  if (!item) {
+    return { valid: false, code: "invalid-argument", error: "구매할 수 없는 아이템입니다." };
+  }
+  if (!SERVER_PURCHASE_ITEM_IDS.has(itemId)) {
+    return { valid: false, code: "invalid-argument", error: "이 구매 경로에서 지원하지 않는 아이템입니다." };
+  }
+  if (!isOperator && (userData.role === "parent" || userData.role === "admin")) {
+    return { valid: false, code: "permission-denied", error: "학생 계정만 상점 아이템을 구매할 수 있습니다." };
+  }
+
+  const crystals = Math.max(0, Number(userData.crystals || 0));
+  if (crystals < item.cost) {
+    return { valid: false, code: "failed-precondition", error: `광석이 부족합니다. (필요: ${item.cost}개)` };
+  }
+
+  return { valid: true, item };
+}
+
+function calculatePurchaseUserUpdates({
+  itemId,
+  userData = {},
+  nowMs = Date.now(),
+  isRadarActiveFn = null,
+}) {
+  const item = STORE_ITEM_GIFT_CATALOG[itemId];
+  if (!item) {
+    return { ok: false, code: "invalid-argument", error: "구매할 수 없는 아이템입니다." };
+  }
+  if (!SERVER_PURCHASE_ITEM_IDS.has(itemId)) {
+    return { ok: false, code: "invalid-argument", error: "이 구매 경로에서 지원하지 않는 아이템입니다." };
+  }
+
+  const currentCrystals = Math.max(0, Number(userData.crystals || 0));
+  if (currentCrystals < item.cost) {
+    return { ok: false, code: "failed-precondition", error: `광석이 부족합니다. (필요: ${item.cost}개)` };
+  }
+
+  const updates = {
+    crystals: currentCrystals - item.cost,
+  };
+  let shouldSyncAnswers = false;
+
+  if (itemId === "radar") {
+    const active = typeof isRadarActiveFn === "function"
+      ? isRadarActiveFn(userData, nowMs)
+      : (Number(userData.radarExpiresAtMs || 0) > nowMs);
+    if (active) {
+      return { ok: false, code: "failed-precondition", error: "이미 첨단 마이닝 스캐너를 활성화 중입니다." };
+    }
+    updates.hasRadar = true;
+    updates.radarActivatedAtMs = nowMs;
+    updates.radarExpiresAtMs = nowMs + STORE_RADAR_DURATION_DAYS * 24 * 60 * 60 * 1000;
+  } else if (item.uniqueField) {
+    if (userData[item.uniqueField]) {
+      return { ok: false, code: "failed-precondition", error: `이미 ${item.name}을 보유 중입니다.` };
+    }
+    updates[item.uniqueField] = true;
+    shouldSyncAnswers = true;
+  } else if (item.frameId) {
+    const ownedFrames = getOwnedProfileFrames(userData);
+    if (ownedFrames.includes(item.frameId)) {
+      return { ok: false, code: "failed-precondition", error: `이미 ${item.name}을 보유 중입니다.` };
+    }
+    updates.ownedProfileFrames = [...ownedFrames, item.frameId];
+    updates.selectedProfileFrame = item.frameId;
+    shouldSyncAnswers = true;
+  } else if (item.baseThemeId) {
+    const ownedThemes = getOwnedBaseThemes(userData);
+    if (ownedThemes.includes(item.baseThemeId)) {
+      return { ok: false, code: "failed-precondition", error: `이미 ${item.name}을 보유 중입니다.` };
+    }
+    updates.ownedBaseThemes = [...ownedThemes, item.baseThemeId];
+    updates.selectedBaseTheme = item.baseThemeId;
+  } else if (item.recipientField) {
+    const currentOwned = Math.max(0, Number(userData[item.recipientField] || 0));
+    updates[item.recipientField] = currentOwned + (item.transferAmount || 1);
+  }
+
+  return {
+    ok: true,
+    userUpdates: updates,
+    shouldSyncAnswers,
+    item,
+  };
+}
+
+function getPurchaseTransactionType(itemId) {
+  const item = STORE_ITEM_GIFT_CATALOG[itemId];
+  if (item?.baseThemeId) return "base_theme_purchase";
+  if (item?.uniqueField || item?.frameId) return "agora_profile_purchase";
+  return "store_purchase";
+}
+
 module.exports = {
   STORE_RADAR_DURATION_DAYS,
   STORE_PHOTON_SHIELD_CHARGES_PER_GIFT,
   STORE_ITEM_GIFT_CATALOG,
+  SERVER_PURCHASE_ITEM_IDS,
   getOwnedProfileFrames,
   getOwnedBaseThemes,
   validateGiftRequest,
   calculateGiftRecipientUpdates,
+  validatePurchaseRequest,
+  calculatePurchaseUserUpdates,
+  getPurchaseTransactionType,
 };

@@ -1,4 +1,6 @@
 const assert = require("assert");
+const fs = require("fs");
+const path = require("path");
 const policy = require("./classicReadingPolicy");
 
 console.log("=== Running classicReadingPolicy unit tests ===");
@@ -177,5 +179,19 @@ const notCompletedStatusBook = {
   achievementStats: { reviewedAssignmentCount: 2 }
 };
 assert.strictEqual(policy.isBookEligibleForCompletion(notCompletedStatusBook), false);
+
+// 11. Reading-day history queries must use the automatically indexed date field.
+// Ordering only by a descending document ID requires a separate Firestore index and
+// caused western-classic assignment submissions to fail with FAILED_PRECONDITION.
+const classicReadingSource = fs.readFileSync(path.join(__dirname, "classicReading.js"), "utf8");
+const readingDayCreditQueries = classicReadingSource.match(
+  /collection\("readingDayCredits"\)\s*\.orderBy\("dateKey", "desc"\)/g
+) || [];
+assert.strictEqual(readingDayCreditQueries.length, 2, "Both reading-day history queries must sort by dateKey");
+assert.strictEqual(
+  /collection\("readingDayCredits"\)\s*\.orderBy\(admin\.firestore\.FieldPath\.documentId\(\), "desc"\)/.test(classicReadingSource),
+  false,
+  "Reading-day history must not require a descending document-ID index"
+);
 
 console.log("All classicReadingPolicy unit tests passed successfully!");

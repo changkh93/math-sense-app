@@ -20,6 +20,12 @@ import { getActiveShipFamily, getShipGrade } from '../../utils/shipCatalog';
 import auroraObservatoryImage from '../../assets/themes/aurora-observatory.jpg';
 import goldenArchiveImage from '../../assets/themes/golden-archive.jpg';
 import deepSeaLabImage from '../../assets/themes/deep-sea-lab.jpg';
+import lunarLibraryImage from '../../assets/themes/lunar-library.jpg';
+import crystalCavernImage from '../../assets/themes/crystal-cavern.svg';
+import marsGreenhouseImage from '../../assets/themes/mars-greenhouse.svg';
+import quantumTerminalImage from '../../assets/themes/quantum-terminal.svg';
+import cometCampImage from '../../assets/themes/comet-camp.svg';
+import infinityGardenImage from '../../assets/themes/infinity-garden.svg';
 import './PublicProfile.css';
 
 const MotionDiv = motion.div;
@@ -27,6 +33,12 @@ const BASE_THEME_IMAGES = {
   aurora_observatory: auroraObservatoryImage,
   solar_archive: goldenArchiveImage,
   deep_lab: deepSeaLabImage,
+  lunar_library: lunarLibraryImage,
+  crystal_cavern: crystalCavernImage,
+  mars_greenhouse: marsGreenhouseImage,
+  quantum_terminal: quantumTerminalImage,
+  comet_camp: cometCampImage,
+  infinity_garden: infinityGardenImage,
 };
 
 const CONCEPT_STATUS_META = {
