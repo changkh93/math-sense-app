@@ -31,11 +31,8 @@ const getStats = (uid) => {
   return statsByUid.get(uid);
 };
 
-console.log(`🚢 [Crew Stats Backfill] ${APPLY ? 'APPLY' : 'DRY-RUN'}`);
-
-const [responsesSnap, teamRewardsSnap, chestEventsSnap, chestRewardsSnap, usersSnap] = await Promise.all([
-  db.collectionGroup('responses').where('scopeType', '==', 'crew').get(),
-  db.collectionGroup('crystal_transactions').where('type', '==', 'study_crew_team_mission').get(),
+const [responsesSnap, chestEventsSnap, chestRewardsSnap, usersSnap] = await Promise.all([
+  db.collectionGroup('responses').get(),
   db.collectionGroup('crystalChestEvents').get(),
   db.collectionGroup('crystalChestRewards').get(),
   db.collection('users').get(),
@@ -44,16 +41,27 @@ const [responsesSnap, teamRewardsSnap, chestEventsSnap, chestRewardsSnap, usersS
 responsesSnap.forEach((docSnap) => {
   const data = docSnap.data() || {};
   if (!data.userId || data.isGuest === true) return;
-  getStats(data.userId).missionParticipationCount += 1;
+  if (data.scopeType === 'crew' || docSnap.ref.path.includes('studyCrews')) {
+    getStats(data.userId).missionParticipationCount += 1;
+  }
 });
 
-teamRewardsSnap.forEach((docSnap) => {
-  const data = docSnap.data() || {};
-  if (data.metadata?.scopeType !== 'crew') return;
-  // crystal_transactions는 users/{uid}의 바로 아래 서브컬렉션이다.
-  const uid = docSnap.ref.parent.parent?.id;
-  if (uid) getStats(uid).teamMissionCount += 1;
-});
+let teamRewardsCount = 0;
+await Promise.all(
+  usersSnap.docs.map(async (userDoc) => {
+    const txSnap = await userDoc.ref
+      .collection('crystal_transactions')
+      .where('type', '==', 'study_crew_team_mission')
+      .get();
+    txSnap.forEach((docSnap) => {
+      const data = docSnap.data() || {};
+      if (data.metadata?.scopeType === 'crew') {
+        teamRewardsCount += 1;
+        getStats(userDoc.id).teamMissionCount += 1;
+      }
+    });
+  })
+);
 
 chestEventsSnap.forEach((docSnap) => {
   const data = docSnap.data() || {};
@@ -102,7 +110,7 @@ console.log(JSON.stringify({
   users: usersSnap.size,
   changed,
   crewMissionResponses: responsesSnap.size,
-  teamRewardTransactions: teamRewardsSnap.size,
+  teamRewardTransactions: teamRewardsCount,
   chestEvents: chestEventsSnap.size,
   chestRewards: chestRewardsSnap.size,
   applied: APPLY,
