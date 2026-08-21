@@ -112,4 +112,70 @@ assert.strictEqual(policy.validateStatusTransition("paused", "reading").allowed,
 assert.strictEqual(policy.validateStatusTransition("completed", "reading").allowed, true);
 assert.strictEqual(policy.validateStatusTransition("reading", "invalid").allowed, false);
 
+// 8. 30-day recorded gap eligibility
+assert.strictEqual(policy.isReadingLogEligibleForDayCredit({
+  readDateKst: "2026-08-01",
+  recordedAt: new Date("2026-08-15T10:00:00+09:00") // 14 days later
+}), true);
+assert.strictEqual(policy.isReadingLogEligibleForDayCredit({
+  readDateKst: "2026-08-01",
+  recordedAt: new Date("2026-08-31T10:00:00+09:00") // 30 days later
+}), true);
+assert.strictEqual(policy.isReadingLogEligibleForDayCredit({
+  readDateKst: "2026-08-01",
+  recordedAt: new Date("2026-09-02T10:00:00+09:00") // 32 days later
+}), false);
+assert.strictEqual(policy.isReadingLogEligibleForDayCredit({
+  readDateKst: "2026-08-20",
+  recordedAt: new Date("2026-08-10T10:00:00+09:00") // recorded before reading date
+}), false);
+assert.strictEqual(policy.isReadingLogEligibleForDayCredit({
+  readDateKst: "2026-08-20",
+  recordedAt: "invalid-timestamp"
+}), false);
+
+// 9. Streak calculation with backdated entries
+const streakDates = ["2026-08-01", "2026-08-02", "2026-08-03", "2026-08-05", "2026-08-06", "2026-08-07", "2026-08-08"];
+const streakResult = policy.calculateStreaks(streakDates, "2026-08-08");
+assert.strictEqual(streakResult.totalReadingDays, 7);
+assert.strictEqual(streakResult.longestReadingStreak, 4); // Aug 5 to Aug 8
+assert.strictEqual(streakResult.currentReadingStreak, 4);
+
+// If user logs yesterday instead of today
+const streakResultYesterday = policy.calculateStreaks(streakDates, "2026-08-09");
+assert.strictEqual(streakResultYesterday.currentReadingStreak, 4); // Still active from yesterday
+
+// 10. Completion eligibility
+const eligibleBookWithAssignments = {
+  status: "completed",
+  totalPages: 300,
+  progress: { furthestPage: 300 },
+  achievementStats: { reviewedAssignmentCount: 1, validReadingDayCount: 1 }
+};
+assert.strictEqual(policy.isBookEligibleForCompletion(eligibleBookWithAssignments), true);
+
+const eligibleBookWithReadingDays = {
+  status: "completed",
+  totalPages: 250,
+  progress: { furthestPage: 250 },
+  achievementStats: { reviewedAssignmentCount: 0, validReadingDayCount: 2 }
+};
+assert.strictEqual(policy.isBookEligibleForCompletion(eligibleBookWithReadingDays), true);
+
+const incompletePagesBook = {
+  status: "completed",
+  totalPages: 300,
+  progress: { furthestPage: 200 },
+  achievementStats: { reviewedAssignmentCount: 1 }
+};
+assert.strictEqual(policy.isBookEligibleForCompletion(incompletePagesBook), false);
+
+const notCompletedStatusBook = {
+  status: "reading",
+  totalPages: 300,
+  progress: { furthestPage: 300 },
+  achievementStats: { reviewedAssignmentCount: 2 }
+};
+assert.strictEqual(policy.isBookEligibleForCompletion(notCompletedStatusBook), false);
+
 console.log("All classicReadingPolicy unit tests passed successfully!");

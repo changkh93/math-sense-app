@@ -20,6 +20,8 @@ import eternalVoyagerBadge from '../assets/badge/eternal_voyager.png';
 import { getExplorerExperience, calculateExplorerLevel } from './explorerLevelUtils.js';
 import { buildCrewBadges } from './crewBadgeUtils.js';
 export { buildCrewBadges } from './crewBadgeUtils.js';
+import { buildReadingBadges } from './readingBadgeUtils.js';
+export { buildReadingBadges } from './readingBadgeUtils.js';
 
 import masterRegAdditionBadge from '../assets/badge/master_reg_addition.png';
 import masterRegMultiplicationBadge from '../assets/badge/master_reg_multiplication.png';
@@ -410,6 +412,7 @@ export function buildCollectionBadges(userData = {}, history = []) {
   const badges = [
     ...buildAgoraBadges(userData),
     ...buildCrewBadges(userData),
+    ...buildReadingBadges(userData),
     { id: 'cosmos_initiate', title: '코스모스 입문', icon: '🌌', category: 'general', unlocked: quizStats.uniqueQuizUnits > 0, desc: '첫 번째 수학 탐사를 성공적으로 마쳤습니다.' },
     { id: 'crystal_collector', title: '광석 수집가', icon: '💎', category: 'general', unlocked: (userData?.crystals || 0) >= 500, desc: '광석을 500개 이상 모았습니다. (중급 대원)' },
     { id: 'galaxy_scholar', title: '은하 학자', icon: '📜', category: 'general', unlocked: quizStats.averageScore >= 95, desc: '평균 정답률 95% 이상을 유지 중인 엘리트 대원입니다.' },

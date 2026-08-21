@@ -100,6 +100,134 @@ module.exports = function ({ functions, admin, costOptimizedDataFunctions, requi
     return ["western-classic", "서양고전", "서양고전읽기", "classic", "classics"].includes(clusterId);
   }
 
+  function getReadingCreditRefs(uid, bookId, dateKey = "") {
+    const userRef = db.collection("users").doc(uid);
+    return {
+      userRef,
+      dayCreditRef: dateKey ? userRef.collection("readingDayCredits").doc(dateKey) : null,
+      bookDayCreditRef: dateKey
+        ? userRef.collection("readingBookDayCredits").doc(`${bookId}__${dateKey}`)
+        : null,
+      bookCreditRef: userRef.collection("readingBookCredits").doc(bookId),
+    };
+  }
+
+  function applyReadingDayCredit(tx, {
+    uid,
+    bookId,
+    logId,
+    readDateKst,
+    recordedAt,
+    source,
+    bookRef,
+    bookData,
+    nowTimestamp,
+    userSnap,
+    dayCreditSnap,
+    bookDayCreditSnap,
+    recentDayCreditsSnap,
+  }) {
+    if (!policy.isReadingLogEligibleForDayCredit({ readDateKst, recordedAt })) {
+      return { bookData, readingStats: userSnap.data()?.readingStats || {} };
+    }
+
+    const { userRef, dayCreditRef, bookDayCreditRef } = getReadingCreditRefs(uid, bookId, readDateKst);
+    let readingStats = userSnap.data()?.readingStats || {};
+    let nextBookData = bookData;
+
+    if (!bookDayCreditSnap.exists) {
+      tx.set(bookDayCreditRef, {
+        bookId,
+        dateKey: readDateKst,
+        firstLogId: logId,
+        source,
+        eligibilityVersion: 1,
+        creditedAt: nowTimestamp,
+      });
+      const currentAchievementStats = bookData.achievementStats || {};
+      const achievementStats = {
+        ...currentAchievementStats,
+        validReadingDayCount: Math.max(0, Number(currentAchievementStats.validReadingDayCount || 0)) + 1,
+        reviewedAssignmentCount: Math.max(0, Number(currentAchievementStats.reviewedAssignmentCount || 0)),
+        version: 1,
+      };
+      tx.set(bookRef, { achievementStats }, { merge: true });
+      nextBookData = { ...bookData, achievementStats };
+    }
+
+    if (!dayCreditSnap.exists) {
+      tx.set(dayCreditRef, {
+        dateKey: readDateKst,
+        firstLogId: logId,
+        firstBookId: bookId,
+        source,
+        eligibilityVersion: 1,
+        creditedAt: nowTimestamp,
+      });
+      const recentDates = recentDayCreditsSnap.docs.map((docSnap) => docSnap.id);
+      const streaks = policy.calculateStreaks(
+        [...recentDates, readDateKst],
+        getKSTDateString(nowTimestamp.toDate())
+      );
+      readingStats = {
+        ...readingStats,
+        readingDayCount: Math.max(0, Number(readingStats.readingDayCount || 0)) + 1,
+        currentReadingStreak: streaks.currentReadingStreak,
+        longestReadingStreak: Math.max(
+          Math.max(0, Number(readingStats.longestReadingStreak || 0)),
+          streaks.longestReadingStreak
+        ),
+        version: 1,
+        backfillComplete: readingStats.backfillComplete === true,
+      };
+      tx.set(userRef, { readingStats }, { merge: true });
+    }
+
+    return { bookData: nextBookData, readingStats };
+  }
+
+  function reconcileReadingBookCredit(tx, {
+    uid,
+    bookId,
+    bookData,
+    nowTimestamp,
+    userSnap,
+    bookCreditSnap,
+    readingStats: projectedReadingStats,
+  }) {
+    const { userRef, bookCreditRef } = getReadingCreditRefs(uid, bookId);
+    const readingStats = projectedReadingStats || userSnap.data()?.readingStats || {};
+    const eligible = policy.isBookEligibleForCompletion(bookData);
+    if (eligible === bookCreditSnap.exists) return readingStats;
+
+    const nextReadingStats = {
+      ...readingStats,
+      validCompletedBookCount: Math.max(
+        0,
+        Number(readingStats.validCompletedBookCount || 0) + (eligible ? 1 : -1)
+      ),
+      version: 1,
+      backfillComplete: readingStats.backfillComplete === true,
+    };
+
+    if (eligible) {
+      tx.set(bookCreditRef, {
+        bookId,
+        qualifyingReadingDayCount: Number(bookData.achievementStats?.validReadingDayCount || 0),
+        qualifyingReviewedAssignmentCount: Number(bookData.achievementStats?.reviewedAssignmentCount || 0),
+        totalPages: Number(bookData.totalPages || 0),
+        furthestPage: Number(bookData.progress?.furthestPage || 0),
+        eligibilityVersion: 1,
+        creditedAt: nowTimestamp,
+        updatedAt: nowTimestamp,
+      });
+    } else {
+      tx.delete(bookCreditRef);
+    }
+    tx.set(userRef, { readingStats: nextReadingStats }, { merge: true });
+    return nextReadingStats;
+  }
+
   /**
    * Public-profile bookshelf projection.
    *
@@ -215,6 +343,11 @@ module.exports = function ({ functions, admin, costOptimizedDataFunctions, requi
         latestReadAt: null,
         latestLogId: null,
       },
+      achievementStats: {
+        validReadingDayCount: 0,
+        reviewedAssignmentCount: 0,
+        version: 1,
+      },
       startedAt: customTimestamp,
       completedAt: validation.status === policy.BOOK_STATUSES.COMPLETED ? customTimestamp : null,
       pausedAt: validation.status === policy.BOOK_STATUSES.PAUSED ? customTimestamp : null,
@@ -270,9 +403,12 @@ module.exports = function ({ functions, admin, costOptimizedDataFunctions, requi
     let resultPayload = null;
 
     await db.runTransaction(async (tx) => {
-      const [commandSnap, bookSnap] = await Promise.all([
+      const creditRefs = getReadingCreditRefs(uid, bookId);
+      const [commandSnap, bookSnap, userSnap, bookCreditSnap] = await Promise.all([
         tx.get(command.cmdRef),
         tx.get(bookRef),
+        tx.get(creditRefs.userRef),
+        tx.get(creditRefs.bookCreditRef),
       ]);
       const existing = resolveCommandSnapshot(commandSnap, command.payloadHash);
       if (existing.isDuplicate) {
@@ -348,6 +484,21 @@ module.exports = function ({ functions, admin, costOptimizedDataFunctions, requi
         schemaVersion: 1,
       });
 
+      const updatedBookData = {
+        ...book,
+        ...updates,
+        progress: book.progress || {},
+      };
+
+      await reconcileReadingBookCredit(tx, {
+        uid,
+        bookId,
+        bookData: updatedBookData,
+        nowTimestamp,
+        userSnap,
+        bookCreditSnap,
+      });
+
       resultPayload = { bookId, prevStatus, status: targetStatus, logId: logRef.id };
 
       tx.set(command.cmdRef, buildCommandData({
@@ -399,9 +550,14 @@ module.exports = function ({ functions, admin, costOptimizedDataFunctions, requi
     let resultPayload = null;
 
     await db.runTransaction(async (tx) => {
-      const [commandSnap, bookSnap] = await Promise.all([
+      const creditRefs = getReadingCreditRefs(uid, bookId, safeDate);
+      const [commandSnap, bookSnap, userSnap, dayCreditSnap, bookDayCreditSnap, bookCreditSnap] = await Promise.all([
         tx.get(command.cmdRef),
         tx.get(bookRef),
+        tx.get(creditRefs.userRef),
+        tx.get(creditRefs.dayCreditRef),
+        tx.get(creditRefs.bookDayCreditRef),
+        tx.get(creditRefs.bookCreditRef),
       ]);
       const existing = resolveCommandSnapshot(commandSnap, command.payloadHash);
       if (existing.isDuplicate) {
@@ -415,6 +571,17 @@ module.exports = function ({ functions, admin, costOptimizedDataFunctions, requi
       if (book.userId !== uid) {
         throw new functions.https.HttpsError("permission-denied", "본인의 책만 수정할 수 있습니다.", { code: policy.ERROR_CODES.BOOK_FORBIDDEN });
       }
+      if (!userSnap.exists) {
+        throw new functions.https.HttpsError("failed-precondition", "사용자 문서를 찾을 수 없습니다.");
+      }
+
+      const recentDayCreditsSnap = dayCreditSnap.exists
+        ? { docs: [] }
+        : await tx.get(
+          creditRefs.userRef.collection("readingDayCredits")
+            .orderBy(admin.firestore.FieldPath.documentId(), "desc")
+            .limit(31)
+        );
 
       const logRef = db.collection("readingLogs").doc();
       const logData = {
@@ -452,6 +619,38 @@ module.exports = function ({ functions, admin, costOptimizedDataFunctions, requi
       tx.update(bookRef, {
         progress: nextProgress,
         updatedAt: nowTimestamp,
+      });
+
+      const updatedBookData = {
+        ...book,
+        progress: nextProgress,
+      };
+
+      const creditResult = applyReadingDayCredit(tx, {
+        uid,
+        bookId,
+        logId: logRef.id,
+        readDateKst: safeDate,
+        readAt: readAtTimestamp,
+        recordedAt: nowTimestamp,
+        source: policy.LOG_SOURCES.BOOKSHELF,
+        bookRef,
+        bookData: updatedBookData,
+        nowTimestamp,
+        userSnap,
+        dayCreditSnap,
+        bookDayCreditSnap,
+        recentDayCreditsSnap,
+      });
+
+      reconcileReadingBookCredit(tx, {
+        uid,
+        bookId,
+        bookData: creditResult.bookData,
+        nowTimestamp,
+        userSnap,
+        bookCreditSnap,
+        readingStats: creditResult.readingStats,
       });
 
       resultPayload = {
@@ -493,10 +692,13 @@ module.exports = function ({ functions, admin, costOptimizedDataFunctions, requi
     const resultPayload = { bookId, archived: true };
 
     return db.runTransaction(async (tx) => {
-      const [commandSnap, bookSnap, linkedLogsSnap] = await Promise.all([
+      const creditRefs = getReadingCreditRefs(uid, bookId);
+      const [commandSnap, bookSnap, linkedLogsSnap, userSnap, bookCreditSnap] = await Promise.all([
         tx.get(command.cmdRef),
         tx.get(bookRef),
         tx.get(db.collection("readingLogs").where("bookId", "==", bookId)),
+        tx.get(creditRefs.userRef),
+        tx.get(creditRefs.bookCreditRef),
       ]);
       const existing = resolveCommandSnapshot(commandSnap, command.payloadHash);
       if (existing.isDuplicate) return existing.result;
@@ -522,6 +724,22 @@ module.exports = function ({ functions, admin, costOptimizedDataFunctions, requi
       linkedLogsSnap.docs.forEach((logDoc) => {
         tx.update(logDoc.ref, { voidedAt: nowTimestamp, archivedAt: nowTimestamp, updatedAt: nowTimestamp });
       });
+
+      const updatedBookData = {
+        ...book,
+        archivedAt: nowTimestamp,
+        progress: book.progress || {},
+      };
+
+      await reconcileReadingBookCredit(tx, {
+        uid,
+        bookId,
+        bookData: updatedBookData,
+        nowTimestamp,
+        userSnap,
+        bookCreditSnap,
+      });
+
       tx.set(command.cmdRef, buildCommandData({
         uid,
         commandId,
@@ -560,9 +778,13 @@ module.exports = function ({ functions, admin, costOptimizedDataFunctions, requi
     const nowTimestamp = Timestamp.fromDate(now);
 
     return db.runTransaction(async (tx) => {
-      const [commandSnap, bookSnap] = await Promise.all([
+      const creditRefs = getReadingCreditRefs(uid, bookId);
+      const shouldReconcileCompletion = totalPages !== null;
+      const [commandSnap, bookSnap, userSnap, bookCreditSnap] = await Promise.all([
         tx.get(command.cmdRef),
         tx.get(bookRef),
+        shouldReconcileCompletion ? tx.get(creditRefs.userRef) : Promise.resolve(null),
+        shouldReconcileCompletion ? tx.get(creditRefs.bookCreditRef) : Promise.resolve(null),
       ]);
       const existing = resolveCommandSnapshot(commandSnap, command.payloadHash);
       if (existing.isDuplicate) return existing.result;
@@ -579,6 +801,23 @@ module.exports = function ({ functions, admin, costOptimizedDataFunctions, requi
       if (rating !== null) updates.rating = rating;
 
       tx.update(bookRef, updates);
+
+      const updatedBookData = {
+        ...book,
+        ...updates,
+        progress: book.progress || {},
+      };
+
+      if (shouldReconcileCompletion) {
+        reconcileReadingBookCredit(tx, {
+          uid,
+          bookId,
+          bookData: updatedBookData,
+          nowTimestamp,
+          userSnap,
+          bookCreditSnap,
+        });
+      }
 
       const resultPayload = { bookId, totalPages, rating };
       tx.set(command.cmdRef, buildCommandData({
@@ -696,15 +935,20 @@ module.exports = function ({ functions, admin, costOptimizedDataFunctions, requi
 
     try {
       await db.runTransaction(async (tx) => {
-        const [commandSnap, assignmentSnap, bookSnap, logSnap] = await Promise.all([
+        const creditRefs = getReadingCreditRefs(uid, bookId, dateStr);
+        const [commandSnap, assignmentSnap, bookSnap, logSnap, userSnap, dayCreditSnap, bookDayCreditSnap, bookCreditSnap] = await Promise.all([
           tx.get(command.cmdRef),
           tx.get(assignmentRef),
           tx.get(bookRef),
           tx.get(logRef),
+          tx.get(creditRefs.userRef),
+          tx.get(creditRefs.dayCreditRef),
+          tx.get(creditRefs.bookDayCreditRef),
+          tx.get(creditRefs.bookCreditRef),
         ]);
-        const existingCommand = resolveCommandSnapshot(commandSnap, command.payloadHash);
-        if (existingCommand.isDuplicate) {
-          resultPayload = existingCommand.result;
+        const existing = resolveCommandSnapshot(commandSnap, command.payloadHash);
+        if (existing.isDuplicate) {
+          resultPayload = existing.result;
           return;
         }
 
@@ -717,42 +961,43 @@ module.exports = function ({ functions, admin, costOptimizedDataFunctions, requi
         }
         const book = bookSnap.data() || {};
         if (book.userId !== uid) {
-          throw new functions.https.HttpsError("permission-denied", "본인의 책만 연결할 수 있습니다.", { code: policy.ERROR_CODES.BOOK_FORBIDDEN });
+          throw new functions.https.HttpsError("permission-denied", "본인의 책에만 과제를 제출할 수 있습니다.", { code: policy.ERROR_CODES.BOOK_FORBIDDEN });
+        }
+        if (!userSnap.exists) {
+          throw new functions.https.HttpsError("failed-precondition", "사용자 문서를 찾을 수 없습니다.");
         }
 
-        const existingAssignment = assignmentSnap.exists ? assignmentSnap.data() || {} : null;
+        const existingAssignment = assignmentSnap.exists ? (assignmentSnap.data() || {}) : null;
         if (existingAssignment) {
           if (existingAssignment.userId !== uid || existingAssignment.date !== dateStr || !isWesternClassicCluster(existingAssignment.clusterId)) {
             throw new functions.https.HttpsError("permission-denied", "수정할 수 없는 과제입니다.");
           }
           if (existingAssignment.status === "reviewed") {
-            throw new functions.https.HttpsError(
-              "failed-precondition",
-              "관리자 검토가 완료된 과제는 수정할 수 없습니다.",
-              { code: policy.ERROR_CODES.ASSIGNMENT_LOCKED }
-            );
+            throw new functions.https.HttpsError("failed-precondition", "이미 검토 완료된 과제는 수정할 수 없습니다.", {
+              code: policy.ERROR_CODES.ASSIGNMENT_LOCKED,
+            });
           }
-          // Lock book change after first submission
           if (existingAssignment.reading?.bookId && existingAssignment.reading.bookId !== bookId) {
-            throw new functions.https.HttpsError(
-              "failed-precondition",
-              "첫 제출 후에는 연결된 책을 변경할 수 없습니다. 관리자에게 문의해 주세요.",
-              { code: policy.ERROR_CODES.BOOK_CHANGE_LOCKED }
-            );
+            throw new functions.https.HttpsError("failed-precondition", "첫 제출 후에는 연결된 책을 변경할 수 없습니다. 관리자에게 문의해 주세요.", {
+              code: policy.ERROR_CODES.BOOK_CHANGE_LOCKED,
+            });
           }
         }
 
-        const [userSnap, bookLogsSnap] = await Promise.all([
-          tx.get(db.collection("users").doc(uid)),
-          logSnap.exists
-            ? tx.get(db.collection("readingLogs").where("bookId", "==", bookId))
-            : Promise.resolve(null),
-        ]);
-        const userData = userSnap.exists ? userSnap.data() || {} : {};
+        const userData = userSnap.data() || {};
         const userName = userData.studentName || userData.name || userData.displayName || "탐험가";
-
         const prevRevision = logSnap.exists ? Number(logSnap.data()?.revision || 1) : 0;
         const nextRevision = prevRevision + 1;
+        const bookLogsSnap = logSnap.exists
+          ? await tx.get(db.collection("readingLogs").where("bookId", "==", bookId))
+          : null;
+        const recentDayCreditsSnap = dayCreditSnap.exists
+          ? { docs: [] }
+          : await tx.get(
+            creditRefs.userRef.collection("readingDayCredits")
+              .orderBy(admin.firestore.FieldPath.documentId(), "desc")
+              .limit(31)
+          );
 
         const assignmentDocData = {
           userId: uid,
@@ -822,6 +1067,38 @@ module.exports = function ({ functions, admin, costOptimizedDataFunctions, requi
           });
         }
         tx.update(bookRef, { progress: nextProgress, updatedAt: nowTimestamp });
+
+        const updatedBookData = {
+          ...book,
+          progress: nextProgress,
+        };
+
+        const creditResult = applyReadingDayCredit(tx, {
+          uid,
+          bookId,
+          logId: deterministicLogId,
+          readDateKst: dateStr,
+          readAt: readAtTimestamp,
+          recordedAt: logDocData.recordedAt,
+          source: policy.LOG_SOURCES.ASSIGNMENT,
+          bookRef,
+          bookData: updatedBookData,
+          nowTimestamp,
+          userSnap,
+          dayCreditSnap,
+          bookDayCreditSnap,
+          recentDayCreditsSnap,
+        });
+
+        reconcileReadingBookCredit(tx, {
+          uid,
+          bookId,
+          bookData: creditResult.bookData,
+          nowTimestamp,
+          userSnap,
+          bookCreditSnap,
+          readingStats: creditResult.readingStats,
+        });
 
         resultPayload = {
           assignmentId,
@@ -899,12 +1176,25 @@ module.exports = function ({ functions, admin, costOptimizedDataFunctions, requi
       const nextLedgerVersion = crystalDiff !== 0 ? currentLedgerVersion + 1 : currentLedgerVersion;
 
       const userRef = db.collection("users").doc(targetUserId);
-      const [logSnap, userSnap] = await Promise.all([
+      const bookId = assignment.reading?.bookId;
+      const bookRef = bookId ? db.collection("readingBooks").doc(bookId) : null;
+      const assignmentCreditRef = db.collection("users").doc(targetUserId).collection("readingAssignmentCredits").doc(assignmentId);
+      const bookCreditRef = bookId
+        ? db.collection("users").doc(targetUserId).collection("readingBookCredits").doc(bookId)
+        : null;
+
+      const [logSnap, userSnap, assignCreditSnap, bookSnap, bookCreditSnap] = await Promise.all([
         tx.get(logRef),
-        crystalDiff !== 0 ? tx.get(userRef) : Promise.resolve(null),
+        tx.get(userRef),
+        tx.get(assignmentCreditRef),
+        bookRef ? tx.get(bookRef) : Promise.resolve(null),
+        bookCreditRef ? tx.get(bookCreditRef) : Promise.resolve(null),
       ]);
-      if (crystalDiff !== 0 && !userSnap?.exists) {
+      if (!userSnap?.exists) {
         throw new functions.https.HttpsError("failed-precondition", "과제 소유자 계정을 찾을 수 없습니다.");
+      }
+      if (status === "reviewed" && (!bookSnap?.exists || bookSnap.data()?.archivedAt)) {
+        throw new functions.https.HttpsError("failed-precondition", "활성 독서 도서가 연결된 과제만 검토 완료할 수 있습니다.");
       }
 
       tx.set(
@@ -928,7 +1218,7 @@ module.exports = function ({ functions, admin, costOptimizedDataFunctions, requi
         });
       }
 
-      if (crystalDiff !== 0 && userSnap?.exists) {
+      if (crystalDiff !== 0) {
         const userData = userSnap.data() || {};
         const transactionId = `assignment_review_${assignmentId}_${nextLedgerVersion}`;
         recordCrystalTransaction(tx, targetUserId, transactionId, {
@@ -945,6 +1235,80 @@ module.exports = function ({ functions, admin, costOptimizedDataFunctions, requi
           },
         });
         tx.update(userRef, { crystals: Number(userData.crystals || 0) + crystalDiff });
+      }
+
+      // Reading Assignment Credit & Book Achievement Reconcile
+      const hadAssignCredit = assignCreditSnap.exists;
+      let bookData = bookSnap?.exists ? bookSnap.data() : null;
+      let projectedReadingStats = userSnap.data()?.readingStats || {};
+
+      if (status === "reviewed" && !hadAssignCredit) {
+        tx.set(assignmentCreditRef, {
+          assignmentId,
+          bookId: bookId || null,
+          clusterId: "western-classic",
+          creditedAt: nowTimestamp,
+        });
+
+        const curReadingStats = projectedReadingStats;
+        projectedReadingStats = {
+          ...curReadingStats,
+          reviewedAssignmentCount: Number(curReadingStats.reviewedAssignmentCount || 0) + 1,
+          version: 1,
+          backfillComplete: curReadingStats.backfillComplete === true,
+        };
+        tx.set(userRef, {
+          readingStats: projectedReadingStats,
+        }, { merge: true });
+
+        if (bookRef && bookData) {
+          const curAch = bookData.achievementStats || {};
+          const nextAch = {
+            ...curAch,
+            reviewedAssignmentCount: Number(curAch.reviewedAssignmentCount || 0) + 1,
+            validReadingDayCount: Number(curAch.validReadingDayCount || 0),
+            version: 1,
+          };
+          tx.update(bookRef, { achievementStats: nextAch });
+          bookData = { ...bookData, achievementStats: nextAch };
+        }
+      } else if (status === "needs_revision" && hadAssignCredit) {
+        tx.delete(assignmentCreditRef);
+
+        const curReadingStats = projectedReadingStats;
+        projectedReadingStats = {
+          ...curReadingStats,
+          reviewedAssignmentCount: Math.max(0, Number(curReadingStats.reviewedAssignmentCount || 0) - 1),
+          version: 1,
+          backfillComplete: curReadingStats.backfillComplete === true,
+        };
+        tx.set(userRef, {
+          readingStats: projectedReadingStats,
+        }, { merge: true });
+
+        if (bookRef && bookData) {
+          const curAch = bookData.achievementStats || {};
+          const nextAch = {
+            ...curAch,
+            reviewedAssignmentCount: Math.max(0, Number(curAch.reviewedAssignmentCount || 0) - 1),
+            validReadingDayCount: Number(curAch.validReadingDayCount || 0),
+            version: 1,
+          };
+          tx.update(bookRef, { achievementStats: nextAch });
+          bookData = { ...bookData, achievementStats: nextAch };
+        }
+      }
+
+      if (bookRef && bookData) {
+        reconcileReadingBookCredit(tx, {
+          uid: targetUserId,
+          bookId,
+          bookData,
+          nowTimestamp,
+          userSnap,
+          bookCreditSnap,
+          readingStats: projectedReadingStats,
+        });
       }
     });
 
@@ -1001,16 +1365,37 @@ module.exports = function ({ functions, admin, costOptimizedDataFunctions, requi
         updatedAt: nowTimestamp,
       };
 
+      let oldBookData = null;
+      let newBookData = newBook;
+
       if (oldBookId !== targetBookId) {
         const oldBookRef = db.collection("readingBooks").doc(oldBookId);
-        const [oldBookSnap, oldLogsSnap, newLogsSnap] = await Promise.all([
+        const userRef = db.collection("users").doc(assignment.userId);
+        const oldBookCreditRef = userRef.collection("readingBookCredits").doc(oldBookId);
+        const newBookCreditRef = userRef.collection("readingBookCredits").doc(targetBookId);
+        const dateKey = String(updatedLog.readDateKst || "");
+        const oldBookDayRef = dateKey
+          ? userRef.collection("readingBookDayCredits").doc(`${oldBookId}__${dateKey}`)
+          : null;
+        const newBookDayRef = dateKey
+          ? userRef.collection("readingBookDayCredits").doc(`${targetBookId}__${dateKey}`)
+          : null;
+        const assignmentCreditRef = userRef.collection("readingAssignmentCredits").doc(assignmentId);
+        const [oldBookSnap, oldLogsSnap, newLogsSnap, userSnap, oldBookCreditSnap, newBookCreditSnap, oldBookDaySnap, newBookDaySnap] = await Promise.all([
           tx.get(oldBookRef),
           tx.get(db.collection("readingLogs").where("bookId", "==", oldBookId)),
           tx.get(db.collection("readingLogs").where("bookId", "==", targetBookId)),
+          tx.get(userRef),
+          tx.get(oldBookCreditRef),
+          tx.get(newBookCreditRef),
+          oldBookDayRef ? tx.get(oldBookDayRef) : Promise.resolve(null),
+          newBookDayRef ? tx.get(newBookDayRef) : Promise.resolve(null),
         ]);
         if (!oldBookSnap.exists || oldBookSnap.data()?.userId !== assignment.userId) {
           throw new functions.https.HttpsError("failed-precondition", "기존 연결 도서를 확인할 수 없습니다.");
         }
+
+        oldBookData = oldBookSnap.data();
 
         const oldLogs = oldLogsSnap.docs
           .filter((docSnap) => docSnap.id !== logRef.id)
@@ -1019,13 +1404,96 @@ module.exports = function ({ functions, admin, costOptimizedDataFunctions, requi
           .filter((docSnap) => docSnap.id !== logRef.id)
           .map((docSnap) => ({ id: docSnap.id, ...docSnap.data() }));
         newLogs.push({ id: logRef.id, ...updatedLog });
+
+        const oldProgress = policy.calculateReadingBookProgressFromLogs(oldLogs);
+        const newProgress = policy.calculateReadingBookProgressFromLogs(newLogs);
+
+        const oldAch = oldBookData.achievementStats || {};
+        const newAch = newBookData.achievementStats || {};
+        const isReviewed = assignment.status === "reviewed";
+        const countValidReadingDays = (logs) => new Set(logs
+          .filter((log) => (
+            log.eventType === policy.LOG_EVENT_TYPES.PROGRESS &&
+            !log.voidedAt &&
+            policy.isReadingLogEligibleForDayCredit({
+              readDateKst: log.readDateKst,
+              recordedAt: log.recordedAt || log.createdAt,
+            })
+          ))
+          .map((log) => log.readDateKst)).size;
+
+        const nextOldAch = {
+          ...oldAch,
+          reviewedAssignmentCount: isReviewed ? Math.max(0, Number(oldAch.reviewedAssignmentCount || 0) - 1) : Number(oldAch.reviewedAssignmentCount || 0),
+          validReadingDayCount: countValidReadingDays(oldLogs),
+          version: 1,
+        };
+        const nextNewAch = {
+          ...newAch,
+          reviewedAssignmentCount: isReviewed ? Number(newAch.reviewedAssignmentCount || 0) + 1 : Number(newAch.reviewedAssignmentCount || 0),
+          validReadingDayCount: countValidReadingDays(newLogs),
+          version: 1,
+        };
+
+        oldBookData = { ...oldBookData, progress: oldProgress, achievementStats: nextOldAch };
+        newBookData = { ...newBookData, progress: newProgress, achievementStats: nextNewAch };
+
         tx.update(oldBookRef, {
-          progress: policy.calculateReadingBookProgressFromLogs(oldLogs),
+          progress: oldProgress,
+          achievementStats: nextOldAch,
           updatedAt: nowTimestamp,
         });
         tx.update(newBookRef, {
-          progress: policy.calculateReadingBookProgressFromLogs(newLogs),
+          progress: newProgress,
+          achievementStats: nextNewAch,
           updatedAt: nowTimestamp,
+        });
+
+        if (dateKey) {
+          const oldStillHasDate = oldLogs.some((log) => (
+            log.readDateKst === dateKey &&
+            log.eventType === policy.LOG_EVENT_TYPES.PROGRESS &&
+            !log.voidedAt &&
+            policy.isReadingLogEligibleForDayCredit({ readDateKst: dateKey, recordedAt: log.recordedAt || log.createdAt })
+          ));
+          const movedLogEligible = policy.isReadingLogEligibleForDayCredit({
+            readDateKst: dateKey,
+            recordedAt: updatedLog.recordedAt || updatedLog.createdAt,
+          });
+          if (oldBookDaySnap?.exists && !oldStillHasDate) tx.delete(oldBookDayRef);
+          if (!newBookDaySnap?.exists && movedLogEligible) {
+            tx.set(newBookDayRef, {
+              bookId: targetBookId,
+              dateKey,
+              firstLogId: logRef.id,
+              source: updatedLog.source || policy.LOG_SOURCES.ASSIGNMENT,
+              eligibilityVersion: 1,
+              creditedAt: nowTimestamp,
+            });
+          }
+        }
+        if (isReviewed) {
+          tx.set(assignmentCreditRef, { bookId: targetBookId, updatedAt: nowTimestamp }, { merge: true });
+        }
+
+        let projectedReadingStats = userSnap.data()?.readingStats || {};
+        projectedReadingStats = reconcileReadingBookCredit(tx, {
+          uid: assignment.userId,
+          bookId: oldBookId,
+          bookData: oldBookData,
+          nowTimestamp,
+          userSnap,
+          bookCreditSnap: oldBookCreditSnap,
+          readingStats: projectedReadingStats,
+        });
+        reconcileReadingBookCredit(tx, {
+          uid: assignment.userId,
+          bookId: targetBookId,
+          bookData: newBookData,
+          nowTimestamp,
+          userSnap,
+          bookCreditSnap: newBookCreditSnap,
+          readingStats: projectedReadingStats,
         });
       }
 

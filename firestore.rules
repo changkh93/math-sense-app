@@ -75,6 +75,7 @@ service cloud.firestore {
         'accountStatus',
         'agoraStats',
         'crewStats',
+        'readingStats',
         'helpCount',
         'questionCount',
         'galaxyLearningLedgerVersion',
@@ -101,6 +102,7 @@ service cloud.firestore {
              !request.resource.data.keys().hasAny([
                'agoraStats',
                'crewStats',
+               'readingStats',
                'helpCount',
                'questionCount',
                'galaxyLearningLedgerVersion',
@@ -121,7 +123,11 @@ service cloud.firestore {
     function isServerManagedUserSubcollection(collectionId) {
       return collectionId == 'galaxyLearningOreEvents' ||
              collectionId == 'galaxyOperations' ||
-             collectionId == 'agoraAnswerCredits';
+             collectionId == 'agoraAnswerCredits' ||
+             collectionId == 'readingDayCredits' ||
+             collectionId == 'readingBookCredits' ||
+             collectionId == 'readingAssignmentCredits' ||
+             collectionId == 'readingBookDayCredits';
     }
 
     function isValidAgoraUpvoteToggle() {
