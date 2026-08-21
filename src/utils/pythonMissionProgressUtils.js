@@ -15,6 +15,15 @@ export function normalizeMissionLabProgress(progress = {}) {
     bestStarsByMission: progress?.bestStarsByMission && typeof progress.bestStarsByMission === 'object'
       ? { ...progress.bestStarsByMission }
       : {},
+    bestAssistanceByMission: progress?.bestAssistanceByMission && typeof progress.bestAssistanceByMission === 'object'
+      ? { ...progress.bestAssistanceByMission }
+      : {},
+    unlockedTools: Array.isArray(progress?.unlockedTools)
+      ? [...new Set(progress.unlockedTools.filter(Boolean))]
+      : [],
+    unlockedActs: Array.isArray(progress?.unlockedActs)
+      ? [...new Set(progress.unlockedActs.filter(Boolean))]
+      : ['act-0-awakening'],
   }
 }
 
@@ -36,13 +45,27 @@ export function getMissionSetCompletion(progress, missionSet) {
   }
 }
 
-export function mergeMissionCompletion(progress, missionSet, missionId, stars = 1) {
+export function mergeMissionCompletion(progress, missionSet, missionId, stars = 1, assistance = null) {
   const current = normalizeMissionLabProgress(progress)
   const completedMissionIds = [...new Set([...current.completedMissionIds, missionId].filter(Boolean))]
   const bestStarsByMission = {
     ...current.bestStarsByMission,
     [missionId]: Math.max(Number(current.bestStarsByMission?.[missionId] || 0), Number(stars || 0)),
   }
+
+  const bestAssistanceByMission = { ...current.bestAssistanceByMission }
+  if (assistance !== null && assistance !== undefined) {
+    const level = typeof assistance === 'number' ? assistance : (assistance.maxLevel ?? 0)
+    const existing = bestAssistanceByMission[missionId]
+    bestAssistanceByMission[missionId] = existing === undefined ? level : Math.min(existing, level)
+  }
+
+  const completedMission = Array.isArray(missionSet?.missions)
+    ? missionSet.missions.find((m) => m?.id === missionId)
+    : null
+  const newUnlocks = completedMission?.scaffold?.unlocksOnComplete || []
+  const unlockedTools = [...new Set([...(current.unlockedTools || []), ...newUnlocks])]
+
   const completed = getMissionIds(missionSet).every((id) => completedMissionIds.includes(id))
 
   return {
@@ -53,6 +76,8 @@ export function mergeMissionCompletion(progress, missionSet, missionId, stars = 
     completedMissionCount: completedMissionIds.length,
     totalMissionCount: getMissionIds(missionSet).length,
     bestStarsByMission,
+    bestAssistanceByMission,
+    unlockedTools,
     bestStars: Object.values(bestStarsByMission).reduce((sum, value) => sum + Number(value || 0), 0),
     completed,
   }

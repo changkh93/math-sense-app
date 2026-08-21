@@ -1,37 +1,47 @@
 import { useMemo } from 'react'
+import { normalizeRuntimeEvents } from './lumiEventNormalizer.js'
+import { reduceLumiWorldState } from './lumiWorldReducer.js'
 
-function getVisibleWorld(mission, events, playhead) {
-  const base = mission?.world || {}
-  const rover = { ...(base.rover || { x: 0, y: 0, direction: 0, energy: 100 }) }
-  const objects = (base.objects || []).map((item) => ({ ...item }))
-  const visible = Array.isArray(events) ? events.slice(0, Math.max(0, playhead + 1)) : []
-  for (const event of visible) {
-    if (event?.type === 'world' && event.end) Object.assign(rover, event.end)
-    if (event?.type === 'line' && event.rover) Object.assign(rover, event.rover)
-    if (event?.type === 'world' && event.action === 'collect' && event.object?.id) {
-      const targetObject = objects.find((item) => item.id === event.object.id)
-      if (targetObject) targetObject.collected = true
-    }
-  }
-  return { ...base, rover, objects }
-}
+export default function PythonWorldCanvas({ mission, events = [], playhead = -1, showHud = true, showSensor = true }) {
+  const normalizedEvents = useMemo(() => normalizeRuntimeEvents(events), [events])
+  const targetSeq = playhead < 0 ? -1 : (normalizedEvents[playhead]?.seq ?? playhead)
 
-export default function PythonWorldCanvas({ mission, events = [], playhead = -1 }) {
-  const world = useMemo(() => getVisibleWorld(mission, events, playhead), [mission, events, playhead])
-  const width = Math.max(1, Number(world.width) || 8)
-  const height = Math.max(1, Number(world.height) || 5)
-  const rover = world.rover || { x: 0, y: 0, direction: 0, energy: 100 }
-  const target = world.target || { x: width - 1, y: Math.floor(height / 2) }
-  const obstacles = Array.isArray(world.obstacles) ? world.obstacles : []
-  const objects = Array.isArray(world.objects) ? world.objects.filter((item) => !item.collected) : []
+  const worldState = useMemo(() => {
+    return reduceLumiWorldState(mission?.world || {}, normalizedEvents, targetSeq)
+  }, [mission?.world, normalizedEvents, targetSeq])
+
+  const width = Math.max(1, Number(worldState.width) || 8)
+  const height = Math.max(1, Number(worldState.height) || 5)
+  const rover = worldState.rover || { x: 0, y: 0, direction: 0, energy: 100, awake: true }
+  const target = worldState.target || { x: width - 1, y: Math.floor(height / 2), kind: 'beacon' }
+  const obstacles = worldState.obstacles || []
+  const objects = (worldState.objects || []).filter((item) => !item.collected)
+  const isAwake = Boolean(rover.awake)
+  const lastSpeech = rover.lastMessage
+  const activeSensor = showSensor ? worldState.sensorReadings?.steps_to_target : undefined
+
   const cellStyle = (x, y) => ({
     left: `${((x + 0.5) / width) * 100}%`,
     top: `${((y + 0.5) / height) * 100}%`,
   })
 
   return (
-    <section className="python-world" aria-label="루미 미션 월드">
+    <section className={`python-world ${!isAwake ? 'is-dark-awakening' : ''}`} aria-label="루미 미션 월드">
       <div className="python-world__sky" />
+      {!isAwake && (
+        <>
+          <div className="python-world__awakening-copy">
+            <span>UNKNOWN SIGNAL DETECTED</span>
+            <strong>LUMI CORE · NO RESPONSE</strong>
+            <small>오른쪽의 코드를 실행해 비상 전원을 연결하세요</small>
+          </div>
+          <div className="python-world__offline-core" aria-hidden="true">
+            <span className="python-world__offline-ring python-world__offline-ring--one" />
+            <span className="python-world__offline-ring python-world__offline-ring--two" />
+            <i>▲</i><b>POWER 0%</b>
+          </div>
+        </>
+      )}
       <div
         className="python-world__grid"
         style={{ '--grid-columns': width, '--grid-rows': height }}
@@ -58,21 +68,32 @@ export default function PythonWorldCanvas({ mission, events = [], playhead = -1 
         <div className="python-world__beacon" style={cellStyle(target.x, target.y)}>
           <span className="python-world__beacon-core" />
           <span className="python-world__beacon-label">TARGET</span>
+          {activeSensor !== undefined && (
+            <span className="python-world__sensor-badge">{activeSensor} STEPS</span>
+          )}
         </div>
         <div
-          className="python-world__rover"
+          className={`python-world__rover ${!isAwake ? 'python-world__rover--sleeping' : 'python-world__rover--awake'}`}
           style={{ ...cellStyle(rover.x, rover.y), '--rover-rotation': `${Number(rover.direction) || 0}deg` }}
         >
           <span className="python-world__rover-glow" />
-          <span className="python-world__rover-body">▲</span>
-          <span className="python-world__rover-label">LUMI</span>
+          <span className="python-world__rover-body">{isAwake ? '▲' : '●'}</span>
+          <span className="python-world__rover-label">{isAwake ? 'LUMI' : 'OFFLINE'}</span>
+          {lastSpeech && (
+            <div className="python-world__speech-bubble" role="status">
+              💬 "{lastSpeech}"
+            </div>
+          )}
         </div>
       </div>
-      <div className="python-world__hud">
-        <span>좌표 {rover.x}, {rover.y}</span>
-        <span>에너지 {rover.energy ?? 100}</span>
-        <span>방향 {rover.direction ?? 0}°</span>
-      </div>
+      {showHud && (
+        <div className="python-world__hud">
+          <span>코어: {isAwake ? 'ONLINE' : 'STANDBY'}</span>
+          <span>좌표 {rover.x}, {rover.y}</span>
+          <span>에너지 {rover.energy ?? 100}</span>
+          <span>방향 {rover.direction ?? 0}°</span>
+        </div>
+      )}
     </section>
   )
 }

@@ -1,5 +1,7 @@
 # 루미 프로토콜: 메타센스 Python World 교육과정·게임·개발 설계
 
+> **상태: 장기 참고/Legacy 설계.** 2026-08-22 이후 초급 진입 순서, Vertical Slice, Beginner API, 이벤트 계약과 구현 우선순위는 [`docs/lumi-protocol/README.md`](./lumi-protocol/README.md) 및 그 하위 명세가 우선한다. 이 문서의 `for` 중심 첫 Vertical Slice와 코어 32모듈 고정안은 더 이상 현재 구현 기준이 아니다.
+
 작성일: 2026-08-10  
 대상: 메타센스 파이썬 행성군집  
 권장 제품명: **루미 프로토콜 (LUMI Protocol)**  

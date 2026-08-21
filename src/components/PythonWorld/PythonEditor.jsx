@@ -29,6 +29,7 @@ export default function PythonEditor({ value, onChange, activeLine, readOnly = f
   const viewRef = useRef(null)
   const onChangeRef = useRef(onChange)
   const initialValueRef = useRef(value || '')
+  const syncingValueRef = useRef(false)
 
   useEffect(() => {
     onChangeRef.current = onChange
@@ -51,7 +52,7 @@ export default function PythonEditor({ value, onChange, activeLine, readOnly = f
           EditorState.tabSize.of(4),
           keymap.of([indentWithTab, ...defaultKeymap, ...historyKeymap]),
           EditorView.updateListener.of((update) => {
-            if (update.docChanged) onChangeRef.current?.(update.state.doc.toString())
+            if (update.docChanged && !syncingValueRef.current) onChangeRef.current?.(update.state.doc.toString())
           }),
           EditorView.theme({
             '&': { height: '100%', backgroundColor: '#07101f', color: '#dcecff' },
@@ -77,7 +78,12 @@ export default function PythonEditor({ value, onChange, activeLine, readOnly = f
     if (!view) return
     const current = view.state.doc.toString()
     if (current === (value || '')) return
-    view.dispatch({ changes: { from: 0, to: current.length, insert: value || '' } })
+    syncingValueRef.current = true
+    try {
+      view.dispatch({ changes: { from: 0, to: current.length, insert: value || '' } })
+    } finally {
+      syncingValueRef.current = false
+    }
   }, [value])
 
   useEffect(() => {

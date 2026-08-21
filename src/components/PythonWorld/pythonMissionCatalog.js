@@ -363,6 +363,28 @@ export function getMissionVariant(mission, variant) {
   if (!mission || !variant) return mission
   const worldOverrides = variant.world || {}
   const target = variant.target || worldOverrides.target
+  const baseGoals = Array.isArray(mission.goals) ? mission.goals : null
+  let nextGoal = mission.goal
+  let nextGoals = baseGoals
+
+  if (Array.isArray(variant.goals)) {
+    nextGoals = variant.goals
+  } else if (variant.goal) {
+    if (baseGoals?.length) {
+      nextGoals = [{ ...baseGoals[0], ...variant.goal }, ...baseGoals.slice(1)]
+    } else {
+      nextGoal = { ...(mission.goal || {}), ...variant.goal }
+    }
+  } else if (target) {
+    if (baseGoals?.length) {
+      nextGoals = baseGoals.map((goal) => goal?.type === 'position'
+        ? { ...goal, x: target.x, y: target.y }
+        : goal)
+    } else if (mission.goal) {
+      nextGoal = { ...mission.goal, x: target.x, y: target.y }
+    }
+  }
+
   return {
     ...mission,
     world: {
@@ -372,9 +394,21 @@ export function getMissionVariant(mission, variant) {
       target: { ...mission.world?.target, ...(target || {}) },
       objects: worldOverrides.objects || mission.world?.objects,
     },
-    goal: variant.goal || (target ? { ...mission.goal, x: target.x, y: target.y } : mission.goal),
-    goals: variant.goals || mission.goals,
+    goal: nextGoal,
+    goals: nextGoals,
   }
 }
 
-export { LOOP_MISSION_SET_ID }
+import { LUMI_VERTICAL_SLICE_SET, getLumiVerticalSliceSet, LUMI_COURSE_CATALOG, getLumiCourseCatalog } from './lumiCourseCatalog.js'
+
+export function getAllPythonMissionSets() {
+  return [...Object.values(BUILTIN_MISSION_SETS), LUMI_VERTICAL_SLICE_SET]
+}
+
+export {
+  LOOP_MISSION_SET_ID,
+  LUMI_VERTICAL_SLICE_SET,
+  getLumiVerticalSliceSet,
+  LUMI_COURSE_CATALOG,
+  getLumiCourseCatalog,
+}

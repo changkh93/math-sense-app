@@ -113,9 +113,10 @@
 .python-world__hud { position: absolute; left: 12px; right: 12px; bottom: 9px; display: flex; justify-content: space-between; color: #92acc8; font: .68rem monospace; }
 @keyframes python-beacon { 50% { transform: scale(1.24); opacity: .78; } }
 
-.python-lab__timeline { display: grid; grid-template-columns: 32px 1fr 32px auto; gap: 8px; align-items: center; min-height: 48px; padding: 0 7px; }
+.python-lab__timeline { display: flex; gap: 8px; align-items: center; min-height: 48px; padding: 0 7px; }
 .python-lab__timeline button { width: 30px; height: 30px; border: 1px solid #294763; border-radius: 7px; color: #d9f9ff; background: #10223a; cursor: pointer; }
-.python-lab__timeline input { accent-color: var(--lab-cyan); }
+.python-lab__timeline input { flex: 1; min-width: 70px; accent-color: var(--lab-cyan); }
+.python-lab__timeline select { min-height: 30px; border: 1px solid #294763; border-radius: 7px; color: #d9f9ff; background: #10223a; }
 .python-lab__timeline span { color: #7f99b4; font: .65rem monospace; }
 .python-lab__result { margin-top: 2px; padding: 12px 14px; border-radius: 10px; background: rgba(255,103,132,.08); border: 1px solid rgba(255,103,132,.25); }
 .python-lab__result.is-success { background: rgba(85,241,200,.08); border-color: rgba(85,241,200,.3); }
@@ -141,6 +142,86 @@
 .python-lab__inspector pre { margin: 0; color: #bcd5ec; white-space: pre-wrap; }
 .python-lab--empty { display: grid; place-items: center; text-align: center; }
 
+.python-world__rover--sleeping .python-world__rover-body { color: #5a738e; filter: grayscale(1); }
+.python-world__rover--sleeping .python-world__rover-glow { background: rgba(90, 115, 142, .1); box-shadow: none; }
+.python-world__awakening-copy { position:absolute;z-index:3;left:0;right:0;top:9%;text-align:center;pointer-events:none; }
+.python-world__awakening-copy span,.python-world__awakening-copy strong,.python-world__awakening-copy small { display:block; }
+.python-world__awakening-copy span { color:#ff7891;font:800 .62rem monospace;letter-spacing:.2em;animation:python-warning-blink 1.5s steps(2,end) infinite; }
+.python-world__awakening-copy strong { margin-top:8px;color:#9ab0c2;font:900 1rem monospace;letter-spacing:.08em; }
+.python-world__awakening-copy small { margin-top:6px;color:#617c94;font-size:.68rem; }
+.python-world.is-dark-awakening { background:radial-gradient(circle at 50% 52%,rgba(39,107,137,.22),transparent 25%),linear-gradient(#040a16,#08182b); }
+.python-world.is-dark-awakening .python-world__grid { left:17%;right:17%;top:22%;bottom:12%;opacity:.68;transform:perspective(800px) rotateX(58deg); }
+.python-world.is-dark-awakening .python-world__beacon { display:none; }
+.python-world.is-dark-awakening .python-world__rover { visibility:hidden; }
+.python-world__offline-core { position:absolute;z-index:3;left:50%;top:53%;width:210px;height:210px;display:grid;place-items:center;border-radius:50%;transform:translate(-50%,-50%);background:radial-gradient(circle,#183247 0 8%,#0d2037 34%,#050b16 70%);box-shadow:0 0 38px rgba(73,183,220,.3),0 0 110px rgba(32,115,155,.18); }
+.python-world__offline-core::after { content:"";position:absolute;inset:37%;border-radius:50%;background:#263f4e;box-shadow:0 0 18px #41677a;animation:python-warning-blink 1.5s steps(2,end) infinite; }
+.python-world__offline-core i { position:relative;z-index:2;color:#607787;font-size:58px;font-style:normal;filter:grayscale(1); }
+.python-world__offline-core b { position:absolute;bottom:28px;color:#ff7891;font:800 .62rem monospace;letter-spacing:.18em; }
+.python-world__offline-ring { position:absolute;inset:8px;border:1px solid rgba(82,181,209,.45);border-radius:50%;transform:rotate(28deg) scaleY(.36); }
+.python-world__offline-ring--two { inset:-16px;transform:rotate(-47deg) scaleY(.31);border-color:rgba(155,111,220,.42); }
+@keyframes python-warning-blink { 50% { opacity:.42; } }
+.python-world__speech-bubble {
+  position: absolute;
+  bottom: calc(100% + 14px);
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: rgba(4, 15, 30, .92);
+  border: 1px solid var(--lab-cyan);
+  box-shadow: 0 0 16px rgba(73, 233, 255, .3);
+  color: #eaf8ff;
+  font: 700 .75rem/1.2 monospace;
+  white-space: nowrap;
+  pointer-events: none;
+  z-index: 10;
+  animation: python-bubble-pop .25s ease-out;
+}
+@keyframes python-bubble-pop {
+  0% { transform: translateX(-50%) scale(0.7); opacity: 0; }
+  100% { transform: translateX(-50%) scale(1); opacity: 1; }
+}
+.python-world__sensor-badge {
+  position: absolute;
+  top: -24px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 2px 7px;
+  border-radius: 4px;
+  background: rgba(85, 241, 200, .18);
+  border: 1px solid var(--lab-mint);
+  color: var(--lab-mint);
+  font: 700 .62rem monospace;
+  white-space: nowrap;
+}
+.python-lab__memory-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.python-lab__memory-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 5px 8px;
+  border-radius: 6px;
+  background: rgba(20, 42, 70, .5);
+  border: 1px solid rgba(73, 233, 255, .2);
+  font: .72rem monospace;
+}
+.python-lab__memory-name { color: var(--lab-cyan); font-weight: 700; }
+.python-lab__memory-val { color: var(--lab-mint); }
+.python-lab__token-pill {
+  display: inline-block;
+  padding: 1px 6px;
+  margin: 0 2px;
+  border-radius: 4px;
+  background: rgba(248, 186, 76, .2);
+  border: 1px solid #f8ba4c;
+  color: #ffd77f;
+  font-weight: 700;
+}
+
 @media (max-width: 1100px) {
   .python-lab__layout { grid-template-columns: 250px 1fr; }
   .python-lab__code-panel { grid-column: 1 / -1; min-height: 570px; }
@@ -152,4 +233,9 @@
   .python-lab__layout { grid-template-columns: 1fr; }
   .python-lab__briefing, .python-lab__code-panel { grid-column: auto; }
   .python-world { min-height: 340px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .python-world__beacon-core, .python-world__speech-bubble { animation: none !important; }
+  .python-world__beacon, .python-world__rover, .python-world__obstacle, .python-world__object { transition: none !important; }
 }

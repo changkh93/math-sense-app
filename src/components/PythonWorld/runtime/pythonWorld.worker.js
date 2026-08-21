@@ -82,6 +82,7 @@ def _run_mission(payload_json, code):
     max_output_chars = int(limits.get("maxOutputChars", 5000))
     events = []
     command_count = 0
+    trace_context = {"current_line": None, "last_line": None, "last_locals": {}}
 
     class WorldState:
         def __init__(self, config):
@@ -94,6 +95,7 @@ def _run_mission(payload_json, code):
                 "y": int(rover.get("y", 0)),
                 "direction": int(rover.get("direction", 0)) % 360,
                 "energy": int(rover.get("energy", 100)),
+                "awake": bool(rover.get("awake", True)),
             }
             self.max_energy = int(rover.get("maxEnergy", config.get("maxEnergy", 100)))
             self.target = {
@@ -101,6 +103,7 @@ def _run_mission(payload_json, code):
                 "y": int(target.get("y", 0)),
                 "kind": str(target.get("kind", "beacon")),
             }
+            self.path_clear = bool(config.get("pathClear", True))
             self.obstacles = {
                 (int(item.get("x", -1)), int(item.get("y", -1)))
                 for item in (config.get("obstacles") or [])
@@ -123,12 +126,17 @@ def _run_mission(payload_json, code):
         def target_distance(self):
             return abs(self.target["x"] - self.rover["x"]) + abs(self.target["y"] - self.rover["y"])
 
+        @property
+        def steps_to_target(self):
+            return self.target_distance
+
         def snapshot(self):
             return {
                 "width": self.width,
                 "height": self.height,
                 "rover": dict(self.rover),
                 "target": dict(self.target),
+                "pathClear": self.path_clear,
                 "objects": [dict(item) for item in self.objects],
                 "inventory": [dict(item) for item in self.inventory],
                 "collectedCount": len(self.inventory),
@@ -182,7 +190,10 @@ def _run_mission(payload_json, code):
             return f"Signal(kind={self.kind!r}, position={self.position})"
 
     def emit(event_type, **data):
-        events.append({"type": event_type, "seq": len(events), **data})
+        event_data = {"type": event_type, "seq": len(events), **data}
+        if "sourceLine" not in event_data and trace_context["current_line"] is not None:
+            event_data["sourceLine"] = trace_context["current_line"]
+        events.append(event_data)
         if len(events) > max_trace_events:
             raise MissionLimitError("실행 단계가 너무 많습니다.")
 
@@ -199,8 +210,25 @@ def _run_mission(payload_json, code):
         def energy(self):
             return state.rover["energy"]
 
+        @property
+        def awake(self):
+            return state.rover.get("awake", True)
+
+        @property
+        def position(self):
+            return (state.rover["x"], state.rover["y"])
+
         def snapshot(self):
             return dict(state.rover)
+
+        def wake(self):
+            nonlocal command_count
+            command_count += 1
+            if command_count > max_commands:
+                raise MissionLimitError("월드 명령 수가 안전 한도를 넘었습니다.")
+            state.rover["awake"] = True
+            emit("world", action="wake", end=dict(state.rover))
+            return True
 
         def move(self, distance=1):
             nonlocal command_count
@@ -324,6 +352,17 @@ def _run_mission(payload_json, code):
         def target_distance(self):
             return state.target_distance
 
+        @property
+        def steps_to_target(self):
+            steps = state.steps_to_target
+            emit("sensor_read", sensor="steps_to_target", value=steps)
+            return steps
+
+        @property
+        def path_clear(self):
+            emit("sensor_read", sensor="path_clear", value=state.path_clear)
+            return state.path_clear
+
         def snapshot(self):
             return state.snapshot()
 
@@ -344,7 +383,6 @@ def _run_mission(payload_json, code):
     calls = []
     result_error = None
     student_globals = {}
-
     try:
         tree = ast.parse(code, filename="<student>", mode="exec")
         concepts, calls, violations = _analyze(tree)
@@ -372,12 +410,34 @@ def _run_mission(payload_json, code):
             "tuple": tuple,
             "zip": zip,
         }
-        student_globals = {"__builtins__": allowed_builtins, "__name__": "__main__"}
+        student_globals = {
+            "__builtins__": allowed_builtins,
+            "__name__": "__main__",
+            "lumi": lumi,
+            "world": world,
+        }
 
         def trace_student(frame, event, arg):
             if frame.f_code.co_filename != "<student>":
                 return trace_student
             if event == "line":
+                cur_line = int(frame.f_lineno)
+                trace_context["current_line"] = cur_line
+                if trace_context["last_line"] is not None:
+                    prev_line = trace_context["last_line"]
+                    prev_locals = trace_context["last_locals"]
+                    for k, v in frame.f_locals.items():
+                        if not k.startswith("__") and k not in {"lumi", "world"}:
+                            old_val = prev_locals.get(k)
+                            if k not in prev_locals or old_val != v:
+                                emit("memory_changed", sourceLine=prev_line, name=k, before=_json_value(old_val), after=_json_value(v))
+
+                trace_context["last_line"] = cur_line
+                trace_context["last_locals"] = {
+                    k: v for k, v in frame.f_locals.items()
+                    if not k.startswith("__") and k not in {"lumi", "world"}
+                }
+
                 variables = {
                     key: _json_value(value)
                     for key, value in frame.f_locals.items()
@@ -385,7 +445,7 @@ def _run_mission(payload_json, code):
                 }
                 emit(
                     "line",
-                    line=int(frame.f_lineno),
+                    line=cur_line,
                     variables=variables,
                     rover=dict(state.rover),
                 )
@@ -395,6 +455,15 @@ def _run_mission(payload_json, code):
         with contextlib.redirect_stdout(stdout):
             sys.settrace(trace_student)
             exec(compiled, student_globals, student_globals)
+
+        if trace_context["last_line"] is not None:
+            prev_line = trace_context["last_line"]
+            prev_locals = trace_context["last_locals"]
+            for k, v in student_globals.items():
+                if not k.startswith("__") and k not in {"lumi", "world"}:
+                    old_val = prev_locals.get(k)
+                    if k not in prev_locals or old_val != v:
+                        emit("memory_changed", sourceLine=prev_line, name=k, before=_json_value(old_val), after=_json_value(v))
     except BaseException as exc:
         line = getattr(exc, "lineno", None)
         if line is None and exc.__traceback__ is not None:
