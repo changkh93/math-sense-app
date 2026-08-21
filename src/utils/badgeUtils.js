@@ -59,7 +59,13 @@ import trustedGuideBadge from '../assets/badge/trusted_guide.png';
 import problemSolverPilotBadge from '../assets/badge/problem_solver_pilot.png';
 import galaxyMentorBadge from '../assets/badge/galaxy_mentor.png';
 import hundredAnswersNavigatorBadge from '../assets/badge/hundred_answers_navigator.png';
+import agoraSageBadge from '../assets/badge/agora_sage.png';
+import explorationLegendBadge from '../assets/badge/exploration_legend.png';
+import curiosityBeaconBadge from '../assets/badge/curiosity_beacon.png';
+import agoraLighthouseBadge from '../assets/badge/agora_lighthouse.png';
 import agoraArchimedesBadge from '../assets/badge/agora_archimedes.png';
+
+import crewFirstBoardBadge from '../assets/badge/crew_first_board.png';
 import crewTeamCoreBadge from '../assets/badge/crew_team_core.png';
 import crewGalaxyVanguardBadge from '../assets/badge/crew_galaxy_vanguard.png';
 import oneBookUniverseBadge from '../assets/badge/one_book_universe.png';
@@ -80,7 +86,12 @@ const BADGE_PREMIUM_IMAGES = {
   problem_solver_pilot: problemSolverPilotBadge,
   galaxy_mentor: galaxyMentorBadge,
   hundred_answers_navigator: hundredAnswersNavigatorBadge,
+  agora_sage: agoraSageBadge,
+  exploration_legend: explorationLegendBadge,
+  curiosity_beacon: curiosityBeaconBadge,
+  agora_lighthouse: agoraLighthouseBadge,
   agora_archimedes: agoraArchimedesBadge,
+  crew_first_board: crewFirstBoardBadge,
   crew_team_core: crewTeamCoreBadge,
   crew_galaxy_vanguard: crewGalaxyVanguardBadge,
   one_book_universe: oneBookUniverseBadge,
