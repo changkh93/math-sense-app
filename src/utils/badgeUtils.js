@@ -66,6 +66,12 @@ import agoraLighthouseBadge from '../assets/badge/agora_lighthouse.png';
 import agoraArchimedesBadge from '../assets/badge/agora_archimedes.png';
 
 import crewFirstBoardBadge from '../assets/badge/crew_first_board.png';
+import crewFirstOpBadge from '../assets/badge/crew_first_op.png';
+import crewWeekSailorBadge from '../assets/badge/crew_week_sailor.png';
+import crewOpVeteranBadge from '../assets/badge/crew_op_veteran.png';
+import crewTeamIgnitionBadge from '../assets/badge/crew_team_ignition.png';
+import crewOreContributorBadge from '../assets/badge/crew_ore_contributor.png';
+import crewBoxEngineerBadge from '../assets/badge/crew_box_engineer.png';
 import crewTeamCoreBadge from '../assets/badge/crew_team_core.png';
 import crewGalaxyVanguardBadge from '../assets/badge/crew_galaxy_vanguard.png';
 import oneBookUniverseBadge from '../assets/badge/one_book_universe.png';
@@ -92,6 +98,12 @@ const BADGE_PREMIUM_IMAGES = {
   agora_lighthouse: agoraLighthouseBadge,
   agora_archimedes: agoraArchimedesBadge,
   crew_first_board: crewFirstBoardBadge,
+  crew_first_op: crewFirstOpBadge,
+  crew_week_sailor: crewWeekSailorBadge,
+  crew_op_veteran: crewOpVeteranBadge,
+  crew_team_ignition: crewTeamIgnitionBadge,
+  crew_ore_contributor: crewOreContributorBadge,
+  crew_box_engineer: crewBoxEngineerBadge,
   crew_team_core: crewTeamCoreBadge,
   crew_galaxy_vanguard: crewGalaxyVanguardBadge,
   one_book_universe: oneBookUniverseBadge,
