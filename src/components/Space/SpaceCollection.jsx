@@ -23,6 +23,7 @@ export default function SpaceCollection({ userData, history }) {
   };
 
   const agoraBadges = badges.filter((b) => b.category === 'agora' || b.category === 'social');
+  const crewBadges = badges.filter((b) => b.category === 'crew');
   const generalBadges = badges.filter((b) => b.category === 'general');
   const courseMasterBadges = badges.filter((b) => b.category === 'course_master');
   const regionMasterBadges = badges.filter((b) => b.category === 'region_master');
@@ -229,7 +230,18 @@ export default function SpaceCollection({ userData, history }) {
         </div>
       </div>
 
-      {/* 4. 일반 & 업적 배지 Section */}
+      {/* 4. 스터디 크루 활동 배지 Section */}
+      <div style={{ marginBottom: '3rem' }}>
+        <h3 style={{ color: 'var(--text-bright)', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <span>🚢 스터디 크루 활동 배지</span>
+          <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 400 }}>(미션·팀워크·공동 광석 상자 기여)</span>
+        </h3>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1.2rem' }}>
+          {crewBadges.map(renderBadgeCard)}
+        </div>
+      </div>
+
+      {/* 5. 일반 & 업적 배지 Section */}
       <div style={{ marginBottom: '3rem' }}>
         <h3 style={{ color: 'var(--text-bright)', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
           <span>🏅 일반 탐사 & 활동 배지</span>

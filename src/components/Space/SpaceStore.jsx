@@ -1889,6 +1889,7 @@ function StoreChallengeAccordionSection({ challengeBadges = [] }) {
   // Course section initial state: CLOSED (false)
   const [openSections, setOpenSections] = React.useState({
     'agora': true,
+    'crew': true,
     'cluster_elementary': false,
     'middle-math': false,
     'python': false,
@@ -1902,6 +1903,7 @@ function StoreChallengeAccordionSection({ challengeBadges = [] }) {
 
   const sections = [
     { key: 'agora', title: '💬 스텔라 아고라 배지' },
+    { key: 'crew', title: '🚢 스터디 크루 활동 배지' },
     { key: 'cluster_elementary', title: '🏫 초등수학 성역 배지' },
     { key: 'middle-math', title: '📐 중등수학 성역 배지' },
     { key: 'python', title: '🐍 파이썬 코딩 성역 배지' },
@@ -1919,7 +1921,8 @@ function StoreChallengeAccordionSection({ challengeBadges = [] }) {
         {sections.map(({ key, title }) => {
           const regionBadges = challengeBadges.filter(b => {
             if (key === 'agora') return b.category === 'agora';
-            if (key === 'general') return !b.clusterId && b.category !== 'region_master' && b.category !== 'agora';
+            if (key === 'crew') return b.category === 'crew';
+            if (key === 'general') return !b.clusterId && b.category !== 'region_master' && b.category !== 'agora' && b.category !== 'crew';
             return b.clusterId === key;
           });
           if (regionBadges.length === 0) return null;

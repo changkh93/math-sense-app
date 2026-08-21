@@ -74,6 +74,7 @@ service cloud.firestore {
         'isDeleted',
         'accountStatus',
         'agoraStats',
+        'crewStats',
         'helpCount',
         'questionCount',
         'galaxyLearningLedgerVersion',
@@ -99,6 +100,7 @@ service cloud.firestore {
              (!('accountStatus' in request.resource.data) || request.resource.data.accountStatus == 'active') &&
              !request.resource.data.keys().hasAny([
                'agoraStats',
+               'crewStats',
                'helpCount',
                'questionCount',
                'galaxyLearningLedgerVersion',

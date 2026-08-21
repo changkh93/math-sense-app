@@ -226,6 +226,15 @@ function buildDefaultStudentUserData({ uid, email, studentName, loginId, grade, 
     crewActiveStudyRoomId: "",
     crewActiveStudyRoomStatus: "",
     crewSnapshot: null,
+    crewStats: {
+      missionParticipationCount: 0,
+      teamMissionCount: 0,
+      chestContributionCount: 0,
+      chestCompletionCount: 0,
+      chestRewardClaimCount: 0,
+      version: 1,
+      backfillComplete: true,
+    },
     clusterAccess: { cluster_elementary: "active" },
     uid,
     email,
@@ -9284,13 +9293,32 @@ exports.submitStudyCrewDailyMission = regionalFunctions.https.onCall(async (data
       });
     }
 
-    rewardsByUser.forEach((amount, rewardUid) => {
+    const crewStatsUserIds = scopeType === "crew" && !guest
+      ? uniqueIds([...rewardsByUser.keys(), ...(isFirstCrewParticipation ? [uid] : [])])
+      : [...rewardsByUser.keys()];
+    crewStatsUserIds.forEach((rewardUid) => {
+      const amount = rewardsByUser.get(rewardUid) || 0;
       const rewardUserSnap = rewardUserSnaps.get(rewardUid);
       if (!rewardUserSnap?.exists) return;
       const rewardUserData = rewardUserSnap.data() || {};
+      const currentCrewStats = rewardUserData.crewStats && typeof rewardUserData.crewStats === "object"
+        ? rewardUserData.crewStats
+        : {};
+      const shouldCountParticipation = scopeType === "crew" && rewardUid === uid && isFirstCrewParticipation;
+      const shouldCountTeamMission = scopeType === "crew" && teamRewardedUserIds.includes(rewardUid);
       tx.set(db.collection("users").doc(rewardUid), {
-        crystals: Number(rewardUserData.crystals || 0) + amount,
+        ...(amount > 0 ? { crystals: Number(rewardUserData.crystals || 0) + amount } : {}),
         ...(rewardUserUpdates.get(rewardUid) || {}),
+        ...(scopeType === "crew" ? {
+          crewStats: {
+            ...currentCrewStats,
+            missionParticipationCount: Math.max(0, Number(currentCrewStats.missionParticipationCount || 0))
+              + (shouldCountParticipation ? 1 : 0),
+            teamMissionCount: Math.max(0, Number(currentCrewStats.teamMissionCount || 0))
+              + (shouldCountTeamMission ? 1 : 0),
+            version: 1,
+          },
+        } : {}),
       }, { merge: true });
     });
 
@@ -11688,6 +11716,11 @@ async function contributePerfectAssignmentToCrewChest(assignmentId, assignment =
         contributedAmount: contributedToday + acceptedAmount,
         updatedAt: now,
       }, { merge: true });
+      transaction.update(userRef, {
+        "crewStats.chestContributionCount": FieldValue.increment(1),
+        "crewStats.chestCompletionCount": FieldValue.increment(boxCompleted ? 1 : 0),
+        "crewStats.version": 1,
+      });
     }
 
     transaction.set(crewDailyRef, {
@@ -11943,6 +11976,11 @@ exports.claimCrewCrystalChestReward = regionalFunctions.https.onCall(async (data
       crystals: Number(userData.crystals || 0) + rewardAmount,
       ...calculateGrowthUpdates(userData, rewardAmount),
       lastCrewCrystalChestClaimAt: FieldValue.serverTimestamp(),
+      crewStats: {
+        ...(userData.crewStats && typeof userData.crewStats === "object" ? userData.crewStats : {}),
+        chestRewardClaimCount: Math.max(0, Number(userData.crewStats?.chestRewardClaimCount || 0)) + 1,
+        version: 1,
+      },
     }, { merge: true });
     recordCrystalTransaction(transaction, uid, txId, {
       amount: rewardAmount,

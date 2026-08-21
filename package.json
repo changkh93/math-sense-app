@@ -10,6 +10,8 @@
     "lint": "eslint .",
     "test:agora-badges": "node scripts/test-agora-badges.mjs",
     "backfill:agora-stats": "node scripts/backfill-agora-stats.mjs",
+    "test:crew-badges": "node scripts/test-crew-badges.mjs",
+    "backfill:crew-stats": "node scripts/backfill-crew-stats.mjs",
     "test:streak": "node scripts/test-streak-utils.mjs",
     "test:pdf-url": "node scripts/test-pdf-url-utils.mjs",
     "test:google-auth": "node scripts/test-google-auth-flow.mjs",
