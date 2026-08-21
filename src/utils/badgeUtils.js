@@ -53,6 +53,12 @@ import masterClusterPythonBadge from '../assets/badge/master_cluster_python.png'
 import masterClusterClassicBadge from '../assets/badge/master_cluster_classic.png';
 
 import firstContactBadge from '../assets/badge/first_contact.png';
+import stellarResponderBadge from '../assets/badge/stellar_responder.png';
+import knowledgeRelayBadge from '../assets/badge/knowledge_relay.png';
+import trustedGuideBadge from '../assets/badge/trusted_guide.png';
+import problemSolverPilotBadge from '../assets/badge/problem_solver_pilot.png';
+import galaxyMentorBadge from '../assets/badge/galaxy_mentor.png';
+import hundredAnswersNavigatorBadge from '../assets/badge/hundred_answers_navigator.png';
 import agoraArchimedesBadge from '../assets/badge/agora_archimedes.png';
 import crewTeamCoreBadge from '../assets/badge/crew_team_core.png';
 import crewGalaxyVanguardBadge from '../assets/badge/crew_galaxy_vanguard.png';
@@ -68,6 +74,12 @@ const BADGE_PREMIUM_IMAGES = {
   kind_solver: kindSolverBadge,
   question_pioneer: questionPioneerBadge,
   first_contact: firstContactBadge,
+  stellar_responder: stellarResponderBadge,
+  knowledge_relay: knowledgeRelayBadge,
+  trusted_guide: trustedGuideBadge,
+  problem_solver_pilot: problemSolverPilotBadge,
+  galaxy_mentor: galaxyMentorBadge,
+  hundred_answers_navigator: hundredAnswersNavigatorBadge,
   agora_archimedes: agoraArchimedesBadge,
   crew_team_core: crewTeamCoreBadge,
   crew_galaxy_vanguard: crewGalaxyVanguardBadge,
