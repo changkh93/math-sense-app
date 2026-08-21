@@ -84,8 +84,10 @@ import hundredDayScribeBadge from '../assets/badge/hundred_day_scribe.png';
 import unfadingReadingLampBadge from '../assets/badge/unfading_reading_lamp.png';
 import galaxyReadingHabitBadge from '../assets/badge/galaxy_reading_habit.png';
 import firstLogbookBadge from '../assets/badge/first_logbook.png';
+import reflectiveChroniclerBadge from '../assets/badge/reflective_chronicler.png';
 import oneBookUniverseBadge from '../assets/badge/one_book_universe.png';
 import classicSmallLibraryBadge from '../assets/badge/classic_small_library.png';
+import libraryOfStarsBadge from '../assets/badge/library_of_stars.png';
 import galacticArchivistBadge from '../assets/badge/galactic_archivist.png';
 
 // 배지 외형 업그레이드 1종(프리미엄)의 광석 가격.
@@ -141,9 +143,11 @@ const BADGE_PREMIUM_IMAGES = {
   galaxy_reading_habit: galaxyReadingHabitBadge,
   first_reading_logbook: firstLogbookBadge,
   first_logbook: firstLogbookBadge,
+  reflective_chronicler: reflectiveChroniclerBadge,
   one_book_universe: oneBookUniverseBadge,
   classic_bookshelf_keeper: classicSmallLibraryBadge,
   classic_small_library: classicSmallLibraryBadge,
+  library_of_stars: libraryOfStarsBadge,
   galactic_archivist: galacticArchivistBadge,
   cosmos_initiate: cosmosInitiateBadge,
   crystal_collector: crystalCollectorBadge,
