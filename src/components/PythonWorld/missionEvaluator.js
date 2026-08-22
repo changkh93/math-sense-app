@@ -1,6 +1,7 @@
 import { normalizeRuntimeEvents } from './lumiEventNormalizer.js'
 import { reduceExecutionTraceState } from './executionTraceReducer.js'
 import { evaluateTacticalGoal } from './tacticalGoalEvaluators.js'
+import { getLumiGoalLabel } from './lumiScaffolding.js'
 
 const EXECUTED_CALL_EVENT = Object.freeze({
   'lumi.wake': 'rover_woke',
@@ -101,8 +102,10 @@ function hasReachedSingleGoal(goal, ctx) {
   if (goal.type === 'spokenMessage') {
     return events.some((event) => {
       if (event.type !== 'rover_spoke') return false
-      const msg = String(event.payload?.message || '')
-      return !goal.includes || msg.includes(goal.includes)
+      if (!goal.includes) return true
+      const msg = String(event.payload?.message || '').toLowerCase().trim()
+      const expected = String(goal.includes).toLowerCase().trim()
+      return msg.includes(expected)
     })
   }
   if (goal.type === 'collectedCount') {
@@ -116,24 +119,56 @@ function hasReachedSingleGoal(goal, ctx) {
     return remaining.length === 0 && Number(finalState?.collectedCount || 0) > 0
   }
   if (goal.type === 'minimumEnergy') return Number(rover.energy || 0) >= Number(goal.value || 0)
-  if (goal.type === 'stdoutIncludes') return stdout.includes(String(goal.value || ''))
+  if (goal.type === 'stdoutIncludes') {
+    const expected = String(goal.value || '').trim()
+    if (!expected) return true
+    const cleanStdout = stdout.replace(/\r\n/g, '\n')
+    if (cleanStdout.includes(expected)) return true
+    const normStdout = cleanStdout.toLowerCase().replace(/\s+/g, ' ')
+    const normExpected = expected.toLowerCase().replace(/\s+/g, ' ')
+    return normStdout.includes(normExpected)
+  }
 
   // Variables & Memory Goals
   if (goal.type === 'variableDefined') {
-    return execTrace.variables[goal.name] !== undefined || events.some((e) => e.type === 'memory_changed' && e.payload?.name === goal.name)
+    if (goal.name && (execTrace.variables[goal.name] !== undefined || events.some((e) => e.type === 'memory_changed' && e.payload?.name === goal.name))) {
+      return true
+    }
+    if (!goal.strictName) {
+      const userVars = Object.keys(execTrace.variables).filter((k) => !k.startsWith('_') && k !== 'lumi' && k !== 'world')
+      return userVars.length > 0
+    }
+    return false
   }
   if (goal.type === 'variableValueEquals') {
-    const currentVal = execTrace.variables[goal.name]
-    return currentVal === goal.value
+    if (goal.name && execTrace.variables[goal.name] === goal.value) {
+      return true
+    }
+    if (!goal.strictName) {
+      const userVars = Object.entries(execTrace.variables).filter(
+        ([k]) => !k.startsWith('_') && k !== 'lumi' && k !== 'world'
+      )
+      return userVars.some(([, val]) => val === goal.value)
+    }
+    return false
   }
   if (goal.type === 'variableChanged') {
-    const memEvents = events.filter((e) => e.type === 'memory_changed' && e.payload?.name === goal.name)
+    let memEvents = events.filter((e) => e.type === 'memory_changed' && e.payload?.name === goal.name)
+    if (memEvents.length === 0 && !goal.strictName) {
+      memEvents = events.filter(
+        (e) => e.type === 'memory_changed' && !e.payload?.name?.startsWith('_') && e.payload?.name !== 'lumi' && e.payload?.name !== 'world'
+      )
+    }
     if (memEvents.length === 0) return false
     const lastChange = memEvents[memEvents.length - 1]
     const hasMutated = lastChange.payload?.before !== lastChange.payload?.after
     if (!hasMutated) return false
     if (goal.expectedFinal !== undefined) {
-      return lastChange.payload?.after === goal.expectedFinal || execTrace.variables[goal.name] === goal.expectedFinal
+      if (lastChange.payload?.after === goal.expectedFinal) return true
+      const userVars = Object.entries(execTrace.variables).filter(
+        ([k]) => !k.startsWith('_') && k !== 'lumi' && k !== 'world'
+      )
+      return userVars.some(([, val]) => val === goal.expectedFinal)
     }
     return true
   }
@@ -519,7 +554,7 @@ export function getDetailedGoalEvaluation(mission, runtimeResult) {
 
     return {
       type: goal.type,
-      label: label || goal.type,
+      label: label || getLumiGoalLabel(goal),
       passed,
       hint: passed ? undefined : hint,
     }

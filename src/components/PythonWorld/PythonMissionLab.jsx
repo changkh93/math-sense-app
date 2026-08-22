@@ -17,9 +17,20 @@ import { deriveExecutionModel, selectSystemObjectInspectorItems } from './execut
 import { projectTacticalEvents } from './lumiTacticalEventProjector'
 import { reduceTacticalState } from './lumiTacticalReducer'
 import LumiTacticalInspector from './LumiTacticalInspector'
+import {
+  LUMI_DRAFT_SCHEMA_VERSION,
+  getLumiConceptLessons,
+  getLumiInitialCode,
+  getLumiLearningSteps,
+  getLumiMissionGoals,
+  getLumiMissionHints,
+  getLumiScaffoldMeta,
+  getLumiSolutionPreview,
+  getRelevantMissionApi,
+} from './lumiScaffolding'
 import './PythonMissionLab.css'
 
-const DRAFT_PREFIX = 'metasense:python-mission:v5:'
+const DRAFT_PREFIX = `metasense:python-mission:${LUMI_DRAFT_SCHEMA_VERSION}:`
 const RUN_SEQUENCE_PREFIX = 'metasense:python-mission-run-sequence:v5:'
 const MAX_PERSISTED_CODE_CHARS = 20_000
 const RUN_HISTORY_SLOTS = 20
@@ -43,11 +54,11 @@ function getNextRunSlot(unitId, missionId) {
 
 function readDraft(unitId, mission) {
   try {
-    const v5 = localStorage.getItem(`${DRAFT_PREFIX}${unitId}:${mission.id}`)
-    if (typeof v5 === 'string' && v5.trim()) return v5
-    return mission.starterCode || ''
+    const currentDraft = localStorage.getItem(`${DRAFT_PREFIX}${unitId}:${mission.id}`)
+    if (typeof currentDraft === 'string') return currentDraft
+    return getLumiInitialCode(mission)
   } catch {
-    return mission.starterCode || ''
+    return getLumiInitialCode(mission)
   }
 }
 
@@ -76,6 +87,63 @@ function getPlaybackCursors(rawEvents) {
   }).filter((index) => index >= 0)
 }
 
+function SolutionCodeOverlay({ preview, onClose }) {
+  const [timeLeft, setTimeLeft] = useState(preview.duration)
+  const onCloseRef = useRef(onClose)
+
+  useEffect(() => {
+    onCloseRef.current = onClose
+  }, [onClose])
+
+  useEffect(() => {
+    const startedAt = Date.now()
+    const timer = setInterval(() => {
+      const remaining = Math.max(0, preview.duration - (Date.now() - startedAt))
+      setTimeLeft(remaining)
+      if (remaining <= 0) {
+        clearInterval(timer)
+        onCloseRef.current?.()
+      }
+    }, 100)
+    return () => clearInterval(timer)
+  }, [preview.duration, preview.sessionId])
+
+  return (
+    <div
+      className="python-lab__solution-overlay"
+      role="dialog"
+      aria-modal="true"
+      aria-label="완성 코드 예시"
+      onCopy={(e) => e.preventDefault()}
+      onCut={(e) => e.preventDefault()}
+      onContextMenu={(e) => e.preventDefault()}
+      onDragStart={(e) => e.preventDefault()}
+    >
+      <div className="python-lab__solution-header">
+        <div>
+          <strong>완성 코드 예시 (복사 불가)</strong>
+          <span>눈으로 읽고 이해한 뒤 직접 에디터에 타이핑하세요. (복사 및 드래그가 차단되어 있습니다)</span>
+        </div>
+        <button type="button" onClick={onClose}>닫기</button>
+      </div>
+      <pre
+        onCopy={(e) => e.preventDefault()}
+        onCut={(e) => e.preventDefault()}
+        onContextMenu={(e) => e.preventDefault()}
+        onDragStart={(e) => e.preventDefault()}
+      >
+        {preview.code}
+      </pre>
+      <div className="python-lab__solution-footer">
+        <div className="python-lab__solution-progress">
+          <span style={{ width: `${(timeLeft / preview.duration) * 100}%` }} />
+        </div>
+        <span>{Math.ceil(timeLeft / 1000)}초 뒤 자동으로 닫힙니다.</span>
+      </div>
+    </div>
+  )
+}
+
 export default function PythonMissionLab({ unit, missionSet, initialMissionIndex = null, initialProgress, onBack }) {
   const { user } = useAuth()
   const missions = useMemo(() => missionSet?.missions || [], [missionSet?.missions])
@@ -101,6 +169,8 @@ export default function PythonMissionLab({ unit, missionSet, initialMissionIndex
   const [runtimeMetadata, setRuntimeMetadata] = useState(null)
   const [inspectorTab, setInspectorTab] = useState('trace')
   const [hintLevel, setHintLevel] = useState(0)
+  const [solutionReviewUsed, setSolutionReviewUsed] = useState(false)
+  const [solutionSession, setSolutionSession] = useState(null)
   const [playing, setPlaying] = useState(false)
   const [playbackSpeed, setPlaybackSpeed] = useState(1)
   const [soundMuted, setSoundMuted] = useState(() => isLumiMuted())
@@ -109,9 +179,19 @@ export default function PythonMissionLab({ unit, missionSet, initialMissionIndex
   const runtimeRef = useRef(null)
   const autoplayRef = useRef(null)
   const draftDirtyRef = useRef(false)
+  const draftWriteEpochRef = useRef(0)
+  const draftLoadEpochRef = useRef(0)
   const runIdRef = useRef(0)
   const celebratedRunIdsRef = useRef(new Set())
   const pendingResultRef = useRef(null)
+  const scaffoldMeta = useMemo(() => getLumiScaffoldMeta(mission), [mission])
+  const learningSteps = useMemo(() => getLumiLearningSteps(mission), [mission])
+  const missionHints = useMemo(() => getLumiMissionHints(mission), [mission])
+  const relevantApi = useMemo(() => getRelevantMissionApi(mission), [mission])
+  const conceptLessons = useMemo(() => getLumiConceptLessons(mission), [mission])
+  const solutionPreview = useMemo(() => getLumiSolutionPreview(mission), [mission])
+  const missionGoals = useMemo(() => getLumiMissionGoals(mission, result), [mission, result])
+  const assistanceLevel = Math.max(hintLevel, solutionReviewUsed ? 3 : 0)
 
   const currentSeq = playhead < 0 ? -1 : (events[playhead]?.seq ?? playhead)
 
@@ -231,6 +311,8 @@ export default function PythonMissionLab({ unit, missionSet, initialMissionIndex
   useEffect(() => {
     if (!mission) return
     let active = true
+    const loadEpoch = ++draftLoadEpochRef.current
+    draftWriteEpochRef.current += 1
     runIdRef.current += 1
     pendingResultRef.current = null
     clearInterval(autoplayRef.current)
@@ -245,7 +327,14 @@ export default function PythonMissionLab({ unit, missionSet, initialMissionIndex
     setRuntimeMetadata(null)
     setLastRewardPaid(null)
     setHintLevel(0)
+    setSolutionReviewUsed(false)
+    setSolutionSession(null)
     draftDirtyRef.current = false
+
+    const solutionTimer = setTimeout(() => {
+      const preview = getLumiSolutionPreview(mission)
+      if (preview) setSolutionSession({ sessionId: Date.now(), ...preview, automatic: true })
+    }, 500)
 
     const isMission1Offline = mission.id === 'lumi-vs-01' && !(progress.completedMissionIds || []).includes('lumi-vs-01')
     startWorldAmbience(isMission1Offline ? 'offline' : 'online')
@@ -253,18 +342,29 @@ export default function PythonMissionLab({ unit, missionSet, initialMissionIndex
     if (!isPreviewOnly && user?.uid && missionSet?.kind !== 'prototype' && !hasLocalDraft(unit?.id, mission.id)) {
       getDoc(doc(db, 'users', user.uid, 'pythonMissionProgress', mission.id))
         .then((snapshot) => {
-          const serverDraft = snapshot.data()?.draftCode
-          if (active && snapshot.exists() && typeof serverDraft === 'string' && serverDraft.trim()) setCode(serverDraft)
+          const data = snapshot.data()
+          const serverDraft = data?.draftCode
+          if (
+            active && draftLoadEpochRef.current === loadEpoch &&
+            snapshot.exists() &&
+            data?.draftSchemaVersion === LUMI_DRAFT_SCHEMA_VERSION &&
+            typeof serverDraft === 'string'
+          ) setCode(serverDraft)
         })
         .catch((error) => console.warn('Mission draft load failed:', error))
     }
-    return () => { active = false }
+    return () => {
+      active = false
+      clearTimeout(solutionTimer)
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isPreviewOnly, mission?.id, missionSet?.kind, unit?.id, user?.uid])
 
   useEffect(() => {
     if (isPreviewOnly || !mission || !draftDirtyRef.current) return
+    const writeEpoch = draftWriteEpochRef.current
     const timer = setTimeout(() => {
+      if (draftWriteEpochRef.current !== writeEpoch || !draftDirtyRef.current) return
       const persistedCode = codeForPersistence(code)
       try {
         localStorage.setItem(`${DRAFT_PREFIX}${unit?.id}:${mission.id}`, persistedCode)
@@ -307,12 +407,13 @@ export default function PythonMissionLab({ unit, missionSet, initialMissionIndex
   const visibleTools = scaffold.visibleTools || ['run', 'reset', 'step', 'replay', 'memory', 'sensor', 'timeline', 'api', 'inspector']
   const showReset = visibleTools.includes('reset')
   const showTimeline = visibleTools.includes('step') || visibleTools.includes('timeline') || visibleTools.includes('replay')
-  const showApi = Array.isArray(mission.api) && mission.api.length > 0 && (!scaffold.visibleTools || visibleTools.includes('api'))
-  const showMemory = visibleTools.includes('memory')
+  // 학습에 필요한 새 도구의 설명은 미션별 UI 옵션과 관계없이 항상 제공합니다.
+  const showApi = relevantApi.length > 0
+  const showMemoryCore = visibleTools.includes('memory')
   const showMissionTabs = missionSet.kind !== 'prototype' || visibleTools.includes('mission-tabs')
   const showHud = missionSet.kind !== 'prototype' || visibleTools.includes('hud')
   const showSensor = missionSet.kind !== 'prototype' || visibleTools.includes('sensor')
-  const showInspector = !scaffold.visibleTools || visibleTools.includes('inspector') || visibleTools.includes('trace') || showMemory
+  const showInspector = !scaffold.visibleTools || visibleTools.includes('inspector') || visibleTools.includes('trace') || showMemoryCore
   const isViewOnly = scaffold.mode === 'view-only'
   const firstUnfinishedIndex = missions.findIndex((item) => !completedIds.has(item.id))
   const maxUnlockedMissionIndex = firstUnfinishedIndex < 0 ? missions.length - 1 : firstUnfinishedIndex
@@ -321,15 +422,18 @@ export default function PythonMissionLab({ unit, missionSet, initialMissionIndex
     if (!mission) return
     const isFirstMissionClear = !progress.completedMissionIds?.includes(mission.id)
     const assistanceInfo = {
-      maxLevel: hintLevel,
-      hintsViewed: (mission.hints || []).slice(0, hintLevel).map((h) => (typeof h === 'object' ? h.type : 'context')),
-      rescueUsed: false,
+      maxLevel: assistanceLevel,
+      hintsViewed: [
+        ...missionHints.slice(0, hintLevel).map((hint) => hint.type || 'context'),
+        ...(solutionReviewUsed ? ['solution-review'] : []),
+      ],
+      rescueUsed: solutionReviewUsed,
     }
     const nextProgress = mergeMissionCompletion(progress, missionSet, mission.id, evaluation.stars, assistanceInfo)
     nextProgress.independentClearCount = Number(progress.independentClearCount || 0)
     nextProgress.hintedClearCount = Number(progress.hintedClearCount || 0)
     if (isFirstMissionClear) {
-      if (hintLevel > 0) nextProgress.hintedClearCount += 1
+      if (assistanceLevel > 0) nextProgress.hintedClearCount += 1
       else nextProgress.independentClearCount += 1
     }
     setProgress(nextProgress)
@@ -358,7 +462,7 @@ export default function PythonMissionLab({ unit, missionSet, initialMissionIndex
           userId: user.uid,
           missionId: mission.id,
           stars: Number(evaluation.stars || 2),
-          assistanceLevel: hintLevel,
+          assistanceLevel,
           unitId: unit.id,
           unitTitle: unit.title || 'LUMI Protocol: 사라진 빛의 항로',
           lumiCourseId: missionSet?.lumiCourseId || 'lumi-season-1',
@@ -373,7 +477,7 @@ export default function PythonMissionLab({ unit, missionSet, initialMissionIndex
         console.warn('LUMI mission reward claim error:', rewardErr)
       }
     }
-  }, [hintLevel, isPreviewOnly, mission, missionSet, missions.length, progress, unit, user?.uid])
+  }, [assistanceLevel, hintLevel, isPreviewOnly, mission, missionHints, missionSet, missions.length, progress, solutionReviewUsed, unit, user?.uid])
 
   const persistAttempt = useCallback(async ({ evaluation, runtimeResult, durationMs }) => {
     if (isPreviewOnly || !user?.uid || !unit?.id || !mission) return
@@ -387,6 +491,7 @@ export default function PythonMissionLab({ unit, missionSet, initialMissionIndex
       missionTitle: mission.title,
       lastCode: persistedCode,
       draftCode: persistedCode,
+      draftSchemaVersion: LUMI_DRAFT_SCHEMA_VERSION,
       lastResult: {
         completed: evaluation.completed === true,
         cleared: evaluation.cleared === true,
@@ -397,7 +502,7 @@ export default function PythonMissionLab({ unit, missionSet, initialMissionIndex
         errorType: runtimeResult?.error?.type || '',
         errorLine: Number(runtimeResult?.error?.line || 0),
         commandCount: Number(runtimeResult?.commandCount || 0),
-        hintLevel,
+        hintLevel: assistanceLevel,
         durationMs: Math.round(durationMs || 0),
       },
       lastPlayedAt: serverTimestamp(),
@@ -422,12 +527,12 @@ export default function PythonMissionLab({ unit, missionSet, initialMissionIndex
         error: runtimeResult?.error || null,
         commandCount: Number(runtimeResult?.commandCount || 0),
         eventCount: Number(runtimeResult?.events?.length || 0),
-        hintLevel,
+        hintLevel: assistanceLevel,
         durationMs: Math.round(durationMs || 0),
         timestamp: serverTimestamp(),
       }),
     ])
-  }, [code, hintLevel, isPreviewOnly, mission, missionSet.id, missionSet.version, unit, user?.uid])
+  }, [assistanceLevel, code, isPreviewOnly, mission, missionSet.id, missionSet.version, unit, user?.uid])
 
   const runMission = useCallback(async () => {
     if (!mission || !runtimeRef.current || running) return
@@ -561,6 +666,10 @@ export default function PythonMissionLab({ unit, missionSet, initialMissionIndex
   }, [])
 
   const handleReset = useCallback(() => {
+    draftLoadEpochRef.current += 1
+    draftWriteEpochRef.current += 1
+    runIdRef.current += 1
+    pendingResultRef.current = null
     pausePlayback()
     if (running) {
       clearInterval(autoplayRef.current)
@@ -574,30 +683,26 @@ export default function PythonMissionLab({ unit, missionSet, initialMissionIndex
     setResult(null)
     setRuntimeMetadata(null)
     setLastRewardPaid(null)
+    setSolutionSession(null)
+    setInputValues(mission?.inputValues || ['4'])
     draftDirtyRef.current = false
-    updateCode(mission.starterCode || '')
+    const initialCode = getLumiInitialCode(mission)
+    setCode(initialCode)
     if (!isPreviewOnly) {
       try {
-        localStorage.removeItem(`${DRAFT_PREFIX}${unit?.id}:${mission.id}`)
+        localStorage.setItem(`${DRAFT_PREFIX}${unit?.id}:${mission.id}`, initialCode)
       } catch {
         // ignore
       }
-      if (user?.uid && mission?.id) {
-        setDoc(doc(db, 'users', user.uid, 'pythonMissionProgress', mission.id), {
-          draftCode: '',
-          lastCode: '',
-          updatedAt: serverTimestamp(),
-        }, { merge: true }).catch(() => {})
-      }
     }
-  }, [isPreviewOnly, mission, pausePlayback, running, unit?.id, updateCode, user?.uid])
+  }, [isPreviewOnly, mission, pausePlayback, running, unit?.id])
 
   const editorRef = useRef(null)
 
   const suggestedTokens = useMemo(() => {
     if (!mission) return []
     const tokens = []
-    const memoryCode = mission.memoryFragment?.code || ''
+    const memoryCode = solutionPreview?.code || ''
 
     // Extract ONLY pure string literals (e.g. "신호 수신", "LUMI ONLINE", "COMMAND CORE 100%")
     const stringMatches = memoryCode.match(/(["'])(?:(?=(\\?))\2.)*?\1/g) || []
@@ -626,7 +731,7 @@ export default function PythonMissionLab({ unit, missionSet, initialMissionIndex
     }
 
     return tokens
-  }, [mission])
+  }, [mission, solutionPreview?.code])
 
   const handleInsertToken = (tokenText) => {
     playLumiSound('type')
@@ -699,36 +804,47 @@ export default function PythonMissionLab({ unit, missionSet, initialMissionIndex
           <span className="python-lab__eyebrow">{mission.eyebrow}</span>
           <h2>{mission.title}</h2>
           {mission.subtitle && <p className="python-lab__subtitle">{mission.subtitle}</p>}
-          {(mission.objective || mission.summary) && (
-            <p className="python-lab__objective">{mission.objective || mission.summary}</p>
-          )}
           {mission.storyIntro && <p className="python-lab__story-intro">{mission.storyIntro}</p>}
-          <p>{mission.briefing}</p>
+          {mission.briefing && (
+            <section className="python-lab__mission-copy python-lab__mission-copy--story">
+              <span>지금 어떤 상황인가요?</span>
+              <p>{mission.briefing}</p>
+            </section>
+          )}
+          {(mission.codeObjective || mission.objective || mission.summary) && (
+            <section className="python-lab__mission-copy python-lab__mission-copy--code">
+              <span>코드로 무엇을 해야 하나요?</span>
+              <p>{mission.codeObjective || mission.objective || mission.summary}</p>
+            </section>
+          )}
+          <div className={`python-lab__scaffold-stage is-${scaffoldMeta.stage}`}>
+            <span>{scaffoldMeta.label}</span>
+            <p>{scaffoldMeta.instruction}</p>
+          </div>
+
+          <section className="python-lab__learning-steps" aria-label="코드 작성 순서">
+            <h3>코드 작성 순서</h3>
+            <ol>
+              {learningSteps.map((step) => <li key={step}>{step}</li>)}
+            </ol>
+          </section>
 
           {/* Mission Goals / Checklist Section */}
-          {(result?.goalDetails || mission.checklist || mission.goals)?.length > 0 && (
-            <div className="python-lab__checklist-card" style={{
-              background: 'rgba(15, 23, 42, 0.7)',
-              border: '1px solid #1e3a5f',
-              borderRadius: '8px',
-              padding: '0.85rem 1rem',
-              margin: '1rem 0',
-            }}>
-              <h4 style={{ margin: '0 0 0.5rem 0', color: '#55f1c8', fontSize: '0.88rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                <span>🎯</span> 미션 완수 목표
+          {missionGoals.length > 0 && (
+            <div className="python-lab__checklist-card">
+              <h4>
+                <span>🎯</span> 실행 후 이렇게 되면 성공입니다
               </h4>
-              <ul style={{ margin: 0, paddingLeft: '1.2rem', color: '#cbd5e1', fontSize: '0.84rem', lineHeight: '1.5' }}>
-                {(result?.goalDetails || mission.checklist || mission.goals || []).map((item, idx) => {
-                  const label = typeof item === 'string' ? item : (item.label || item.type)
+              <ul>
+                {missionGoals.map((item, idx) => {
+                  const label = item.label
                   const passed = typeof item === 'object' && item.passed !== undefined ? item.passed : null
                   const hint = typeof item === 'object' ? item.hint : null
                   return (
-                    <li key={idx} style={{ marginBottom: '0.35rem', color: passed === true ? '#55f1c8' : passed === false ? '#f87171' : '#cbd5e1' }}>
-                      <span style={{ marginRight: '0.35rem', fontWeight: 'bold' }}>{passed === true ? '✓' : passed === false ? '✗' : '○'}</span>
+                    <li key={`${idx}-${label}`} className={passed === true ? 'is-passed' : passed === false ? 'is-failed' : ''}>
+                      <span>{passed === true ? '✓' : passed === false ? '✗' : '○'}</span>
                       <span>{label}</span>
-                      {passed === false && hint && (
-                        <div style={{ color: '#fca5a5', fontSize: '0.8em', marginTop: '0.15rem' }}>↳ {hint}</div>
-                      )}
+                      {passed === false && hint && <small>↳ {hint}</small>}
                     </li>
                   )
                 })}
@@ -736,7 +852,7 @@ export default function PythonMissionLab({ unit, missionSet, initialMissionIndex
             </div>
           )}
 
-          {scaffold.highlightToken && (
+          {scaffold.exposure === 'minimal-skeleton' && scaffold.highlightToken && (
             <p className="python-lab__hint">
               💡 수정할 토큰: <span className="python-lab__token-pill">{scaffold.highlightToken}</span>
             </p>
@@ -748,30 +864,42 @@ export default function PythonMissionLab({ unit, missionSet, initialMissionIndex
             </div>
           )}
 
+          {conceptLessons.length > 0 && (
+            <section className="python-lab__concept-lessons">
+              <h3>먼저 알아둘 원리</h3>
+              {conceptLessons.map((lesson) => (
+                <article key={lesson.title}>
+                  <strong>{lesson.title}</strong>
+                  <p>{lesson.body}</p>
+                </article>
+              ))}
+            </section>
+          )}
+
           {showApi && (
             <>
-              <h3>사용 가능한 API</h3>
-              {mission.api.map((item) => (
+              <h3>이번에 사용하는 도구</h3>
+              {relevantApi.map((item) => (
                 <div className="python-lab__api" key={item.signature || item}>
                   <code>{item.signature || item}</code>
                   {item.description && <p>{item.description}</p>}
+                  {item.detail && <small>{item.detail}</small>}
                 </div>
               ))}
             </>
           )}
 
-          {mission.hints?.length > 0 && (
+          {missionHints.length > 0 && (
             <>
               <button
                 type="button"
                 className="python-lab__hint-button"
-                onClick={() => setHintLevel((level) => Math.min(level + 1, mission.hints.length))}
+                onClick={() => setHintLevel((level) => Math.min(level + 1, missionHints.length))}
               >
-                힌트 신호 받기 ({hintLevel}/{mission.hints.length})
+                단계별 도움말 보기 ({hintLevel}/{missionHints.length})
               </button>
-              {mission.hints.slice(0, hintLevel).map((hint, index) => {
-                const hintText = typeof hint === 'object' ? hint.text : hint
-                return <p className="python-lab__hint" key={`${index}-${hintText}`}>HINT {index + 1}. {hintText}</p>
+              {missionHints.slice(0, hintLevel).map((hint, index) => {
+                return <p className="python-lab__hint" key={`${index}-${hint.text}`}><strong>{hint.label}</strong> {hint.text}</p>
               })}
             </>
           )}
@@ -903,6 +1031,17 @@ export default function PythonMissionLab({ unit, missionSet, initialMissionIndex
           <div className="python-lab__editor-toolbar">
             <span>main.py</span>
             <div>
+              {solutionPreview && (
+                <button
+                  type="button"
+                  className="is-solution"
+                  onClick={() => {
+                    setSolutionReviewUsed(true)
+                    setSolutionSession({ sessionId: Date.now(), ...solutionPreview, automatic: false })
+                  }}
+                  disabled={running}
+                >완성 코드 보기</button>
+              )}
               {showReset && (
                 <button type="button" onClick={handleReset} disabled={running}>RESET</button>
               )}
@@ -911,7 +1050,7 @@ export default function PythonMissionLab({ unit, missionSet, initialMissionIndex
                 : <button type="button" className="is-run" onClick={runMission} disabled={runtimeStatus !== 'ready'}>▶ RUN</button>}
             </div>
           </div>
-          {suggestedTokens.length > 0 && !isViewOnly && (
+          {scaffold.allowQuickInsert === true && suggestedTokens.length > 0 && !isViewOnly && (
             <div className="python-lab__quick-chips" aria-label="추천 문자열 및 코드 칩">
               <span className="python-lab__quick-chips-label">💡 원클릭 입력:</span>
               <div className="python-lab__quick-chips-list">
@@ -964,12 +1103,19 @@ export default function PythonMissionLab({ unit, missionSet, initialMissionIndex
               activeLine={activeTrace?.line}
               readOnly={running || isViewOnly}
             />
+            {solutionSession && (
+              <SolutionCodeOverlay
+                key={solutionSession.sessionId}
+                preview={solutionSession}
+                onClose={() => setSolutionSession(null)}
+              />
+            )}
           </div>
           {showInspector && (
             <>
               <div className="python-lab__inspector-tabs">
                 <button type="button" className={inspectorTab === 'trace' ? 'is-active' : ''} onClick={() => setInspectorTab('trace')}>
-                  {showMemory ? '기억 코어 (MEMORY)' : '실행 추적 (TRACE)'}
+                  {showMemoryCore ? '변수 기록 (MEMORY)' : '실행 추적 (TRACE)'}
                 </button>
                 {registeredClasses.length > 0 && (
                   <button type="button" className={inspectorTab === 'blueprint' ? 'is-active' : ''} onClick={() => setInspectorTab('blueprint')}>

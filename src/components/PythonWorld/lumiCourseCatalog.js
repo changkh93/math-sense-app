@@ -53,6 +53,8 @@ export const VERTICAL_SLICE_MISSIONS = [
     },
     scaffold: {
       mode: 'view-only',
+      stage: 'observe',
+      allowSolvedStarter: true,
       visibleTools: ['run'],
       unlocksOnComplete: ['reset'],
     },
@@ -329,7 +331,11 @@ export const VERTICAL_SLICE_MISSIONS = [
     hiddenVariants: [
       {
         id: 'variant-offset-1',
-        world: { rover: { x: 0, y: 1 }, target: { x: 2, y: 3 } },
+        world: {
+          rover: { x: 0, y: 1 },
+          target: { x: 2, y: 3 },
+          obstacles: [{ x: 1, y: 2 }],
+        },
         goals: [
           { type: 'position', x: 2, y: 3 },
           { type: 'eventOccurred', eventType: 'rover_spoke' },
@@ -892,14 +898,14 @@ lumi.move(4)
     hiddenVariants: [
       {
         world: {
-          width: 9,
+          width: 8,
           height: 6,
-          rover: { x: 1, y: 1, direction: 0, energy: 100, awake: true },
-          target: { x: 7, y: 3, kind: 'beacon' },
-          obstacles: [{ x: 5, y: 1 }, { x: 3, y: 2 }, { x: 4, y: 4 }],
+          rover: { x: 0, y: 1, direction: 0, energy: 100, awake: true },
+          target: { x: 5, y: 3, kind: 'beacon' },
+          obstacles: [{ x: 4, y: 1 }, { x: 2, y: 2 }, { x: 3, y: 4 }],
         },
         goals: [
-          { type: 'position', x: 7, y: 3 },
+          { type: 'position', x: 5, y: 3 },
           { type: 'noCollision' },
           { type: 'stdoutIncludes', value: 'COMMAND CORE 100%' },
         ],
@@ -1094,13 +1100,13 @@ energy = 5
     hiddenVariants: [
       {
         world: {
-          width: 8,
+          width: 7,
           height: 5,
-          rover: { x: 1, y: 2, direction: 0, energy: 100, awake: true },
-          target: { x: 5, y: 2, kind: 'beacon' },
+          rover: { x: 0, y: 2, direction: 0, energy: 100, awake: true },
+          target: { x: 3, y: 2, kind: 'beacon' },
           obstacles: [],
         },
-        goals: [{ type: 'position', x: 5, y: 2 }],
+        goals: [{ type: 'position', x: 3, y: 2 }],
       },
     ],
   },

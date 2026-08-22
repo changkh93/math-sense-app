@@ -104,28 +104,28 @@ export function normalizeRuntimeEvents(rawEvents = []) {
     } else if (raw.type === 'memory_changed') {
       type = 'memory_changed'
       payload = {
-        name: raw.name,
-        before: raw.before,
-        after: raw.after,
-        receiverInstanceId: raw.receiverInstanceId || null,
+        name: raw.name ?? raw.payload?.name,
+        before: raw.before ?? raw.payload?.before,
+        after: raw.after ?? raw.payload?.after,
+        receiverInstanceId: raw.receiverInstanceId ?? raw.payload?.receiverInstanceId ?? null,
         frameId,
       }
     } else if (raw.type === 'input_requested') {
       type = 'input_requested'
       payload = {
-        prompt: raw.prompt || '',
+        prompt: raw.prompt ?? raw.payload?.prompt ?? '',
       }
     } else if (raw.type === 'input_received') {
       type = 'input_received'
       payload = {
-        prompt: raw.prompt || '',
-        value: raw.value,
+        prompt: raw.prompt ?? raw.payload?.prompt ?? '',
+        value: raw.value ?? raw.payload?.value,
       }
     } else if (raw.type === 'sensor_read') {
       type = 'sensor_read'
       payload = {
-        sensor: raw.sensor,
-        value: raw.value,
+        sensor: raw.sensor ?? raw.payload?.sensor,
+        value: raw.value ?? raw.payload?.value,
       }
     } else {
       payload = { ...raw }

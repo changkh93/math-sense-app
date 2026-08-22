@@ -1,64 +1,10 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useMemo } from 'react'
 import { normalizeRuntimeEvents } from './lumiEventNormalizer.js'
 import { reduceLumiWorldState } from './lumiWorldReducer.js'
 import { reduceExecutionTraceState } from './executionTraceReducer.js'
 import { projectTacticalEvents } from './lumiTacticalEventProjector.js'
 import { reduceTacticalState } from './lumiTacticalReducer.js'
 import LumiTacticalWorldLayer from './LumiTacticalWorldLayer.jsx'
-import { playLumiSound } from './lumiAudio.js'
-
-function MemoryHologramOverlay({ fragment, onClose }) {
-  const [timeLeft, setTimeLeft] = useState(fragment.duration || 2500)
-  const onCloseRef = useRef(onClose)
-
-  useEffect(() => {
-    playLumiSound('hologram')
-  }, [])
-
-  useEffect(() => {
-    onCloseRef.current = onClose
-  }, [onClose])
-
-  useEffect(() => {
-    const duration = fragment.duration || 2500
-    const startTime = Date.now()
-
-    const interval = setInterval(() => {
-      const elapsed = Date.now() - startTime
-      const remaining = Math.max(0, duration - elapsed)
-      setTimeLeft(remaining)
-      if (remaining <= 0) {
-        clearInterval(interval)
-        onCloseRef.current?.()
-      }
-    }, 50)
-
-    return () => clearInterval(interval)
-  }, [fragment.duration])
-
-  return (
-    <div className="lumi-hologram-memory" role="alert">
-      <div className="lumi-hologram-memory__backdrop" onClick={onClose} />
-      <div className="lumi-hologram-memory__box">
-        <div className="lumi-hologram-memory__header">
-          <span className="lumi-hologram-memory__badge">📡 DAMAGED COMMAND MEMORY</span>
-          <small>{fragment.label || '손상된 명령 신호 파편'}</small>
-        </div>
-        <pre className="lumi-hologram-memory__code">{fragment.code}</pre>
-        <div className="lumi-hologram-memory__progress">
-          <div
-            className="lumi-hologram-memory__bar"
-            style={{ width: `${(timeLeft / (fragment.duration || 2500)) * 100}%` }}
-          />
-        </div>
-        <div className="lumi-hologram-memory__footer">
-          <span>기억 신호 감쇄 중: {(timeLeft / 1000).toFixed(1)}s</span>
-          <button type="button" onClick={onClose}>복원 시작 →</button>
-        </div>
-      </div>
-    </div>
-  )
-}
 
 export default function PythonWorldCanvas({
   mission,
@@ -88,25 +34,6 @@ export default function PythonWorldCanvas({
 
   const instances = useMemo(() => Object.values(execTraceState.instances || {}), [execTraceState])
 
-  const fragment = mission?.memoryFragment
-  const [manualKey, setManualKey] = useState(null)
-  const [dismissedMissions, setDismissedMissions] = useState({})
-
-  const isDismissed = Boolean(mission?.id && dismissedMissions[mission.id])
-  const showHologram = Boolean(fragment && (manualKey || (fragment.autoPlay && !isDismissed)))
-
-  const handleCloseHologram = () => {
-    setManualKey(null)
-    if (mission?.id) {
-      setDismissedMissions((prev) => ({ ...prev, [mission.id]: true }))
-    }
-  }
-
-  const replayHologram = () => {
-    if (!fragment) return
-    setManualKey(Date.now())
-  }
-
   const isObjectMission = Boolean(mission?.isPilot || mission?.isSpike || mission?.isObjectMission || mission?.actId === 'object-learning-pilot')
   const width = Math.max(1, Number(worldState.width) || 8)
   const height = Math.max(1, Number(worldState.height) || 5)
@@ -126,15 +53,6 @@ export default function PythonWorldCanvas({
   return (
     <section className={`python-world ${!isAwake ? 'is-dark-awakening' : ''} ${result?.cleared ? 'is-mission-cleared' : ''}`} aria-label="루미 미션 월드">
       <div className="python-world__sky" />
-
-      {/* Damaged Memory Hologram Overlay */}
-      {showHologram && fragment && (
-        <MemoryHologramOverlay
-          key={`${mission?.id}-${manualKey || 'auto'}`}
-          fragment={fragment}
-          onClose={handleCloseHologram}
-        />
-      )}
 
       {/* Drone Assembly Header for Object Missions */}
       {isObjectMission && (
@@ -160,18 +78,6 @@ export default function PythonWorldCanvas({
           <span style={{ color: '#38bdf8' }}>🛠️</span>
           <span>드론 조립실: 코드로 생성한 드론이 착륙장에 실시간으로 조립됩니다.</span>
         </div>
-      )}
-
-      {/* Re-trigger Hologram Button */}
-      {fragment && !showHologram && (
-        <button
-          type="button"
-          className="lumi-memory-retrigger-btn"
-          onClick={replayHologram}
-          title="손상된 명령 기억 파편 다시 보기"
-        >
-          📡 기억 신호 다시 수신
-        </button>
       )}
 
       {/* Signal Transmission Beam when RUN is pressed */}

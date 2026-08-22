@@ -190,11 +190,69 @@
   background: rgba(73, 233, 255, .07);
   color: #c7e5f5 !important;
 }
+.python-lab__mission-copy {
+  margin: 0 0 8px;
+  padding: 9px 10px;
+  border-radius: 8px;
+  background: rgba(16, 36, 65, .52);
+  border: 1px solid rgba(96, 137, 180, .2);
+}
+.python-lab__mission-copy > span {
+  display: block;
+  margin-bottom: 4px;
+  color: #83a0bd;
+  font: 800 .61rem monospace;
+  letter-spacing: .12em;
+}
+.python-lab__mission-copy > p { margin: 0; color: #b7cce0; font-size: .78rem; line-height: 1.5; }
+.python-lab__mission-copy--code { border-color: rgba(85, 241, 200, .25); background: rgba(23, 71, 74, .2); }
+.python-lab__mission-copy--code > span { color: var(--lab-mint); }
+.python-lab__mission-copy--code > p { color: #e5fbf6; font-weight: 700; }
+.python-lab__scaffold-stage {
+  margin: 2px 0 7px;
+  padding: 8px 10px;
+  border-left: 2px solid var(--lab-violet);
+  background: rgba(157, 116, 255, .07);
+}
+.python-lab__scaffold-stage > span { color: #c9b7ff; font: 800 .66rem monospace; letter-spacing: .08em; }
+.python-lab__scaffold-stage > p { margin: 3px 0 0; color: #9fb0c5; font-size: .72rem; line-height: 1.45; }
+.python-lab__scaffold-stage.is-field-test { border-left-color: #f8ba4c; background: rgba(248, 186, 76, .06); }
+.python-lab__scaffold-stage.is-field-test > span { color: #ffd77f; }
+.python-lab__learning-steps,
+.python-lab__concept-lessons,
+.python-lab__checklist-card {
+  margin: 8px 0 0;
+  padding: 10px 11px;
+  border: 1px solid rgba(96, 137, 180, .24);
+  border-radius: 9px;
+  background: rgba(12, 27, 50, .64);
+}
+.python-lab__learning-steps h3,
+.python-lab__concept-lessons h3 {
+  margin: 0 0 7px;
+  color: #d5e8fa;
+  font-size: .76rem;
+  letter-spacing: 0;
+  text-transform: none;
+}
+.python-lab__learning-steps ol,
+.python-lab__checklist-card ul { margin: 0; padding-left: 1.2rem; }
+.python-lab__learning-steps li,
+.python-lab__checklist-card li { margin: 0 0 5px; color: #b8cce0; font-size: .75rem; line-height: 1.5; }
+.python-lab__checklist-card h4 { margin: 0 0 7px; color: var(--lab-mint); font-size: .78rem; }
+.python-lab__checklist-card li > span:first-child { margin-right: 5px; font-weight: 900; }
+.python-lab__checklist-card li.is-passed { color: var(--lab-mint); }
+.python-lab__checklist-card li.is-failed { color: #fca5a5; }
+.python-lab__checklist-card li small { display: block; margin: 3px 0 0 20px; color: #fca5a5; }
+.python-lab__concept-lessons article + article { margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(96, 137, 180, .16); }
+.python-lab__concept-lessons strong { display: block; color: #d7cbff; font-size: .74rem; }
+.python-lab__concept-lessons p { margin: 3px 0 0; color: #94aac0; font-size: .72rem; line-height: 1.5; }
 .python-lab__concepts { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
 .python-lab__concepts span { padding: 3px 7px; border: 1px solid rgba(157, 116, 255, .3); border-radius: 6px; color: #c8b6ff; background: rgba(157, 116, 255, .09); font: .68rem monospace; }
 .python-lab__api { margin-bottom: 7px; padding: 7px 10px; border-left: 2px solid var(--lab-cyan); background: rgba(39, 85, 120, .14); }
 .python-lab__api code { color: var(--lab-mint); font-size: .74rem; }
 .python-lab__api p { margin: 4px 0 0; color: #8095ad; font-size: .72rem; }
+.python-lab__api small { display: block; margin-top: 5px; color: #a9bfd3; font-size: .69rem; line-height: 1.5; }
 .python-lab__hint-button { width: 100%; margin-top: 12px; padding: 7px 10px; border: 1px solid rgba(248, 186, 76, .42); border-radius: 8px; color: #ffd77f; background: rgba(248, 186, 76, .08); cursor: pointer; font-size: .76rem; }
 .python-lab__hint { margin: 6px 0 0; padding: 7px 9px; border-radius: 6px; background: rgba(248, 186, 76, .06); color: #c9b98f !important; font-size: .74rem !important; }
 
@@ -483,6 +541,53 @@
   min-height: 120px;
   height: 100%;
 }
+.python-lab__editor-wrap { position: relative; overflow: hidden; }
+.python-lab__editor-toolbar button.is-solution {
+  border-color: rgba(157, 116, 255, .62);
+  color: #ddceff;
+  background: rgba(88, 57, 148, .3);
+}
+.python-lab__solution-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  padding: 14px;
+  box-sizing: border-box;
+  background: rgba(4, 10, 24, .985);
+  border: 1px solid rgba(85, 241, 200, .42);
+  animation: lumi-solution-in .2s ease-out;
+  user-select: none;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+}
+@keyframes lumi-solution-in { from { opacity: 0; transform: translateY(-5px); } }
+.python-lab__solution-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 10px; }
+.python-lab__solution-header strong { display: block; color: var(--lab-mint); font-size: .9rem; }
+.python-lab__solution-header span { display: block; margin-top: 3px; color: #92a9c1; font-size: .7rem; line-height: 1.4; }
+.python-lab__solution-header button { padding: 5px 9px; border: 1px solid #365271; border-radius: 6px; color: #dcecff; background: #10223a; cursor: pointer; }
+.python-lab__solution-overlay pre {
+  flex: 1;
+  min-height: 0;
+  margin: 0;
+  padding: 12px 14px;
+  overflow: auto;
+  border-radius: 8px;
+  color: #dffcf4;
+  background: #06101f;
+  font: .78rem/1.55 'JetBrains Mono', Consolas, monospace;
+  white-space: pre-wrap;
+  user-select: none;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  cursor: default;
+}
+.python-lab__solution-footer { margin-top: 10px; color: #8fa6bd; font-size: .68rem; }
+.python-lab__solution-progress { height: 4px; margin-bottom: 6px; overflow: hidden; border-radius: 99px; background: rgba(85, 241, 200, .12); }
+.python-lab__solution-progress span { display: block; height: 100%; background: linear-gradient(90deg, var(--lab-mint), var(--lab-cyan)); transition: width .1s linear; }
 .python-editor-execution-line { background: linear-gradient(90deg, rgba(73,233,255,.2), rgba(73,233,255,.03)); box-shadow: inset 3px 0 var(--lab-cyan); }
 .python-lab__inspector-tabs { display: flex; border-top: 1px solid #1b3049; border-bottom: 1px solid #1b3049; background: #091426; flex-shrink: 0; }
 .python-lab__inspector-tabs button { padding: 0 10px; height: 30px; border: 0; border-bottom: 2px solid transparent; color: #7189a2; background: transparent; font: 700 .64rem monospace; cursor: pointer; }
@@ -616,116 +721,6 @@
 .python-world__awakening-tag { color: #ff7891; font: 800 .6rem monospace; letter-spacing: .14em; }
 .python-world__awakening-banner strong { color: #d0e4f7; font: 900 .78rem monospace; letter-spacing: .06em; }
 .python-world__awakening-banner small { color: #7f99b2; font-size: .66rem; }
-
-/* Hologram Memory Fragment System */
-.lumi-hologram-memory {
-  position: absolute;
-  inset: 0;
-  z-index: 25;
-  display: grid;
-  place-items: center;
-  padding: 16px;
-}
-.lumi-hologram-memory__backdrop {
-  position: absolute;
-  inset: 0;
-  background: rgba(3, 8, 20, .82);
-  backdrop-filter: blur(8px);
-}
-.lumi-hologram-memory__box {
-  position: relative;
-  z-index: 2;
-  width: min(380px, 90%);
-  padding: 18px;
-  border-radius: 14px;
-  background: linear-gradient(145deg, rgba(8, 28, 54, .95), rgba(4, 14, 30, .98));
-  border: 1.5px solid var(--lab-cyan);
-  box-shadow: 0 0 35px rgba(73, 233, 255, .35), inset 0 0 25px rgba(73, 233, 255, .08);
-  animation: lumi-hologram-pop .3s ease-out;
-}
-@keyframes lumi-hologram-pop {
-  0% { transform: scale(0.85); opacity: 0; }
-  100% { transform: scale(1); opacity: 1; }
-}
-.lumi-hologram-memory__header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 10px;
-  border-bottom: 1px solid rgba(73, 233, 255, .25);
-  padding-bottom: 8px;
-}
-.lumi-hologram-memory__badge {
-  color: var(--lab-cyan);
-  font: 800 .68rem monospace;
-  letter-spacing: .12em;
-  text-shadow: 0 0 8px rgba(73, 233, 255, .6);
-}
-.lumi-hologram-memory__header small { color: #8ba9c4; font-size: .66rem; }
-.lumi-hologram-memory__code {
-  margin: 0 0 12px;
-  padding: 12px 14px;
-  border-radius: 8px;
-  background: rgba(2, 8, 18, .9);
-  border: 1px solid rgba(85, 241, 200, .4);
-  color: var(--lab-mint);
-  font: 800 .95rem/1.4 'JetBrains Mono', Consolas, monospace;
-  white-space: pre-wrap;
-  box-shadow: inset 0 0 16px rgba(85, 241, 200, .1);
-  text-shadow: 0 0 6px rgba(85, 241, 200, .5);
-}
-.lumi-hologram-memory__progress {
-  height: 4px;
-  border-radius: 99px;
-  background: rgba(73, 233, 255, .15);
-  overflow: hidden;
-  margin-bottom: 10px;
-}
-.lumi-hologram-memory__bar {
-  height: 100%;
-  background: linear-gradient(90deg, var(--lab-mint), var(--lab-cyan));
-  box-shadow: 0 0 8px var(--lab-cyan);
-  transition: width .05s linear;
-}
-.lumi-hologram-memory__footer {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-.lumi-hologram-memory__footer span { color: #819db7; font: .65rem monospace; }
-.lumi-hologram-memory__footer button {
-  padding: 5px 12px;
-  border: 0;
-  border-radius: 6px;
-  background: var(--lab-mint);
-  color: #031518;
-  font: 800 .72rem monospace;
-  cursor: pointer;
-  box-shadow: 0 0 12px rgba(85, 241, 200, .4);
-}
-
-/* Re-trigger Hologram Floating Button */
-.lumi-memory-retrigger-btn {
-  position: absolute;
-  top: 10px;
-  right: 10px;
-  z-index: 12;
-  padding: 5px 10px;
-  border-radius: 6px;
-  border: 1px solid rgba(73, 233, 255, .4);
-  background: rgba(6, 18, 38, .85);
-  color: var(--lab-cyan);
-  font: 700 .64rem monospace;
-  cursor: pointer;
-  backdrop-filter: blur(6px);
-  transition: background .15s, border-color .15s, transform .15s;
-}
-.lumi-memory-retrigger-btn:hover {
-  background: rgba(14, 38, 74, .95);
-  border-color: var(--lab-cyan);
-  transform: translateY(-1px);
-  box-shadow: 0 0 14px rgba(73, 233, 255, .3);
-}
 
 /* Transmission Beam on RUN */
 .lumi-transmission-beam {
