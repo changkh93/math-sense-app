@@ -15,10 +15,11 @@
 - 이전 피드백에 대한 학생의 이모티콘 평가나 코멘트가 있으면 반드시 읽고, 다음 피드백에서 짧게 반응한다.
 - 학습량이 매우 낮거나 제출물과 학습 기록이 맞지 않는 경우에도 단정적으로 비난하지 않는다. 대신 확인된 사실, 다음 제출에서 회복할 행동, 반복 시 운영자가 검토할 조치를 분명히 남긴다.
 - 고전 읽기(`western-classic`) 과제는 수학·Python의 영상/코드 학습량 기준을 적용하지 않는다. 약 15분간 함께 읽고, 도달 쪽수와 독서 퀴즈를 확인하는 활동이라는 전제에서 아래 **고전 읽기 과제 전용 피드백 규칙**으로 평가한다.
+- **CODE TRACE와 LUMI Protocol은 Python 전용 활동이다.** 현재 과제가 Python이 아니면 같은 학생·같은 날짜에 기록이 있어도 학습량, 칭찬, 보완점, 보너스 광석, `allTitles`, AI 프롬프트에 포함하지 않는다. 초등수학의 중등수학 레벨업 예외도 이 두 활동에는 적용하지 않는다.
 
 ### 문서 규정과 코드 구현의 일치
 
-이 문서의 레벨업 예외, 학습 기록 필터, 진행 중 퀴즈 인정 규칙, Python CODE TRACE 인정 규칙은 단순 가이드가 아니라 **코드가 자동으로 적용해야 하는 규칙**이다. 수동 작업(export 스크립트)과 운영툴의 “AI 피드백 생성” 버튼(`assignmentFeedbackService.js`) 양쪽 모두 같은 규칙을 구현해야 한다. 한쪽만 고치면 다른 경로에서 같은 버그가 재발한다.
+이 문서의 레벨업 예외, 학습 기록 필터, 진행 중 퀴즈 인정 규칙, Python CODE TRACE·LUMI Protocol 인정 규칙과 Python 전용 활동 격리는 단순 가이드가 아니라 **코드가 자동으로 적용해야 하는 규칙**이다. 수동 작업(export 스크립트)과 운영툴의 “AI 피드백 생성” 버튼(`assignmentFeedbackService.js`) 양쪽 모두 같은 규칙을 구현해야 한다. 한쪽만 고치면 다른 경로에서 같은 버그가 재발한다.
 
 특히 아래 항목은 코드 누락이 잦은 지점이므로, 문서를 고칠 때 반드시 코드도 함께 확인한다.
 
@@ -27,6 +28,8 @@
 - **한글 NFD 인코딩**: macOS/iOS에서 입력된 한글이 NFD(분해 자모)로 저장되는 경우, 정규식/비교 전에 반드시 NFC로 정규화하지 않으면 “함수/방정식” 키워드가 매칭되지 않아 과정 분류가 실패하고 기록이 누락된다(조승아 사례).
 - **학습 메타데이터 역추적 우선**: `learning_progress` 문서에 `clusterId`가 없어도 제목/unitId 정규식으로 과정을 맞히면 안 된다. 먼저 `learning_progress/{unitId}` → `units/{unitId}.chapterId` → `chapters/{chapterId}.regionId` → `regions/{regionId}.clusterId` 순서로 역추적해 실제 과정을 찾는다. 새 CODE TRACE 진행 기록은 `learning_progress` 최상위와 `codeTrace` 내부에 `clusterId/chapterId`를 함께 저장한다. 그래야 `unit_py_math_2` 같은 파이썬 수학 단원이 “unknown”으로 빠지지 않는다(인효린 사례).
 - **Python CODE TRACE 반영**: CODE TRACE는 영상을 보는 활동도, 퀴즈를 푸는 활동도 아니지만 코드를 보고 구조를 손으로 따라 쓰는 별도 고난도 학습이다. `history.type === "code_trace"` 완료 기록과 `learning_progress.codeTrace` 진행 기록을 Python 학습 근거로 반드시 합산해야 한다. 수동 export와 운영툴 “AI 피드백 생성” 양쪽 모두 `codeTraces`, `inProgressCodeTraces`, `codeTraceCount`, `codeTraceProgressCount` 같은 요약 필드를 제공해야 하며, 이 필드가 없으면 영상 시간이 짧다는 이유만으로 Python 학습을 낮게 평가할 위험이 있다.
+- **Python LUMI Protocol 반영**: LUMI Protocol은 코드를 직접 실행해 로버를 움직이고, Trace로 상태 변화를 관찰하며, 미션을 해결하는 Python 실습이다. `history.type === "lumi_protocol"` 최초 완료 기록과 `learning_progress.lumi_protocol_vertical_slice.missionLab` 진행 상태를 Python 학습 근거로 합산한다. 양쪽 생성 경로 모두 `lumiProtocols`, `inProgressLumiProtocols`, `lumiProtocolCount`, `lumiProtocolProgressCount`, `lumiProtocolMissionCount`, `lumiProtocolCrystalsEarned`를 같은 의미로 제공한다.
+- **Python 전용 활동 선차단**: `code_trace`, `lumi_protocol` 및 명시적 레거시 LUMI 기록은 제목·unitId 추론이나 초등→중등 레벨업 병합보다 먼저 활동 타입으로 판별한다. 현재 과제가 Python이 아니면 즉시 제외하고, `allTitles`, `progressTitles`, `balanceSignals`, `concernSignals`, 증거 목록, 프롬프트에도 흘려보내지 않는다. 제목에 “코드”가 있다는 이유로 다른 과정에 포함하거나, `unknown` 기록을 현재 과정으로 흡수해서는 안 된다.
 - **퀴즈 배틀 분리 평가**: 퀴즈 배틀(`history.type === "quiz_battle"`)은 점수 체계가 0~1500(정답×100)으로 일반 퀴즈(0~100)와 다르다. 배틀을 일반 퀴즈 버킷에 그냥 섞어 넣으면 `averageScore`가 오염되고 “완료 퀴즈 N개”에 묻혀 배틀 복습 활동이 보이지 않는다. 수동 export와 운영툴 “AI 피드백 생성” 양쪽 모두 `quiz_battle`을 일반 퀴즈에서 분리해 별도 요약 필드(`battles`, `battleCount`, `battleWinCount`, `battleDrawCount`, `battleLossCount`, `battleForfeitCount`, `battleAverageAccuracy`, `isSufficientBattleReview`)로 제공해야 한다. 이 필드가 없으면 영상이 없다는 이유만으로 배틀만 열심히 한 학생을 25광석으로 낮게 평가한다.
 - **스마트 워크북 분리 평가**: 완료 기록은 `history.type === "workbook"`, 진행 기록은 `learning_progress.workbookSession`에 남는다. 워크북은 일반 퀴즈와 별도 활동이므로 `averageScore`/`quizCount`에 섞지 않고 `workbooks`, `inProgressWorkbooks`, `workbookCount`, `workbookProgressCount`, `workbookAverageScore`로 제공한다. 완료 점수·정답 수·재시도 수와 진행 페이지를 풀이 활동 근거로 인정한다.
 - **고전 읽기 전용 컨텍스트**: `western-classic` 과제에는 현재 `assignment.reading`과 같은 학생의 이전 고전 읽기 제출을 함께 제공해야 한다. 같은 `bookId`의 가장 최근 이전 제출 페이지를 기준으로 `previousSubmittedPage`, `currentSubmittedPage`, `pagesAdvancedSincePreviousSubmission`, `comparisonState`를 계산한다. 수동 export와 운영툴 “AI 피드백 생성” 양쪽이 같은 비교 규칙을 사용해야 한다.
@@ -52,6 +55,35 @@ CODE TRACE 규정을 문서에 추가한 뒤에는 아래 구현을 함께 맞�
   - `learning_progress.codeTrace.completedExerciseCount > 0`이지만 완료 전인 경우, 완료로 단정하지 않고 “진행 중 CODE TRACE”로 노출되는지 확인한다.
 - CODE TRACE가 없는 기존 Python 과제, 수학 과제, 초등수학 레벨업 예외가 기존과 동일하게 동작하는지 회귀 확인한다.
 - CODE TRACE 앱 내부 보상은 과제 보너스 광석과 별개다. 코드 세트별 즉시 보상을 지급하고, 단원 전체 기준 총 30~80광석 범위가 되도록 분배한다. 중복 지급 방지는 `learning_progress.codeTrace.earnedExerciseIds`로 판단하고, 일일 학습 기록에는 `crystalsEarnedTotal`을 노출한다.
+
+### LUMI Protocol 및 Python 전용 활동 격리 체크리스트
+
+상세 데이터 계약·보상·마이그레이션·테스트 기준은 [`docs/lumi-protocol/10_DAILY_RECORD_REWARD_AND_ASSIGNMENT_FEEDBACK_SPEC.md`](./lumi-protocol/10_DAILY_RECORD_REWARD_AND_ASSIGNMENT_FEEDBACK_SPEC.md)를 따른다.
+
+- `scripts/export-pending-assignment-contexts.mjs`
+  - `history.type === "lumi_protocol"`인 최초 완료 기록을 LUMI 전용 버킷으로 분리하고, 미션 제목·ACT·미션 ID·별·도움 사용량·획득 광석을 보존한다.
+  - `learning_progress/lumi_protocol_vertical_slice.missionLab`에서 실제 진행이 있는 미완료 미션만 `inProgressLumiProtocols`로 추출한다.
+  - `learningSummary`에 `lumiProtocols`, `inProgressLumiProtocols`, `lumiProtocolCount`, `lumiProtocolProgressCount`, `lumiProtocolMissionCount`, `lumiProtocolCrystalsEarned`를 생성한다.
+  - Python 과제일 때만 CODE TRACE와 LUMI를 `hasPractice`, `hasCourseLearningRecord`, `learningLoad`, `balanceSignals`에 포함한다.
+  - 현재 과제가 Python이 아니면 CODE TRACE와 LUMI를 과정 메타데이터 역추적 전에 제거한다. 초등수학 레벨업 병합 대상은 `middle-math`의 수학 활동뿐이며 Python 전용 활동은 포함하지 않는다.
+- `src/services/assignmentFeedbackService.js`
+  - 운영툴 단건 생성 경로에서도 위와 동일한 필드·집계·필터 순서를 사용한다.
+  - Python 과제 프롬프트에만 CODE TRACE와 LUMI 요약을 조건부로 추가한다. 다른 과정 프롬프트에는 활동명이 0건 안내 문구로도 등장하지 않아야 한다.
+  - Python 과제에서는 LUMI 완료/진행을 코드 실행·수정·Trace 관찰 근거로 인정하되, 실행 횟수만 많은 실패·Reset·단순 재실행을 진도나 성취로 부풀리지 않는다.
+- 일일 학습 기록
+  - 타임라인에는 정규화 타입 `lumi`로 표시하며 최초 미션 완료, 별/도움 사용, 해당 완료에서 실제 지급된 광석을 보여 준다.
+  - 일일 통계에는 `lumiProtocolCount`, `lumiProtocolProgressCount`, `lumiProtocolMissionCount`, `lumiProtocolCrystalsEarned`를 별도 집계한다. 영상 수·퀴즈 수·CODE TRACE 수와 섞지 않는다.
+- LUMI 앱 내부 광석과 과제 피드백 보너스는 별개다.
+  - 수직 슬라이스 기준 앱 내부 기본 보상은 일반 미션 8개×4광석 + 필드 테스트 2개×8광석 = 총 48광석이다. 기존 시간대/휴일 배율은 미션별 산정 후 적용한다.
+  - 최초 성공한 미션에만 지급하며 실패, 힌트, Reset, STOP, 재실행·재완료에는 지급하거나 회수하지 않는다.
+  - 사용자 잔고·성장 카운터·진도 보상 키·`history`·`crystal_transactions(type: "lumi_protocol_mission_reward")`를 하나의 멱등 트랜잭션으로 확정한다.
+  - 위 48광석은 앱 안에서 이미 받은 학습 보상이고, `suggestedBonusCrystals`는 제출 품질과 일일 학습 흐름에 대한 별도 과제 보너스다. 과제 피드백이 앱 내부 광석을 다시 지급하면 안 된다.
+- 저장·회귀 검증
+  - Python 과제에서 LUMI만 완료한 경우 “학습 기록 0건”이 아니며, 완료 미션과 Trace 기반 실습을 구체적으로 언급하는지 확인한다.
+  - Python 과제에서 LUMI가 진행 중이면 완료로 단정하지 않고 현재 미션/진행도를 표시하는지 확인한다.
+  - 초등수학·중등수학·고전 읽기 과제 컨텍스트와 최종 피드백에서 `CODE TRACE`, `code_trace`, `LUMI`, `lumi_protocol`, `루미`가 모두 사라지는지 확인한다.
+  - 초등수학→중등수학 레벨업 사례와 같은 날짜에 Python 전용 기록이 함께 있어도 중등수학 영상·퀴즈·데이터 로그만 인정되는지 확인한다.
+  - 과정이 `unknown`이면 CODE TRACE/LUMI를 어떤 비-Python 과제에도 넣지 않는다. Python 귀속을 명시적으로 확인할 수 있을 때만 Python 과제에 포함한다.
 
 ### 퀴즈 배틀 코드 반영 체크리스트
 
@@ -116,18 +148,21 @@ CODE TRACE 규정을 문서에 추가한 뒤에는 아래 구현을 함께 맞�
 | --- | --- | --- |
 | 초등수학 | 독서 20분 + 수학 20분 | 플랫폼 기록은 수학 20분 기준으로 보고, 독서는 제출문 근거로만 판단. 단, 초등수학을 모두 학습하고 레벨업한 학생이 초등수학 수업 시간에 중등수학을 학습한 경우에는 중등수학 영상/퀴즈/데이터 로그/풀이 정리도 초등수학 과제의 수학 학습으로 인정한다 |
 | 중등수학 | 50분 | 영상, 멈춰서 풀이하는 시간, 데이터 로그, 퀴즈 기록, 제출문 정리 근거를 합쳐 학습 흐름 판단 |
-| Python | 50분 | 영상, 멈춰서 코드 작성/실행/수정한 시간, 데이터 로그, 퀴즈, CODE TRACE, 원본 코드 제출을 함께 판단 |
+| Python | 50분 | 영상, 멈춰서 코드 작성/실행/수정한 시간, 데이터 로그, 퀴즈, CODE TRACE, LUMI Protocol 미션·Trace, 원본 코드 제출을 함께 판단 |
 | 고전 읽기 | 함께 읽기 약 15분 + 독서 퀴즈 | 선택한 책, 도달 쪽수, 직전 같은 책 제출 대비 진행, 같은 날짜 독서 퀴즈, 오늘 읽은 내용의 짧은 기록을 함께 판단. 페이지 수만으로 성실도를 단정하지 않는다 |
 
 주의:
 
 - 영상 시청은 반드시 실제 기록된 개수와 시간을 쓴다. 예: `자연수와 소수의 곱셈 #1` 1개, 4분 47초.
 - 영상 시간은 전체 학습 시간을 그대로 의미하지 않는다. 학생은 영상을 멈추고 문제를 풀거나, 코드를 작성/실행하거나, 노트에 정리하는 시간이 필요하다.
-- 따라서 중등수학/Python에서 영상 시간이 정규 기준의 절반 안팎이고 퀴즈, 데이터 로그, CODE TRACE, 퀴즈 배틀, 코드 제출, 풀이 정리 중 일부가 함께 확인되면 성실한 학습 흐름으로 본다. 이 경우 “기준 학습량 대비 부족”을 피드백 중심 근거로 쓰지 않는다.
+- 따라서 중등수학/Python에서 영상 시간이 정규 기준의 절반 안팎이고 해당 과정의 퀴즈, 데이터 로그, 퀴즈 배틀, 코드 제출, 풀이 정리가 함께 확인되거나, **Python 과제에서만** CODE TRACE·LUMI Protocol이 확인되면 성실한 학습 흐름으로 본다. 이 경우 “기준 학습량 대비 부족”을 피드백 중심 근거로 쓰지 않는다.
 - 퀴즈 배틀은 경쟁 복습/확인 활동이다. 같은 행성 학생과 1:1로 기존 학습 범위에서 출제된 문제를 풀며, 틀린 문제는 다크매터에 등록된다. 영상 시간이 짧거나 없어도 배틀을 통해 배운 개념을 확인하고 복습한 근거로 본다. 단, 중도 포기(forfeited)는 성실한 복습에서 제외한다.
 - Python에서 CODE TRACE 완료 또는 의미 있는 진행 기록이 있으면 “영상 뒤 확인 활동”보다 강한 코드 실습 근거로 본다. CODE TRACE는 정답 코드를 보고 필수 이름, 클래스/함수 위치, 들여쓰기와 실행 흐름을 따라 쓰는 활동이므로, 영상 시간이 짧아도 완료율·정확도와 제출 설명이 좋으면 성실한 학습 흐름으로 인정한다.
 - CODE TRACE는 퀴즈 점수처럼 단순히 100점 여부만 보지 않는다. 완료한 exercise 수, 전체 exercise 수, 정확도(`accuracy` 또는 `bestAccuracy`), 학생 제출 코드/설명과의 연결을 함께 본다.
 - 진행 중 CODE TRACE도 학습 근거다. `learning_progress.codeTrace.completedExerciseCount > 0`이면 완료 전이라도 “코드 따라쓰기 진행 중”으로 언급하고, 완료로 단정하지 않는다.
+- Python에서 LUMI 미션 최초 완료 기록은 코드 실행과 상태 변화 관찰이 결합된 실습 근거다. 완료 미션 수, 미션 제목/개념, 별, 도움 사용, Trace 관찰과 제출 설명의 연결을 함께 본다.
+- 진행 중 LUMI도 실제 코드 실행 또는 미션 상태 변화가 있을 때 학습 근거로 인정하되 완료로 표현하지 않는다. 단순 화면 진입, 빈 초안 저장, 실패 실행 반복은 완료 미션 수나 성취로 합산하지 않는다.
+- CODE TRACE와 LUMI는 Python 과제에서만 위 규칙을 적용한다. 초등수학·중등수학·고전 읽기 등 비-Python 과제에서는 같은 날짜 기록이라도 학습량과 보너스 판단에서 완전히 제외한다.
 - 퀴즈 배틀은 승패가 아니라 참여 횟수와 정답률을 중심으로 평가한다(SEI 랭킹과 같은 철학). 패배해도 정답률과 참여가 학습 근거가 된다. 완료한 배틀이 3회 이상이거나 평균 정답률이 60% 이상(포기 제외)이면 충분한 복습 활동(`isSufficientBattleReview`)으로 인정한다. 이 경우 영상이 없어도 성실한 학습 흐름으로 보고 “확인 활동이 부족하다”고 쓰지 않는다.
 - 퀴즈 배틀 점수(0~1500, 정답×100)는 일반 퀴즈 점수(0~100)와 체계가 다르다. 두 점수를 섞어 `averageScore`를 계산하면 안 된다. `learningSummary.battles`와 `learningSummary.quizzes`를 분리해 본다.
 - 퀴즈 배틀이 충분하면 배틀에서 틀린 개념·남은 약점을 다음 행동으로 연결한다. “확인 활동이 부족하다”고 쓰지 않는다. 반대로 중도 포기가 많거나 정답률이 매우 낮으면 인정을 약하게 하되, “공부를 안 했다”고 단정하지 않고 남은 배틀 마무리나 약점 개념 영상 시청으로 유도한다.
@@ -141,14 +176,17 @@ CODE TRACE 규정을 문서에 추가한 뒤에는 아래 구현을 함께 맞�
   2. 같은 날짜의 `history` 또는 `learning_progress`에 `clusterId: "middle-math"`로 분류되는 기록이 하나라도 있다.
 - 신호 2(실제 데이터 기반)가 더 신뢰할 만하다. 코드는 `belongsToCourse`/`shouldIncludeCourse`에서 `includeMiddleMathLevelUp` 옵션을 받되, `fetchLearningSummary`가 `allRows`를 읽은 뒤 `middle-math` row 존재 여부로 이 옵션을 스스로 다시 켜도록 구현한다. 그래야 호출부가 키워드 신호를 놓쳐도 기록 누락이 발생하지 않는다.
 - 위 레벨업 예외에서 영상 시간이 짧아도 같은 날짜 중등수학 퀴즈 여러 개, 데이터 로그, 다크매터 회복 기록이 있으면 “수학 기록 없음” 또는 “기록 없음으로 보완요청”으로 판단하지 않는다. 피드백에는 “초등수학 시간에 레벨업 학습으로 중등수학을 진행한 기록을 확인했다”고 명시한다.
+- 위 레벨업 예외가 허용하는 것은 `middle-math`로 확인된 수학 활동뿐이다. 같은 날짜의 CODE TRACE·LUMI Protocol은 Python 전용이므로 초등수학 과제의 `allTitles`, 학습량, 칭찬, 보너스 근거에 포함하지 않는다.
 - 위 예외는 한 방향으로만 적용한다. 중등수학 과제(`middle-math`)에서는 초등수학(`cluster_elementary`) 영상/퀴즈/데이터 로그를 중등수학 학습량으로 인정하지 않는다.
 - 과제 과정과 다른 과정의 기록은 위 예외를 제외하고 피드백 근거에서 제외한다. 예: Python 과제에서 초등수학 `4월 평가` 진행 기록을 “Python 진행 중 퀴즈/코드”로 쓰면 안 된다.
 - 과정이 명확하지 않은 진행 중 퀴즈나 `learning_progress` 문서는 현재 과제의 학습 근거로 쓰지 않는다. 과정이 불명확하면 “다른 과정 또는 과정 미확인 기록”으로 제외하고, 피드백에는 포함하지 않는다. 단, 과정 분류 자체가 실패해서 누락된 경우는 `units → chapters → regions` 역추적과 아래 “NFD 인코딩” 항목을 반드시 확인한다.
-- `learningSummary`의 기준 필드는 `videos`, `quizzes`, `workbooks`, `dataLogs`, `inProgressQuizzes`, `inProgressWorkbooks`, `progressVideos`, Python의 `codeTraces`, `inProgressCodeTraces`, 그리고 퀴즈 배틀의 `battles`다. 완료 기록뿐 아니라 **진행 중 퀴즈·워크북, 부분 시청 영상, 진행 중 CODE TRACE, 퀴즈 배틀도 학습 근거로 인정**한다. 학생이 퀴즈·워크북·CODE TRACE를 끝까지 완료하지 않으면 `history`에 기록이 쌓이지 않고 `learning_progress`에만 진행 상태가 남을 수 있으므로 두 컬렉션을 합쳐 본다.
-- `learningSummary.allTitles`는 참고용 전체 기록이고, 피드백 문장의 기준은 `learningSummary.videos`, `quizzes`, `dataLogs`, `inProgressQuizzes`, `codeTraces`, `inProgressCodeTraces`, `battles`다.
+- `learningSummary`의 기준 필드는 `videos`, `quizzes`, `workbooks`, `dataLogs`, `inProgressQuizzes`, `inProgressWorkbooks`, `progressVideos`, 퀴즈 배틀의 `battles`, 그리고 **Python 과제에 한해서만** `codeTraces`, `inProgressCodeTraces`, `lumiProtocols`, `inProgressLumiProtocols`다. 완료 기록뿐 아니라 실제 진행이 있는 활동도 근거로 인정하되, 학생이 끝까지 완료하지 않으면 `history`가 아니라 `learning_progress`에만 남을 수 있으므로 두 컬렉션을 합쳐 본다.
+- `learningSummary.allTitles`는 필터링을 마친 참고용 기록이다. 피드백 문장의 기준은 과정별 배열이며, 비-Python 과제의 `allTitles`와 `progressTitles`에는 CODE TRACE·LUMI 제목 자체가 들어가면 안 된다.
 - `learningSummary.progressTitles`와 `progressVideos`는 진행/부분 시청 참고용이다. 완료 영상 개수처럼 말하지 않는다.
 - `learningSummary.codeTraces`는 완료된 CODE TRACE 기록이다. 피드백에는 완료한 단원명, 정확도, 완료 exercise 수를 우선 적는다.
 - `learningSummary.inProgressCodeTraces`는 진행 중 CODE TRACE 기록이다. 피드백에는 완료로 쓰지 말고 “진행 중: 2/5, 최고 정확도 86%”처럼 현재 상태를 적는다.
+- `learningSummary.lumiProtocols`는 Python 과제에서 제출일에 최초 완료한 LUMI 미션 기록이다. 완료 미션명·학습 개념·별/도움·Trace 기반 실습을 적고, `lumiProtocolCrystalsEarned`는 앱 내부 지급 사실로만 표시한다.
+- `learningSummary.inProgressLumiProtocols`는 Python 과제의 진행 중 미션이다. 실제 진행이 있을 때만 “진행 중”으로 적고 완료·광석 획득으로 표현하지 않는다.
 - `learningSummary.battles`는 완료/포기된 퀴즈 배틀 기록이다. 피드백에는 참여 횟수, 승패(승 W 무 D 패 L), 평균 정답률을 함께 적는다. 예: “퀴즈 배틀 5회 (승 4 무 0 패 1, 정답률 72%)로 기존 학습 범위를 경쟁하며 복습했습니다.” 배틀 점수(0~1500)는 일반 퀴즈 점수(0~100)와 섞지 않는다.
 - `learningSummary.workbooks`는 완료 워크북, `inProgressWorkbooks`는 이어 풀기 세션이다. 예: “스마트 워크북 2건을 완료해 평균 85점이었고, 다음 워크북은 3/8페이지까지 진행했습니다.” 일반 퀴즈 평균과 워크북 평균을 합치지 않는다.
 - **한글 NFD 인코딩 주의**: `history`/`learning_progress` 문서의 한글 제목/unitId/unitTitle이 NFD(분해 자모, 예: `중2_05_일차함수`)로 저장되는 경우가 있다. 코드가 비교 전에 NFC(`중2_05_일차함수`)로 정규화하지 않으면 `clusterId`, `regionId`, `chapterId`, 제출문 키워드 비교가 실패해 기록이 누락될 수 있다. 모든 과정 정규화/메타데이터 역추적 함수는 입력을 NFC로 정규화한 뒤 비교해야 한다. 제출문 한글 비교(`hasMiddleMathLevelUpSignal`)도 마찬가지다.
@@ -347,8 +385,8 @@ pagesAdvancedSincePreviousSubmission = currentSubmittedPage - previousSubmittedP
 피해야 할 문장:
 
 - “기준 학습량 대비 조금 부족: 영상 29.9분 / 기준 50분”
-- “다음에는 영상 뒤에 퀴즈나 데이터 로그 확인까지 이어가면 좋겠습니다.”라고 쓰면서 이미 퀴즈, 데이터 로그, CODE TRACE가 있는 경우
-- “영상 시간이 부족합니다.”라고만 쓰고 코드 작성, 실행, 정리, 퀴즈, 데이터 로그, CODE TRACE를 보지 않은 경우
+- “다음에는 영상 뒤에 퀴즈나 데이터 로그 확인까지 이어가면 좋겠습니다.”라고 쓰면서 이미 해당 과정의 퀴즈·데이터 로그가 있거나, Python 과제에 CODE TRACE·LUMI가 있는 경우
+- “영상 시간이 부족합니다.”라고만 쓰고 코드 작성, 실행, 정리, 해당 과정의 퀴즈·데이터 로그를 보지 않거나, Python 과제의 CODE TRACE·LUMI를 보지 않은 경우
 - “좋은 시도입니다.”처럼 제출물의 어떤 부분이 좋은지 말하지 않는 빈 칭찬
 
 대신 이렇게 쓴다:
@@ -402,12 +440,15 @@ node scripts/export-pending-assignment-contexts.mjs --out=/private/tmp/pending_a
   - Python CODE TRACE 완료/진행 현황
     - 완료 기록: `history.type === "code_trace"`의 단원명, 정확도, 완료 exercise 수, 획득 광석
     - 진행 기록: `learning_progress.codeTrace.completedExerciseCount`, `totalExerciseCount`, `bestAccuracy`, `lastMode`, `updatedAt`
+  - Python LUMI Protocol 완료/진행 현황
+    - 완료 기록: `history.type === "lumi_protocol"`의 미션명, 개념, 별, 도움 수준, 획득 광석
+    - 진행 기록: `learning_progress/lumi_protocol_vertical_slice.missionLab`의 완료 미션 수, 전체 미션 수, 최근 미션, 누적 획득 광석
   - 퀴즈 배틀 완료/포기 현황
     - 완료 기록: `history.type === "quiz_battle"`의 참여 횟수, 승패(win/draw/loss), 정답률(correctCount/totalCount), 중도 포기(forfeited) 여부
     - 배틀 점수(0~1500)는 일반 퀴즈 점수(0~100)와 체계가 다르므로 분리해서 본다
   - 과정별 정규 학습량 대비 수준
-  - 영상/퀴즈/데이터 로그/CODE TRACE/퀴즈 배틀 균형
-  - `history`(완료 활동)와 `learning_progress`(진행 중 퀴즈/부분 시청 영상/진행 중 CODE TRACE)를 **모두** 읽어 합친다. 어느 한쪽만 읽으면 학생이 퀴즈나 CODE TRACE를 끝까지 못 끝낸 경우 “0건”으로 누락된다.
+  - 해당 과정의 영상/퀴즈/데이터 로그/퀴즈 배틀 균형과 Python 과제의 CODE TRACE/LUMI 균형
+  - `history`(완료 활동)와 `learning_progress`(진행 중 퀴즈/부분 시청 영상, Python의 진행 중 CODE TRACE/LUMI)를 **모두** 읽어 합친다. 어느 한쪽만 읽으면 실제 진행 기록이 “0건”으로 누락된다.
 - 매터센스/복습 기록 요약
   - 최근 오답/복습 표시 개념
   - 문제 미리보기
@@ -450,6 +491,9 @@ node scripts/export-pending-assignment-contexts.mjs --out=/private/tmp/pending_a
 - Python 과제에서 제출일 Python 학습 기록이 없더라도 첨부 코드가 있으면 코드 자체는 반드시 검토한다. 이때 피드백은 “Python 학습 기록은 확인되지 않지만, 첨부 코드에서는 어떤 변화가 보인다”처럼 학습 기록과 코드 검토를 분리해서 쓴다.
 - Python 첨부 코드가 있으면 같은 학생의 이전 Python 제출 첨부와 비교해 새로 추가된 기능, 수정된 함수/클래스, 실행 결과 확인 여부를 피드백에 반영한다.
 - Python 과제에서 CODE TRACE 기록이 있으면 영상/퀴즈와 분리해 반드시 언급한다. 예: “오늘은 `몬스터 잡기 게임` CODE TRACE를 5/5 완료했고 정확도 92%로 구조를 따라 쓰는 연습을 했습니다.”
+- Python 과제에서 LUMI Protocol 기록이 있으면 영상·퀴즈·CODE TRACE와 분리해 반드시 언급한다. 예: “오늘은 LUMI `첫 걸음` 미션을 완료하며 `lumi.move()`를 실행하고 Trace에서 위치 변화를 확인했습니다.”
+- LUMI 완료는 미션 성공과 최초 완료 기록이 모두 확인될 때만 쓴다. 진행 중에는 “현재 `변수 전달` 미션을 진행 중”처럼 표현하고, 실패 실행·Reset·재실행 횟수를 학습량으로 부풀리지 않는다.
+- LUMI에서 받은 광석은 앱 내부 학습 보상으로만 설명한다. 예: “LUMI 미션 최초 완료 보상 4광석도 획득했습니다.” 이를 과제 보너스에 다시 더하거나 같은 보상을 두 번 지급하지 않는다.
 - CODE TRACE 완료 기록은 코드 실습 근거로 인정한다. 영상 시간이 짧더라도 CODE TRACE 완료율과 정확도가 좋고 제출문이 해당 코드 구조를 설명하면 저학습 경보를 피한다.
 - 진행 중 CODE TRACE는 완료로 포장하지 않는다. 예: “CODE TRACE는 2/5까지 진행 중이고 최고 정확도 86%입니다. 다음에는 남은 3개를 마무리해 주세요.”
 - CODE TRACE는 “베껴 썼다”는 부정적 표현으로 다루지 않는다. 정답 코드를 보고 따라 쓰는 것이 목적이므로, 피드백에는 “필수 이름과 구조를 정확히 따라 쓰는 연습”, “클래스/함수 위치와 들여쓰기 흐름을 익히는 연습”으로 설명한다.
@@ -466,21 +510,21 @@ node scripts/export-pending-assignment-contexts.mjs --out=/private/tmp/pending_a
 - 내보낸 컨텍스트에 원본 코드 내용이 없고 첨부 URL만 있으면, 해당 URL의 원본 파일을 내려받아 확인한다. 내려받은 파일이 비어 있거나 실패하면 피드백과 운영자 요약에 “첨부 원본 확인 필요”를 남긴다.
 - 정해진 커리큘럼을 벗어나는 별도 다음 미션은 쓰지 않는다.
 - `learningSummary.concernSignals`가 있으면 반드시 `더 발전시키면 좋은 점`에 반영한다.
-- `learningSummary.learningLoad`는 참고하되, 영상 시간만으로 충분/부족을 단정하지 않는다. 퀴즈, 데이터 로그, CODE TRACE, 코드 제출, 실행 결과, 손풀이/정리 흔적을 함께 본다.
+- `learningSummary.learningLoad`는 참고하되, 영상 시간만으로 충분/부족을 단정하지 않는다. 해당 과정의 퀴즈, 데이터 로그, 코드 제출, 실행 결과, 손풀이/정리 흔적을 함께 보고, Python 과제에서만 CODE TRACE·LUMI를 더한다.
 - 초등수학은 `learningSummary.mathActivityCount`, `readingActivityCount`, `readingQuizCount`를 함께 본다. 독서 기록만으로 수학 학습을 했다고 쓰지 않는다.
 - 초등수학 과제에서 제출문이 다항식, 제곱근, 소인수분해, 방정식, 함수, 중등 기하처럼 중등수학 내용이고, 학생이 레벨업 학습자인 정황이 있으면 `learningSummary`에 초등수학 기록이 0건이어도 바로 “수학 기록 없음”으로 판단하지 않는다. 같은 날짜 중등수학 기록, `sameDay`, `allTitles`, 제출문 풀이 근거를 추가 확인하고, 확인되면 초등수학 과제의 수학 학습으로 인정한다.
 - 초등수학 과제에서 `learningSummary.videos`, `quizzes`, `dataLogs`가 비어 있는데 제출문이 중등수학 내용이면, 이것은 “학습 기록 없음” 확정이 아니라 “초등수학 필터에 중등수학 레벨업 기록이 빠졌을 가능성”이다. 이 경우 Firestore `users/{uid}/history`의 해당 날짜 원본 또는 내보낸 `allTitles`를 확인해 `clusterId: "middle-math"` 기록이 있는지 점검한다.
 - 레벨업 중등수학 기록이 확인되면 `learningSummary.mathActivityCount`가 0이더라도 피드백 근거에 중등수학 퀴즈/영상/데이터 로그를 직접 적고, `suggestedStatus`는 정상 `reviewed`를 우선 검토한다. 단, 제출문이 한 문장으로 너무 짧으면 “다음에는 퀴즈 중 헷갈린 유형 1개를 적어 달라”처럼 제출문 구체성만 보완점으로 둔다.
 - 반대로 중등수학 과제에서 초등수학 기록만 확인되는 경우에는 레벨업 예외를 적용하지 않는다. 중등수학 과제는 중등수학 기록, 중등수학 풀이 근거, 또는 해당 중등수학 첨부/코드만 학습 근거로 본다.
 - 영상 개수와 시간은 `learningSummary.videos` 기준으로만 적는다.
-- 영상만 있고 퀴즈, 데이터 로그, CODE TRACE, 퀴즈 배틀, 코드 실행 근거, 제출문 정리 중 아무것도 없을 때만 “확인 활동이 부족하다”고 안내한다. 이미 퀴즈, 데이터 로그, CODE TRACE, 퀴즈 배틀이 있으면 해당 확인 활동을 먼저 인정한다.
+- 영상만 있고 해당 과정의 퀴즈, 데이터 로그, 퀴즈 배틀, 코드 실행 근거, 제출문 정리 중 아무것도 없을 때만 “확인 활동이 부족하다”고 안내한다. Python 과제에서는 CODE TRACE·LUMI도 먼저 확인하고, 이미 있으면 해당 실습을 인정한다.
 - 퀴즈가 진행 중이면 완료로 단정하지 말고 진행도와 오답 수를 함께 언급한다.
 - `learningSummary.attention.opportunities > 0`이면 집중도 광석 획득률을 확인하고, 낮을 때는 부드럽지만 구체적으로 언급한다.
 - `learningSummary.inProgressQuizzes`가 있으면 완료 여부보다 현재 진행도와 오답 개수를 함께 본다.
 - `darkMatterSummary.concepts` 또는 `darkMatterSummary.items`가 있으면 “어떤 개념이 아직 불안정한지”를 피드백에 연결한다.
 - 제출문만 길게 요약하고 학습 기록/매터센스를 언급하지 않는 피드백은 불합격으로 보고 다시 작성한다.
 - 제출 원본, 제출문, 학습 기록 사이에 불일치가 있으면 “좋은 시도”로 뭉개지 않는다. 예: 첨부 원본 코드에는 `draw()` 메서드가 없는데 제출 본문 코드에는 `draw()`가 있는 것처럼 적혀 있거나, 원본 코드는 조건문 실습인데 제출 설명은 반복문 게임을 말하는 경우처럼 코드 내용과 설명이 서로 다르면 `학습 기록에서 확인한 점` 또는 `더 발전시키면 좋은 점`에 구체적으로 쓴다.
-- 영상 시청이 1분 미만이거나 정규 기준의 10% 미만이고, 퀴즈/데이터 로그/CODE TRACE/코드 실행/제출문 정리 근거도 없으면 “거의 학습하지 않은 기록”으로 본다. 반대로 영상 시간이 짧아도 CODE TRACE 완료, 코드 실행 결과나 풀이 정리가 충분하면 부족 판단을 보류하고 운영자 확인 포인트로 남긴다.
+- 영상 시청이 1분 미만이거나 정규 기준의 10% 미만이고, 해당 과정의 퀴즈/데이터 로그/코드 실행/제출문 정리 근거도 없으면 “거의 학습하지 않은 기록”으로 본다. Python 과제에서는 CODE TRACE·LUMI도 확인하며, 둘 중 하나의 의미 있는 완료/진행이나 코드 실행 결과가 충분하면 부족 판단을 보류한다.
 - 현재 과제 과정의 학습 기록이 0건이면, 같은 날짜 다른 과정 기록이 있더라도 원칙적으로 “해당 과정 학습 기록 없음”으로 판단한다. 첨부 코드가 있으면 코드는 별도 검토하되, 학습 기록 없음 자체는 경고/보완 검토 근거가 될 수 있다.
 - 단, 초등수학 과제에서 같은 날짜 중등수학 학습 기록 또는 중등수학 풀이 제출이 확인되는 레벨업 학생은 예외다. 이 경우 현재 과제 과정의 초등수학 기록이 0건이어도 “학습 기록 없음” 경고로 처리하지 말고, 중등수학 학습 기록을 초등수학 수학 학습 근거로 반영한다.
 - “0건” 판단 자체가 코드 결함일 수 있다. 진행 중 퀴즈가 `learning_progress`에만 남았거나(조승아 사례), 한글이 NFD로 저장되어 과정 분류가 실패했거나(조승아 사례), 제출문 키워드에 안 걸려 레벨업 감지가 안 된 경우(조하람 사례)는 “학습 기록 없음”이 아니다. 위 “학습 기록 0건 진단 체크리스트”를 먼저 통과한 뒤에만 경보를 검토한다.
@@ -504,7 +548,7 @@ node scripts/export-pending-assignment-contexts.mjs --out=/private/tmp/pending_a
 {제출물에서 확인되는 구체적 장점 + 학습 기록에서 확인되는 성실한 부분}
 
 #### 학습 기록에서 확인한 점
-{영상 시청 시간, 집중도 광석, 타임어택, 완료 보너스, 퀴즈 진행도/점수, 데이터 로그, CODE TRACE 완료/진행도/정확도, 퀴즈 배틀 참여 횟수/승패/정답률, 코드 실행/수정 근거. 영상 시간은 전체 학습 시간과 다를 수 있음을 고려}
+{영상 시청 시간, 집중도 광석, 타임어택, 완료 보너스, 퀴즈 진행도/점수, 데이터 로그, 퀴즈 배틀 참여 횟수/승패/정답률, 코드 실행/수정 근거. Python 과제일 때만 CODE TRACE 완료/진행도/정확도와 LUMI 완료/진행 미션·Trace·앱 내부 획득 광석을 추가한다. 영상 시간은 전체 학습 시간과 다를 수 있음을 고려}
 
 #### 질문에 대한 답변
 {학생이 질문한 내용에 대한 정확한 답변. 질문이 없으면 이 섹션 생략}
@@ -527,6 +571,8 @@ node scripts/export-pending-assignment-contexts.mjs --out=/private/tmp/pending_a
 5. **제출문에 따르면 분명히 공부했는데 기록이 없는가?** → 학생이 종이 문제집으로 풀었거나, 플랫폼 밖에서 공부했을 수 있다. 이때는 “플랫폼 기록이 없어 확인이 어렵다”고 안내하되, 제출문 구체성을 다음 행동으로 요청한다. 단, “안 했다”고 단정하지 않는다.
 6. **퀴즈 배틀만 있고 영상/일반 퀴즈가 0건인가?** → 학생이 배틀 데이 등으로 퀴즈 배틀만 집중적으로 했을 수 있다. `history.type === "quiz_battle"` 기록이 있으면 “학습 기록 0건”이 아니다. 배틀은 경쟁 복습 활동으로 학습 근거로 인정한다. 단, 배틀 점수(0~1500)가 일반 퀴즈 점수(0~100)와 섞여 averageScore를 오염시키지 않았는지 확인한다. 배틀이 일반 퀴즈 버킷에 묻혀 `quizCount`로만 보이는 경우도 점검한다.
 7. **고전 읽기 과제인가?** → 고전 읽기는 영상·코드·데이터 로그가 없어도 책/쪽수 제출과 같은 날짜 독서 퀴즈가 핵심 학습 기록이다. `assignment.reading`, 같은 책의 이전 과제, 고전 읽기 `history`와 `learning_progress`를 먼저 확인한다. 이 근거가 있으면 일반 과정의 “영상 0분/학습 기록 0건” 경보를 적용하지 않는다.
+8. **Python 과제에 CODE TRACE 또는 LUMI만 있는가?** → `history.type === "code_trace"`, `history.type === "lumi_protocol"`, `learning_progress.codeTrace`, `learning_progress.lumi_protocol_vertical_slice.missionLab`의 실제 완료/진행을 확인한다. 있으면 Python 학습 기록 0건이 아니다. 단, 현재 과제가 Python이 아니면 이 확인 결과를 해당 과제에 사용하지 않는다.
+9. **비-Python 과제 컨텍스트에 Python 전용 활동이 섞였는가?** → 발견되면 학습 근거가 아니라 필터 결함이다. CODE TRACE·LUMI를 모든 요약 배열, 제목 목록, 신호, 프롬프트에서 제거한 뒤 해당 과정 기록만으로 0건 여부를 다시 판단한다.
 
 위 항목을 모두 확인한 뒤에도 해당 과정의 완료/진행 기록이 정말로 없을 때만 “학습 기록 없음” 경보를 검토한다. 코드와 export 스크립트 양쪽 모두 이 체크리스트를 자동으로 통과해야 한다.
 
@@ -535,11 +581,12 @@ node scripts/export-pending-assignment-contexts.mjs --out=/private/tmp/pending_a
 `learning_progress` 문서는 진행 중 상태만 남고 `clusterId`가 비어 있을 수 있다. 이때 과정은 제목/unitId 정규식으로 추론하지 않고, 실제 콘텐츠 메타데이터를 따라가서 정한다.
 
 - **명시 필드 우선**: `clusterId`, `courseId`, `regionId`, `codeTrace.clusterId`가 있으면 먼저 사용한다.
+- **전용 활동 타입 선차단**: `type === "code_trace"` 또는 `type === "lumi_protocol"`이면 과정 메타데이터 역추적보다 먼저 Python 전용으로 표시한다. 현재 과제가 비-Python이면 즉시 제외한다. LUMI 레거시 `python_mission`은 명시적 `experienceType: "lumi_protocol"` 또는 `lumiCourseId/missionId` 계약이 함께 있을 때만 같은 규칙을 적용한다.
 - **unit 역추적**: 명시 필드가 없으면 `units/{unitId}`를 조회한다. unit 문서에 `clusterId/courseId/regionId`가 있으면 사용하고, `chapterId`만 있으면 다음 단계로 간다.
 - **chapter/region 역추적**: `chapters/{chapterId}.regionId`를 읽고, `regions/{regionId}.clusterId`로 실제 과정을 확정한다.
 - **문서 ID에 region id가 들어 있는 레거시 단원**은 `reg_..._chap_...` 구조에서 region id만 추출한 뒤 `regions/{regionId}.clusterId`를 조회한다. 이것은 과정 키워드 추론이 아니라 저장 구조 역추적이다.
 - **역추적 실패 시 제외**: 그래도 과정이 확인되지 않으면 해당 과제의 학습 근거로 쓰지 않는다. 제목에 “소수/함수/코드”가 들어 있다는 이유만으로 초등/중등/Python을 단정하지 않는다.
-- **회귀 검증**: 실제 데이터로 (a) 인효린 `unit_py_math_2` CODE TRACE → python, (b) 하다솜 중등 진행 기록 → middle-math, (c) 조승아 NFD 단원 → middle-math, (d) 조하람 SSS 합동 history → middle-math 레벨업, (e) 초등·파이썬 기록이 중등으로 오탐되지 않는지 확인한다.
+- **회귀 검증**: 실제 데이터로 (a) 인효린 `unit_py_math_2` CODE TRACE → python, (b) LUMI 완료/진행 → python, (c) 하다솜 중등 진행 기록 → middle-math, (d) 조승아 NFD 단원 → middle-math, (e) 조하람 SSS 합동 history → middle-math 레벨업, (f) 초등·중등·고전 과제에 CODE TRACE/LUMI가 노출되지 않는지 확인한다.
 
 ## 저학습/제출 불일치 경보 처리
 
@@ -547,12 +594,12 @@ node scripts/export-pending-assignment-contexts.mjs --out=/private/tmp/pending_a
 
 경보 조건:
 
-- 제출일 영상 시청이 1분 미만이거나 정규 기준의 10% 미만이고, 퀴즈/데이터 로그/CODE TRACE/충분한 퀴즈 배틀(완료 3회+ 또는 정답률 60%+, 포기 제외)/코드 실행/제출문 정리 근거도 없다. 단, 충분한 퀴즈 배틀이 있으면 경보 조건에서 제외한다.
+- 제출일 영상 시청이 1분 미만이거나 정규 기준의 10% 미만이고, 해당 과정의 퀴즈/데이터 로그/충분한 퀴즈 배틀(완료 3회+ 또는 정답률 60%+, 포기 제외)/코드 실행/제출문 정리 근거도 없다. Python 과제에서는 CODE TRACE·LUMI도 확인한다. 단, 충분한 퀴즈 배틀이 있으면 경보 조건에서 제외한다.
 - 현재 과제 과정의 학습 기록이 0건이다. 같은 날짜 다른 과정 기록이 있어도 원칙적으로 해당 과정 기록으로 합산하지 않는다.
 - 예외: 초등수학 과제에서 같은 날짜 중등수학 기록 또는 중등수학 풀이 정리가 확인되는 레벨업 학생은 경보 조건에서 제외한다. 이때 중등수학 기록을 초등수학 수학 학습으로 인정하고, 보너스도 초등수학 수학 20분 기준에 준해 판단한다.
 - 초등수학 과제의 제출문이 중등수학 내용인데 `learningSummary`가 비어 있거나 `수학 기록 없음`으로 보이면, 경보를 쓰기 전에 반드시 같은 날짜 `middle-math` 기록을 확인한다. `유리수`, `절댓값`, `정수와 유리수`, `방정식`, `부등식`, `완전제곱식` 등의 퀴즈/영상/데이터 로그가 있으면 경보 조건에서 제외한다.
 - 중등수학 과제에서 초등수학 기록만 있는 경우는 예외가 아니다. 이 경우 중등수학 기록 없음 경보를 유지한다.
-- 영상 기록만 아주 짧고 퀴즈, 데이터 로그, CODE TRACE, 코드 실행 흔적, 진행 중 퀴즈가 없다.
+- 영상 기록만 아주 짧고 해당 과정의 퀴즈, 데이터 로그, 코드 실행 흔적, 진행 중 퀴즈가 없다. Python 과제에서는 CODE TRACE·LUMI도 없을 때만 이 조건을 적용한다.
 - 첨부 원본 코드와 제출 본문에 붙여 넣은 코드가 서로 다르거나, 실행하면 바로 오류가 날 가능성이 크다.
 - 첨부 원본 코드와 제출 본문 설명이 서로 다른 과제를 말하는 것처럼 보인다.
 - 제출 본문이 코드 원본을 설명하지 못하고, 이전 제출과 비교해 새로 배운 흔적이 거의 없다.
@@ -562,11 +609,13 @@ node scripts/export-pending-assignment-contexts.mjs --out=/private/tmp/pending_a
 
 - 학생에게는 “아무거나 복사했다”, “공부를 안 했다”처럼 의도를 단정하는 문장을 쓰지 않는다.
 - 대신 “오늘 기록으로는 영상 학습이 16초만 확인되어, 이 과제를 충분히 학습했다고 보기는 어렵습니다.”처럼 관찰 사실을 말한다.
-- 단, 영상 시간이 정규 기준의 절반 안팎이고 퀴즈/데이터 로그/CODE TRACE/코드 근거가 있으면 저학습 경보로 쓰지 않는다. 이때는 “영상과 확인 활동이 이어졌다”는 점을 인정하고, 부족한 부분은 제출문 구체성이나 오답 정리처럼 실제 빈틈으로 좁힌다.
-- 첨부 코드가 있는 Python 과제에서 Python 학습 기록이 0건이면, 코드 개선점은 인정하되 학습 기록 공백은 별도 문장으로 명확히 쓴다. 예: “첨부한 `add_sound.py`에서는 이전보다 사운드 기능을 넣으려는 변화가 보입니다. 다만 제출일 Python 영상/퀴즈/데이터 로그/CODE TRACE는 확인되지 않아, 이 코드가 어떤 학습 과정을 거쳐 작성됐는지는 확인하기 어렵습니다.”
+- 단, 영상 시간이 정규 기준의 절반 안팎이고 해당 과정의 퀴즈/데이터 로그/코드 근거가 있거나, Python 과제에서 CODE TRACE·LUMI가 있으면 저학습 경보로 쓰지 않는다. 이때는 “영상과 확인 활동이 이어졌다”는 점을 인정하고, 부족한 부분은 제출문 구체성이나 오답 정리처럼 실제 빈틈으로 좁힌다.
+- 첨부 코드가 있는 Python 과제에서 Python 학습 기록이 0건이면, 코드 개선점은 인정하되 학습 기록 공백은 별도 문장으로 명확히 쓴다. 예: “첨부한 `add_sound.py`에서는 이전보다 사운드 기능을 넣으려는 변화가 보입니다. 다만 제출일 Python 영상/퀴즈/데이터 로그/CODE TRACE/LUMI는 확인되지 않아, 이 코드가 어떤 학습 과정을 거쳐 작성됐는지는 확인하기 어렵습니다.”
 - 첨부 코드가 이전 같은 파일과 동일하면 개선점으로 인정하지 않는다. 예: “첨부한 `add_sound.py`는 4월 29일 제출의 `add_sound.py`와 코드 내용이 동일합니다. 제출일 Python 학습 기록도 없어 이번 과제에서 새로 학습하고 수정한 부분은 확인되지 않습니다.”
 - 첨부 코드에 의미 있는 개선이 있는데 영상 기록만 매우 짧으면, “과제 전체가 불성실”처럼 뭉뚱그리지 않는다. 예: “코드에서는 `monster_group`과 충돌 감지 구조로 나아간 변화가 보입니다. 다만 제출문은 25분 학습을 말하지만 플랫폼 기록은 49초라, 학습 기록과 제출 설명이 크게 맞지 않습니다.”
 - Python CODE TRACE 완료 기록이 있으면 학습 기록 0건이나 확인 활동 없음으로 처리하지 않는다. 예: “영상은 짧지만 `Game` 클래스 CODE TRACE를 4/4 완료했고 정확도 90%가 확인되어, 코드 구조를 손으로 따라 쓰는 학습은 이루어졌습니다.”
+- Python LUMI 미션 완료 기록이 있으면 학습 기록 0건이나 실행 근거 없음으로 처리하지 않는다. 예: “영상은 짧지만 LUMI `첫 걸음` 미션을 완료하며 코드를 실행하고 Trace에서 위치 변화를 확인한 기록이 있습니다.”
+- Python LUMI 진행 기록만 있으면 완료로 단정하지 않는다. 실제 진행 미션과 상태를 인정하되, 다음 행동은 “현재 미션에서 바꾼 인자와 실행 후 달라진 상태 1가지를 적기”처럼 작게 제시한다.
 - Python CODE TRACE만 있고 제출문이 “영상 봤다” 또는 “코드 짰다”처럼 실제 기록과 다르게 적혀 있으면, CODE TRACE는 인정하되 제출 설명 불일치는 분리해서 안내한다. 예: “오늘 기록은 영상/퀴즈보다 CODE TRACE 중심입니다. 다음 제출에서는 따라 쓴 코드에서 헷갈린 함수 이름 1개를 적어 주세요.”
 - CODE TRACE 정확도가 낮거나 완료율이 낮은 경우에도 곧바로 불성실로 보지 않는다. 다만 같은 exercise를 거의 진행하지 못했거나 `completedExerciseCount`가 0이면 학습 근거로 세게 인정하지 않는다.
 - 불일치는 “첨부한 원본 코드와 제출 본문에 적은 코드/설명이 서로 맞지 않아, 선생님이 어떤 부분을 직접 이해하고 만든 것인지 확인하기 어렵습니다.”처럼 설명한다.
@@ -692,7 +741,7 @@ node scripts/export-pending-assignment-contexts.mjs --out=/private/tmp/pending_a
 위 문구가 Python 과제에서 부적절한 이유:
 
 - `4월 평가`는 Python 과제 기록이 아니라 초등수학 또는 다른 과정 기록일 수 있다.
-- 현재 과제의 `clusterId`가 `python`이면 Python으로 판별되는 영상/퀴즈/데이터 로그/CODE TRACE/코드 기록만 학습 근거로 쓴다.
+- 현재 과제의 `clusterId`가 `python`이면 Python으로 판별되는 영상/퀴즈/데이터 로그/CODE TRACE/LUMI/코드 기록만 학습 근거로 쓴다.
 - 과정이 불명확한 진행 중 퀴즈는 피드백 근거에서 제외하고, 운영자 요약에 “제외된 다른 과정/과정 미확인 기록”으로만 남긴다.
 
 초등수학 레벨업 예외를 잘못 처리한 예시:
@@ -739,12 +788,12 @@ node scripts/export-pending-assignment-contexts.mjs --out=/private/tmp/pending_a
 
 | 광석 | 기준 |
 | --- | --- |
-| 10 | 제출은 했지만 학습 기록/내용 근거가 매우 약함. 영상 1분 미만, CODE TRACE 0개, 원본/설명 불일치, 이전과 진전 없음이 함께 보이면 이 범위를 우선 검토 |
-| 20 | 기본 제출은 했으나 영상/퀴즈/데이터 로그/CODE TRACE/코드 실행/정리 근거 중 확인되는 것이 거의 없음 |
-| 25 | 일부 학습 기록은 있으나 제출문이 짧거나, 확인 활동 또는 실행 근거가 약함. CODE TRACE가 1개 이상 진행 중이지만 완료율/정확도/설명 근거가 약한 경우도 이 범위 |
-| 30 | 영상이 기준의 절반 안팎이고 퀴즈/데이터 로그/CODE TRACE/코드 근거 중 하나 이상이 이어지며 제출 기록이 과제와 맞음. 또는 영상은 짧아도 CODE TRACE를 의미 있게 진행하고 제출문이 해당 구조를 설명함 |
-| 35 | 영상/퀴즈/데이터 로그/CODE TRACE/코드 실행 또는 정리 흐름이 균형 있고, 오답/막힌 부분을 일부 설명함. CODE TRACE를 대부분 완료하고 정확도와 제출 설명이 양호하면 이 범위 |
-| 40 | 기준 학습량 충족, 기록 구체성, 집중도, 약점 보완 또는 질문까지 모두 좋음. CODE TRACE 전체 완료, 높은 정확도, 제출 코드/설명 연결이 모두 좋으면 이 범위 |
+| 10 | 제출은 했지만 해당 과정의 학습 기록/내용 근거가 매우 약하고, 원본/설명 불일치와 이전 대비 진전 없음이 함께 보이면 이 범위를 우선 검토 |
+| 20 | 기본 제출은 했으나 해당 과정의 영상/퀴즈/데이터 로그/코드 실행/정리 근거 중 확인되는 것이 거의 없음. Python 과제에서는 CODE TRACE·LUMI도 없음 |
+| 25 | 일부 학습 기록은 있으나 제출문이 짧거나 확인 활동·실행 근거가 약함. Python 과제에서 CODE TRACE 또는 LUMI를 일부 진행했지만 완료/설명 연결이 약한 경우도 이 범위 |
+| 30 | 영상이 기준의 절반 안팎이고 해당 과정의 확인·실습 근거가 이어지며 제출 기록이 과제와 맞음. Python 과제에서는 영상이 짧아도 CODE TRACE 또는 LUMI를 의미 있게 진행하고 제출문이 해당 구조·상태 변화를 설명함 |
+| 35 | 해당 과정의 영상/퀴즈/데이터 로그/실행 또는 정리 흐름이 균형 있고, 오답/막힌 부분을 일부 설명함. Python 과제에서 CODE TRACE 대부분 완료 또는 LUMI 여러 미션 완료와 제출 설명 연결이 양호한 경우도 이 범위 |
+| 40 | 기준 학습량 충족, 기록 구체성, 집중도, 약점 보완 또는 질문까지 모두 좋음. Python 과제에서 CODE TRACE/LUMI의 높은 완성도와 제출 코드·설명 연결까지 좋으면 이 범위 |
 
 예: 초등수학 과제에서 수학 영상 1개를 4분 47초 시청하고 독서 기록을 남겼다면, “영상 3개 시청”처럼 쓰면 안 된다. 수학 플랫폼 학습량은 20분 기준으로는 부족한 편이므로, 제출 성실도와 독서 기록을 인정하되 25~30광석 범위에서 판단한다.
 
@@ -770,11 +819,19 @@ node scripts/export-pending-assignment-contexts.mjs --out=/private/tmp/pending_a
 
 예: Python 과제에서 영상, 퀴즈, 데이터 로그는 없지만 CODE TRACE 전체 완료와 높은 정확도가 있고 제출문이 해당 코드 구조를 설명한다면 “학습 기록 없음”이 아니다. 이 경우 30~35광석을 우선 검토하고, 다음 행동은 “따라 쓴 코드를 한 줄 응용하기”로 둔다.
 
+예: Python 과제에서 LUMI 일반 미션 3개를 최초 완료하고 각 미션에서 사용한 함수·인자와 Trace 상태 변화를 제출문에 설명했다면 30~35광석을 우선 검토한다. 앱에서 받은 미션 광석은 이미 지급된 별도 보상이므로 과제 보너스에 더하지 않는다.
+
+예: Python 과제에서 LUMI 필드 테스트까지 완료하고, 실패 원인과 코드를 고친 과정을 제출 코드·설명으로 연결했다면 35~40광석을 검토한다. 별 수만 보지 말고 디버깅과 상태 관찰의 구체성을 본다.
+
+예: Python 과제에서 LUMI 미션을 진행 중이지만 아직 성공하지 못했다면 실제 실행·수정·Trace 관찰은 인정하되 완료로 표현하지 않고 25~30광석 범위에서 다른 학습 근거와 함께 판단한다.
+
+예: 초등수학 또는 중등수학 과제일에 CODE TRACE/LUMI 기록이 함께 존재해도 이를 수학 학습이나 보너스 근거로 사용하지 않는다. 초등수학 레벨업 사례라면 `middle-math` 수학 활동만 인정한다.
+
 예: 영상 없이 퀴즈 배틀만 5회 이상 했고 평균 정답률이 60% 이상이면 충분한 복습 활동으로 인정해 30~35광석을 우선 검토한다. “영상 0분”이라는 숫자만으로 20~25광석으로 낮추지 않는다. 배틀에서 틀린 개념을 다음 행동으로 연결한다.
 
 예: 퀴즈 배틀을 13회 했고 정답률이 70% 안팎이라면, 영상이 없어도 다수 단원을 경쟁하며 복습한 성실한 활동으로 35광석까지 검토한다. 다음 행동은 “배틀에서 틀린 개념 1가지를 영상이나 퀴즈로 다시 확인하기”로 둔다.
 
-예: 퀴즈 배틀을 1~2회만 했고 정답률이 보통(50% 안팎)이라면, 복습 활동 자체는 인정하되 보너스는 25~30광석 범위에서 검토한다. 영상이나 CODE TRACE가 함께 있으면 그 근거를 우선으로 평가한다.
+예: 퀴즈 배틀을 1~2회만 했고 정답률이 보통(50% 안팎)이라면, 복습 활동 자체는 인정하되 보너스는 25~30광석 범위에서 검토한다. Python 과제에서 CODE TRACE·LUMI가 함께 있거나 해당 과정 영상이 있으면 그 근거도 함께 평가한다.
 
 예: 퀴즈 배틀 중 중도 포기(forfeited)가 대부분이거나 정답률이 매우 낮으면(30% 미만), 인정을 약하게 해 20~25광석 범위에서 검토한다. 다만 “공부를 안 했다”고 단정하지 않고, 남은 배틀을 끝까지 마무리하거나 약점 개념 영상을 보는 행동으로 유도한다.
 
@@ -849,9 +906,12 @@ node scripts/apply-manual-assignment-feedbacks.mjs \
 
 - 각 피드백의 `잘한 점`, `학습 기록에서 확인한 점`, `더 발전시키면 좋은 점`에 학생별 구체 근거가 있는지 확인한다.
 - “기준 학습량 대비 조금 부족”을 썼다면, 그 근거가 영상 시간 하나뿐인지 확인한다. 영상 시간 하나뿐이면 문장을 고친다.
-- 퀴즈, 데이터 로그, CODE TRACE가 있는 학생에게 “퀴즈나 데이터 로그까지 이어가라”고 쓰지 않았는지 확인한다.
-- Python 과제에서 코드 제출/실행 근거 또는 CODE TRACE 근거를 보지 않고 영상 시간만으로 낮은 평가를 하지 않았는지 확인한다.
+- 해당 과정의 퀴즈·데이터 로그가 있거나 Python 과제에 CODE TRACE·LUMI가 있는 학생에게 “퀴즈나 데이터 로그까지 이어가라”고 쓰지 않았는지 확인한다.
+- Python 과제에서 코드 제출/실행, CODE TRACE 또는 LUMI 근거를 보지 않고 영상 시간만으로 낮은 평가를 하지 않았는지 확인한다.
 - Python 과제에서 CODE TRACE가 있으면 완료/진행 여부, 정확도, exercise 수를 `학습 기록에서 확인한 점`에 적었는지 확인한다.
+- Python 과제에서 LUMI가 있으면 완료/진행 여부, 미션명·개념, Trace 관찰, 앱 내부 획득 광석을 `학습 기록에서 확인한 점`에 정확히 적었는지 확인한다.
+- 비-Python 과제의 컨텍스트·초안·최종 피드백에 CODE TRACE/LUMI 명칭, 제목, 개수, 진행도, 획득 광석이 한 번도 등장하지 않는지 확인한다.
+- LUMI 앱 내부 미션 광석을 `suggestedBonusCrystals`에 합산하거나 과제 승인 시 다시 지급하도록 쓰지 않았는지 확인한다.
 - 고전 읽기 과제에서 현재 책과 도달 쪽수, 같은 책의 직전 제출 쪽수, 증가량 또는 비교 불가 사유, 독서 퀴즈, 오늘 읽은 내용이 반영되었는지 확인한다.
 - 고전 읽기 페이지 증가량을 “오늘 읽은 분량”으로 단정하거나, 분당 쪽수·최소 쪽수로 평가하지 않았는지 확인한다.
 - 고전 읽기 첫 제출·책 변경·낮은 쪽수 기록을 비교 자료 부족만으로 감점하거나 보완요청하지 않았는지 확인한다.
@@ -895,7 +955,8 @@ node --input-type=module -e 'import admin from "firebase-admin"; import { readFi
 - 첨부파일 또는 링크의 원본 코드가 실제 과제와 맞는지 확인한다.
 - 제출 본문의 코드가 첨부 원본 코드와 같은지, 다르다면 학생이 무엇을 수정했는지 설명했는지 확인한다.
 - 제출 본문 설명이 원본 코드의 핵심 동작, 직접 수정한 부분, 실행 결과와 연결되는지 확인한다.
-- 당일 영상/퀴즈/데이터 로그/CODE TRACE가 정규 기준 대비 어느 정도인지 확인한다.
+- 당일 해당 과정의 영상/퀴즈/데이터 로그가 정규 기준 대비 어느 정도인지 확인하고, Python 과제에서만 CODE TRACE·LUMI 기록을 추가 확인한다.
+- 비-Python 과제라면 최종 문안과 근거 패널에 CODE TRACE·LUMI가 노출되지 않는지 마지막으로 확인한다.
 - 이전 제출에서도 같은 문제가 반복되는지 확인한다.
 - 반복되는 경우 단순 감점으로 끝내지 말고, 보완요청, 보호자 안내, 개별 학습 점검 중 어떤 조치가 학생 행동 변화를 만들 수 있을지 결정한다.
 

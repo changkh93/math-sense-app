@@ -12,7 +12,14 @@ import {
   setDoc,
   where,
 } from 'firebase/firestore';
-import { db } from '../firebase';
+import { db } from '../firebase.js';
+import {
+  belongsToCourse,
+  isPythonExclusiveActivity,
+  normalizeCourseId,
+  sanitizeLearningSummaryForCourse,
+  buildFeedbackWhitelistDto,
+} from './coursePolicyUtils.js';
 
 const CLUSTER_LABELS = {
   python: 'Python',
@@ -206,21 +213,14 @@ function hasMiddleMathLevelUpSignal(text = '') {
   return /중등|방정식|부등식|등식|함수|다항식|곱셈공식|제곱근|소인수분해|완전제곱|이차|유리수|정수|절댓값|기하/i.test(normalizeText(text));
 }
 
-function belongsToCourse(item = {}, courseId = '', options = {}) {
-  const target = normalizeClusterId(courseId);
-  if (!target || target === 'unknown') return true;
-  const itemCourse = learningItemCourseId(item);
-  if (itemCourse === target) return true;
-  // 초등수학 과제 + 레벨업 옵션이면 같은 날짜 중등수학 기록도 포함한다.
-  return target === 'cluster_elementary'
-    && options.includeMiddleMathLevelUp === true
-    && itemCourse === 'middle-math';
-}
-
 // 비동기 버전: learning_progress처럼 clusterId 필드가 없는 문서는 region 역조회로 정확한
 // 과정을 구한 뒤 비교한다. 정규식 오탐(하다솜/조승아 사례)을 원천 차단한다.
 async function belongsToCourseAsync(item = {}, courseId = '', options = {}) {
   const target = normalizeClusterId(courseId);
+  // 하드 게이트: 비-Python 과제에서는 CODE TRACE / LUMI Protocol 등 Python 전용 활동을 무조건 제외한다.
+  if (isPythonExclusiveActivity(item) && target !== 'python') {
+    return false;
+  }
   if (!target || target === 'unknown') return true;
   const itemCourse = await resolveLearningItemCourseId(item);
   if (itemCourse === target) return true;
@@ -443,7 +443,9 @@ async function summarizeLearningProgress(progressDocs, startMs, endMs, courseId,
   const videos = [];
   const inProgressQuizzes = [];
   const inProgressCodeTraces = [];
+  const inProgressLumiProtocols = [];
   const inProgressWorkbooks = [];
+  const targetCourse = normalizeClusterId(courseId);
 
   // 각 문서의 과정을 region 역조회로 정확히 정한 뒤 필터링한다(정규식 오탐 방지).
   const filtered = await filterRowsByCourse(
@@ -493,26 +495,55 @@ async function summarizeLearningProgress(progressDocs, startMs, endMs, courseId,
       });
     }
 
-    const codeTrace = data.codeTrace;
-    const codeTraceUpdatedAtMs = getTimestampMs(codeTrace?.updatedAt) || updatedAtMs;
-    const completedExerciseCount = Number(codeTrace?.completedExerciseCount || 0);
-    if (
-      codeTraceUpdatedAtMs
-      && codeTraceUpdatedAtMs >= startMs
-      && codeTraceUpdatedAtMs <= endMs
-      && completedExerciseCount > 0
-      && codeTrace?.completed !== true
-    ) {
-      inProgressCodeTraces.push({
-        unitId,
-        title: normalizeText(data.unitTitle || unitId),
-        completedExerciseCount,
-        totalExerciseCount: Number(codeTrace.totalExerciseCount || 0),
-        bestAccuracy: Number(codeTrace.bestAccuracy || 0),
-        lastExerciseId: codeTrace.lastExerciseId || '',
-        lastMode: codeTrace.lastMode || '',
-        updatedAtMs: codeTraceUpdatedAtMs,
-      });
+    if (targetCourse === 'python') {
+      const codeTrace = data.codeTrace;
+      const codeTraceUpdatedAtMs = getTimestampMs(codeTrace?.updatedAt) || updatedAtMs;
+      const completedExerciseCount = Number(codeTrace?.completedExerciseCount || 0);
+      if (
+        codeTraceUpdatedAtMs
+        && codeTraceUpdatedAtMs >= startMs
+        && codeTraceUpdatedAtMs <= endMs
+        && completedExerciseCount > 0
+        && codeTrace?.completed !== true
+      ) {
+        inProgressCodeTraces.push({
+          unitId,
+          title: normalizeText(data.unitTitle || unitId),
+          completedExerciseCount,
+          totalExerciseCount: Number(codeTrace.totalExerciseCount || 0),
+          bestAccuracy: Number(codeTrace.bestAccuracy || 0),
+          lastExerciseId: codeTrace.lastExerciseId || '',
+          lastMode: codeTrace.lastMode || '',
+          updatedAtMs: codeTraceUpdatedAtMs,
+        });
+      }
+
+      const missionLab = data.missionLab;
+      const isLumi = missionLab && (missionLab.experienceType === 'lumi_protocol' || String(missionLab.missionSetId || '').startsWith('lumi-'));
+      if (isLumi) {
+        const lumiUpdatedAtMs = getTimestampMs(missionLab.lastCompletedAt) || getTimestampMs(missionLab.updatedAt) || updatedAtMs;
+        const completedMissionCount = Number(missionLab.completedMissionCount || missionLab.completedMissionIds?.length || 0);
+        if (
+          lumiUpdatedAtMs
+          && lumiUpdatedAtMs >= startMs
+          && lumiUpdatedAtMs <= endMs
+          && completedMissionCount > 0
+          && missionLab.completed !== true
+        ) {
+          inProgressLumiProtocols.push({
+            lumiCourseId: missionLab.lumiCourseId || 'lumi-season-1',
+            unitId,
+            title: normalizeText(data.unitTitle || 'LUMI Protocol: 사라진 빛의 항로'),
+            completedMissionCount,
+            totalMissionCount: Number(missionLab.totalMissionCount || 10),
+            lastMissionId: missionLab.lastCompletedMissionId || missionLab.lastMissionId || '',
+            bestStars: missionLab.bestStarsByMission ? Math.max(...Object.values(missionLab.bestStarsByMission), 0) : Number(missionLab.bestStars || 0),
+            crystalsEarnedTotal: Number(missionLab.crystalsEarnedTotal || 0),
+            completed: false,
+            updatedAtMs: lumiUpdatedAtMs,
+          });
+        }
+      }
     }
 
     const workbookSession = data.workbookSession;
@@ -540,11 +571,14 @@ async function summarizeLearningProgress(progressDocs, startMs, endMs, courseId,
     }
   });
 
-  return { videos, inProgressQuizzes, inProgressCodeTraces, inProgressWorkbooks };
+  return { videos, inProgressQuizzes, inProgressCodeTraces, inProgressLumiProtocols, inProgressWorkbooks };
 }
 
 async function fetchLearningSummary(userId, dateStr, courseId = '', options = {}) {
   const range = dateRangeForKst(dateStr);
+  const normalizedCourse = normalizeClusterId(courseId);
+  const isPythonCourse = normalizedCourse === 'python';
+
   if (!userId || !range) {
     return {
       date: dateStr || '',
@@ -560,10 +594,16 @@ async function fetchLearningSummary(userId, dateStr, courseId = '', options = {}
       workbookCount: 0,
       workbookProgressCount: 0,
       workbookAverageScore: null,
+      lumiProtocolCount: 0,
+      lumiProtocolProgressCount: 0,
+      lumiProtocolMissionCount: 0,
+      lumiProtocolCrystalsEarned: 0,
       workbooks: [],
       inProgressWorkbooks: [],
       codeTraces: [],
       inProgressCodeTraces: [],
+      lumiProtocols: [],
+      inProgressLumiProtocols: [],
     };
   }
 
@@ -582,15 +622,21 @@ async function fetchLearningSummary(userId, dateStr, courseId = '', options = {}
   const endMs = range.end.toMillis();
   const allRows = historySnap.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() }));
 
+  // 비-Python 과제에서는 메타데이터 역조회 전에 명백한 Python 전용 활동을 미리 제거하여
+  // 불필요한 Firestore read를 절감하고 과정 간 누출을 원천 방지한다.
+  const candidateRows = isPythonCourse
+    ? allRows
+    : allRows.filter((row) => !isPythonExclusiveActivity(row));
+
   // 초등수학 과제에서 레벨업 예외 적용 여부를 실제 데이터로도 확인한다.
   // 제출문 키워드 신호(호출부)가 없더라도, 같은 날짜에 middle-math history가 있으면
   // 초등수학을 마치고 중등수학으로 넘어간 학생으로 보고 레벨업 기록을 인정한다.
   // 각 row의 과정은 region 역조회로 정확히 정한다(정규식 오탐 방지).
   const allResolved = await Promise.all(
-    allRows.map((row) => resolveLearningItemCourseId(row).then((course) => ({ row, course })))
+    candidateRows.map((row) => resolveLearningItemCourseId(row).then((course) => ({ row, course })))
   );
   let includeMiddleMathLevelUp = options.includeMiddleMathLevelUp === true;
-  if (!includeMiddleMathLevelUp && normalizeClusterId(courseId) === 'cluster_elementary') {
+  if (!includeMiddleMathLevelUp && normalizedCourse === 'cluster_elementary') {
     includeMiddleMathLevelUp = allResolved.some((item) => item.course === 'middle-math');
   }
   const mergedOptions = { ...options, includeMiddleMathLevelUp };
@@ -599,12 +645,16 @@ async function fetchLearningSummary(userId, dateStr, courseId = '', options = {}
   const rows = allResolved
     .filter(({ row, course }) => belongsToCourse({ ...row, clusterId: course }, courseId, mergedOptions))
     .map(({ row }) => row);
-  const codeTraceRows = rows.filter((row) => row.type === 'code_trace');
+
+  const codeTraceRows = isPythonCourse ? rows.filter((row) => row.type === 'code_trace') : [];
+  const lumiRows = isPythonCourse
+    ? rows.filter((row) => row.type === 'lumi_protocol' || (row.type === 'python_mission' && (row.experienceType === 'lumi_protocol' || String(row.missionSetId || '').startsWith('lumi-'))))
+    : [];
   const workbookRows = rows.filter((row) => row.type === 'workbook');
   // 퀴즈 배틀은 점수 체계(0~1500, 정답x100)가 일반 퀴즈(0~100)와 다르므로 별도로 분리한다.
   // 분리하지 않으면 배틀 점수가 averageScore를 오염시킨다.
   const battleRows = rows.filter((row) => row.type === 'quiz_battle');
-  const quizRows = rows.filter((row) => !['video', 'video_complete', 'text', 'data_log_read', 'attention', 'code_trace', 'quiz_battle', 'workbook'].includes(row.type || 'quiz_pass'));
+  const quizRows = rows.filter((row) => !['video', 'video_complete', 'text', 'data_log_read', 'attention', 'code_trace', 'lumi_protocol', 'python_mission', 'quiz_battle', 'workbook'].includes(row.type || 'quiz_pass'));
   const videoRows = rows.filter((row) => ['video', 'video_complete', 'recovery_mastery'].includes(row.type));
   const textRows = rows.filter((row) => ['text', 'data_log_read'].includes(row.type));
   const dataLogRows = rows.filter((row) => row.type === 'data_log_read');
@@ -622,7 +672,8 @@ async function fetchLearningSummary(userId, dateStr, courseId = '', options = {}
   );
   const inProgressQuizzes = progressSummary.inProgressQuizzes;
   const progressVideos = progressSummary.videos;
-  const inProgressCodeTraces = progressSummary.inProgressCodeTraces;
+  const inProgressCodeTraces = isPythonCourse ? progressSummary.inProgressCodeTraces : [];
+  const inProgressLumiProtocols = isPythonCourse ? progressSummary.inProgressLumiProtocols : [];
   const inProgressWorkbooks = progressSummary.inProgressWorkbooks;
 
   const videoSeconds = videoRows.reduce((sum, row) => sum + secondsFromLearningRow(row), 0)
@@ -631,16 +682,20 @@ async function fetchLearningSummary(userId, dateStr, courseId = '', options = {}
   const combinedQuizCount = quizRows.length + inProgressQuizzes.length;
   for (const item of inProgressQuizzes) titleSet.add(item.title);
   for (const item of progressVideos) titleSet.add(item.title);
-  for (const row of codeTraceRows) titleSet.add(normalizeText(row.unitTitle || row.regionTitle || row.title || 'CODE TRACE'));
-  for (const item of inProgressCodeTraces) titleSet.add(item.title);
+  if (isPythonCourse) {
+    for (const row of codeTraceRows) titleSet.add(normalizeText(row.unitTitle || row.regionTitle || row.title || 'CODE TRACE'));
+    for (const item of inProgressCodeTraces) titleSet.add(item.title);
+    for (const row of lumiRows) titleSet.add(normalizeText(row.unitTitle || row.missionTitle || 'LUMI Protocol'));
+    for (const item of inProgressLumiProtocols) titleSet.add(item.title);
+  }
   for (const row of workbookRows) titleSet.add(normalizeText(row.unitTitle || row.regionTitle || '스마트 워크북'));
   for (const item of inProgressWorkbooks) titleSet.add(item.title);
 
-  return {
+  const rawSummary = {
     date: dateStr,
-    courseId: normalizeClusterId(courseId),
-    allActivityCount: allRows.length,
-    activityCount: rows.length + inProgressQuizzes.length + progressVideos.length + inProgressCodeTraces.length + inProgressWorkbooks.length,
+    courseId: normalizedCourse,
+    allActivityCount: isPythonCourse ? allRows.length : allRows.filter((r) => !isPythonExclusiveActivity(r)).length,
+    activityCount: rows.length + inProgressQuizzes.length + progressVideos.length + inProgressCodeTraces.length + inProgressLumiProtocols.length + inProgressWorkbooks.length,
     quizCount: combinedQuizCount,
     inProgressQuizCount: inProgressQuizzes.length,
     videoCount: videoRows.length + progressVideos.length,
@@ -650,6 +705,10 @@ async function fetchLearningSummary(userId, dateStr, courseId = '', options = {}
     dataLogCount: dataLogRows.length,
     codeTraceCount: codeTraceRows.length,
     codeTraceProgressCount: inProgressCodeTraces.length,
+    lumiProtocolCount: lumiRows.length,
+    lumiProtocolProgressCount: inProgressLumiProtocols.length,
+    lumiProtocolMissionCount: lumiRows.length,
+    lumiProtocolCrystalsEarned: lumiRows.reduce((sum, r) => sum + Number(r.crystalsEarned || 0), 0),
     workbookCount: workbookRows.length,
     workbookProgressCount: inProgressWorkbooks.length,
     workbookAverageScore: workbookScoreRows.length ? Math.round(workbookScoreRows.reduce((sum, score) => sum + score, 0) / workbookScoreRows.length) : null,
@@ -661,6 +720,11 @@ async function fetchLearningSummary(userId, dateStr, courseId = '', options = {}
     battleForfeitCount: battleAssessment.forfeitCount,
     battleAverageAccuracy: battleAssessment.averageAccuracy,
     isSufficientBattleReview: battleAssessment.isSufficientBattleReview,
+    averageScore: scoreRows.length ? Math.round(scoreRows.reduce((sum, score) => sum + score, 0) / scoreRows.length) : null,
+    focusScore: attentionRows.length
+      ? Math.round((attentionRows.filter((row) => row.attentionResult === 'hit').length / attentionRows.length) * 100)
+      : null,
+    titles: Array.from(titleSet).slice(0, 8),
     battles: battleRows.slice(0, 8).map((row) => ({
       title: normalizeText(row.unitTitle || row.battleUnitTitle || '퀴즈 배틀'),
       score: Number(row.score) || 0,
@@ -669,8 +733,6 @@ async function fetchLearningSummary(userId, dateStr, courseId = '', options = {}
       result: row.battleResult || (row.forfeited ? 'forfeit' : ''),
       forfeited: row.forfeited === true,
     })),
-    averageScore: scoreRows.length ? Math.round(scoreRows.reduce((sum, score) => sum + score, 0) / scoreRows.length) : null,
-    titles: Array.from(titleSet).slice(0, 8),
     videos: [
       ...videoRows.slice(0, 6).map((row) => ({
         title: normalizeText(row.unitTitle || row.transmissionTitle || row.regionTitle || '영상 학습'),
@@ -724,6 +786,29 @@ async function fetchLearningSummary(userId, dateStr, courseId = '', options = {}
       lastExerciseId: item.lastExerciseId,
       lastMode: item.lastMode,
     })),
+    lumiProtocols: lumiRows.slice(0, 8).map((row) => ({
+      lumiCourseId: row.lumiCourseId || 'lumi-season-1',
+      unitId: row.unitId || '',
+      title: normalizeText(row.unitTitle || 'LUMI Protocol: 사라진 빛의 항로'),
+      missionId: row.missionId || '',
+      missionTitle: normalizeText(row.missionTitle || row.title || ''),
+      concepts: row.concepts || [],
+      stars: Number(row.stars || 0),
+      assistanceLevel: Number(row.assistanceLevel || 0),
+      crystalsEarned: Number(row.crystalsEarned || 0),
+      completed: true,
+    })),
+    inProgressLumiProtocols: inProgressLumiProtocols.map((item) => ({
+      lumiCourseId: item.lumiCourseId || 'lumi-season-1',
+      unitId: item.unitId || '',
+      title: item.title,
+      completedMissionCount: item.completedMissionCount,
+      totalMissionCount: item.totalMissionCount,
+      lastMissionId: item.lastMissionId,
+      bestStars: item.bestStars,
+      crystalsEarnedTotal: item.crystalsEarnedTotal,
+      completed: false,
+    })),
     inProgressWorkbooks: inProgressWorkbooks.map((item) => ({
       title: item.title,
       currentPage: item.currentPage,
@@ -738,6 +823,8 @@ async function fetchLearningSummary(userId, dateStr, courseId = '', options = {}
     excludedOtherCourseTitles: Array.from(new Set(allResolved
       .filter(({ row, course }) => !belongsToCourse({ ...row, clusterId: course }, courseId, mergedOptions))
       .map(({ row }) => row)
+      // 하드 게이트 4단계: 비-Python 과제의 제외 목록에서 Python 전용 활동 제목도 완전 배제하여 프롬프트/진단 누출 차단
+      .filter((row) => !(isPythonExclusiveActivity(row) && !isPythonCourse))
       .map((row) => normalizeText(row.unitTitle || row.transmissionTitle || row.quizTitle || row.regionTitle))
       .filter(Boolean))).slice(0, 6),
     includesMiddleMathLevelUp: includeMiddleMathLevelUp,
@@ -745,6 +832,8 @@ async function fetchLearningSummary(userId, dateStr, courseId = '', options = {}
       ? Math.round((attentionRows.filter((row) => row.attentionResult === 'hit').length / attentionRows.length) * 100)
       : null,
   };
+
+  return sanitizeLearningSummaryForCourse(rawSummary, courseId);
 }
 
 async function fetchDarkMatterSummary(userId) {
@@ -796,43 +885,60 @@ async function fetchDarkMatterSummary(userId) {
   };
 }
 
-function buildEvidence(context) {
+function buildEvidence(context = {}) {
   const evidence = [];
-  const { currentSubmission, previousSubmissions, sameDaySubmissions, dailyLearningSummary, darkMatterSummary } = context;
-  const includesLevelUp = context.includesMiddleMathLevelUp === true;
+  const courseId = normalizeClusterId(context?.student?.courseId || context?.courseId);
+  const {
+    currentSubmission = {},
+    previousSubmissions = [],
+    sameDaySubmissions = [],
+    dailyLearningSummary = {},
+    darkMatterSummary = {}
+  } = context || {};
+  const includesLevelUp = context?.includesMiddleMathLevelUp === true;
 
-  if (currentSubmission.attachmentCount > 0) {
+  if (currentSubmission.attachmentCount > 0 && Array.isArray(currentSubmission.attachments)) {
     evidence.push(`이번 제출물에 첨부파일 ${currentSubmission.attachmentCount}개가 포함됨: ${currentSubmission.attachments.map((att) => att.name).join(', ')}`);
   }
-  if (currentSubmission.contentLength >= 80) {
+  if ((currentSubmission.contentLength || 0) >= 80) {
     evidence.push(`제출 글이 ${currentSubmission.contentLength}자로, 학습 내용을 설명하려는 흔적이 있음`);
   }
   if (currentSubmission.studentQuestions?.length) {
     evidence.push(`학생 질문 확인: ${currentSubmission.studentQuestions.join(' / ')}`);
   }
-  if (previousSubmissions.length > 0) {
+  if (previousSubmissions?.length > 0) {
     evidence.push(`같은 과정의 최근 과제 ${previousSubmissions.length}건과 비교 가능`);
   }
-  const previousResponses = previousSubmissions.filter((item) => item.feedbackReaction || item.feedbackComment);
+  const previousResponses = (previousSubmissions || []).filter((item) => item.feedbackReaction || item.feedbackComment);
   if (previousResponses.length > 0) {
     evidence.push(`이전 피드백에 대한 학생 반응 ${previousResponses.length}건 확인`);
   }
-  if (sameDaySubmissions.length > 0) {
+  if (sameDaySubmissions?.length > 0) {
     evidence.push(`같은 날짜에 다른 과제 ${sameDaySubmissions.length}건도 제출되어 일괄 제출 맥락 확인 필요`);
   }
-  if (includesLevelUp) {
-    // 초등수학 과제에서 중등수학 레벨업 기록을 수학 학습으로 인정한 경우.
-    evidence.push(`초등수학 과제 시간에 레벨업 학습으로 중등수학을 진행한 기록 ${dailyLearningSummary.activityCount}건을 수학 학습으로 인정함`);
-  } else if (dailyLearningSummary.activityCount > 0) {
-    evidence.push(`제출일 ${context.student.courseLabel} 학습 기록 ${dailyLearningSummary.activityCount}건 확인`);
+  if (dailyLearningSummary.activityCount > 0) {
+    if (includesLevelUp) {
+      // 초등수학 과제에서 중등수학 레벨업 기록을 수학 학습으로 인정한 경우.
+      evidence.push(`초등수학 과제 시간에 레벨업 학습으로 중등수학을 진행한 기록 ${dailyLearningSummary.activityCount}건을 수학 학습으로 인정함`);
+    } else {
+      evidence.push(`제출일 ${context.student.courseLabel} 학습 기록 ${dailyLearningSummary.activityCount}건 확인`);
+    }
   } else if (dailyLearningSummary.allActivityCount > 0) {
     evidence.push(`같은 날짜 다른 과정 기록 ${dailyLearningSummary.allActivityCount}건은 확인되지만 ${context.student.courseLabel} 기록은 없음`);
   }
-  if ((dailyLearningSummary.codeTraceCount || 0) > 0) {
-    evidence.push(`CODE TRACE 완료 ${dailyLearningSummary.codeTraceCount}건 확인`);
-  }
-  if ((dailyLearningSummary.codeTraceProgressCount || 0) > 0) {
-    evidence.push(`진행 중 CODE TRACE ${dailyLearningSummary.codeTraceProgressCount}건 확인`);
+  if (courseId === 'python') {
+    if ((dailyLearningSummary.codeTraceCount || 0) > 0) {
+      evidence.push(`CODE TRACE 완료 ${dailyLearningSummary.codeTraceCount}건 확인`);
+    }
+    if ((dailyLearningSummary.codeTraceProgressCount || 0) > 0) {
+      evidence.push(`진행 중 CODE TRACE ${dailyLearningSummary.codeTraceProgressCount}건 확인`);
+    }
+    if ((dailyLearningSummary.lumiProtocolCount || 0) > 0) {
+      evidence.push(`LUMI Protocol 미션 완료 ${dailyLearningSummary.lumiProtocolCount}건 확인`);
+    }
+    if ((dailyLearningSummary.lumiProtocolProgressCount || 0) > 0) {
+      evidence.push(`진행 중 LUMI Protocol ${dailyLearningSummary.lumiProtocolProgressCount}건 확인`);
+    }
   }
   if ((dailyLearningSummary.workbookCount || 0) > 0) {
     const scoreNote = dailyLearningSummary.workbookAverageScore != null ? `, 평균 ${dailyLearningSummary.workbookAverageScore}점` : '';
@@ -856,6 +962,7 @@ function buildEvidence(context) {
 
 function buildFeedbackPolicyGuidance(context) {
   const courseId = normalizeClusterId(context?.student?.courseId);
+  const isPythonCourse = courseId === 'python';
   const targetMinutes = getCourseTargetMinutes(courseId);
   const learning = context?.dailyLearningSummary || {};
   const submission = context?.currentSubmission || {};
@@ -863,16 +970,18 @@ function buildFeedbackPolicyGuidance(context) {
   // 퀴즈 배틀은 경쟁 복습/확인 활동으로 학습 근거에 포함한다(포기 제외).
   const battleCount = Number(learning.battleCount || 0);
   const isSufficientBattleReview = learning.isSufficientBattleReview === true;
+  const hasCodeTraceActivity = isPythonCourse && Boolean((learning.codeTraceCount || 0) > 0 || (learning.codeTraceProgressCount || 0) > 0);
+  const hasLumiActivity = isPythonCourse && Boolean((learning.lumiProtocolCount || 0) > 0 || (learning.lumiProtocolProgressCount || 0) > 0);
+  const hasPythonCodePractice = Boolean(hasCodeTraceActivity || hasLumiActivity);
   const hasLearningFollowUpActivity = Boolean(
     (learning.quizCount || 0) > 0 ||
     (learning.dataLogCount || 0) > 0 ||
-    (learning.codeTraceCount || 0) > 0 ||
-    (learning.codeTraceProgressCount || 0) > 0 ||
+    hasCodeTraceActivity ||
+    hasLumiActivity ||
     (learning.workbookCount || 0) > 0 ||
     (learning.workbookProgressCount || 0) > 0 ||
     battleCount > 0
   );
-  const hasCodeTraceActivity = Boolean((learning.codeTraceCount || 0) > 0 || (learning.codeTraceProgressCount || 0) > 0);
   const hasSubmissionEvidence = Boolean(
     (submission.attachmentCount || 0) > 0 ||
     (submission.contentLength || 0) >= 80 ||
@@ -883,14 +992,16 @@ function buildFeedbackPolicyGuidance(context) {
     hasLearningFollowUpActivity
   );
   const isVeryLowLearning = !hasCourseLearningRecord || (videoMinutes < Math.max(1, targetMinutes * 0.1) && !hasLearningFollowUpActivity);
-  // 충분한 배틀 복습(완료 3회+ 또는 정답률 60%+, 포기 제외)은 영상 없이도 합리적 학습 흐름으로 인정한다.
-  const isReasonableFlow = (videoMinutes >= targetMinutes * 0.45 && hasLearningFollowUpActivity) || hasCodeTraceActivity || isSufficientBattleReview;
+  // 충분한 배틀 복습(완료 3회+ 또는 정답률 60%+, 포기 제외) 및 Python 코드 실습은 영상 없이도 합리적 학습 흐름으로 인정한다.
+  const isReasonableFlow = (videoMinutes >= targetMinutes * 0.45 && hasLearningFollowUpActivity) || hasPythonCodePractice || isSufficientBattleReview;
 
   return {
     targetMinutes,
     videoMinutes,
     hasLearningFollowUpActivity,
     hasCodeTraceActivity,
+    hasLumiActivity,
+    hasPythonCodePractice,
     hasSubmissionEvidence,
     hasCourseLearningRecord,
     isVeryLowLearning,
@@ -901,10 +1012,10 @@ function buildFeedbackPolicyGuidance(context) {
     rules: [
       '영상 시간은 전체 학습 시간이 아니다. 학생은 영상을 멈추고 풀이, 코드 작성, 실행, 수정, 정리를 할 수 있다.',
       '영상 시간이 기준의 절반 안팎이고 퀴즈, 데이터 로그, 코드 제출, 제출문 정리 중 하나 이상이 있으면 성실한 학습 흐름으로 인정한다.',
-      'Python 과제에서 CODE TRACE 완료/진행 기록은 영상/퀴즈와 다른 코드 실습 근거로 인정한다.',
+      'Python 과제에서 CODE TRACE와 LUMI Protocol 완료/진행 기록은 영상/퀴즈와 다른 코드 실습 근거로 인정한다.',
       '스마트 워크북 완료/진행 기록은 풀이·재시도 기반의 확인 활동으로 인정하며, 일반 퀴즈 점수와 섞지 않고 워크북 평균과 진행 페이지를 별도로 해석한다.',
       '영상 시간 숫자만으로 "기준 학습량 대비 부족"이라고 쓰지 않는다.',
-      '이미 퀴즈, 데이터 로그, CODE TRACE가 있으면 "퀴즈나 데이터 로그까지 이어가라"는 개선 문구를 쓰지 않는다.',
+      '이미 퀴즈, 데이터 로그, CODE TRACE, LUMI Protocol이 있으면 "퀴즈나 데이터 로그까지 이어가라"는 개선 문구를 쓰지 않는다.',
       '개선점은 오답 이유 한 줄 정리, 코드 실행 결과, 직접 바꾼 코드 설명처럼 실제로 비어 있는 근거에서 고른다.',
       'Python은 영상 시청보다 직접 코드 작성, 실행, 오류 수정, 실행 결과 근거를 더 중요하게 본다.',
       '초등수학 과제에서 초등수학을 마친 학생이 레벨업 학습으로 중등수학을 진행한 경우, 같은 날짜 중등수학 퀴즈/영상/데이터 로그를 초등수학 과제의 수학 학습으로 인정한다. 이 경우 "수학 기록 없음"이나 "학습 기록 없음"으로 판단하지 않고 "초등수학 시간에 레벨업 학습으로 중등수학을 진행했다"고 표현한다.',
@@ -1085,6 +1196,8 @@ export async function buildAssignmentFeedbackContext(assignment, styleKey = 'bal
 export function createFallbackAssignmentFeedback(context, styleKey = 'balanced') {
   const studentName = context?.student?.name || '학생';
   const courseLabel = context?.student?.courseLabel || '과정';
+  const courseId = normalizeCourseId(context?.student?.courseId || context?.courseId);
+  const isPython = courseId === 'python';
   const submission = context?.currentSubmission || {};
   const hasAttachments = (submission.attachmentCount || 0) > 0;
   const previous = context?.previousSubmissions || [];
@@ -1094,10 +1207,15 @@ export function createFallbackAssignmentFeedback(context, styleKey = 'balanced')
   const firstAttachment = submission.attachments?.[0]?.name;
   const weakness = darkMatter.recentWeaknesses?.[0];
   const studentQuestions = submission.studentQuestions || [];
-  const codeTraceNote = (learning.codeTraceCount || 0) > 0
+  const codeTraceNote = isPython && (learning.codeTraceCount || 0) > 0
     ? `CODE TRACE 완료 ${learning.codeTraceCount}건`
-    : (learning.codeTraceProgressCount || 0) > 0
+    : isPython && (learning.codeTraceProgressCount || 0) > 0
       ? `진행 중 CODE TRACE ${learning.codeTraceProgressCount}건`
+      : '';
+  const lumiNote = isPython && (learning.lumiProtocolCount || 0) > 0
+    ? `LUMI Protocol 완료 ${learning.lumiProtocolCount}건`
+    : isPython && (learning.lumiProtocolProgressCount || 0) > 0
+      ? `진행 중 LUMI Protocol ${learning.lumiProtocolProgressCount}건`
       : '';
   const workbookNote = (learning.workbookCount || 0) > 0
     ? `스마트 워크북 완료 ${learning.workbookCount}건${learning.workbookAverageScore != null ? ` (평균 ${learning.workbookAverageScore}점)` : ''}`
@@ -1115,9 +1233,10 @@ export function createFallbackAssignmentFeedback(context, styleKey = 'balanced')
     ? '이전 과제 기록과 비교해 이번 제출에서 유지하거나 개선할 부분을 확인할 수 있습니다.'
     : '아직 비교할 과제 기록이 많지 않으므로, 이번 제출이 앞으로의 성장 기준점이 됩니다.';
 
+  const pythonPracticeNote = [codeTraceNote, lumiNote].filter(Boolean).join(', ');
   const learningFlowNote = policy.isReasonableFlow
-    ? codeTraceNote
-      ? `${codeTraceNote}${learning.videoMinutes ? `과 영상 ${learning.videoMinutes}분` : ''}${learning.quizCount ? `, 퀴즈 ${learning.quizCount}건` : ''}${learning.dataLogCount ? `, 데이터 로그 ${learning.dataLogCount}건` : ''}이 확인되어, 코드를 손으로 따라 쓰는 확인 활동까지 남았습니다.`
+    ? pythonPracticeNote
+      ? `${pythonPracticeNote}${learning.videoMinutes ? `과 영상 ${learning.videoMinutes}분` : ''}${learning.quizCount ? `, 퀴즈 ${learning.quizCount}건` : ''}${learning.dataLogCount ? `, 데이터 로그 ${learning.dataLogCount}건` : ''}이 확인되어, 코드를 직접 다루는 실습 활동까지 남았습니다.`
       : battleNote && !learning.videoMinutes && !(learning.quizCount || 0) && !(learning.dataLogCount || 0) && !workbookNote
         ? `${battleNote}로 기존 학습 범위를 경쟁하며 복습한 기록이 확인됩니다. 영상 없이도 배운 개념을 확인 활동으로 이어간 점은 좋습니다.`
         : `영상 ${learning.videoMinutes}분에 ${learning.quizCount ? `퀴즈 ${learning.quizCount}건` : ''}${learning.quizCount && (learning.dataLogCount || workbookNote) ? ', ' : ''}${learning.dataLogCount ? `데이터 로그 ${learning.dataLogCount}건` : ''}${workbookNote ? `${learning.quizCount || learning.dataLogCount ? ', ' : ''}${workbookNote}` : ''}${battleNote ? `${learning.quizCount || learning.dataLogCount || workbookNote ? ', ' : ''}${battleNote}` : ''}${!learning.quizCount && !learning.dataLogCount && !workbookNote && !battleNote && hasAttachments ? '제출 자료' : ''}까지 이어진 점을 보면, 단순히 영상만 본 기록은 아닙니다.`

@@ -39,6 +39,10 @@ export function useLearningHistory(userId, dateStr) {
     codeTraceProgressCount: 0,
     missionLabCount: 0,
     missionLabProgressCount: 0,
+    lumiProtocolCount: 0,
+    lumiProtocolProgressCount: 0,
+    lumiProtocolMissionCount: 0,
+    lumiProtocolCrystalsEarned: 0,
     totalVideoSeconds: 0,
     isAssignmentSubmitted: false,
     attentionHits: 0,
@@ -156,6 +160,10 @@ export function useLearningHistory(userId, dateStr) {
       logCount: 0,
       codeTraceCount: 0,
       codeTraceProgressCount: 0,
+      lumiProtocolCount: 0,
+      lumiProtocolProgressCount: 0,
+      lumiProtocolMissionCount: 0,
+      lumiProtocolCrystalsEarned: 0,
       missionLabCount: 0,
       missionLabProgressCount: 0,
       totalVideoSeconds: 0,
@@ -241,9 +249,24 @@ export function useLearningHistory(userId, dateStr) {
       } else if (hType === 'code_trace') {
         stats.codeTraceCount++;
         displayType = 'code_trace';
+      } else if (hType === 'lumi_protocol') {
+        stats.lumiProtocolCount++;
+        stats.lumiProtocolMissionCount++;
+        stats.lumiProtocolCrystalsEarned += Number(data.crystalsEarned || 0);
+        displayType = 'lumi_protocol';
       } else if (hType === 'python_mission') {
-        stats.missionLabCount++;
-        displayType = 'python_mission';
+        const isLumi = data.experienceType === 'lumi_protocol' ||
+          String(data.missionSetId || '').startsWith('lumi-') ||
+          String(data.unitId || '').startsWith('lumi_protocol_');
+        if (isLumi) {
+          stats.lumiProtocolCount++;
+          stats.lumiProtocolMissionCount++;
+          stats.lumiProtocolCrystalsEarned += Number(data.crystalsEarned || 0);
+          displayType = 'lumi_protocol';
+        } else {
+          stats.missionLabCount++;
+          displayType = 'python_mission';
+        }
       } else if (hType === 'workbook') {
         stats.workbookCount++;
         displayType = 'workbook';
@@ -268,6 +291,8 @@ export function useLearningHistory(userId, dateStr) {
             ? '📝'
             : displayType === 'code_trace'
               ? '⌨️'
+              : displayType === 'lumi_protocol'
+                ? '🛰️'
               : displayType === 'python_mission'
                 ? '🛰️'
               : displayType === 'workbook'
@@ -284,13 +309,15 @@ export function useLearningHistory(userId, dateStr) {
               ? '데이터 로그 열람'
               : displayType === 'code_trace'
                 ? '코드 따라쓰기'
-                : displayType === 'python_mission'
-                  ? 'MISSION LAB'
-                : displayType === 'workbook'
-                  ? '스마트 워크북'
-                : displayType === 'quiz_battle'
-                  ? '퀴즈 배틀'
-                  : '현장 탐사(퀴즈)';
+              : displayType === 'lumi_protocol'
+                ? 'LUMI PROTOCOL'
+              : displayType === 'python_mission'
+                ? 'MISSION LAB'
+              : displayType === 'workbook'
+                ? '스마트 워크북'
+              : displayType === 'quiz_battle'
+                ? '퀴즈 배틀'
+                : '현장 탐사(퀴즈)';
 
       aggregated.push({
         id: `quiz_${docSnap.id}`,
@@ -317,7 +344,15 @@ export function useLearningHistory(userId, dateStr) {
       const metadata = data.metadata || {};
 
       // Skip types already captured by history
-      if (tType === 'quiz_reward' || tType === 'mastery_bonus' || tType === 'quiz_penalty' || tType === 'quiz_battle_reward' || tType === 'workbook_reward' || tType === 'workbook_penalty') return;
+      if (
+        tType === 'quiz_reward' ||
+        tType === 'mastery_bonus' ||
+        tType === 'quiz_penalty' ||
+        tType === 'quiz_battle_reward' ||
+        tType === 'workbook_reward' ||
+        tType === 'workbook_penalty' ||
+        tType === 'lumi_protocol_mission_reward'
+      ) return;
 
       let displayType = 'general';
       let displayTitle = data.amount < 0 ? `🛒 광석 소모: ${desc}` : `💎 광석 획득: ${desc}`;
@@ -521,12 +556,15 @@ export function useLearningHistory(userId, dateStr) {
           }
         }
 
-        // Mission Lab progress from the same unit progress document.
+        // Mission Lab / LUMI Protocol progress from the same unit progress document.
         if (data.missionLab) {
           const missionLab = data.missionLab;
+          const isLumi = missionLab.experienceType === 'lumi_protocol' ||
+            String(missionLab.missionSetId || '').startsWith('lumi-') ||
+            unitId.startsWith('lumi_protocol_');
           const completedMissionCount = Number(missionLab.completedMissionCount || missionLab.completedMissionIds?.length || 0);
-          const totalMissionCount = Number(missionLab.totalMissionCount || 0);
-          const rawMissionTime = missionLab.lastCompletedAt || data.updatedAt;
+          const totalMissionCount = Number(missionLab.totalMissionCount || (isLumi ? 10 : 0));
+          const rawMissionTime = missionLab.lastCompletedAt || missionLab.updatedAt || data.updatedAt;
           const missionUpdatedAt = rawMissionTime?.toDate
             ? rawMissionTime.toDate()
             : rawMissionTime?.seconds
@@ -536,26 +574,53 @@ export function useLearningHistory(userId, dateStr) {
           const hasMissionWork = completedMissionCount > 0 || missionLab.completed === true;
 
           if (isMissionToday && hasMissionWork) {
-            const isAlreadyTracked = aggregated.some(a => a.type === 'python_mission' && a.metadata?.unitId === unitId);
+            const isAlreadyTracked = aggregated.some(a =>
+              (a.type === 'lumi_protocol' || a.type === 'python_mission') &&
+              (a.metadata?.unitId === unitId || a.metadata?.missionSetId === missionLab.missionSetId)
+            );
             if (!isAlreadyTracked) {
-              if (missionLab.completed === true) stats.missionLabCount++;
-              else stats.missionLabProgressCount++;
-              aggregated.push({
-                id: `lp_python_mission_${unitId}`,
-                timestamp: missionUpdatedAt,
-                type: 'python_mission',
-                title: `🛰️ MISSION LAB: ${data.unitTitle || formatUnitId(unitId)}`,
-                score: null,
-                crystalsEarned: 0,
-                metadata: {
-                  unitId,
-                  unitTitle: data.unitTitle || '',
-                  missionLabCompleted: missionLab.completed === true,
-                  completedMissionCount,
-                  totalMissionCount,
-                  bestStars: Number(missionLab.bestStars || 0),
-                }
-              });
+              if (isLumi) {
+                if (missionLab.completed === true) stats.lumiProtocolCount++;
+                else stats.lumiProtocolProgressCount++;
+                aggregated.push({
+                  id: `lp_lumi_protocol_${unitId}`,
+                  timestamp: missionUpdatedAt,
+                  type: 'lumi_protocol',
+                  title: `🛰️ LUMI PROTOCOL: ${data.unitTitle || '사라진 빛의 항로'}`,
+                  score: null,
+                  crystalsEarned: 0,
+                  metadata: {
+                    unitId,
+                    unitTitle: data.unitTitle || 'LUMI Protocol: 사라진 빛의 항로',
+                    experienceType: 'lumi_protocol',
+                    missionLabCompleted: missionLab.completed === true,
+                    completedMissionCount,
+                    totalMissionCount,
+                    bestStars: missionLab.bestStarsByMission ? Math.max(...Object.values(missionLab.bestStarsByMission), 0) : Number(missionLab.bestStars || 0),
+                    crystalsEarnedTotal: Number(missionLab.crystalsEarnedTotal || 0),
+                    lastMissionId: missionLab.lastCompletedMissionId || missionLab.lastMissionId || '',
+                  }
+                });
+              } else {
+                if (missionLab.completed === true) stats.missionLabCount++;
+                else stats.missionLabProgressCount++;
+                aggregated.push({
+                  id: `lp_python_mission_${unitId}`,
+                  timestamp: missionUpdatedAt,
+                  type: 'python_mission',
+                  title: `🛰️ MISSION LAB: ${data.unitTitle || formatUnitId(unitId)}`,
+                  score: null,
+                  crystalsEarned: 0,
+                  metadata: {
+                    unitId,
+                    unitTitle: data.unitTitle || '',
+                    missionLabCompleted: missionLab.completed === true,
+                    completedMissionCount,
+                    totalMissionCount,
+                    bestStars: Number(missionLab.bestStars || 0),
+                  }
+                });
+              }
             }
           }
         }
@@ -612,6 +677,13 @@ export function useLearningHistory(userId, dateStr) {
     // Sort chronologically
     aggregated.sort((a, b) => (a.timestamp?.getTime() || 0) - (b.timestamp?.getTime() || 0));
 
+    // Ensure all numeric stats are finite
+    Object.keys(stats).forEach(key => {
+      if (typeof stats[key] === 'number' && !Number.isFinite(stats[key])) {
+        stats[key] = 0;
+      }
+    });
+
     setActivities(aggregated);
     setDailyStats(stats);
 
@@ -634,7 +706,7 @@ export function useLearningHistory(userId, dateStr) {
 
 /** Learning-only activity types for grouping */
 const LEARNING_TYPES = new Set([
-  'quiz_pass', 'quiz_in_progress', 'video_reward', 'video_view', 'video_attention', 'data_log_read', 'code_trace', 'python_mission', 'quiz_battle', 'workbook', 'workbook_in_progress'
+  'quiz_pass', 'quiz_in_progress', 'video_reward', 'video_view', 'video_attention', 'data_log_read', 'code_trace', 'python_mission', 'lumi_protocol', 'quiz_battle', 'workbook', 'workbook_in_progress'
 ]);
 
 /**
@@ -709,7 +781,13 @@ function buildGroupedActivities(rawActivities) {
     if (act.type === 'video_reward' || act.type === 'video_view' || act.type === 'video_attention') normalizedType = 'video';
     else if (act.type === 'data_log_read') normalizedType = 'text';
     else if (act.type === 'code_trace') normalizedType = 'code';
-    else if (act.type === 'python_mission') normalizedType = 'mission';
+    else if (act.type === 'lumi_protocol') normalizedType = 'lumi';
+    else if (act.type === 'python_mission') {
+      const isLumi = meta.experienceType === 'lumi_protocol' ||
+        String(meta.missionSetId || '').startsWith('lumi-') ||
+        String(unitId || '').startsWith('lumi_protocol_');
+      normalizedType = isLumi ? 'lumi' : 'mission';
+    }
     else if (act.type === 'workbook' || act.type === 'workbook_in_progress') normalizedType = 'workbook';
     else if (act.type === 'quiz_battle') normalizedType = 'battle';
 
@@ -744,6 +822,13 @@ function buildGroupedActivities(rawActivities) {
         completionCrystalMisses: 0,
         codeTraceCompleted: false,
         completedExerciseCount: 0,
+        todayCompletedMissionIds: new Set(),
+        todayCompletedCount: 0,
+        completedMissionCount: 0,
+        totalMissionCount: 0,
+        bestStars: 0,
+        lastMissionTitle: '',
+        crystalsEarnedToday: 0,
         crystalsEarnedTotal: 0,
         earnedExerciseCount: 0,
         totalPracticeCount: 0,
@@ -866,6 +951,29 @@ function buildGroupedActivities(rawActivities) {
         group.score = Math.max(group.score || 0, bestAccuracy);
       }
       if (meta.lastMode) group.lastMode = meta.lastMode;
+    }
+    if (normalizedType === 'lumi') {
+      if (meta.missionId) {
+        group.todayCompletedMissionIds.add(meta.missionId);
+      }
+      group.todayCompletedCount = group.todayCompletedMissionIds.size;
+      const completedCount = Number(meta.completedMissionCount || group.todayCompletedCount || 0);
+      const totalCount = Number(meta.totalMissionCount || 10);
+      const stars = Number(meta.stars || meta.bestStars || 0);
+      const crystalsEarned = Number(act.crystalsEarned || 0);
+      const crystalsTotal = Number(meta.crystalsEarnedTotal || 0);
+
+      group.completedMissionCount = Math.max(group.completedMissionCount || 0, completedCount);
+      group.totalMissionCount = Math.max(group.totalMissionCount || 0, totalCount);
+      group.bestStars = Math.max(group.bestStars || 0, stars);
+      group.crystalsEarnedToday = (group.crystalsEarnedToday || 0) + crystalsEarned;
+      group.crystalsEarnedTotal = Math.max(group.crystalsEarnedTotal || 0, crystalsTotal, group.crystalsEarnedToday);
+      if (meta.missionTitle) {
+        group.lastMissionTitle = meta.missionTitle;
+      } else if (meta.lastMissionId && !group.lastMissionTitle) {
+        group.lastMissionTitle = meta.lastMissionId;
+      }
+      group.completed = group.completed || meta.missionLabCompleted === true || (group.completedMissionCount >= group.totalMissionCount && group.totalMissionCount > 0);
     }
   });
 

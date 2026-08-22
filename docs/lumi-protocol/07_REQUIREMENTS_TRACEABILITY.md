@@ -57,7 +57,20 @@ planned → in_progress → implemented → verified
 | PROG-02 | 더 낮은 도움 재성공을 best로 저장 | 04 §9 | P0-08 | `test-phase6-progress-evaluator.mjs` | verified |
 | COMPAT-01 | 기존 20개 미션·진행·direct entry 보존 | 02 §5, 04 §10·15 | P0-01, P0-08 | `test-python-mission-utils.mjs` | verified |
 
-## 6. 구현자가 갱신할 증거
+## 6. 일일 기록·광석·과제 피드백 요구사항
+
+| ID | 요구사항 | 설계 근거 | 작업 | 검증 | 상태 |
+| --- | --- | --- | --- | --- | --- |
+| FEED-01 | LUMI 미션 최초 완료와 과정 진행을 일일 학습기록에 표시 | 10 §3·5 | P1-LUMI-01 | history/progress 중복 제거 테스트, 일일 타임라인 QA | planned |
+| FEED-02 | LUMI 완료·진행을 Python 과제의 코드 실습 근거로 반영 | 10 §6 | P1-LUMI-02 | export/service 공통 fixture | planned |
+| FEED-03 | CODE TRACE와 LUMI를 비-Python 과제에서 하드 게이트로 제외 | 10 §7 | P1-LUMI-03 | 과정 격리 매트릭스 | planned |
+| FEED-04 | 초등수학의 중등수학 레벨업 예외와 Python 전용 활동 격리를 동시에 유지 | 10 §7.4 | P1-LUMI-03 | 초등→중등 허용, Code Trace/LUMI 제외 회귀 테스트 | planned |
+| REWARD-01 | 일반 미션 4·Field Test 8, 파일럿 기본 총 48광석 | 10 §4.1 | P1-LUMI-04 | 정책 단위 테스트 | planned |
+| REWARD-02 | 미션 최초 완료에만 정확히 한 번 지급 | 10 §4.3 | P1-LUMI-04 | 동시 클릭·재시도·재실행 멱등 테스트 | planned |
+| REWARD-03 | 잔고·성장·progress·history·원장을 하나의 transaction으로 일치 | 10 §4.3 | P1-LUMI-04 | transaction 원자성·합계 불변식 테스트 | planned |
+| REWARD-04 | 실패·Reset·STOP·힌트·재생에는 보상이나 차감 없음 | 10 §2.3·4 | P1-LUMI-04 | 부정 경로 테스트 | planned |
+
+## 7. 구현자가 갱신할 증거
 
 `implemented` 또는 `verified`로 바꿀 때 다음 중 하나 이상을 증거 칸에 링크하거나 기록한다.
 

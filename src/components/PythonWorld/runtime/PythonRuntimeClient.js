@@ -70,8 +70,8 @@ export default class PythonRuntimeClient {
     return this.request('load', {}, LOAD_TIMEOUT_MS)
   }
 
-  run({ mission, code }) {
-    return this.request('run', { mission, code }, RUN_TIMEOUT_MS)
+  run({ mission, code, inputValues }) {
+    return this.request('run', { mission, code, inputValues }, RUN_TIMEOUT_MS)
   }
 
   rejectAll(error) {

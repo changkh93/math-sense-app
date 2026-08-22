@@ -1,7 +1,8 @@
-import { useEffect, useRef } from 'react'
-import { EditorState, StateEffect, StateField } from '@codemirror/state'
+import { forwardRef, useEffect, useImperativeHandle, useRef } from 'react'
+import { Compartment, EditorState, StateEffect, StateField } from '@codemirror/state'
 import { defaultKeymap, history, historyKeymap, indentWithTab } from '@codemirror/commands'
 import { python } from '@codemirror/lang-python'
+import { closeBrackets, closeBracketsKeymap } from '@codemirror/autocomplete'
 import { EditorView, Decoration, keymap, lineNumbers, highlightActiveLineGutter } from '@codemirror/view'
 
 const setExecutionLine = StateEffect.define()
@@ -24,12 +25,59 @@ const executionLineField = StateField.define({
   provide: (field) => EditorView.decorations.from(field),
 })
 
-export default function PythonEditor({ value, onChange, activeLine, readOnly = false }) {
+const PythonEditor = forwardRef(function PythonEditor({ value, onChange, activeLine, readOnly = false }, ref) {
   const hostRef = useRef(null)
   const viewRef = useRef(null)
   const onChangeRef = useRef(onChange)
-  const initialValueRef = useRef(value || '')
   const syncingValueRef = useRef(false)
+  const editableCompartmentRef = useRef(new Compartment())
+
+  useImperativeHandle(ref, () => ({
+    insertSnippet: (insertText) => {
+      const view = viewRef.current
+      if (!view) return
+
+      const { state } = view
+      const { from, to } = state.selection.main
+      const doc = state.doc.toString()
+
+      let contentToInsert = insertText
+      let replaceFrom = from
+      let replaceTo = to
+
+      // Intelligent quote handling:
+      // If insertText is `"XYZ"` and user cursor is already inside `print("` or `"`:
+      const charBefore = from > 0 ? doc[from - 1] : ''
+      const charAfter = to < doc.length ? doc[to] : ''
+
+      if (contentToInsert.startsWith('"') && contentToInsert.endsWith('"') && contentToInsert.length >= 2) {
+        const inner = contentToInsert.slice(1, -1)
+        if (charBefore === '"' && charAfter === '"') {
+          // Cursor is between "" -> insert inner text only
+          contentToInsert = inner
+        } else if (charBefore === '"') {
+          // Cursor is right after opening " -> insert inner text + closing "
+          contentToInsert = `${inner}"`
+        } else if (charAfter === '"') {
+          // Cursor is right before closing " -> insert opening " + inner text
+          contentToInsert = `"${inner}`
+        }
+      }
+
+      view.dispatch({
+        changes: { from: replaceFrom, to: replaceTo, insert: contentToInsert },
+        selection: { anchor: replaceFrom + contentToInsert.length },
+        scrollIntoView: true,
+      })
+      view.focus()
+    },
+    focus: () => {
+      viewRef.current?.focus()
+    },
+  }), [])
+
+  const initialValueRef = useRef(value || '')
+  const initialReadOnlyRef = useRef(readOnly)
 
   useEffect(() => {
     onChangeRef.current = onChange
@@ -47,12 +95,20 @@ export default function PythonEditor({ value, onChange, activeLine, readOnly = f
           highlightActiveLineGutter(),
           history(),
           python(),
+          closeBrackets(),
           executionLineField,
-          EditorView.editable.of(!readOnly),
+          editableCompartmentRef.current.of(EditorView.editable.of(!initialReadOnlyRef.current)),
           EditorState.tabSize.of(4),
-          keymap.of([indentWithTab, ...defaultKeymap, ...historyKeymap]),
+          keymap.of([
+            indentWithTab,
+            ...closeBracketsKeymap,
+            ...defaultKeymap,
+            ...historyKeymap,
+          ]),
           EditorView.updateListener.of((update) => {
-            if (update.docChanged && !syncingValueRef.current) onChangeRef.current?.(update.state.doc.toString())
+            if (update.docChanged && !syncingValueRef.current) {
+              onChangeRef.current?.(update.state.doc.toString())
+            }
           }),
           EditorView.theme({
             '&': { height: '100%', backgroundColor: '#07101f', color: '#dcecff' },
@@ -67,10 +123,19 @@ export default function PythonEditor({ value, onChange, activeLine, readOnly = f
       }),
     })
     viewRef.current = view
+
     return () => {
       view.destroy()
       viewRef.current = null
     }
+  }, [])
+
+  useEffect(() => {
+    const view = viewRef.current
+    if (!view) return
+    view.dispatch({
+      effects: editableCompartmentRef.current.reconfigure(EditorView.editable.of(!readOnly)),
+    })
   }, [readOnly])
 
   useEffect(() => {
@@ -91,4 +156,6 @@ export default function PythonEditor({ value, onChange, activeLine, readOnly = f
   }, [activeLine])
 
   return <div className="python-editor-host" ref={hostRef} aria-label="Python 코드 편집기" />
-}
+})
+
+export default PythonEditor

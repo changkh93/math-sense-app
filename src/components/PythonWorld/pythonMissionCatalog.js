@@ -1,6 +1,6 @@
 const LOOP_MISSION_SET_ID = 'lumi-loop-navigation-v1'
 
-const LOOP_MISSION_SET = Object.freeze({
+export const LOOP_MISSION_SET = Object.freeze({
   id: LOOP_MISSION_SET_ID,
   version: 1,
   title: '반복 자동화 프로토콜',
@@ -134,7 +134,7 @@ function createAlphaMission({
   }
 }
 
-const IF_MISSION_SET = Object.freeze({
+export const IF_MISSION_SET = Object.freeze({
   id: 'lumi-if-decision-v1', version: 1, title: '에너지 판단 프로토콜',
   description: 'if 조건문으로 루미가 상황을 읽고 안전한 행동을 선택하게 합니다.',
   protocol: { id: 'if-decision', name: '에너지 판단 프로토콜', level: 1 },
@@ -205,7 +205,7 @@ const IF_MISSION_SET = Object.freeze({
   ],
 })
 
-const WHILE_MISSION_SET = Object.freeze({
+export const WHILE_MISSION_SET = Object.freeze({
   id: 'lumi-while-sensor-v1', version: 1, title: '지속 센서 프로토콜',
   description: 'while 반복으로 조건이 바뀔 때까지 루미의 행동을 지속합니다.',
   protocol: { id: 'while-sensor', name: '지속 센서 프로토콜', level: 1 },
@@ -251,7 +251,7 @@ const WHILE_MISSION_SET = Object.freeze({
   ],
 })
 
-const FUNCTION_MISSION_SET = Object.freeze({
+export const FUNCTION_MISSION_SET = Object.freeze({
   id: 'lumi-function-module-v1', version: 1, title: '함수 모듈 프로토콜',
   description: '반복 가능한 행동을 함수로 묶어 루미의 능력 모듈을 만듭니다.',
   protocol: { id: 'function-module', name: '함수 모듈 프로토콜', level: 1 },
@@ -399,16 +399,10 @@ export function getMissionVariant(mission, variant) {
   }
 }
 
-import { LUMI_VERTICAL_SLICE_SET, getLumiVerticalSliceSet, LUMI_COURSE_CATALOG, getLumiCourseCatalog } from './lumiCourseCatalog.js'
-
 export function getAllPythonMissionSets() {
-  return [...Object.values(BUILTIN_MISSION_SETS), LUMI_VERTICAL_SLICE_SET]
+  return Object.values(BUILTIN_MISSION_SETS)
 }
 
 export {
   LOOP_MISSION_SET_ID,
-  LUMI_VERTICAL_SLICE_SET,
-  getLumiVerticalSliceSet,
-  LUMI_COURSE_CATALOG,
-  getLumiCourseCatalog,
 }

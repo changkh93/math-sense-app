@@ -214,6 +214,10 @@ P0 파일럿 뒤 진행한다.
 | P1-05 | Mission author preview | base/transfer/오류/reduced-motion 미리보기 |
 | P1-06 | 교사 진단 요약 | concept와 assistance를 분리해 표시 |
 | P1-07 | tablet input bar | 들여쓰기·괄호·콜론·따옴표 입력 지원 |
+| P1-LUMI-01 | 일일 학습기록 통합 | 최초 완료 history와 진행 progress를 중복 없이 병합하고 `lumi` 타임라인·일일 통계 표시 |
+| P1-LUMI-02 | Python 과제 피드백 통합 | 수동 export와 운영툴 서비스가 동일한 LUMI 요약·학습량 판정을 생성 |
+| P1-LUMI-03 | Python 전용 활동 과정 격리 | 비-Python 과제의 수집·요약·프롬프트·운영툴에서 CODE TRACE/LUMI 완전 제외, 초등→중등 예외 보존 |
+| P1-LUMI-04 | 최초 완료 광석·원장 | 일반 4/Field Test 8, 기본 총 48광석, 잔고·progress·history·원장 멱등 transaction |
 
 ## 4. P2 — 커리큘럼 확장
 
@@ -247,6 +251,10 @@ Act 7은 한 번에 제작하지 말고 list → split/join → tuple → dictio
 | `missionEvaluator.js` | mastery/understanding/transfer 평가 |
 | `pythonMissionSchema.js` | schema v2 validation |
 | `pythonMissionProgressUtils.js` | assistance/tool/act additive merge |
+| `useLearningHistory.js`, `DailyLearningTimeline.jsx` | LUMI 일일 기록 집계와 표시 |
+| `assignmentFeedbackService.js`, `export-pending-assignment-contexts.mjs` | LUMI 과제 요약과 Python 전용 하드 게이트 |
+| `crystalLedger.js`, `holidayUtils.js`, 선택적 Firebase Function | LUMI 최초 완료 보상·배율·권한 경계 |
+| `AdminAssignmentDetail.jsx` | Python 과제에서만 LUMI 증거 표시 |
 | `scripts/test-python-mission-utils.mjs` | legacy + v2 회귀 |
 | 신규 테스트 scripts | event, catalog, evaluator, progress 계약 |
 
@@ -305,6 +313,20 @@ Act 7은 한 번에 제작하지 말고 list → split/join → tuple → dictio
 - transfer input override
 - infinite loop STOP 후 worker 복구
 
+### 6.6 일일 기록·보상·과제 피드백 계약
+
+- 일반 미션 4광석, Field Test 8광석, 10개 기본 총 48광석
+- 최초 완료 뒤 동시 클릭·재시도·재실행 추가 지급 0
+- 실패·힌트·Reset·STOP·타임라인 재생의 지급·차감 0
+- 사용자 잔고·성장 통계·progress 합계·history·원장 금액 일치
+- 당일 최초 완료 수와 누적 진행 수 분리
+- 신규 history와 progress fallback 중복 집계 없음
+- 수동 export와 운영툴 서비스가 같은 fixture에서 같은 LUMI 요약 생성
+- Python 과제에는 CODE TRACE/LUMI 포함
+- 초등수학·중등수학·고전 읽기에는 CODE TRACE/LUMI 제목·수·광석·프롬프트 문구가 없음
+- 초등수학→중등수학 레벨업 기록은 기존대로 인정하되 Python 전용 활동은 제외
+- 과정 unknown인 CODE TRACE/LUMI는 어떤 과제에도 자동 포함하지 않음
+
 ## 7. 수동 QA 매트릭스
 
 | 환경 | 필수 확인 |
@@ -330,4 +352,3 @@ Act 7은 한 번에 제작하지 말고 list → split/join → tuple → dictio
 - 미완료 범위가 명시됨
 - 사용자-facing 문자열이 초급 용어와 일치
 - 코드 리뷰 체크리스트 자체 점검 완료
-

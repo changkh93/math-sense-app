@@ -1,5 +1,11 @@
 import admin from 'firebase-admin';
 import { readFileSync, writeFileSync } from 'fs';
+import {
+  belongsToCourse,
+  isPythonExclusiveActivity,
+  normalizeCourseId,
+  sanitizeLearningSummaryForCourse,
+} from '../src/services/coursePolicyUtils.js';
 
 const args = process.argv.slice(2);
 const outArg = args.find(arg => arg.startsWith('--out='));
@@ -143,7 +149,25 @@ async function fetchUnitCourseId(unitId = '') {
   return courseId;
 }
 
-function shouldIncludeCourse(itemCourse = '', normalizedCourseId = '', options = {}) {
+function isPythonExclusiveActivity(item = {}) {
+  const type = String(item.type || '').trim();
+  const activityType = String(item.activityType || '').trim();
+  const experienceType = String(item.experienceType || item.missionLab?.experienceType || '').trim();
+  if (type === 'code_trace' || activityType === 'code_trace' || item.codeTrace) return true;
+  if (type === 'lumi_protocol' || activityType === 'lumi_protocol_mission_complete' || experienceType === 'lumi_protocol') return true;
+  if (item.missionLab && (item.missionLab.experienceType === 'lumi_protocol' || String(item.missionLab.missionSetId || '').startsWith('lumi-'))) return true;
+  if (type === 'python_mission') {
+    if (experienceType === 'lumi_protocol') return true;
+    if (String(item.missionSetId || '').startsWith('lumi-')) return true;
+    if (String(item.unitId || '').startsWith('lumi_protocol_')) return true;
+  }
+  return false;
+}
+
+function shouldIncludeCourse(itemCourse = '', normalizedCourseId = '', options = {}, item = {}) {
+  if (isPythonExclusiveActivity(item) && normalizedCourseId !== 'python') {
+    return false;
+  }
   if (!normalizedCourseId || normalizedCourseId === 'unknown') return true;
   if (itemCourse === normalizedCourseId) return true;
   return normalizedCourseId === 'cluster_elementary'
@@ -191,7 +215,7 @@ async function filterItemsByCourse(items = [], courseId = '', options = {}) {
   const resolved = await Promise.all(
     items.map((item) => resolveItemCourseId(item).then((itemCourse) => ({ item, itemCourse })))
   );
-  return resolved.filter(({ itemCourse }) => shouldIncludeCourse(itemCourse, normalized, options)).map(({ item }) => item);
+  return resolved.filter(({ item, itemCourse }) => shouldIncludeCourse(itemCourse, normalized, options, item)).map(({ item }) => item);
 }
 
 function toMillis(value) {
@@ -395,11 +419,29 @@ function summarizeCodeTraceRows(rows) {
   }));
 }
 
+function summarizeLumiRows(rows = []) {
+  return rows.map(item => ({
+    lumiCourseId: item.lumiCourseId || 'lumi-season-1',
+    unitId: item.unitId || '',
+    title: normalizeText(item.unitTitle || 'LUMI Protocol: 사라진 빛의 항로'),
+    missionId: item.missionId || '',
+    missionTitle: normalizeText(item.missionTitle || titleOf(item) || ''),
+    concepts: item.concepts || [],
+    stars: Number(item.stars || 0),
+    assistanceLevel: Number(item.assistanceLevel || 0),
+    crystalsEarned: Number(item.crystalsEarned || 0),
+    completed: true,
+    timestamp: timestampToJson(item.timestamp),
+  }));
+}
+
 async function summarizeLearningProgress(progressDocs, start, end, courseId, options = {}) {
   const videos = [];
   const inProgressQuizzes = [];
   const inProgressCodeTraces = [];
+  const inProgressLumiProtocols = [];
   const inProgressWorkbooks = [];
+  const targetCourse = normalizeCourseId(courseId);
 
   // 각 문서의 과정을 region 역조회로 정확히 정한 뒤 필터링한다(정규식 오탐 방지).
   const filtered = await filterItemsByCourse(
@@ -455,26 +497,55 @@ async function summarizeLearningProgress(progressDocs, start, end, courseId, opt
       });
     }
 
-    const codeTrace = data.codeTrace;
-    const codeTraceUpdatedAt = toDate(codeTrace?.updatedAt) || updatedAt;
-    const completedExerciseCount = Number(codeTrace?.completedExerciseCount || 0);
-    if (
-      codeTraceUpdatedAt
-      && codeTraceUpdatedAt >= start
-      && codeTraceUpdatedAt <= end
-      && completedExerciseCount > 0
-      && codeTrace?.completed !== true
-    ) {
-      inProgressCodeTraces.push({
-        unitId,
-        title: normalizeText(data.unitTitle || unitId),
-        completedExerciseCount,
-        totalExerciseCount: Number(codeTrace.totalExerciseCount || 0),
-        bestAccuracy: Number(codeTrace.bestAccuracy || 0),
-        lastExerciseId: codeTrace.lastExerciseId || '',
-        lastMode: codeTrace.lastMode || '',
-        updatedAt: codeTraceUpdatedAt.toISOString(),
-      });
+    if (targetCourse === 'python') {
+      const codeTrace = data.codeTrace;
+      const codeTraceUpdatedAt = toDate(codeTrace?.updatedAt) || updatedAt;
+      const completedExerciseCount = Number(codeTrace?.completedExerciseCount || 0);
+      if (
+        codeTraceUpdatedAt
+        && codeTraceUpdatedAt >= start
+        && codeTraceUpdatedAt <= end
+        && completedExerciseCount > 0
+        && codeTrace?.completed !== true
+      ) {
+        inProgressCodeTraces.push({
+          unitId,
+          title: normalizeText(data.unitTitle || unitId),
+          completedExerciseCount,
+          totalExerciseCount: Number(codeTrace.totalExerciseCount || 0),
+          bestAccuracy: Number(codeTrace.bestAccuracy || 0),
+          lastExerciseId: codeTrace.lastExerciseId || '',
+          lastMode: codeTrace.lastMode || '',
+          updatedAt: codeTraceUpdatedAt.toISOString(),
+        });
+      }
+
+      const missionLab = data.missionLab;
+      const isLumi = missionLab && (missionLab.experienceType === 'lumi_protocol' || String(missionLab.missionSetId || '').startsWith('lumi-'));
+      if (isLumi) {
+        const lumiUpdatedAt = toDate(missionLab.lastCompletedAt) || toDate(missionLab.updatedAt) || updatedAt;
+        const completedMissionCount = Number(missionLab.completedMissionCount || missionLab.completedMissionIds?.length || 0);
+        if (
+          lumiUpdatedAt
+          && lumiUpdatedAt >= start
+          && lumiUpdatedAt <= end
+          && completedMissionCount > 0
+          && missionLab.completed !== true
+        ) {
+          inProgressLumiProtocols.push({
+            lumiCourseId: missionLab.lumiCourseId || 'lumi-season-1',
+            unitId,
+            title: normalizeText(data.unitTitle || 'LUMI Protocol: 사라진 빛의 항로'),
+            completedMissionCount,
+            totalMissionCount: Number(missionLab.totalMissionCount || 10),
+            lastMissionId: missionLab.lastCompletedMissionId || missionLab.lastMissionId || '',
+            bestStars: missionLab.bestStarsByMission ? Math.max(...Object.values(missionLab.bestStarsByMission), 0) : Number(missionLab.bestStars || 0),
+            crystalsEarnedTotal: Number(missionLab.crystalsEarnedTotal || 0),
+            completed: false,
+            updatedAt: lumiUpdatedAt.toISOString(),
+          });
+        }
+      }
     }
 
     const workbookSession = data.workbookSession;
@@ -498,7 +569,7 @@ async function summarizeLearningProgress(progressDocs, start, end, courseId, opt
     }
   });
 
-  return { videos, inProgressQuizzes, inProgressCodeTraces, inProgressWorkbooks };
+  return { videos, inProgressQuizzes, inProgressCodeTraces, inProgressLumiProtocols, inProgressWorkbooks };
 }
 
 function compactAssignment(doc) {
@@ -728,54 +799,84 @@ function buildLearningLoadSummary({ courseId, videos, quizzes, workbooks = [], d
   };
 }
 
+const historyQueryCache = new Map();
+const progressQueryCache = new Map();
+const darkMatterQueryCache = new Map();
+const cacheStats = {
+  historyQueries: 0,
+  historyHits: 0,
+  progressReads: 0,
+  progressHits: 0,
+  darkMatterReads: 0,
+  darkMatterHits: 0,
+};
+
 async function getLearningSummary(uid, date, courseId = '', options = {}) {
   if (!uid || !date) return { activityCount: 0, quizCount: 0, workbookCount: 0, workbookProgressCount: 0, workbookAverageScore: null, codeTraceCount: 0, codeTraceProgressCount: 0, battleCount: 0, battleForfeitCount: 0, battleAverageAccuracy: null, isSufficientBattleReview: false, averageScore: null, titles: [], videos: [], inProgressQuizzes: [], workbooks: [], inProgressWorkbooks: [], codeTraces: [], inProgressCodeTraces: [], battles: [] };
   const start = new Date(`${date}T00:00:00+09:00`);
   const end = new Date(`${date}T23:59:59+09:00`);
-  const [snap, progressSnap] = await Promise.all([
-    db.collection('users').doc(uid).collection('history')
+
+  const historyKey = `${uid}|${date}`;
+  let snap;
+  if (historyQueryCache.has(historyKey)) {
+    cacheStats.historyHits++;
+    snap = historyQueryCache.get(historyKey);
+  } else {
+    cacheStats.historyQueries++;
+    snap = await db.collection('users').doc(uid).collection('history')
       .where('timestamp', '>=', admin.firestore.Timestamp.fromDate(start))
       .where('timestamp', '<=', admin.firestore.Timestamp.fromDate(end))
       .get()
-      .catch(() => null),
-    db.collection('users').doc(uid).collection('learning_progress').get().catch(() => null),
-  ]);
+      .catch(() => null);
+    historyQueryCache.set(historyKey, snap);
+  }
+
+  let progressSnap;
+  if (progressQueryCache.has(uid)) {
+    cacheStats.progressHits++;
+    progressSnap = progressQueryCache.get(uid);
+  } else {
+    cacheStats.progressReads++;
+    progressSnap = await db.collection('users').doc(uid).collection('learning_progress').get().catch(() => null);
+    progressQueryCache.set(uid, progressSnap);
+  }
 
   if (!snap) return { activityCount: 0, quizCount: 0, workbookCount: 0, workbookProgressCount: 0, workbookAverageScore: null, battleCount: 0, battleForfeitCount: 0, battleAverageAccuracy: null, isSufficientBattleReview: false, averageScore: null, titles: [], videos: [], inProgressQuizzes: [], workbooks: [], inProgressWorkbooks: [], codeTraces: [], inProgressCodeTraces: [], battles: [] };
 
   const allItems = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+  const normalizedCourseId = normalizeCourseId(courseId);
+  const isPythonCourse = normalizedCourseId === 'python';
 
-  // 초등수학 과제에서 레벨업 예외 적용 여부를 실제 데이터로도 확인한다.
-  // 제출문 키워드 신호(호출부)가 없더라도, 같은 날짜에 middle-math history가 있으면
-  // 초등수학을 마치고 중등수학으로 넘어간 학생으로 보고 레벨업 기록을 인정한다.
-  // 각 item의 과정은 region 역조회로 정확히 정한다(정규식 오탐 방지).
+  const candidateItems = isPythonCourse
+    ? allItems
+    : allItems.filter(item => !isPythonExclusiveActivity(item));
+
   const allResolved = await Promise.all(
-    allItems.map(item => resolveItemCourseId(item).then(itemCourse => ({ item, itemCourse })))
+    candidateItems.map(item => resolveItemCourseId(item).then(itemCourse => ({ item, itemCourse })))
   );
   let includeMiddleMathLevelUp = options.includeMiddleMathLevelUp === true;
-  if (!includeMiddleMathLevelUp && normalizeCourseId(courseId) === 'cluster_elementary') {
+  if (!includeMiddleMathLevelUp && normalizedCourseId === 'cluster_elementary') {
     includeMiddleMathLevelUp = allResolved.some(entry => entry.itemCourse === 'middle-math');
   }
   const mergedOptions = { ...options, includeMiddleMathLevelUp };
 
-  const normalizedCourseId = normalizeCourseId(courseId);
   const items = allResolved
-    .filter(({ itemCourse }) => shouldIncludeCourse(itemCourse, normalizedCourseId, mergedOptions))
+    .filter(({ item, itemCourse }) => shouldIncludeCourse(itemCourse, normalizedCourseId, mergedOptions, item))
     .map(({ item }) => item);
-  const isElementary = normalizeCourseId(courseId) === 'cluster_elementary';
+  const isElementary = normalizedCourseId === 'cluster_elementary';
   const readingItems = isElementary ? items.filter(isReadingRelatedItem) : [];
   const mathItems = isElementary ? items.filter(item => !isReadingRelatedItem(item)) : items;
-  const codeTraceItems = mathItems.filter(item => item.type === 'code_trace');
+  const codeTraceItems = isPythonCourse ? mathItems.filter(item => item.type === 'code_trace') : [];
+  const lumiItems = isPythonCourse
+    ? mathItems.filter(item => item.type === 'lumi_protocol' || (item.type === 'python_mission' && (item.experienceType === 'lumi_protocol' || String(item.missionSetId || '').startsWith('lumi-'))))
+    : [];
   const workbookItems = mathItems.filter(item => item.type === 'workbook');
-  // 퀴즈 배틀은 점수 체계(0~1500)가 일반 퀴즈(0~100)와 다르므로 별도로 분리한다.
-  // 분리하지 않으면 배틀 점수가 averageScore를 오염시키고 "완료 퀴즈"에 묻혀 배틀 복습 활동이 안 보인다.
   const battleItems = mathItems.filter(item => item.type === 'quiz_battle');
-  const quizItems = mathItems.filter(item => !['video', 'video_complete', 'recovery_mastery', 'text', 'data_log_read', 'attention', 'code_trace', 'quiz_battle', 'workbook'].includes(item.type || 'quiz'));
+  const quizItems = mathItems.filter(item => !['video', 'video_complete', 'recovery_mastery', 'text', 'data_log_read', 'attention', 'code_trace', 'lumi_protocol', 'python_mission', 'quiz_battle', 'workbook'].includes(item.type || 'quiz'));
   const readingQuizItems = readingItems.filter(item => !['video', 'video_complete', 'recovery_mastery', 'text', 'data_log_read', 'attention', 'code_trace', 'quiz_battle'].includes(item.type || 'quiz'));
   const videoItems = mathItems.filter(item => ['video', 'video_complete', 'recovery_mastery', 'attention'].includes(item.type) || item.attentionResult === 'hit' || item.attentionResult === 'miss');
   const dataLogItems = mathItems.filter(item => ['text', 'data_log_read'].includes(item.type));
   const attentionItems = mathItems.filter(item => item.attentionResult === 'hit' || item.attentionResult === 'miss');
-  // averageScore는 일반 퀴즈 점수(0~100)만으로 계산한다. 배틀 점수(0~1500)는 제외.
   const scores = quizItems.map(item => Number(item.score)).filter(Number.isFinite);
   const workbookScores = workbookItems.map(item => Number(item.score)).filter(Number.isFinite);
   const progressSummary = await summarizeLearningProgress(progressSnap?.docs || [], start, end, courseId, mergedOptions);
@@ -783,9 +884,12 @@ async function getLearningSummary(uid, date, courseId = '', options = {}) {
   const allVideos = [...videos, ...progressSummary.videos];
   const quizzes = summarizeQuizRows(quizItems);
   const codeTraces = summarizeCodeTraceRows(codeTraceItems);
+  const lumis = summarizeLumiRows(lumiItems);
+  const inProgressCodeTraces = isPythonCourse ? progressSummary.inProgressCodeTraces : [];
+  const inProgressLumiProtocols = isPythonCourse ? progressSummary.inProgressLumiProtocols : [];
   const battles = summarizeBattleRows(battleItems);
   const battleAssessment = assessBattleLearning(battles);
-  const progressActivityCount = progressSummary.inProgressQuizzes.length + progressSummary.videos.length + progressSummary.inProgressCodeTraces.length + progressSummary.inProgressWorkbooks.length;
+  const progressActivityCount = progressSummary.inProgressQuizzes.length + progressSummary.videos.length + inProgressCodeTraces.length + inProgressLumiProtocols.length + progressSummary.inProgressWorkbooks.length;
   const attentionHits = attentionItems.filter(item => item.attentionResult === 'hit').length;
   const attentionMisses = attentionItems.filter(item => item.attentionResult === 'miss').length;
   const completionBonusMisses = attentionItems.filter(item => item.attentionSource === 'completion_bonus' && item.attentionResult === 'miss').length;
@@ -810,15 +914,15 @@ async function getLearningSummary(uid, date, courseId = '', options = {}) {
     dataLogs: dataLogItems,
     inProgressQuizzes: progressSummary.inProgressQuizzes,
     codeTraces,
-    inProgressCodeTraces: progressSummary.inProgressCodeTraces,
+    inProgressCodeTraces,
     attention,
     readingActivityCount: readingItems.length,
     battles,
   });
   const hasElementaryReadingOnly = isElementary && readingItems.length > 0 && !load.hasMathPlatformActivity;
 
-  return {
-    allActivityCount: allItems.length,
+  const rawSummary = {
+    allActivityCount: isPythonCourse ? allItems.length : allItems.filter(item => !isPythonExclusiveActivity(item)).length,
     activityCount: items.length + progressActivityCount,
     mathActivityCount: mathItems.length + progressActivityCount,
     readingActivityCount: readingItems.length,
@@ -830,9 +934,12 @@ async function getLearningSummary(uid, date, courseId = '', options = {}) {
     videoCount: allVideos.length,
     dataLogCount: dataLogItems.length,
     codeTraceCount: codeTraces.length,
-    codeTraceProgressCount: progressSummary.inProgressCodeTraces.length,
+    codeTraceProgressCount: inProgressCodeTraces.length,
+    lumiProtocolCount: lumis.length,
+    lumiProtocolProgressCount: inProgressLumiProtocols.length,
+    lumiProtocolMissionCount: lumis.length,
+    lumiProtocolCrystalsEarned: lumis.reduce((sum, item) => sum + Number(item.crystalsEarned || 0), 0),
     inProgressQuizCount: progressSummary.inProgressQuizzes.length,
-    // 퀴즈 배틀 요약 필드. 일반 퀴즈와 분리해 점수 체계를 섞지 않는다.
     battleCount: battleAssessment.battleCount,
     battleWinCount: battleAssessment.winCount,
     battleDrawCount: battleAssessment.drawCount,
@@ -854,7 +961,9 @@ async function getLearningSummary(uid, date, courseId = '', options = {}) {
     })),
     inProgressWorkbooks: progressSummary.inProgressWorkbooks,
     codeTraces,
-    inProgressCodeTraces: progressSummary.inProgressCodeTraces,
+    inProgressCodeTraces,
+    lumiProtocols: lumis,
+    inProgressLumiProtocols,
     battles,
     readingQuizzes: summarizeQuizRows(readingQuizItems),
     dataLogs: dataLogItems.map(item => ({
@@ -877,26 +986,36 @@ async function getLearningSummary(uid, date, courseId = '', options = {}) {
       ...workbookItems.map(titleOf),
       ...progressSummary.inProgressWorkbooks.map(item => item.title),
       ...progressSummary.videos.map(item => item.title),
-      ...codeTraces.map(item => item.title),
-      ...progressSummary.inProgressCodeTraces.map(item => item.title),
+      ...(isPythonCourse ? codeTraces.map(item => item.title) : []),
+      ...(isPythonCourse ? inProgressCodeTraces.map(item => item.title) : []),
+      ...(isPythonCourse ? lumis.map(item => item.title) : []),
+      ...(isPythonCourse ? inProgressLumiProtocols.map(item => item.title) : []),
       ...battles.map(item => item.title),
     ].filter(Boolean))].slice(0, 10),
     progressTitles: [...new Set(progressSummary.videos.map(item => item.title).filter(Boolean))].slice(0, 10),
-    allTitles: [...new Set(allItems.map(titleOf).filter(Boolean))].slice(0, 12),
+    allTitles: [...new Set(allItems.filter(item => !(isPythonExclusiveActivity(item) && !isPythonCourse)).map(titleOf).filter(Boolean))].slice(0, 12),
     recent: items
       .sort((a, b) => toMillis(b.timestamp) - toMillis(a.timestamp))
       .slice(0, 8)
       .map(item => ({
-        type: item.type || '',
-        title: item.title || item.unitTitle || item.chapterTitle || '',
+        type: item.type || 'quiz',
+        title: titleOf(item),
         score: item.score ?? null,
         timestamp: timestampToJson(item.timestamp),
       })),
   };
+
+  return sanitizeLearningSummaryForCourse(rawSummary, courseId);
 }
 
 async function getDarkMatterSummary(uid) {
   if (!uid) return { count: 0, items: [] };
+  if (darkMatterQueryCache.has(uid)) {
+    cacheStats.darkMatterHits++;
+    return darkMatterQueryCache.get(uid);
+  }
+  cacheStats.darkMatterReads++;
+
   const [incorrectSnap, marksSnap] = await Promise.all([
     db.collection('users').doc(uid).collection('incorrect_questions').limit(10).get().catch(() => null),
     db.collection('users').doc(uid).collection('review_marks').where('status', '==', 'active').limit(10).get().catch(() => null),
@@ -932,11 +1051,13 @@ async function getDarkMatterSummary(uid) {
     item.label = item.unitTitle || item.conceptTag || item.label;
   }
 
-  return {
+  const result = {
     count: items.length,
     concepts: [...new Set(items.map(item => item.conceptTag || item.unitTitle || item.label).filter(Boolean))].slice(0, 8),
     items: items.slice(0, 10),
   };
+  darkMatterQueryCache.set(uid, result);
+  return result;
 }
 
 function previousFor(current, allAssignments) {
@@ -975,68 +1096,75 @@ async function main() {
 
   const userCache = new Map();
   const assignmentsCache = new Map();
+  const CONCURRENCY_LIMIT = 6;
   const contexts = [];
 
-  for (const assignment of pending) {
-    if (!userCache.has(assignment.userId)) {
-      userCache.set(assignment.userId, await getUser(assignment.userId));
-    }
-    if (!assignmentsCache.has(assignment.userId)) {
-      assignmentsCache.set(assignment.userId, await getUserAssignments(assignment.userId));
-    }
+  for (let i = 0; i < pending.length; i += CONCURRENCY_LIMIT) {
+    const chunk = pending.slice(i, i + CONCURRENCY_LIMIT);
+    const chunkResults = await Promise.all(chunk.map(async (assignment) => {
+      if (!userCache.has(assignment.userId)) {
+        userCache.set(assignment.userId, await getUser(assignment.userId));
+      }
+      if (!assignmentsCache.has(assignment.userId)) {
+        assignmentsCache.set(assignment.userId, await getUserAssignments(assignment.userId));
+      }
 
-    const allAssignments = assignmentsCache.get(assignment.userId);
-    const date = assignment.date || toDateText(assignment.submittedAt) || toDateText(assignment.createdAt);
-    const currentAttachments = await enrichCodeAttachments(assignment.attachments || []);
-    const previous = await Promise.all(previousFor(assignment, allAssignments).map(async item => ({
-      ...item,
-      attachments: await enrichCodeAttachments(item.attachments || []),
-    })));
-    const codeComparison = buildCodeComparison(currentAttachments, previous);
-    const assignmentWithCode = {
-      ...assignment,
-      attachments: currentAttachments,
-      codeAttachments: currentAttachments
-        .filter(item => item.textPreview || ['py', 'js', 'jsx', 'ts', 'tsx', 'html', 'css'].includes(item.type))
-        .map(item => ({
-          name: item.name,
-          lineCount: item.lineCount || 0,
-          fetchStatus: item.fetchStatus || '',
-          fetchError: item.fetchError || '',
-          textPreview: item.textPreview || '',
-        })),
-      codeComparison,
-    };
-    const courseId = assignment.clusterId || assignment.regionId || assignment.clusterName;
-    const includeMiddleMathLevelUp = normalizeCourseId(courseId) === 'cluster_elementary'
-      && hasMiddleMathLevelUpSignal(`${assignment.title || ''} ${assignment.content || ''}`);
-    const [learningSummary, darkMatterSummary] = await Promise.all([
-      getLearningSummary(assignment.userId, date, courseId, { includeMiddleMathLevelUp }),
-      getDarkMatterSummary(assignment.userId),
-    ]);
+      const allAssignments = assignmentsCache.get(assignment.userId);
+      const date = assignment.date || toDateText(assignment.submittedAt) || toDateText(assignment.createdAt);
+      const currentAttachments = await enrichCodeAttachments(assignment.attachments || []);
+      const previous = await Promise.all(previousFor(assignment, allAssignments).map(async item => ({
+        ...item,
+        attachments: await enrichCodeAttachments(item.attachments || []),
+      })));
+      const codeComparison = buildCodeComparison(currentAttachments, previous);
+      const assignmentWithCode = {
+        ...assignment,
+        attachments: currentAttachments,
+        codeAttachments: currentAttachments
+          .filter(item => item.textPreview || ['py', 'js', 'jsx', 'ts', 'tsx', 'html', 'css'].includes(item.type))
+          .map(item => ({
+            name: item.name,
+            lineCount: item.lineCount || 0,
+            fetchStatus: item.fetchStatus || '',
+            fetchError: item.fetchError || '',
+            textPreview: item.textPreview || '',
+          })),
+        codeComparison,
+      };
+      const courseId = assignment.clusterId || assignment.regionId || assignment.clusterName;
+      const includeMiddleMathLevelUp = normalizeCourseId(courseId) === 'cluster_elementary'
+        && hasMiddleMathLevelUpSignal(`${assignment.title || ''} ${assignment.content || ''}`);
+      const [learningSummary, darkMatterSummary] = await Promise.all([
+        getLearningSummary(assignment.userId, date, courseId, { includeMiddleMathLevelUp }),
+        getDarkMatterSummary(assignment.userId),
+      ]);
 
-    contexts.push({
-      assignment: assignmentWithCode,
-      student: userCache.get(assignment.userId),
-      displayName: userCache.get(assignment.userId).studentName || assignment.userName || userCache.get(assignment.userId).publicDisplayName || userCache.get(assignment.userId).name || userCache.get(assignment.userId).displayName || '학생',
-      courseLabel: assignment.clusterName || assignment.clusterId || assignment.regionId || '과정',
-      previous,
-      sameDay: allAssignments
-        .filter(item => item.id !== assignment.id)
-        .filter(item => (item.date || toDateText(item.submittedAt)) === date)
-        .map(item => ({
-          id: item.id,
-          courseLabel: item.clusterName || item.clusterId || item.regionId || '',
-          status: item.status,
-          content: item.content.slice(0, 160),
-        })),
-      learningSummary,
-      darkMatterSummary,
-    });
+      const studentData = userCache.get(assignment.userId) || {};
+      return {
+        assignment: assignmentWithCode,
+        student: studentData,
+        displayName: studentData.studentName || assignment.userName || studentData.publicDisplayName || studentData.name || studentData.displayName || '학생',
+        courseLabel: assignment.clusterName || assignment.clusterId || assignment.regionId || '과정',
+        previous,
+        sameDay: allAssignments
+          .filter(item => item.id !== assignment.id)
+          .filter(item => (item.date || toDateText(item.submittedAt)) === date)
+          .map(item => ({
+            id: item.id,
+            courseLabel: item.clusterName || item.clusterId || item.regionId || '',
+            status: item.status,
+            content: item.content.slice(0, 160),
+          })),
+        learningSummary,
+        darkMatterSummary,
+      };
+    }));
+    contexts.push(...chunkResults);
   }
 
   writeFileSync(outPath, JSON.stringify({ exportedAt: new Date().toISOString(), count: contexts.length, contexts }, null, 2));
   console.log(`exported ${contexts.length} pending assignment contexts to ${outPath}`);
+  console.log(`[Cache Stats] History queries: ${cacheStats.historyQueries} (hits: ${cacheStats.historyHits}) | Progress reads: ${cacheStats.progressReads} (hits: ${cacheStats.progressHits}) | DarkMatter reads: ${cacheStats.darkMatterReads} (hits: ${cacheStats.darkMatterHits})`);
 }
 
 main().then(() => process.exit(0)).catch(error => {

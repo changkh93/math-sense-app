@@ -271,6 +271,20 @@ export default function AdminAssignmentDetail({ assignment, onReviewed }) {
               return `${item.title || 'CODE TRACE'} 진행 ${count}${accuracy}`;
             })
           ],
+          lumiProtocolCount: context.dailyLearningSummary.lumiProtocolCount || 0,
+          lumiProtocolProgressCount: context.dailyLearningSummary.lumiProtocolProgressCount || 0,
+          lumiProtocols: context.dailyLearningSummary.lumiProtocols || [],
+          inProgressLumiProtocols: context.dailyLearningSummary.inProgressLumiProtocols || [],
+          lumiProtocolTitles: [
+            ...(context.dailyLearningSummary.lumiProtocols || []).map(item => {
+              const stars = item.stars ? ` (별 ${item.stars}개)` : '';
+              return `${item.missionTitle || item.title || 'LUMI Protocol'} 완료${stars}`;
+            }),
+            ...(context.dailyLearningSummary.inProgressLumiProtocols || []).map(item => {
+              const count = `${item.completedMissionCount || 0}/${item.totalMissionCount || 10}`;
+              return `${item.title || 'LUMI Protocol'} 진행 ${count}`;
+            })
+          ],
           learningLoad: context.dailyLearningSummary.learningLoad || null,
           attention: context.dailyLearningSummary.attention || null,
           codeComparisonSummary: context.currentSubmission.codeComparison?.summary || '',
@@ -507,7 +521,7 @@ export default function AdminAssignmentDetail({ assignment, onReviewed }) {
                 {' / 전체 '}
                 {aiFeedback?.contextSummary?.allLearningActivityCount ?? aiContext?.dailyLearningSummary?.allActivityCount ?? aiFeedback?.contextSummary?.learningActivityCount ?? aiContext?.dailyLearningSummary?.activityCount ?? 0}건
               </div>
-              {(
+              {(assignment?.clusterId === 'python' || assignment?.courseId === 'python' || aiContext?.student?.courseId === 'python' || aiFeedback?.contextSummary?.courseLabel === '파이썬' || aiFeedback?.contextSummary?.courseLabel === 'Python') && (
                 (aiFeedback?.contextSummary?.codeTraceCount || aiContext?.dailyLearningSummary?.codeTraceCount || 0) > 0 ||
                 (aiFeedback?.contextSummary?.codeTraceProgressCount || aiContext?.dailyLearningSummary?.codeTraceProgressCount || 0) > 0
               ) && (
@@ -539,6 +553,40 @@ export default function AdminAssignmentDetail({ assignment, onReviewed }) {
                           const count = `${item.completedExerciseCount || 0}/${item.totalExerciseCount || '?'}`;
                           const accuracy = item.bestAccuracy != null ? ` 최고 ${item.bestAccuracy}%` : '';
                           return `${item.title || 'CODE TRACE'} 진행 ${count}${accuracy}`;
+                        })
+                      ]).join(', ')}
+                    </span>
+                  )}
+                </div>
+              )}
+              {(assignment?.clusterId === 'python' || assignment?.courseId === 'python' || aiContext?.student?.courseId === 'python' || aiFeedback?.contextSummary?.courseLabel === '파이썬' || aiFeedback?.contextSummary?.courseLabel === 'Python') && (
+                (aiFeedback?.contextSummary?.lumiProtocolCount || aiContext?.dailyLearningSummary?.lumiProtocolCount || 0) > 0 ||
+                (aiFeedback?.contextSummary?.lumiProtocolProgressCount || aiContext?.dailyLearningSummary?.lumiProtocolProgressCount || 0) > 0
+              ) && (
+                <div>
+                  LUMI Protocol: 완료 {aiFeedback?.contextSummary?.lumiProtocolCount ?? aiContext?.dailyLearningSummary?.lumiProtocolCount ?? 0}건
+                  {' / 진행 '}
+                  {aiFeedback?.contextSummary?.lumiProtocolProgressCount ?? aiContext?.dailyLearningSummary?.lumiProtocolProgressCount ?? 0}건
+                  {((aiFeedback?.contextSummary?.lumiProtocolTitles || [
+                    ...(aiContext?.dailyLearningSummary?.lumiProtocols || []).map(item => {
+                      const stars = item.stars ? ` (별 ${item.stars}개)` : '';
+                      return `${item.missionTitle || item.title || 'LUMI Protocol'} 완료${stars}`;
+                    }),
+                    ...(aiContext?.dailyLearningSummary?.inProgressLumiProtocols || []).map(item => {
+                      const count = `${item.completedMissionCount || 0}/${item.totalMissionCount || 10}`;
+                      return `${item.title || 'LUMI Protocol'} 진행 ${count}`;
+                    })
+                  ]).length > 0) && (
+                    <span style={{ color: 'var(--text-muted)' }}>
+                      {' - '}
+                      {(aiFeedback?.contextSummary?.lumiProtocolTitles || [
+                        ...(aiContext?.dailyLearningSummary?.lumiProtocols || []).map(item => {
+                          const stars = item.stars ? ` (별 ${item.stars}개)` : '';
+                          return `${item.missionTitle || item.title || 'LUMI Protocol'} 완료${stars}`;
+                        }),
+                        ...(aiContext?.dailyLearningSummary?.inProgressLumiProtocols || []).map(item => {
+                          const count = `${item.completedMissionCount || 0}/${item.totalMissionCount || 10}`;
+                          return `${item.title || 'LUMI Protocol'} 진행 ${count}`;
                         })
                       ]).join(', ')}
                     </span>

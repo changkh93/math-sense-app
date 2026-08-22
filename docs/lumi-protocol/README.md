@@ -17,9 +17,10 @@
 3. `02_CURRICULUM_AND_CONTENT_SPEC.md`
 4. `03_VERTICAL_SLICE_SPEC.md`
 5. `04_TECHNICAL_IMPLEMENTATION_SPEC.md`
-6. `05_BACKLOG_ACCEPTANCE_AND_TEST_PLAN.md`
-7. `06_CODE_REVIEW_CHECKLIST.md`
-8. 기존 `docs/LUMI_PROTOCOL_PYTHON_WORLD_CURRICULUM_PLAN.md`
+6. `10_DAILY_RECORD_REWARD_AND_ASSIGNMENT_FEEDBACK_SPEC.md`
+7. `05_BACKLOG_ACCEPTANCE_AND_TEST_PLAN.md`
+8. `06_CODE_REVIEW_CHECKLIST.md`
+9. 기존 `docs/LUMI_PROTOCOL_PYTHON_WORLD_CURRICULUM_PLAN.md`
 
 ## 2. 문서별 역할
 
@@ -33,6 +34,8 @@
 | [06 코드 리뷰 체크리스트](./06_CODE_REVIEW_CHECKLIST.md) | 구현 후 어떤 기준으로 변경을 검토하고 승인하는가? |
 | [07 요구사항 추적표](./07_REQUIREMENTS_TRACEABILITY.md) | 요구사항이 어느 설계·작업·테스트로 이어지는가? |
 | [08 AI 협업 전달 템플릿](./08_AI_HANDOFF_TEMPLATE.md) | 다른 AI에게 어떻게 구현을 맡기고 이후 리뷰를 요청하는가? |
+| [10 일일 기록·광석·과제 피드백 통합 명세](./10_DAILY_RECORD_REWARD_AND_ASSIGNMENT_FEEDBACK_SPEC.md) | LUMI를 일일 기록과 광석 경제에 어떻게 연결하며 Python 외 과제에서 어떻게 격리하는가? |
+| [15 Gate 3~6 일괄 구현 개발 가이드](./15_GATE3_TO_GATE6_BATCH_IMPLEMENTATION_GUIDE.md) | Object 전술 파일럿부터 정식 Object Core·선택 심화·Final까지 어떻게 격리해 일괄 개발하고 순차 승인하는가? |
 
 ## 3. 이번 구현 범위
 
@@ -74,10 +77,12 @@ P0가 아닌 항목:
 10. 힌트 사용은 별과 보상을 깎지 않는다. Assistance Level은 교사용 진단 데이터로 별도 저장한다.
 11. 서사는 코딩을 방해하지 않도록 `코딩 70 / 월드 상호작용 20 / 서사 10`을 목표로 한다.
 12. 기존 완료 기록과 현재 20개 미션은 삭제하지 않는다. 새 과정에 재배치하거나 legacy adapter로 유지한다.
+13. LUMI 미션 실행 횟수에는 광석을 주지 않는다. 미션별 최초 검증 완료에만 정확히 한 번 지급하며 파일럿 10개 기본 총량은 48광석이다.
+14. CODE TRACE와 LUMI Protocol은 Python 전용 학습 근거다. 초등수학 레벨업 예외를 포함한 어떤 비-Python 과제에도 두 활동을 합산하거나 언급하지 않는다.
 
 ## 5. 구현 담당 AI의 작업 규칙
 
-- 구현 시작 전에 01~05 문서를 읽고, 작업 PR/커밋 설명에 관련 요구사항 ID를 적는다.
+- 구현 시작 전에 01~05와 10 문서를 읽고, 작업 PR/커밋 설명에 관련 요구사항 ID를 적는다.
 - 한 번에 P0 전체를 크게 바꾸지 말고 `P0-01`부터 수직 단위로 구현한다.
 - 기존 사용자 변경과 무관한 파일을 정리하거나 포맷하지 않는다.
 - mission catalog의 안정적인 ID를 임의로 재사용하거나 변경하지 않는다.
@@ -112,5 +117,7 @@ P0가 아닌 항목:
 | `ASMT` | 평가·별·transfer |
 | `PROG` | Assistance·진행 저장 |
 | `COMPAT` | 기존 미션·진행 호환 |
+| `REWARD` | 광석 지급·원장·멱등성 |
+| `FEED` | 일일 학습기록·과제 피드백·과정 격리 |
 
 구현 PR은 최소 하나 이상의 요구사항 ID와 P0/P1/P2 백로그 ID를 함께 적는다.

@@ -2,13 +2,17 @@
   --lab-cyan: #49e9ff;
   --lab-mint: #55f1c8;
   --lab-violet: #9d74ff;
-  min-height: 100vh;
+  height: 100%;
+  max-height: 100%;
+  display: flex;
+  flex-direction: column;
   color: #eaf5ff;
   background:
     radial-gradient(circle at 52% 10%, rgba(35, 87, 140, .26), transparent 34%),
     linear-gradient(145deg, #050917 0%, #091226 56%, #060b18 100%);
   font-family: Inter, Pretendard, system-ui, sans-serif;
-  overflow: auto;
+  overflow: hidden;
+  box-sizing: border-box;
 }
 
 .python-lab::before {
@@ -26,22 +30,95 @@
 .python-lab__header {
   position: relative;
   z-index: 2;
-  min-height: 72px;
-  padding: 10px 22px;
-  display: grid;
-  grid-template-columns: 44px 1fr auto;
+  min-height: 44px;
+  height: 44px;
+  padding: 0 16px;
+  display: flex;
+  justify-content: space-between;
   align-items: center;
-  gap: 14px;
-  border-bottom: 1px solid rgba(73, 233, 255, .24);
-  background: rgba(4, 10, 24, .88);
-  backdrop-filter: blur(18px);
+  gap: 12px;
+  border-bottom: 1px solid rgba(73, 233, 255, .2);
+  background: rgba(4, 10, 24, .92);
+  backdrop-filter: blur(14px);
+  flex-shrink: 0;
+  box-sizing: border-box;
 }
 
-.python-lab__header h1 { margin: 2px 0 0; font-size: 1.18rem; letter-spacing: .02em; }
-.python-lab__kicker, .python-lab__eyebrow { color: var(--lab-cyan); font: 700 .68rem/1.2 monospace; letter-spacing: .16em; }
-.python-lab__back { width: 38px; height: 38px; border: 1px solid #294662; border-radius: 10px; color: #dff7ff; background: #0b172b; cursor: pointer; }
-.python-lab__runtime { display: flex; align-items: center; gap: 8px; color: #98abc2; font: 700 .7rem monospace; }
-.python-lab__runtime span { width: 8px; height: 8px; border-radius: 50%; background: #f8ba4c; box-shadow: 0 0 12px currentColor; }
+.python-lab__header-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.python-lab__header-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.python-lab__header-divider {
+  color: rgba(73, 233, 255, .35);
+  font-size: .8rem;
+}
+
+.python-lab__header h1 {
+  margin: 0;
+  font-size: 0.92rem;
+  font-weight: 700;
+  color: #eaf5ff;
+  letter-spacing: .02em;
+  white-space: nowrap;
+}
+.python-lab__kicker, .python-lab__eyebrow { color: var(--lab-cyan); font: 700 .62rem/1.2 monospace; letter-spacing: .14em; white-space: nowrap; }
+.python-lab__back {
+  width: 30px;
+  height: 30px;
+  border: 1px solid #294662;
+  border-radius: 7px;
+  color: #dff7ff;
+  background: #0b172b;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: .95rem;
+  line-height: 1;
+  flex-shrink: 0;
+  transition: background .15s, border-color .15s;
+}
+.python-lab__back:hover { background: #142b4b; border-color: var(--lab-cyan); }
+.python-lab__header-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+.python-lab__sound-btn {
+  width: 30px;
+  height: 30px;
+  border: 1px solid #294662;
+  border-radius: 7px;
+  background: #0b172b;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: .88rem;
+  line-height: 1;
+  transition: background .15s, border-color .15s;
+}
+.python-lab__sound-btn:hover {
+  background: #142b4b;
+  border-color: var(--lab-cyan);
+}
+.python-lab__sound-btn.is-muted {
+  opacity: .6;
+  border-color: #4b303a;
+}
+.python-lab__runtime { display: flex; align-items: center; gap: 6px; color: #98abc2; font: 700 .65rem monospace; flex-shrink: 0; }
+.python-lab__runtime span { width: 7px; height: 7px; border-radius: 50%; background: #f8ba4c; box-shadow: 0 0 10px currentColor; }
 .python-lab__runtime--ready { color: var(--lab-mint); }
 .python-lab__runtime--ready span { background: var(--lab-mint); }
 .python-lab__runtime--error { color: #ff7891; }
@@ -51,136 +128,654 @@
   position: relative;
   z-index: 2;
   display: flex;
-  gap: 8px;
-  padding: 10px 22px;
+  gap: 6px;
+  padding: 3px 14px;
+  min-height: 34px;
+  height: 34px;
+  align-items: center;
   overflow-x: auto;
-  border-bottom: 1px solid rgba(98, 130, 166, .18);
+  border-bottom: 1px solid rgba(98, 130, 166, .16);
   background: rgba(7, 14, 30, .76);
+  flex-shrink: 0;
 }
 
-.python-lab__mission-tabs button { display: flex; align-items: center; gap: 8px; border: 1px solid #253b56; border-radius: 999px; padding: 7px 13px; color: #8fa5bd; background: #0a1528; cursor: pointer; white-space: nowrap; }
-.python-lab__mission-tabs button span { display: grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; background: #182b42; font-size: .72rem; }
-.python-lab__mission-tabs button.is-active { color: #edfcff; border-color: rgba(73, 233, 255, .68); box-shadow: 0 0 18px rgba(73, 233, 255, .14); }
+.python-lab__mission-tabs button { display: flex; align-items: center; gap: 6px; border: 1px solid #253b56; border-radius: 999px; padding: 4px 10px; color: #8fa5bd; background: #0a1528; cursor: pointer; white-space: nowrap; font-size: .72rem; }
+.python-lab__mission-tabs button span { display: grid; place-items: center; width: 16px; height: 16px; border-radius: 50%; background: #182b42; font-size: .62rem; }
+.python-lab__mission-tabs button.is-active { color: #edfcff; border-color: rgba(73, 233, 255, .68); box-shadow: 0 0 14px rgba(73, 233, 255, .14); }
 .python-lab__mission-tabs button.is-active span { color: #04151a; background: var(--lab-cyan); }
 
 .python-lab__layout {
   position: relative;
   z-index: 1;
+  flex: 1;
+  min-height: 0;
+  height: 100%;
   display: grid;
-  grid-template-columns: minmax(230px, .72fr) minmax(360px, 1.35fr) minmax(370px, 1.15fr);
-  gap: 12px;
-  padding: 12px;
-  min-height: calc(100vh - 126px);
+  grid-template-columns: minmax(230px, .75fr) minmax(360px, 1.35fr) minmax(340px, 1.1fr);
+  gap: 10px;
+  padding: 10px;
+  box-sizing: border-box;
+  overflow: hidden;
 }
 
 .python-lab__briefing,
 .python-lab__world-panel,
 .python-lab__code-panel {
   min-width: 0;
+  min-height: 0;
+  height: 100%;
   border: 1px solid rgba(82, 121, 160, .27);
-  border-radius: 16px;
+  border-radius: 14px;
   background: rgba(6, 14, 30, .84);
-  box-shadow: 0 18px 60px rgba(0, 0, 0, .23);
+  box-shadow: 0 14px 40px rgba(0, 0, 0, .23);
   overflow: hidden;
+  box-sizing: border-box;
 }
 
-.python-lab__briefing { padding: 20px; overflow-y: auto; }
-.python-lab__briefing h2 { margin: 7px 0 12px; font-size: 1.38rem; }
-.python-lab__briefing h3 { margin: 24px 0 10px; color: #acc5df; font-size: .76rem; letter-spacing: .12em; text-transform: uppercase; }
-.python-lab__briefing > p { color: #94aac0; line-height: 1.65; font-size: .88rem; }
+.python-lab__briefing {
+  padding: 14px 16px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+.python-lab__briefing h2 { margin: 4px 0 8px; font-size: 1.18rem; }
+.python-lab__briefing h3 { margin: 16px 0 6px; color: #acc5df; font-size: .72rem; letter-spacing: .12em; text-transform: uppercase; }
+.python-lab__briefing > p { margin: 0 0 8px; color: #94aac0; line-height: 1.55; font-size: .82rem; }
 .python-lab__objective { color: #eef9ff !important; font-weight: 700; }
-.python-lab__concepts { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 16px; }
-.python-lab__concepts span { padding: 5px 8px; border: 1px solid rgba(157, 116, 255, .3); border-radius: 6px; color: #c8b6ff; background: rgba(157, 116, 255, .09); font: .72rem monospace; }
-.python-lab__api { margin-bottom: 9px; padding: 10px; border-left: 2px solid var(--lab-cyan); background: rgba(39, 85, 120, .14); }
-.python-lab__api code { color: var(--lab-mint); font-size: .76rem; }
-.python-lab__api p { margin: 6px 0 0; color: #8095ad; font-size: .75rem; }
-.python-lab__hint-button { width: 100%; margin-top: 18px; padding: 10px; border: 1px solid rgba(248, 186, 76, .42); border-radius: 9px; color: #ffd77f; background: rgba(248, 186, 76, .08); cursor: pointer; }
-.python-lab__hint { margin: 9px 0 0; padding: 9px; border-radius: 8px; background: rgba(248, 186, 76, .06); color: #c9b98f !important; font-size: .76rem !important; }
+.python-lab__subtitle { color: var(--lab-cyan) !important; font-weight: 800; }
+.python-lab__story-intro {
+  padding: 9px 10px;
+  border-left: 2px solid var(--lab-cyan);
+  border-radius: 0 7px 7px 0;
+  background: rgba(73, 233, 255, .07);
+  color: #c7e5f5 !important;
+}
+.python-lab__concepts { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.python-lab__concepts span { padding: 3px 7px; border: 1px solid rgba(157, 116, 255, .3); border-radius: 6px; color: #c8b6ff; background: rgba(157, 116, 255, .09); font: .68rem monospace; }
+.python-lab__api { margin-bottom: 7px; padding: 7px 10px; border-left: 2px solid var(--lab-cyan); background: rgba(39, 85, 120, .14); }
+.python-lab__api code { color: var(--lab-mint); font-size: .74rem; }
+.python-lab__api p { margin: 4px 0 0; color: #8095ad; font-size: .72rem; }
+.python-lab__hint-button { width: 100%; margin-top: 12px; padding: 7px 10px; border: 1px solid rgba(248, 186, 76, .42); border-radius: 8px; color: #ffd77f; background: rgba(248, 186, 76, .08); cursor: pointer; font-size: .76rem; }
+.python-lab__hint { margin: 6px 0 0; padding: 7px 9px; border-radius: 6px; background: rgba(248, 186, 76, .06); color: #c9b98f !important; font-size: .74rem !important; }
 
-.python-lab__world-panel { display: flex; flex-direction: column; padding: 10px; }
-.python-world { position: relative; flex: 1; min-height: 390px; overflow: hidden; border-radius: 12px; background: linear-gradient(#081730, #0d2340 42%, #09182c); }
+.python-lab__world-panel {
+  display: flex;
+  flex-direction: column;
+  padding: 8px;
+  overflow: hidden;
+}
+.python-world {
+  position: relative;
+  flex: 1;
+  min-height: 160px;
+  overflow: hidden;
+  border-radius: 10px;
+  background: linear-gradient(#081730, #0d2340 42%, #09182c);
+  perspective: 800px;
+}
 .python-world__sky { position: absolute; inset: 0; background: radial-gradient(circle at 72% 22%, rgba(73,233,255,.17), transparent 23%), radial-gradient(circle, rgba(255,255,255,.45) 0 1px, transparent 1.4px); background-size: auto, 54px 54px; }
-.python-world__grid { position: absolute; left: 7%; right: 7%; top: 18%; bottom: 16%; transform: perspective(660px) rotateX(49deg); transform-origin: center bottom; border: 1px solid rgba(73,233,255,.28); background-image: linear-gradient(rgba(73,233,255,.15) 1px, transparent 1px), linear-gradient(90deg, rgba(73,233,255,.15) 1px, transparent 1px); background-size: calc(100% / var(--grid-columns)) calc(100% / var(--grid-rows)); box-shadow: inset 0 0 38px rgba(73,233,255,.09), 0 0 35px rgba(50,170,255,.11); }
-.python-world__beacon, .python-world__rover, .python-world__obstacle, .python-world__object { position: absolute; display: grid; place-items: center; width: calc(70% / var(--grid-columns)); height: calc(70% / var(--grid-rows)); transform: translate(-50%, -50%) rotateX(-49deg); transform-origin: center; transition: left .28s ease, top .28s ease, opacity .2s ease; }
-.python-world__beacon-core { width: 23px; height: 23px; border-radius: 50%; background: #62edff; box-shadow: 0 0 9px #62edff, 0 0 26px #2f8bff, 0 0 55px #2f8bff; animation: python-beacon 1.5s ease-in-out infinite; }
-.python-world__beacon-label, .python-world__rover-label { position: absolute; top: calc(50% + 22px); color: #9beeff; font: 700 .55rem monospace; letter-spacing: .12em; }
-.python-world__rover-body { position: relative; z-index: 2; color: #fff3a0; font-size: 30px; filter: drop-shadow(0 0 7px #55e7ff); transform: rotate(var(--rover-rotation)); }
-.python-world__rover-glow { position: absolute; width: 38px; height: 38px; border-radius: 50%; background: rgba(83,231,255,.18); box-shadow: 0 0 24px #43d6ff; }
-.python-world__obstacle { color: #9d74ff; font-size: 27px; text-shadow: 0 0 15px #7548ff; }
-.python-world__object { color: #72f5d3; font-size: 25px; text-shadow: 0 0 12px #27ddb0; }
+.python-world__grid {
+  position: absolute;
+  left: 7%;
+  right: 7%;
+  top: 14%;
+  bottom: 14%;
+  transform: rotateX(26deg);
+  transform-origin: center bottom;
+  transform-style: preserve-3d;
+  border: 1px solid rgba(73, 233, 255, .32);
+  background-image: linear-gradient(rgba(73, 233, 255, .15) 1px, transparent 1px), linear-gradient(90deg, rgba(73, 233, 255, .15) 1px, transparent 1px);
+  background-size: calc(100% / var(--grid-columns)) calc(100% / var(--grid-rows));
+  box-shadow: inset 0 0 38px rgba(73, 233, 255, .09), 0 0 35px rgba(50, 170, 255, .11);
+}
+.python-world__beacon, .python-world__rover, .python-world__obstacle, .python-world__object {
+  position: absolute;
+  display: grid;
+  place-items: center;
+  width: calc(85% / var(--grid-columns));
+  min-width: 48px;
+  max-width: 64px;
+  height: calc(85% / var(--grid-rows));
+  min-height: 48px;
+  max-height: 64px;
+  transform: translate(-50%, -50%) rotateX(-26deg);
+  transform-origin: center;
+  transform-style: preserve-3d;
+  transition: left .28s ease, top .28s ease, opacity .2s ease;
+}
+.python-world__beacon { z-index: 8; }
+.python-world__beacon-core {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: #62edff;
+  box-shadow: 0 0 14px #62edff, 0 0 34px #2f8bff, 0 0 60px #2f8bff;
+  animation: python-beacon 1.5s ease-in-out infinite;
+}
+.python-world__beacon-label {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 50%;
+  transform: translateX(-50%);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 3px 8px;
+  border-radius: 4px;
+  background: rgba(3, 14, 30, .95);
+  border: 1px solid #38bdf8;
+  color: #7dd3fc;
+  font: 800 .74rem/1.2 monospace;
+  letter-spacing: .08em;
+  white-space: nowrap;
+  box-shadow: 0 0 14px rgba(56, 189, 248, .45), 0 2px 8px rgba(0, 0, 0, .7);
+  text-shadow: 0 0 6px rgba(56, 189, 248, .8);
+  pointer-events: none;
+  z-index: 20;
+}
+.python-world__rover-label {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 50%;
+  transform: translateX(-50%);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 3px 8px;
+  border-radius: 4px;
+  background: rgba(3, 14, 30, .95);
+  border: 1px solid var(--lab-mint);
+  color: var(--lab-mint);
+  font: 800 .74rem/1.2 monospace;
+  letter-spacing: .08em;
+  white-space: nowrap;
+  box-shadow: 0 0 14px rgba(85, 241, 200, .45), 0 2px 8px rgba(0, 0, 0, .7);
+  text-shadow: 0 0 6px rgba(85, 241, 200, .8);
+  pointer-events: none;
+  z-index: 20;
+}
+.python-world__rover--sleeping .python-world__rover-label {
+  border-color: rgba(255, 120, 145, .8);
+  color: #ff7891;
+  background: rgba(30, 8, 16, .95);
+  box-shadow: 0 0 14px rgba(255, 120, 145, .4), 0 2px 8px rgba(0, 0, 0, .7);
+  text-shadow: 0 0 6px rgba(255, 120, 145, .9);
+}
+.python-world__obstacle { color: #9d74ff; font-size: 28px; text-shadow: 0 0 15px #7548ff; z-index: 7; }
+.python-world__object { color: #72f5d3; font-size: 26px; text-shadow: 0 0 12px #27ddb0; z-index: 7; }
 .python-world__object--charge { color: #ffd766; text-shadow: 0 0 14px #ffb72f; }
 .python-world__object--sample { color: #c693ff; text-shadow: 0 0 14px #8b5cf6; }
-.python-world__hud { position: absolute; left: 12px; right: 12px; bottom: 9px; display: flex; justify-content: space-between; color: #92acc8; font: .68rem monospace; }
+.python-world__hud { position: absolute; left: 10px; right: 10px; bottom: 8px; display: flex; justify-content: space-between; color: #92acc8; font: .65rem monospace; }
 @keyframes python-beacon { 50% { transform: scale(1.24); opacity: .78; } }
 
-.python-lab__timeline { display: flex; gap: 8px; align-items: center; min-height: 48px; padding: 0 7px; }
-.python-lab__timeline button { width: 30px; height: 30px; border: 1px solid #294763; border-radius: 7px; color: #d9f9ff; background: #10223a; cursor: pointer; }
-.python-lab__timeline input { flex: 1; min-width: 70px; accent-color: var(--lab-cyan); }
-.python-lab__timeline select { min-height: 30px; border: 1px solid #294763; border-radius: 7px; color: #d9f9ff; background: #10223a; }
-.python-lab__timeline span { color: #7f99b4; font: .65rem monospace; }
-.python-lab__result { margin-top: 2px; padding: 12px 14px; border-radius: 10px; background: rgba(255,103,132,.08); border: 1px solid rgba(255,103,132,.25); }
+.python-lab__timeline {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  min-height: 38px;
+  height: 38px;
+  padding: 0 6px;
+  flex-shrink: 0;
+  box-sizing: border-box;
+}
+.python-lab__timeline button {
+  width: 28px;
+  height: 28px;
+  min-width: 28px;
+  min-height: 28px;
+  padding: 0;
+  margin: 0;
+  border: 1px solid #294763;
+  border-radius: 6px;
+  color: #d9f9ff;
+  background: #10223a;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: .88rem;
+  line-height: 1;
+  text-align: center;
+  box-sizing: border-box;
+  transition: background .15s, border-color .15s;
+}
+.python-lab__timeline button:hover:not(:disabled) {
+  background: #19385c;
+  border-color: var(--lab-cyan);
+}
+.python-lab__timeline button:disabled {
+  opacity: .35;
+  cursor: not-allowed;
+}
+.python-lab__timeline input[type="range"] {
+  flex: 1;
+  min-width: 60px;
+  height: 6px;
+  accent-color: var(--lab-cyan);
+  cursor: pointer;
+}
+.python-lab__timeline select {
+  height: 28px;
+  min-height: 28px;
+  padding: 0 6px;
+  margin: 0;
+  border: 1px solid #294763;
+  border-radius: 6px;
+  color: #d9f9ff;
+  background: #10223a;
+  font: 700 .68rem monospace;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  box-sizing: border-box;
+}
+.python-lab__timeline span {
+  color: #7f99b4;
+  font: 700 .65rem monospace;
+  white-space: nowrap;
+  letter-spacing: .04em;
+  padding-left: 2px;
+}
+.python-lab__result { margin-top: 4px; padding: 8px 12px; border-radius: 8px; background: rgba(255,103,132,.08); border: 1px solid rgba(255,103,132,.25); flex-shrink: 0; }
 .python-lab__result.is-success { background: rgba(85,241,200,.08); border-color: rgba(85,241,200,.3); }
-.python-lab__result strong { color: #ff91a7; font: 700 .78rem monospace; }
+.python-lab__result strong { color: #ff91a7; font: 700 .74rem monospace; }
 .python-lab__result.is-success strong { color: var(--lab-mint); }
-.python-lab__result p { margin: 6px 0 0; color: #b3c4d5; font-size: .8rem; }
-.python-lab__result button { margin-top: 9px; border: 0; color: #00151a; background: var(--lab-mint); border-radius: 7px; padding: 7px 10px; font-weight: 800; cursor: pointer; }
+.python-lab__result p { margin: 3px 0 0; color: #b3c4d5; font-size: .74rem; line-height: 1.4; }
+.python-lab__result button { margin-top: 6px; border: 0; color: #00151a; background: var(--lab-mint); border-radius: 6px; padding: 5px 10px; font-weight: 800; font-size: .74rem; cursor: pointer; }
+.python-lab__reflection {
+  margin-top: 8px;
+  padding: 8px 10px;
+  border-radius: 7px;
+  background: rgba(73, 233, 255, .07);
+  border: 1px solid rgba(73, 233, 255, .2);
+}
+.python-lab__reflection ol { margin: 5px 0 0; padding-left: 18px; }
+.python-lab__reflection li { margin: 3px 0; color: #c5d9e9; font-size: .74rem; line-height: 1.4; }
 
-.python-lab__code-panel { display: grid; grid-template-rows: 48px minmax(300px, 1fr) 38px minmax(110px, .3fr); }
-.python-lab__editor-toolbar { display: flex; align-items: center; justify-content: space-between; padding: 0 11px 0 15px; border-bottom: 1px solid #1b3049; color: #a8bdd1; font: .72rem monospace; }
-.python-lab__editor-toolbar div { display: flex; gap: 7px; }
-.python-lab__editor-toolbar button { border: 1px solid #294763; border-radius: 7px; padding: 7px 10px; color: #9eb5cb; background: #0b1a2e; font: 700 .68rem monospace; cursor: pointer; }
+.python-lab__code-panel {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  height: 100%;
+}
+.python-lab__editor-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 10px;
+  height: 38px;
+  min-height: 38px;
+  border-bottom: 1px solid #1b3049;
+  color: #a8bdd1;
+  font: .68rem monospace;
+  flex-shrink: 0;
+}
+.python-lab__editor-toolbar div { display: flex; gap: 6px; }
+.python-lab__editor-toolbar button { border: 1px solid #294763; border-radius: 6px; padding: 4px 8px; color: #9eb5cb; background: #0b1a2e; font: 700 .65rem monospace; cursor: pointer; }
 .python-lab__editor-toolbar button.is-run { color: #001b18; border-color: var(--lab-mint); background: var(--lab-mint); }
 .python-lab__editor-toolbar button.is-stop { color: white; border-color: #e65c75; background: #a92c46; }
 .python-lab__editor-toolbar button:disabled { opacity: .45; cursor: not-allowed; }
-.python-lab__editor-wrap, .python-editor-host { min-height: 0; height: 100%; }
+
+.python-lab__quick-chips {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  background: #061224;
+  border-bottom: 1px solid #1a324d;
+  overflow-x: auto;
+  flex-shrink: 0;
+  scrollbar-width: thin;
+}
+.python-lab__quick-chips-label {
+  color: #799bbb;
+  font: 800 .62rem monospace;
+  white-space: nowrap;
+  letter-spacing: .05em;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.python-lab__quick-chips-list {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.python-lab__quick-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 9px;
+  border: 1px solid #23486a;
+  border-radius: 6px;
+  background: rgba(18, 48, 76, 0.5);
+  color: #bfe5ff;
+  font: .68rem monospace;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all .15s ease;
+}
+.python-lab__quick-chip:hover {
+  border-color: var(--lab-cyan);
+  background: rgba(43, 114, 180, 0.4);
+  color: #ffffff;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(73, 233, 255, 0.25);
+}
+.python-lab__quick-chip.is-string {
+  border-color: rgba(85, 241, 200, 0.4);
+  background: rgba(14, 58, 52, 0.45);
+  color: #72f5d3;
+}
+.python-lab__quick-chip.is-string:hover {
+  border-color: var(--lab-mint);
+  background: rgba(22, 90, 80, 0.6);
+  color: #ffffff;
+  box-shadow: 0 2px 8px rgba(85, 241, 200, 0.3);
+}
+.python-lab__quick-chip code {
+  font-family: inherit;
+  font-weight: 700;
+}
+
+.python-lab__editor-wrap, .python-editor-host {
+  flex: 1;
+  min-height: 120px;
+  height: 100%;
+}
 .python-editor-execution-line { background: linear-gradient(90deg, rgba(73,233,255,.2), rgba(73,233,255,.03)); box-shadow: inset 3px 0 var(--lab-cyan); }
-.python-lab__inspector-tabs { display: flex; border-top: 1px solid #1b3049; border-bottom: 1px solid #1b3049; background: #091426; }
-.python-lab__inspector-tabs button { padding: 0 15px; border: 0; border-bottom: 2px solid transparent; color: #7189a2; background: transparent; font: 700 .66rem monospace; cursor: pointer; }
+.python-lab__inspector-tabs { display: flex; border-top: 1px solid #1b3049; border-bottom: 1px solid #1b3049; background: #091426; flex-shrink: 0; }
+.python-lab__inspector-tabs button { padding: 0 10px; height: 30px; border: 0; border-bottom: 2px solid transparent; color: #7189a2; background: transparent; font: 700 .64rem monospace; cursor: pointer; }
 .python-lab__inspector-tabs button.is-active { color: var(--lab-cyan); border-bottom-color: var(--lab-cyan); }
-.python-lab__inspector { overflow: auto; padding: 10px 14px; color: #829ab3; background: #06101f; font: .72rem/1.5 monospace; }
+.python-lab__inspector { height: 95px; min-height: 70px; max-height: 120px; overflow: auto; padding: 6px 10px; color: #829ab3; background: #06101f; font: .68rem/1.45 monospace; flex-shrink: 0; }
 .python-lab__inspector p { margin: 0 0 5px; }
 .python-lab__inspector pre { margin: 0; color: #bcd5ec; white-space: pre-wrap; }
 .python-lab--empty { display: grid; place-items: center; text-align: center; }
 
-.python-world__rover--sleeping .python-world__rover-body { color: #5a738e; filter: grayscale(1); }
-.python-world__rover--sleeping .python-world__rover-glow { background: rgba(90, 115, 142, .1); box-shadow: none; }
-.python-world__awakening-copy { position:absolute;z-index:3;left:0;right:0;top:9%;text-align:center;pointer-events:none; }
-.python-world__awakening-copy span,.python-world__awakening-copy strong,.python-world__awakening-copy small { display:block; }
-.python-world__awakening-copy span { color:#ff7891;font:800 .62rem monospace;letter-spacing:.2em;animation:python-warning-blink 1.5s steps(2,end) infinite; }
-.python-world__awakening-copy strong { margin-top:8px;color:#9ab0c2;font:900 1rem monospace;letter-spacing:.08em; }
-.python-world__awakening-copy small { margin-top:6px;color:#617c94;font-size:.68rem; }
-.python-world.is-dark-awakening { background:radial-gradient(circle at 50% 52%,rgba(39,107,137,.22),transparent 25%),linear-gradient(#040a16,#08182b); }
-.python-world.is-dark-awakening .python-world__grid { left:17%;right:17%;top:22%;bottom:12%;opacity:.68;transform:perspective(800px) rotateX(58deg); }
-.python-world.is-dark-awakening .python-world__beacon { display:none; }
-.python-world.is-dark-awakening .python-world__rover { visibility:hidden; }
-.python-world__offline-core { position:absolute;z-index:3;left:50%;top:53%;width:210px;height:210px;display:grid;place-items:center;border-radius:50%;transform:translate(-50%,-50%);background:radial-gradient(circle,#183247 0 8%,#0d2037 34%,#050b16 70%);box-shadow:0 0 38px rgba(73,183,220,.3),0 0 110px rgba(32,115,155,.18); }
-.python-world__offline-core::after { content:"";position:absolute;inset:37%;border-radius:50%;background:#263f4e;box-shadow:0 0 18px #41677a;animation:python-warning-blink 1.5s steps(2,end) infinite; }
-.python-world__offline-core i { position:relative;z-index:2;color:#607787;font-size:58px;font-style:normal;filter:grayscale(1); }
-.python-world__offline-core b { position:absolute;bottom:28px;color:#ff7891;font:800 .62rem monospace;letter-spacing:.18em; }
-.python-world__offline-ring { position:absolute;inset:8px;border:1px solid rgba(82,181,209,.45);border-radius:50%;transform:rotate(28deg) scaleY(.36); }
-.python-world__offline-ring--two { inset:-16px;transform:rotate(-47deg) scaleY(.31);border-color:rgba(155,111,220,.42); }
-@keyframes python-warning-blink { 50% { opacity:.42; } }
+.python-world__rover {
+  position: absolute;
+  display: grid;
+  place-items: center;
+  width: calc(85% / var(--grid-columns));
+  min-width: 48px;
+  max-width: 64px;
+  height: calc(85% / var(--grid-rows));
+  min-height: 48px;
+  max-height: 64px;
+  transform: translate(-50%, -50%) rotateX(-26deg);
+  transform-origin: center;
+  transform-style: preserve-3d;
+  transition: left .28s ease, top .28s ease, opacity .2s ease;
+  z-index: 10;
+}
+.python-world__rover-body {
+  position: relative;
+  z-index: 3;
+  width: 52px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  transform: rotate(var(--rover-rotation));
+  transition: transform .24s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.python-world__rover-svg {
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+.python-world__rover-flames {
+  animation: python-flame-pulse .22s infinite alternate ease-in-out;
+  transform-origin: 12px 20px;
+}
+@keyframes python-flame-pulse {
+  from { transform: scaleX(.85); opacity: .75; }
+  to { transform: scaleX(1.35); opacity: 1; }
+}
+.python-world__rover-glow {
+  position: absolute;
+  width: 54px;
+  height: 54px;
+  border-radius: 50%;
+  background: rgba(83, 231, 255, .22);
+  box-shadow: 0 0 28px #43d6ff;
+  animation: python-rover-pulse 2s ease-in-out infinite;
+}
+.python-world__rover-orbit {
+  position: absolute;
+  inset: -6px;
+  border: 1.5px solid rgba(73, 233, 255, .6);
+  border-radius: 50%;
+  transform: rotate(24deg) scaleY(.42);
+  pointer-events: none;
+  animation: python-rover-spin 4s linear infinite;
+}
+.python-world__rover-orbit--two {
+  inset: -14px;
+  border-color: rgba(157, 116, 255, .5);
+  transform: rotate(-38deg) scaleY(.34);
+  animation: python-rover-spin-reverse 6s linear infinite;
+}
+@keyframes python-rover-pulse {
+  50% { transform: scale(1.15); opacity: .85; }
+}
+@keyframes python-rover-spin {
+  from { transform: rotate(0deg) scaleY(.42); }
+  to { transform: rotate(360deg) scaleY(.42); }
+}
+@keyframes python-rover-spin-reverse {
+  from { transform: rotate(0deg) scaleY(.34); }
+  to { transform: rotate(-360deg) scaleY(.34); }
+}
+
+/* Sleeping LUMI State */
+.python-world__rover--sleeping .python-world__rover-body {
+  filter: grayscale(.6) drop-shadow(0 0 6px rgba(255, 120, 145, .7));
+  animation: python-rover-glitch 2.5s ease-in-out infinite;
+}
+.python-world__rover--sleeping .python-world__rover-glow {
+  background: rgba(255, 120, 145, .15);
+  box-shadow: 0 0 16px rgba(255, 120, 145, .4);
+}
+.python-world__broken-gauge {
+  position: absolute;
+  width: 62px;
+  height: 62px;
+  border-radius: 50%;
+  border: 1.5px dashed rgba(255, 120, 145, .7);
+  animation: python-gauge-spin 8s linear infinite;
+  pointer-events: none;
+}
+@keyframes python-rover-glitch {
+  0%, 92%, 100% { opacity: 1; transform: rotate(var(--rover-rotation)) scale(1); }
+  94% { opacity: .5; transform: rotate(var(--rover-rotation)) scale(0.92) translateX(-2px); }
+  96% { opacity: .8; transform: rotate(var(--rover-rotation)) scale(1.05) translateX(2px); }
+}
+@keyframes python-gauge-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* Awakening Banner */
+.python-world__awakening-banner {
+  position: absolute;
+  z-index: 4;
+  left: 50%;
+  top: 12px;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 6px 14px;
+  border-radius: 8px;
+  background: rgba(8, 16, 32, .88);
+  border: 1px solid rgba(255, 120, 145, .4);
+  box-shadow: 0 0 20px rgba(255, 120, 145, .15);
+  pointer-events: none;
+}
+.python-world__awakening-tag { color: #ff7891; font: 800 .6rem monospace; letter-spacing: .14em; }
+.python-world__awakening-banner strong { color: #d0e4f7; font: 900 .78rem monospace; letter-spacing: .06em; }
+.python-world__awakening-banner small { color: #7f99b2; font-size: .66rem; }
+
+/* Hologram Memory Fragment System */
+.lumi-hologram-memory {
+  position: absolute;
+  inset: 0;
+  z-index: 25;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+}
+.lumi-hologram-memory__backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(3, 8, 20, .82);
+  backdrop-filter: blur(8px);
+}
+.lumi-hologram-memory__box {
+  position: relative;
+  z-index: 2;
+  width: min(380px, 90%);
+  padding: 18px;
+  border-radius: 14px;
+  background: linear-gradient(145deg, rgba(8, 28, 54, .95), rgba(4, 14, 30, .98));
+  border: 1.5px solid var(--lab-cyan);
+  box-shadow: 0 0 35px rgba(73, 233, 255, .35), inset 0 0 25px rgba(73, 233, 255, .08);
+  animation: lumi-hologram-pop .3s ease-out;
+}
+@keyframes lumi-hologram-pop {
+  0% { transform: scale(0.85); opacity: 0; }
+  100% { transform: scale(1); opacity: 1; }
+}
+.lumi-hologram-memory__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+  border-bottom: 1px solid rgba(73, 233, 255, .25);
+  padding-bottom: 8px;
+}
+.lumi-hologram-memory__badge {
+  color: var(--lab-cyan);
+  font: 800 .68rem monospace;
+  letter-spacing: .12em;
+  text-shadow: 0 0 8px rgba(73, 233, 255, .6);
+}
+.lumi-hologram-memory__header small { color: #8ba9c4; font-size: .66rem; }
+.lumi-hologram-memory__code {
+  margin: 0 0 12px;
+  padding: 12px 14px;
+  border-radius: 8px;
+  background: rgba(2, 8, 18, .9);
+  border: 1px solid rgba(85, 241, 200, .4);
+  color: var(--lab-mint);
+  font: 800 .95rem/1.4 'JetBrains Mono', Consolas, monospace;
+  white-space: pre-wrap;
+  box-shadow: inset 0 0 16px rgba(85, 241, 200, .1);
+  text-shadow: 0 0 6px rgba(85, 241, 200, .5);
+}
+.lumi-hologram-memory__progress {
+  height: 4px;
+  border-radius: 99px;
+  background: rgba(73, 233, 255, .15);
+  overflow: hidden;
+  margin-bottom: 10px;
+}
+.lumi-hologram-memory__bar {
+  height: 100%;
+  background: linear-gradient(90deg, var(--lab-mint), var(--lab-cyan));
+  box-shadow: 0 0 8px var(--lab-cyan);
+  transition: width .05s linear;
+}
+.lumi-hologram-memory__footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.lumi-hologram-memory__footer span { color: #819db7; font: .65rem monospace; }
+.lumi-hologram-memory__footer button {
+  padding: 5px 12px;
+  border: 0;
+  border-radius: 6px;
+  background: var(--lab-mint);
+  color: #031518;
+  font: 800 .72rem monospace;
+  cursor: pointer;
+  box-shadow: 0 0 12px rgba(85, 241, 200, .4);
+}
+
+/* Re-trigger Hologram Floating Button */
+.lumi-memory-retrigger-btn {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 12;
+  padding: 5px 10px;
+  border-radius: 6px;
+  border: 1px solid rgba(73, 233, 255, .4);
+  background: rgba(6, 18, 38, .85);
+  color: var(--lab-cyan);
+  font: 700 .64rem monospace;
+  cursor: pointer;
+  backdrop-filter: blur(6px);
+  transition: background .15s, border-color .15s, transform .15s;
+}
+.lumi-memory-retrigger-btn:hover {
+  background: rgba(14, 38, 74, .95);
+  border-color: var(--lab-cyan);
+  transform: translateY(-1px);
+  box-shadow: 0 0 14px rgba(73, 233, 255, .3);
+}
+
+/* Transmission Beam on RUN */
+.lumi-transmission-beam {
+  position: absolute;
+  inset: 0;
+  z-index: 18;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+  background: radial-gradient(circle at 50% 50%, rgba(73, 233, 255, .16), transparent 60%);
+  animation: lumi-beam-pulse 1s ease-in-out infinite;
+}
+.lumi-transmission-beam span {
+  padding: 6px 14px;
+  border-radius: 99px;
+  background: rgba(4, 14, 28, .92);
+  border: 1px solid var(--lab-mint);
+  color: var(--lab-mint);
+  font: 800 .72rem monospace;
+  letter-spacing: .1em;
+  box-shadow: 0 0 20px rgba(85, 241, 200, .4);
+}
+@keyframes lumi-beam-pulse {
+  50% { opacity: .7; }
+}
+
+/* Speech Bubble */
 .python-world__speech-bubble {
   position: absolute;
   bottom: calc(100% + 14px);
   left: 50%;
   transform: translateX(-50%);
-  padding: 6px 10px;
+  padding: 6px 12px;
   border-radius: 8px;
-  background: rgba(4, 15, 30, .92);
+  background: rgba(4, 15, 30, .94);
   border: 1px solid var(--lab-cyan);
-  box-shadow: 0 0 16px rgba(73, 233, 255, .3);
+  box-shadow: 0 0 18px rgba(73, 233, 255, .35);
   color: #eaf8ff;
-  font: 700 .75rem/1.2 monospace;
+  font: 800 .78rem/1.2 monospace;
   white-space: nowrap;
   pointer-events: none;
-  z-index: 10;
+  z-index: 20;
   animation: python-bubble-pop .25s ease-out;
 }
 @keyframes python-bubble-pop {
   0% { transform: translateX(-50%) scale(0.7); opacity: 0; }
   100% { transform: translateX(-50%) scale(1); opacity: 1; }
 }
+
+/* Sensor Badge */
 .python-world__sensor-badge {
   position: absolute;
   top: -24px;
@@ -194,6 +789,25 @@
   font: 700 .62rem monospace;
   white-space: nowrap;
 }
+
+/* Result Voice & Restoration Badge */
+.python-lab__lumi-voice {
+  color: #ffd77f !important;
+  font: 800 .78rem/1.3 monospace !important;
+  text-shadow: 0 0 8px rgba(255, 215, 127, .4);
+}
+.python-lab__restoration-badge {
+  display: inline-block;
+  margin-top: 2px !important;
+  padding: 2px 8px;
+  border-radius: 4px;
+  background: rgba(85, 241, 200, .15);
+  border: 1px solid var(--lab-mint);
+  color: var(--lab-mint) !important;
+  font: 800 .68rem monospace !important;
+  letter-spacing: .08em;
+}
+
 .python-lab__memory-list {
   display: flex;
   flex-direction: column;
@@ -223,19 +837,494 @@
 }
 
 @media (max-width: 1100px) {
-  .python-lab__layout { grid-template-columns: 250px 1fr; }
-  .python-lab__code-panel { grid-column: 1 / -1; min-height: 570px; }
+  .python-lab {
+    height: auto;
+    max-height: none;
+    min-height: 100vh;
+    overflow-y: auto;
+  }
+  .python-lab__layout {
+    grid-template-columns: 1fr;
+    height: auto;
+    overflow: visible;
+  }
+  .python-lab__briefing,
+  .python-lab__world-panel,
+  .python-lab__code-panel {
+    height: auto;
+    overflow: visible;
+  }
+  .python-lab__world-panel {
+    min-height: 360px;
+  }
+  .python-lab__code-panel {
+    grid-column: auto;
+    min-height: 520px;
+  }
 }
 
 @media (max-width: 720px) {
-  .python-lab__header { grid-template-columns: 40px 1fr; }
-  .python-lab__runtime { grid-column: 2; }
+  .python-lab__header { padding: 0 10px; }
   .python-lab__layout { grid-template-columns: 1fr; }
   .python-lab__briefing, .python-lab__code-panel { grid-column: auto; }
-  .python-world { min-height: 340px; }
+  .python-world { min-height: 240px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .python-world__beacon-core, .python-world__speech-bubble { animation: none !important; }
-  .python-world__beacon, .python-world__rover, .python-world__obstacle, .python-world__object { transition: none !important; }
+  .python-world__beacon-core,
+  .python-world__speech-bubble,
+  .python-world__rover-orbit,
+  .python-world__rover-orbit--two,
+  .python-world__rover-flames,
+  .python-world__rover-glow,
+  .lumi-act-modal__ring,
+  .lumi-act-modal__ring--2,
+  .lumi-transmission-beam {
+    animation: none !important;
+  }
+  .python-world__beacon,
+  .python-world__rover,
+  .python-world__obstacle,
+  .python-world__object,
+  .lumi-tactical-entity,
+  .lumi-act-modal__card {
+    transition: none !important;
+  }
+}
+
+/* Celebration Act Modal */
+.lumi-act-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+}
+.lumi-act-modal__backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(2, 6, 16, .85);
+  backdrop-filter: blur(10px);
+}
+.lumi-act-modal__card {
+  position: relative;
+  z-index: 2;
+  width: min(520px, 94%);
+  padding: 32px 28px;
+  border-radius: 20px;
+  background: linear-gradient(155deg, rgba(10, 32, 60, .96), rgba(5, 14, 28, .98));
+  border: 1.5px solid rgba(85, 241, 200, .6);
+  box-shadow: 0 0 50px rgba(73, 233, 255, .3), inset 0 0 30px rgba(85, 241, 200, .1);
+  text-align: center;
+  animation: lumi-modal-zoom .35s cubic-bezier(0.16, 1, 0.3, 1);
+}
+@keyframes lumi-modal-zoom {
+  0% { transform: scale(0.88); opacity: 0; }
+  100% { transform: scale(1); opacity: 1; }
+}
+.lumi-act-modal__core-visual {
+  position: relative;
+  width: 120px;
+  height: 120px;
+  margin: 0 auto 16px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: radial-gradient(circle, #104860 0 25%, #081d36 60%, #030a16 90%);
+  box-shadow: 0 0 30px rgba(73, 233, 255, .4);
+}
+.lumi-act-modal__ring {
+  position: absolute;
+  inset: 4px;
+  border: 1.5px solid rgba(73, 233, 255, .6);
+  border-radius: 50%;
+  transform: rotate(25deg) scaleY(.4);
+  animation: ring-spin-1 6s linear infinite;
+}
+.lumi-act-modal__ring--2 {
+  inset: -8px;
+  border-color: rgba(85, 241, 200, .5);
+  transform: rotate(-35deg) scaleY(.35);
+  animation: ring-spin-2 8s linear infinite reverse;
+}
+@keyframes ring-spin-1 { 100% { transform: rotate(385deg) scaleY(.4); } }
+@keyframes ring-spin-2 { 100% { transform: rotate(-395deg) scaleY(.35); } }
+.lumi-act-modal__core-badge {
+  position: absolute;
+  bottom: -6px;
+  padding: 2px 8px;
+  border-radius: 99px;
+  background: var(--lab-mint);
+  color: #03171c;
+  font: 900 .6rem monospace;
+  letter-spacing: .08em;
+  box-shadow: 0 0 10px var(--lab-mint);
+}
+.lumi-act-modal__eyebrow {
+  display: inline-block;
+  color: var(--lab-mint);
+  font: 800 .7rem monospace;
+  letter-spacing: .16em;
+  margin-bottom: 6px;
+}
+.lumi-act-modal h2 {
+  margin: 0 0 8px;
+  font-size: 1.55rem;
+  color: #edf8ff;
+  letter-spacing: -.02em;
+}
+.lumi-act-modal__desc {
+  margin: 0 0 18px;
+  color: #92b0c9;
+  font-size: .88rem;
+  line-height: 1.55;
+}
+.lumi-act-modal__stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  margin-bottom: 18px;
+}
+.lumi-act-modal__stat-box {
+  padding: 10px 8px;
+  border-radius: 10px;
+  background: rgba(4, 12, 26, .7);
+  border: 1px solid rgba(73, 233, 255, .2);
+}
+.lumi-act-modal__stat-box small {
+  display: block;
+  margin-bottom: 4px;
+  color: #6d8ba2;
+  font: .62rem monospace;
+}
+.lumi-act-modal__stat-box strong {
+  color: #edf8ff;
+  font: 800 .92rem monospace;
+}
+.lumi-act-modal__stat-box strong.is-cyan { color: var(--lab-cyan); }
+.lumi-act-modal__stat-box strong.is-gold { color: #ffd15c; }
+.lumi-act-modal__quote {
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: rgba(73, 233, 255, .08);
+  border: 1px solid rgba(73, 233, 255, .25);
+  color: #c9e8fb;
+  font-size: .82rem;
+  line-height: 1.55;
+  margin-bottom: 22px;
+  text-align: left;
+}
+.lumi-act-modal__actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.lumi-act-modal__btn-primary {
+  padding: 12px 18px;
+  border: 0;
+  border-radius: 10px;
+  background: linear-gradient(135deg, var(--lab-mint), var(--lab-cyan));
+  color: #03171c;
+  font-weight: 900;
+  font-size: .92rem;
+  cursor: pointer;
+  box-shadow: 0 0 20px rgba(73, 233, 255, .3);
+  transition: transform .15s, box-shadow .15s;
+}
+.lumi-act-modal__btn-primary:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 0 28px rgba(73, 233, 255, .45);
+}
+.lumi-act-modal__btn-secondary {
+  padding: 9px 14px;
+  border: 1px solid #28445e;
+  border-radius: 8px;
+  background: #081628;
+  color: #8daac1;
+  font-weight: 700;
+  font-size: .8rem;
+  cursor: pointer;
+}
+.lumi-act-modal__btn-secondary:hover {
+  color: #e5f5ff;
+  border-color: var(--lab-cyan);
+}
+
+/* Object Core / Execution Trace Memory Styles */
+.python-lab__memory-item--instance,
+.python-lab__memory-item--class {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  background: rgba(14, 28, 48, 0.7);
+  border: 1px solid rgba(82, 121, 160, 0.4);
+  border-radius: 6px;
+  padding: 6px 8px;
+  margin-bottom: 4px;
+  transition: all 0.2s ease;
+}
+
+.python-lab__memory-item--instance.is-self-active {
+  border-color: #55f1c8;
+  background: rgba(18, 56, 50, 0.85);
+  box-shadow: 0 0 12px rgba(85, 241, 200, 0.35);
+}
+
+.python-lab__memory-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.python-lab__instance-badge {
+  font-size: 0.65rem;
+  color: #55f1c8;
+  background: rgba(85, 241, 200, 0.12);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-weight: 700;
+}
+
+.python-lab__class-badge {
+  font-size: 0.65rem;
+  color: #c8b6ff;
+  background: rgba(157, 116, 255, 0.15);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-weight: 700;
+}
+
+.python-lab__self-badge {
+  font-size: 0.62rem;
+  color: #04151a;
+  background: #55f1c8;
+  padding: 1px 5px;
+  border-radius: 3px;
+  font-weight: 900;
+  letter-spacing: 0.05em;
+  animation: python-self-pulse 1.2s infinite alternate ease-in-out;
+}
+
+@keyframes python-self-pulse {
+  from { opacity: 0.8; transform: scale(0.96); }
+  to { opacity: 1; transform: scale(1.04); }
+}
+
+.python-lab__instance-attrs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 2px;
+}
+
+.python-lab__attr-chip {
+  font-size: 0.64rem;
+  color: #a3c4e3;
+  background: rgba(26, 44, 70, 0.7);
+  padding: 2px 5px;
+  border-radius: 3px;
+  font-family: monospace;
+}
+
+.python-lab__attr-chip--method {
+  color: #ffd77f;
+  background: rgba(248, 186, 76, 0.1);
+}
+
+/* Control Input Panel */
+.python-lab__input-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 12px;
+  background: rgba(8, 22, 42, 0.85);
+  border: 1px solid rgba(85, 241, 200, 0.35);
+  border-radius: 8px;
+  margin: 6px 12px;
+}
+
+.python-lab__input-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.python-lab__input-header span {
+  font-size: 0.76rem;
+  font-weight: 800;
+  color: var(--lumi-mint, #55f1c8);
+  letter-spacing: 0.04em;
+}
+
+.python-lab__input-header small {
+  font-size: 0.65rem;
+  color: #7f9bb8;
+}
+
+.python-lab__input-fields {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.python-lab__input-field {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.python-lab__input-field label {
+  font-size: 0.74rem;
+  color: #c4dcf5;
+  font-family: monospace;
+}
+
+.python-lab__input-field input {
+  background: #051324;
+  border: 1px solid #1f3b5c;
+  color: #55f1c8;
+  font-family: monospace;
+  font-size: 0.82rem;
+  padding: 3px 8px;
+  border-radius: 4px;
+  width: 80px;
+  outline: none;
+}
+
+.python-lab__input-field input:focus {
+  border-color: var(--lumi-mint, #55f1c8);
+  box-shadow: 0 0 8px rgba(85, 241, 200, 0.3);
+}
+
+/* Blueprint & Instances Inspector Views */
+.python-lab__blueprint-list,
+.python-lab__instances-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.python-lab__blueprint-card,
+.python-lab__instance-card {
+  background: rgba(6, 18, 36, 0.75);
+  border: 1px solid rgba(85, 241, 200, 0.25);
+  border-radius: 8px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.python-lab__instance-card.is-self-active {
+  border-color: #55f1c8;
+  box-shadow: 0 0 12px rgba(85, 241, 200, 0.3);
+}
+
+.python-lab__instance-card--system {
+  border-color: rgba(73, 233, 255, 0.45);
+  background: linear-gradient(145deg, rgba(6, 28, 48, 0.88), rgba(6, 18, 36, 0.78));
+}
+
+.python-lab__blueprint-header,
+.python-lab__instance-card-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.python-lab__blueprint-tag {
+  font-size: 0.62rem;
+  color: #04151a;
+  background: #f8ba4c;
+  padding: 1px 6px;
+  border-radius: 3px;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+}
+
+.python-lab__blueprint-slot {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin: 4px 0;
+}
+
+.python-lab__blueprint-slot small,
+.python-lab__blueprint-methods small,
+.python-lab__instance-diffs small {
+  font-size: 0.65rem;
+  color: #7f9bb8;
+}
+
+.python-lab__slot-chips,
+.python-lab__method-chips {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.python-lab__slot-chip {
+  font-size: 0.66rem;
+  font-family: monospace;
+  background: rgba(85, 241, 200, 0.15);
+  color: #55f1c8;
+  border: 1px dashed rgba(85, 241, 200, 0.4);
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.python-lab__instance-var {
+  font-size: 0.76rem;
+  color: #c4dcf5;
+}
+
+.python-lab__instance-alias {
+  font-size: 0.68rem;
+  color: #ffd77f;
+  font-family: monospace;
+}
+
+.python-lab__instance-card-attrs {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  background: rgba(3, 10, 22, 0.6);
+  padding: 6px 8px;
+  border-radius: 4px;
+}
+
+.python-lab__instance-attr-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.72rem;
+  font-family: monospace;
+}
+
+.python-lab__attr-name {
+  color: #7f9bb8;
+}
+
+.python-lab__attr-val {
+  color: #a3c4e3;
+}
+
+.python-lab__instance-diffs {
+  margin-top: 4px;
+  border-top: 1px dashed rgba(85, 241, 200, 0.2);
+  padding-top: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.python-lab__diff-entry {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.68rem;
+  font-family: monospace;
+  color: #ffd77f;
 }

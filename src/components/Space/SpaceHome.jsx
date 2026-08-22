@@ -3891,7 +3891,7 @@ function SpaceHome() {
 
   if (currentView === 'lumi_protocol') {
     return (
-      <div className="space-bg" style={{ minHeight: '100dvh', overflowY: 'auto' }}>
+      <div className="space-bg" style={{ height: '100dvh', maxHeight: '100dvh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
         <SpaceNavbar currentView={currentView} onViewChange={switchRootView} />
         <Suspense fallback={<SpaceViewFallback />}>
           <PythonProtocolHub

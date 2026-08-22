@@ -37,6 +37,23 @@ export function normalizeRuntimeEvents(rawEvents = []) {
         line: raw.line,
         variables: raw.variables || {},
         rover: raw.rover || {},
+        activeFrameId: raw.activeFrameId || 'main',
+        receiverInstanceId: raw.receiverInstanceId || null,
+      }
+    } else if (raw.type === 'frame_entered') {
+      type = 'frame_entered'
+      payload = {
+        frameId: raw.frameId,
+        callableKind: raw.callableKind || 'function',
+        functionName: raw.functionName,
+        receiverInstanceId: raw.receiverInstanceId || null,
+      }
+    } else if (raw.type === 'frame_exited') {
+      type = 'frame_exited'
+      payload = {
+        frameId: raw.frameId,
+        functionName: raw.functionName,
+        returnValue: raw.returnValue,
       }
     } else if (raw.type === 'world') {
       const action = raw.action
@@ -90,6 +107,19 @@ export function normalizeRuntimeEvents(rawEvents = []) {
         name: raw.name,
         before: raw.before,
         after: raw.after,
+        receiverInstanceId: raw.receiverInstanceId || null,
+        frameId,
+      }
+    } else if (raw.type === 'input_requested') {
+      type = 'input_requested'
+      payload = {
+        prompt: raw.prompt || '',
+      }
+    } else if (raw.type === 'input_received') {
+      type = 'input_received'
+      payload = {
+        prompt: raw.prompt || '',
+        value: raw.value,
       }
     } else if (raw.type === 'sensor_read') {
       type = 'sensor_read'

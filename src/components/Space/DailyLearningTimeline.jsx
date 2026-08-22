@@ -131,6 +131,13 @@ const TYPE_CONFIG = {
     color: '#f43f5e',
     bg: 'rgba(244, 63, 94, 0.12)',
     border: 'rgba(244, 63, 94, 0.35)'
+  },
+  lumi: {
+    icon: '🛰️',
+    label: 'LUMI PROTOCOL',
+    color: '#55f1c8',
+    bg: 'rgba(85, 241, 200, 0.12)',
+    border: 'rgba(85, 241, 200, 0.35)'
   }
 };
 
@@ -220,6 +227,22 @@ function GroupedView({ items, dailyStats, onActivityClick }) {
             }
             color="#a78bfa"
           />
+
+          {(dailyStats?.lumiProtocolMissionCount > 0 || dailyStats?.lumiProtocolCount > 0 || dailyStats?.lumiProtocolProgressCount > 0 || items.some(i => i.type === 'lumi')) && (
+            <StatChip
+              icon="🛰️"
+              label="LUMI PROTOCOL"
+              value={
+                (dailyStats?.lumiProtocolProgressCount > 0 && !(dailyStats?.lumiProtocolMissionCount > 0 || dailyStats?.lumiProtocolCount > 0))
+                  ? `진행 중 ${dailyStats.lumiProtocolProgressCount}개`
+                  : dailyStats?.lumiProtocolProgressCount > 0
+                    ? `완료 ${dailyStats.lumiProtocolMissionCount || dailyStats.lumiProtocolCount} / 진행 ${dailyStats.lumiProtocolProgressCount}`
+                    : `${dailyStats?.lumiProtocolMissionCount || dailyStats?.lumiProtocolCount || items.filter(i => i.type === 'lumi').length}회`
+              }
+              subValue={dailyStats?.lumiProtocolCrystalsEarned > 0 ? `광석 ${dailyStats.lumiProtocolCrystalsEarned}개` : null}
+              color="#55f1c8"
+            />
+          )}
           
           {/* Assignment stat */}
           <StatChip 
@@ -580,6 +603,58 @@ function GroupedCard({ item, index, onClick }) {
                 +{item.crystalsEarnedTotal} 광석
               </span>
             )}
+          </>
+        )}
+
+        {item.type === 'lumi' && (
+          <>
+            <span className="font-tech" style={{
+              color: item.completed ? '#22c55e' : '#55f1c8',
+              fontWeight: 'bold',
+              background: 'rgba(0,0,0,0.3)',
+              padding: '0.15rem 0.5rem',
+              borderRadius: '4px',
+              border: item.completed ? 'none' : '1px solid rgba(85, 241, 200, 0.25)'
+            }}>
+              {item.todayCompletedCount > 0 ? `오늘 ${item.todayCompletedCount}개 미션 완료` : '진행 중'}
+              {item.totalMissionCount > 0 ? ` · 전체 ${item.completedMissionCount || item.todayCompletedCount || 0}/${item.totalMissionCount} 진행` : ''}
+            </span>
+            {item.bestStars > 0 && (
+              <span className="font-tech" style={{
+                color: 'var(--star-gold)',
+                fontWeight: 'bold',
+                background: 'rgba(0,0,0,0.3)',
+                padding: '0.15rem 0.5rem',
+                borderRadius: '4px'
+              }}>
+                최고 별 {item.bestStars}개
+              </span>
+            )}
+            {item.lastMissionTitle && (
+              <span className="font-tech" style={{ color: 'var(--text-muted)' }}>
+                마지막 미션: {item.lastMissionTitle}
+              </span>
+            )}
+            {item.crystalsEarnedToday > 0 ? (
+              <span className="font-tech" style={{
+                color: 'var(--star-gold)',
+                fontWeight: 'bold',
+                background: 'rgba(0,0,0,0.3)',
+                padding: '0.15rem 0.5rem',
+                borderRadius: '4px'
+              }}>
+                오늘 광석 {item.crystalsEarnedToday}개 획득
+              </span>
+            ) : item.crystalsEarnedTotal > 0 ? (
+              <span className="font-tech" style={{
+                color: 'var(--text-muted)',
+                background: 'rgba(0,0,0,0.2)',
+                padding: '0.15rem 0.5rem',
+                borderRadius: '4px'
+              }}>
+                누적 광석 {item.crystalsEarnedTotal}개
+              </span>
+            ) : null}
           </>
         )}
 

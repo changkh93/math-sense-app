@@ -29,7 +29,7 @@ assert.match(dataCore.concepts, /tuple/)
 assert.equal(vsSet.missions[0].starterCode, 'lumi.wake()')
 
 const allSets = getAllPythonMissionSets()
-assert.equal(allSets.length, 5)
+assert.equal(allSets.length, 6)
 
 // 2. Evaluator new goal types
 // VS-01: awake goal
@@ -95,7 +95,7 @@ assert.equal(evalBlockedTransfer.stars, 2)
 const malformedMission = evaluateMissionRun({}, { finalState: { rover: { awake: true } } })
 assert.equal(malformedMission.worldGoalPassed, false)
 
-// 1-star unlocks next mission even if concept is missing
+// Missing required concept prevents mission clearance
 const eval1Star = evaluateMissionRun({
   goals: [{ type: 'position', x: 4, y: 2 }],
   conceptEvidence: { mustUse: ['for', 'range'] },
@@ -105,9 +105,9 @@ const eval1Star = evaluateMissionRun({
 })
 assert.equal(eval1Star.worldGoalPassed, true)
 assert.equal(eval1Star.conceptPassed, false)
-assert.equal(eval1Star.cleared, true)
+assert.equal(eval1Star.cleared, false)
 assert.equal(eval1Star.completed, false)
-assert.equal(eval1Star.nextUnlocked, true)
-assert.equal(eval1Star.stars, 1) // 1 star granted!
+assert.equal(eval1Star.nextUnlocked, false)
+assert.equal(eval1Star.stars, 0)
 
 console.log('Phase 1 API & Evaluator contract tests passed!')

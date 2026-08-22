@@ -15,12 +15,16 @@ const browserAuthDomain = typeof window !== "undefined" && (window.location.host
   ? "msense.me"
   : defaultAuthDomain;
 
+const env = (typeof import.meta !== "undefined" && import.meta?.env)
+  ? import.meta.env
+  : (typeof process !== "undefined" && process.env ? process.env : {});
+
 const firebaseConfig = {
   apiKey: "AIzaSyAn1TdeM6XArdnf82bOk1BTQMIfkh7kXvQ",
   // Keep the auth helper on the same origin in production. Embedded browsers
   // commonly block the cross-origin storage used by Firebase popup/redirect
   // helpers when this remains on *.firebaseapp.com.
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || browserAuthDomain,
+  authDomain: env.VITE_FIREBASE_AUTH_DOMAIN || browserAuthDomain,
   databaseURL: "https://math-sense-1f6a8-default-rtdb.asia-southeast1.firebasedatabase.app",
   projectId: "math-sense-1f6a8",
   storageBucket: "math-sense-1f6a8.firebasestorage.app",
@@ -33,7 +37,7 @@ export const FUNCTIONS_REGION = "asia-northeast3";
 export const ACCOUNT_DELETION_CALL_TIMEOUT_MS = 10 * 60 * 1000;
 
 const app = initializeApp(firebaseConfig);
-const appCheckSiteKey = import.meta.env.VITE_FIREBASE_APP_CHECK_SITE_KEY ||
+const appCheckSiteKey = env.VITE_FIREBASE_APP_CHECK_SITE_KEY ||
   "6LdfZ1ctAAAAAJEE3gJAHBZP5NQ_C3yE1P4u9NC4";
 
 // App Check 토큰을 먼저 발급하되, 콘솔 강제 적용은 정상 트래픽 지표를 확인한 뒤 켠다.

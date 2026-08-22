@@ -98,4 +98,37 @@ const vs09 = vsSet.missions.find((m) => m.id === 'lumi-vs-09')
 const nearMission = getMissionVariant(vs09, vs09.hiddenVariants[0])
 assert.equal(nearMission.goals[0].x, 3, 'VS-09 singular variant goal updates array-based base goals')
 
-console.log('Phase 5 All 10 Vertical Slice Missions validated successfully!')
+// ACT 1 Mission tests
+import { getLumiAct1Set } from '../src/components/PythonWorld/lumiCourseCatalog.js'
+const act1Set = getLumiAct1Set()
+assert.equal(act1Set.missions.length, 5)
+
+// Act 1-4: Bypassing `#` should fail
+const act1_04 = act1Set.missions.find((m) => m.id === 'lumi-act1-04')
+const bypassCommentsSim = evaluateMissionRun(act1_04, {
+  finalState: { rover: { x: 4, y: 4 } },
+  conceptsUsed: [], // didn't use `#`
+  callsUsed: ['lumi.turn', 'lumi.move'],
+})
+assert.equal(bypassCommentsSim.cleared, false, '1-4 without # cannot clear')
+assert.equal(bypassCommentsSim.stars, 0)
+
+// Act 1-4: Proper detour with `#` succeeds
+const correctCommentsSim = evaluateMissionRun(act1_04, {
+  finalState: { rover: { x: 4, y: 4 } },
+  conceptsUsed: ['#'],
+  callsUsed: ['lumi.turn', 'lumi.move'],
+  events: [{ type: 'rover_turned' }, { type: 'rover_moved' }],
+})
+// Act 1-5: Field Test Master clearance
+const act1_05 = act1Set.missions.find((m) => m.id === 'lumi-act1-05')
+const masterSim = evaluateMissionRun(act1_05, {
+  finalState: { rover: { x: 6, y: 3 } },
+  conceptsUsed: ['print', '+'],
+  callsUsed: ['print', 'lumi.move', 'lumi.turn'],
+  events: [{ type: 'rover_moved' }, { type: 'rover_turned' }],
+})
+assert.equal(masterSim.cleared, true, '1-5 master trajectory clears')
+assert.ok(masterSim.stars >= 2, '1-5 yields 2+ stars on clearance')
+
+console.log('Phase 5 All Missions (Vertical Slice & ACT 1) validated successfully!')
