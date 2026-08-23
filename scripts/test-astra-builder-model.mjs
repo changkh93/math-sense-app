@@ -652,6 +652,59 @@ assert.equal(canAstraBuilderCharacterOccupy(stairBodies, {
   scale: .28,
 }), false)
 
+// 1층 기초 바닥은 부지 띄움 높이와 바닥 두께가 합쳐져 일반
+// 단차보다 높지만, 외부 지형에서 접근할 때 벽으로 판정하지 않아야 한다.
+const groundFoundationGrid = createEmptyAstraBuilderGrid()
+groundFoundationGrid[getAstraBuilderCellIndex(stairCell)] = 2
+const groundFoundationBodies = createAstraBuilderCollisionBodies(groundFoundationGrid, plotBaseY)
+const terrainEntryFootY = plotBaseY - .08
+const groundFoundationHeight = getAstraBuilderWalkSurfaceHeight({
+  x: stairWorldX,
+  z: stairWorldZ,
+  currentFootY: terrainEntryFootY,
+  cells: groundFoundationGrid,
+  plotBaseY,
+  terrainY: terrainEntryFootY,
+})
+assert.equal(
+  groundFoundationHeight,
+  plotBaseY + ASTRA_BUILDER_POC_PLOT.cellSize * .24,
+)
+assert.equal(canAstraBuilderCharacterOccupy(groundFoundationBodies, {
+  x: stairWorldX,
+  z: stairWorldZ,
+  footY: terrainEntryFootY,
+  scale: .25,
+}), true)
+
+// 기초 언더레이 위의 계단도 동일한 1층 진입 규칙을 사용해
+// 첫 발을 디딜 수 있어야 한다.
+const foundationStairGrid = createEmptyAstraBuilderGrid()
+foundationStairGrid[getAstraBuilderCellIndex(stairCell)] = encodeAstraBuilderCell({
+  recipeId: 5,
+  blockType: 5,
+  rotation: 0,
+  occupied: true,
+  foundationUnderlay: true,
+  underlayRecipeId: 2,
+})
+const foundationStairBodies = createAstraBuilderCollisionBodies(foundationStairGrid, plotBaseY)
+const foundationStairEntryHeight = getAstraBuilderWalkSurfaceHeight({
+  x: stairWorldX,
+  z: stairWorldZ - halfCell,
+  currentFootY: terrainEntryFootY,
+  cells: foundationStairGrid,
+  plotBaseY,
+  terrainY: terrainEntryFootY,
+})
+assert.ok(foundationStairEntryHeight > terrainEntryFootY)
+assert.equal(canAstraBuilderCharacterOccupy(foundationStairBodies, {
+  x: stairWorldX,
+  z: stairWorldZ - halfCell,
+  footY: foundationStairEntryHeight,
+  scale: .25,
+}), true)
+
 // 실제 이동 컨트롤러처럼 다음 지지면을 먼저 구한 뒤 그 높이에서 몸 공간을
 // 검사하면 짧은 보폭으로 계단을 끝까지 오를 수 있다.
 let stairFootY = plotBaseY + ASTRA_BUILDER_PLATFORM_SURFACE_OFFSET

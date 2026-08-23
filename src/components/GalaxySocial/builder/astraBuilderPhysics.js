@@ -27,8 +27,20 @@ export function getAstraBuilderStairDirection(rotation = 0) {
 }
 
 const EPSILON = 0.002
+const GROUND_FLOOR_ACCESS_STEP_CELLS = 0.55
 
 const clamp = (value, min, max) => Math.min(max, Math.max(min, value))
+
+function getSupportStepAllowance(traits, cell, dimensions, plot) {
+  if (traits.bodyShape === 'stair') return plot.cellSize * 0.72
+  // The plot is lifted above the surrounding terrain and a foundation has its
+  // own thickness on top of that. Treating both as an ordinary step makes the
+  // exposed side of every ground-floor foundation behave like a wall.
+  if (traits.supportSurface === 'floor' && cell.y === 0) {
+    return Math.max(dimensions.maxStepUp, plot.cellSize * GROUND_FLOOR_ACCESS_STEP_CELLS)
+  }
+  return dimensions.maxStepUp
+}
 
 export function getAstraBuilderCharacterDimensions(
   scale = ASTRA_BUILDER_DEFAULT_CHARACTER_SCALE,
@@ -112,7 +124,10 @@ export function getAstraBuilderWalkSurfaceHeight({
 
   const dimensions = getAstraBuilderCharacterDimensions(characterScale)
   const currentOffset = Number.isFinite(currentFootY) ? currentFootY - plotBaseY : null
-  const candidates = [ASTRA_BUILDER_PLATFORM_SURFACE_OFFSET]
+  const candidates = [{
+    offset: ASTRA_BUILDER_PLATFORM_SURFACE_OFFSET,
+    allowance: dimensions.maxStepUp,
+  }]
 
   // A character is supported by its footprint, not only by the exact centre
   // point. This lets the upper stair remain supportive until the foot overlaps
@@ -137,7 +152,20 @@ export function getAstraBuilderWalkSurfaceHeight({
         const decoded = decodeAstraBuilderCell(cells[getAstraBuilderCellIndex(cell, plot)] || 0)
         if (!decoded.occupied) continue
         if (decoded.foundationUnderlay) {
-          candidates.push((cell.y + 0.24) * plot.cellSize)
+          const foundationTraits = getAstraBuilderBlockTraits(decoded.underlayRecipeId || 2)
+          const foundationOffset = (cell.y + 0.24) * plot.cellSize
+          const foundationAllowance = getSupportStepAllowance(
+            foundationTraits,
+            cell,
+            dimensions,
+            plot,
+          )
+          if (
+            currentOffset === null
+            || foundationOffset <= currentOffset + foundationAllowance + EPSILON
+          ) {
+            candidates.push({ offset: foundationOffset, allowance: foundationAllowance })
+          }
         }
         let supportX = x
         let supportZ = z
@@ -156,20 +184,22 @@ export function getAstraBuilderWalkSurfaceHeight({
           plot,
         )
         if (offset === null) continue
-        const stairAllowance = traits.bodyShape === 'stair' ? plot.cellSize * 0.72 : dimensions.maxStepUp
-        if (currentOffset !== null && offset > currentOffset + stairAllowance + EPSILON) continue
-        candidates.push(offset)
+        const allowance = getSupportStepAllowance(traits, cell, dimensions, plot)
+        if (currentOffset !== null && offset > currentOffset + allowance + EPSILON) continue
+        candidates.push({ offset, allowance })
       }
     }
   }
 
   let selectedOffset
   if (currentOffset === null) {
-    selectedOffset = Math.max(...candidates)
+    selectedOffset = Math.max(...candidates.map(({ offset }) => offset))
   } else {
-    const belowOrReachable = candidates.filter((offset) => offset <= currentOffset + plot.cellSize * 0.72 + EPSILON)
+    const belowOrReachable = candidates.filter(({ offset, allowance }) => (
+      offset <= currentOffset + allowance + EPSILON
+    ))
     selectedOffset = belowOrReachable.length
-      ? Math.max(...belowOrReachable)
+      ? Math.max(...belowOrReachable.map(({ offset }) => offset))
       : ASTRA_BUILDER_PLATFORM_SURFACE_OFFSET
   }
   return Math.max(terrainY, plotBaseY + selectedOffset)
@@ -287,7 +317,12 @@ export function findAstraBuilderBodyCollision(
     if (
       body.supportSurface !== 'none'
       && footY <= body.maxY + EPSILON
-      && footY + dimensions.maxStepUp + EPSILON >= body.maxY
+      && footY + getSupportStepAllowance(
+        { bodyShape: body.bodyShape, supportSurface: body.supportSurface },
+        body.cell,
+        dimensions,
+        body.plot || plot,
+      ) + EPSILON >= body.maxY
     ) return false
     return topY > body.minY + EPSILON && footY < body.maxY - EPSILON
   }) || null
