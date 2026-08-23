@@ -54,6 +54,13 @@ export default function ReadingBookshelfTab({
           </button>
           <button
             type="button"
+            className={`bookshelf-filter-btn ${filterStatus === BOOK_STATUSES.WANT_TO_READ ? 'active' : ''}`}
+            onClick={() => setFilterStatus(BOOK_STATUSES.WANT_TO_READ)}
+          >
+            🔖 {BOOK_STATUS_LABELS.want_to_read} ({books.filter((b) => b.status === BOOK_STATUSES.WANT_TO_READ).length})
+          </button>
+          <button
+            type="button"
             className={`bookshelf-filter-btn ${filterStatus === BOOK_STATUSES.COMPLETED ? 'active' : ''}`}
             onClick={() => setFilterStatus(BOOK_STATUSES.COMPLETED)}
           >

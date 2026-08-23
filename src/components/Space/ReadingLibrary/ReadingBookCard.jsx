@@ -16,14 +16,20 @@ export default function ReadingBookCard({ book, onOpenProgress, onOpenDetail }) 
   const furthestPage = book.progress?.furthestPage || book.progress?.latestReadPage || 0;
   const latestReadAt = book.progress?.latestReadAt;
 
+  const isWantToRead = status === BOOK_STATUSES.WANT_TO_READ;
+
   const getSpineIcon = () => {
     if (status === BOOK_STATUSES.COMPLETED) return '🏆';
     if (status === BOOK_STATUSES.PAUSED) return '⏸️';
+    if (status === BOOK_STATUSES.WANT_TO_READ) return '🔖';
     return '📖';
   };
 
   const handleClick = () => {
-    if (onOpenProgress) {
+    if (isWantToRead) {
+      if (onOpenDetail) onOpenDetail(book);
+      else if (onOpenProgress) onOpenProgress(book);
+    } else if (onOpenProgress) {
       onOpenProgress(book);
     } else if (onOpenDetail) {
       onOpenDetail(book);

@@ -53,12 +53,16 @@ export default function ReadingBookSpine({ book, onOpenProgress, onOpenDetail })
   const isCompleted = status === BOOK_STATUSES.COMPLETED;
   const isPaused = status === BOOK_STATUSES.PAUSED;
   const isReading = status === BOOK_STATUSES.READING;
+  const isWantToRead = status === BOOK_STATUSES.WANT_TO_READ;
 
   const palette = getBookSpinePalette(book);
   const { height, width } = getSpineDimensions(book);
 
   const handleClick = () => {
-    if (onOpenProgress) {
+    if (isWantToRead) {
+      if (onOpenDetail) onOpenDetail(book);
+      else if (onOpenProgress) onOpenProgress(book);
+    } else if (onOpenProgress) {
       onOpenProgress(book);
     } else if (onOpenDetail) {
       onOpenDetail(book);
@@ -109,6 +113,12 @@ export default function ReadingBookSpine({ book, onOpenProgress, onOpenDetail })
             <div className="spine-status-badge completed" title="완독">
               <Star size={13} fill="#fbbf24" color="#fbbf24" className="spin-on-hover" />
               <span className="spine-badge-text">완독</span>
+            </div>
+          )}
+          {isWantToRead && (
+            <div className="spine-status-badge want_to_read" title="관심 도서" style={{ background: 'rgba(56, 189, 248, 0.2)', borderColor: '#38bdf8' }}>
+              <Bookmark size={11} color="#38bdf8" />
+              <span className="spine-badge-text" style={{ color: '#38bdf8' }}>관심</span>
             </div>
           )}
           {isReading && (

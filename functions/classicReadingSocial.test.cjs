@@ -1,5 +1,31 @@
 const assert = require("assert");
 const policy = require("./classicReadingSocialPolicy");
+const createClassicReadingSocial = require("./classicReadingSocial");
+
+assert.strictEqual(typeof createClassicReadingSocial, "function", "Functions module must load successfully");
+assert.strictEqual(policy.DAILY_LIMITS.LINK_BOOK, 20);
+assert.strictEqual(policy.DAILY_LIMITS.REACTION_LIST, 60);
+
+{
+  const firestore = () => ({});
+  firestore.FieldValue = {};
+  firestore.Timestamp = {};
+  const mockFunctions = {
+    https: {
+      HttpsError: class HttpsError extends Error {},
+    },
+  };
+  const moduleResult = createClassicReadingSocial({
+    functions: mockFunctions,
+    admin: { firestore },
+    costOptimizedDataFunctions: { https: { onCall: (handler) => handler } },
+    requireAuthUid: async () => "test-user",
+    requireAdminUid: async () => "test-admin",
+  });
+  assert.strictEqual(typeof moduleResult.functions.linkReadingShareBook, "function");
+  assert.strictEqual(typeof moduleResult.functions.getReadingShareReactionUsers, "function");
+  assert.strictEqual(typeof moduleResult.functions.replyToReadingShareComment, "function");
+}
 
 console.log("=== Running classicReadingSocialPolicy unit tests ===");
 
@@ -125,6 +151,74 @@ console.log("=== Running classicReadingSocialPolicy unit tests ===");
   assert.strictEqual(policy.isSafeDocumentId("nested/path"), false);
   assert.strictEqual(policy.isSafeDocumentId(""), false);
   assert.strictEqual(policy.isSafeDocumentId("."), false);
+}
+
+// 8. Reply validation
+{
+  const emptyReply = policy.validateReplyInput("   ");
+  assert.strictEqual(emptyReply.valid, false);
+  assert.strictEqual(emptyReply.error, policy.ERROR_CODES.INVALID_REPLY);
+
+  const validReply = policy.validateReplyInput("답글입니다!");
+  assert.strictEqual(validReply.valid, true);
+  assert.strictEqual(validReply.content, "답글입니다!");
+
+  const longReply = policy.validateReplyInput("답글".repeat(150));
+  assert.strictEqual(longReply.valid, false);
+  assert.strictEqual(longReply.error, policy.ERROR_CODES.INVALID_REPLY);
+}
+
+// 9. Intent validation & Deterministic Social Book ID
+{
+  assert.strictEqual(policy.validateReadingIntent("want_to_read").valid, true);
+  assert.strictEqual(policy.validateReadingIntent("read").valid, true);
+  assert.strictEqual(policy.validateReadingIntent("invalid").valid, false);
+
+  const socialBookId1 = policy.getDeterministicSocialBookId("user_1234567890123", " 80일간의 세계 일주 ", "쥘 베른");
+  const socialBookId2 = policy.getDeterministicSocialBookId("user_1234567890123", "80일간의세계일주", "쥘베른");
+  assert.strictEqual(socialBookId1, socialBookId2);
+  assert.strictEqual(socialBookId1.startsWith("social__user_1234567__"), true);
+
+  const replyId = policy.getDeterministicReplyId("share_1", "comment_1", "cmd_1");
+  assert.strictEqual(replyId, "reply__share_1__comment_1__cmd_1");
+
+  const notifId = policy.getReplyNotificationId("share_1", "comment_1", "reply_1", "user_target");
+  assert.strictEqual(notifId.startsWith("reading_share_reply_"), true);
+}
+
+// 10. resolveReactionState (v1/v2 compatibility)
+{
+  // v1 want_to_read
+  const v1Want = policy.resolveReactionState({ type: "want_to_read" });
+  assert.deepStrictEqual(v1Want, {
+    resonated: false,
+    readingIntent: "want_to_read",
+    linkedBookId: null,
+    schemaVersion: 1,
+  });
+
+  // v1 resonated
+  const v1Resonated = policy.resolveReactionState({ type: "resonated" });
+  assert.deepStrictEqual(v1Resonated, {
+    resonated: true,
+    readingIntent: null,
+    linkedBookId: null,
+    schemaVersion: 1,
+  });
+
+  // v2 both resonated and linked
+  const v2Full = policy.resolveReactionState({
+    resonated: true,
+    readingIntent: "read",
+    linkedBookId: "book_999",
+    schemaVersion: 2,
+  });
+  assert.deepStrictEqual(v2Full, {
+    resonated: true,
+    readingIntent: "read",
+    linkedBookId: "book_999",
+    schemaVersion: 2,
+  });
 }
 
 console.log("All classicReadingSocialPolicy unit tests passed successfully!");

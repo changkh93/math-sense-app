@@ -279,6 +279,115 @@
   border: 1px solid rgba(255, 255, 255, 0.08);
 }
 
+.drawer-reaction-btn-group {
+  display: flex;
+  align-items: stretch;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  overflow: hidden;
+  transition: all 0.2s ease;
+}
+
+.drawer-reaction-btn-group:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.drawer-reaction-action-part {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  padding: 0.7rem 0.5rem;
+  background: transparent;
+  border: none;
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.drawer-reaction-action-part:hover:not(:disabled) {
+  color: #fff;
+}
+
+.drawer-reaction-action-part:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.drawer-reaction-count-pill {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 0.65rem;
+  background: rgba(255, 255, 255, 0.06);
+  border: none;
+  border-left: 1px solid rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 0.82rem;
+  font-weight: 800;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.drawer-reaction-count-pill:hover {
+  background: rgba(255, 255, 255, 0.15);
+  color: #fff;
+}
+
+/* Resonated active */
+.drawer-reaction-btn-group.active.resonated {
+  background: rgba(167, 139, 250, 0.18);
+  border-color: #a78bfa;
+}
+
+.drawer-reaction-btn-group.active.resonated .drawer-reaction-action-part,
+.drawer-reaction-btn-group.active.resonated .drawer-reaction-count-pill {
+  color: #c4b5fd;
+}
+
+.drawer-reaction-btn-group.active.resonated .drawer-reaction-count-pill {
+  border-left-color: rgba(167, 139, 250, 0.4);
+  background: rgba(167, 139, 250, 0.2);
+}
+
+/* Want to Read active */
+.drawer-reaction-btn-group.active.want {
+  background: rgba(56, 189, 248, 0.18);
+  border-color: #38bdf8;
+}
+
+.drawer-reaction-btn-group.active.want .drawer-reaction-action-part,
+.drawer-reaction-btn-group.active.want .drawer-reaction-count-pill {
+  color: #7dd3fc;
+}
+
+.drawer-reaction-btn-group.active.want .drawer-reaction-count-pill {
+  border-left-color: rgba(56, 189, 248, 0.4);
+  background: rgba(56, 189, 248, 0.2);
+}
+
+/* Read active */
+.drawer-reaction-btn-group.active.read {
+  background: rgba(52, 211, 153, 0.18);
+  border-color: #34d399;
+}
+
+.drawer-reaction-btn-group.active.read .drawer-reaction-action-part,
+.drawer-reaction-btn-group.active.read .drawer-reaction-count-pill {
+  color: #6ee7b7;
+}
+
+.drawer-reaction-btn-group.active.read .drawer-reaction-count-pill {
+  border-left-color: rgba(52, 211, 153, 0.4);
+  background: rgba(52, 211, 153, 0.2);
+}
+
 .drawer-reaction-btn {
   flex: 1;
   display: flex;
@@ -299,18 +408,6 @@
 .drawer-reaction-btn:hover {
   background: rgba(255, 255, 255, 0.1);
   color: #fff;
-}
-
-.drawer-reaction-btn.active.want {
-  background: rgba(56, 189, 248, 0.2);
-  border-color: #38bdf8;
-  color: #38bdf8;
-}
-
-.drawer-reaction-btn.active.resonated {
-  background: rgba(167, 139, 250, 0.2);
-  border-color: #a78bfa;
-  color: #a78bfa;
 }
 
 /* Comments Section */
@@ -525,4 +622,157 @@
 .composer-input:focus, .composer-textarea:focus {
   outline: none;
   border-color: #38bdf8;
+}
+
+/* Reading Lounge Sidebar */
+.reading-lounge-sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  width: 100%;
+}
+
+.reading-sidebar-card {
+  padding: 1.25rem;
+  border-radius: 20px;
+  position: relative;
+  overflow: hidden;
+}
+
+.reading-sidebar-hero {
+  background: linear-gradient(145deg, rgba(30, 27, 75, 0.5) 0%, rgba(15, 23, 42, 0.75) 100%);
+  border: 1px solid rgba(99, 102, 241, 0.35);
+  box-shadow: 0 8px 32px rgba(15, 23, 42, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+
+.reading-sidebar-hero-header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.reading-sidebar-hero-icon {
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  background: rgba(99, 102, 241, 0.2);
+  border: 1px solid rgba(129, 140, 248, 0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #818cf8;
+  flex-shrink: 0;
+}
+
+.reading-sidebar-hero-title {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: #f8fafc;
+}
+
+.reading-sidebar-hero-subtitle {
+  margin: 0;
+  font-size: 0.76rem;
+  color: #a5b4fc;
+}
+
+.reading-sidebar-hero-desc {
+  margin: 0 0 1rem 0;
+  font-size: 0.82rem;
+  color: #cbd5e1;
+  line-height: 1.55;
+}
+
+.reading-sidebar-action-btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.7rem 1rem;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #4f46e5 0%, #6366f1 100%);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: #ffffff;
+  font-size: 0.85rem;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 4px 14px rgba(79, 70, 229, 0.4);
+  transition: all 0.2s ease;
+}
+
+.reading-sidebar-action-btn:hover {
+  background: linear-gradient(135deg, #4338ca 0%, #4f46e5 100%);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 20px rgba(79, 70, 229, 0.5);
+}
+
+.reading-sidebar-quote-card {
+  background: rgba(15, 23, 42, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.reading-sidebar-quote-badge {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  color: #fbbf24;
+  font-size: 0.78rem;
+  font-weight: 800;
+  margin-bottom: 0.6rem;
+  letter-spacing: -0.01em;
+}
+
+.reading-sidebar-quote-text {
+  margin: 0 0 0.5rem 0;
+  font-size: 0.85rem;
+  color: #f1f5f9;
+  font-style: italic;
+  line-height: 1.6;
+}
+
+.reading-sidebar-quote-author {
+  text-align: right;
+  font-size: 0.76rem;
+  color: #94a3b8;
+  font-weight: 600;
+}
+
+.reading-sidebar-guide-card {
+  background: rgba(15, 23, 42, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.reading-sidebar-guide-title {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.9rem;
+  font-weight: 800;
+  color: #f8fafc;
+  margin-bottom: 0.75rem;
+}
+
+.reading-sidebar-guide-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  font-size: 0.8rem;
+  color: #94a3b8;
+  line-height: 1.5;
+}
+
+.reading-sidebar-guide-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+}
+
+.reading-sidebar-guide-item strong {
+  color: #e2e8f0;
 }

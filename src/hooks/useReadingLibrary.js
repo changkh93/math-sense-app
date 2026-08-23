@@ -40,8 +40,8 @@ export function useReadingBooks(userId, options = {}) {
         return books.filter((book) => book.status === status);
       }
 
-      // Sort: reading first, then completed, then paused; then updatedAt desc
-      const statusOrder = { reading: 1, completed: 2, paused: 3 };
+      // Sort: reading first, then want_to_read, then completed, then paused; then updatedAt desc
+      const statusOrder = { reading: 1, want_to_read: 2, completed: 3, paused: 4 };
       return books.sort((a, b) => {
         const orderA = statusOrder[a.status] || 99;
         const orderB = statusOrder[b.status] || 99;

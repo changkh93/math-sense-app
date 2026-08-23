@@ -264,6 +264,11 @@ module.exports = function ({ functions, admin, costOptimizedDataFunctions, requi
     let booksQuery = db.collection("readingBooks")
       .where("userId", "==", targetUserId)
       .where("archivedAt", "==", null)
+      .where("status", "in", [
+        policy.BOOK_STATUSES.READING,
+        policy.BOOK_STATUSES.COMPLETED,
+        policy.BOOK_STATUSES.PAUSED,
+      ])
       .orderBy("createdAt", "desc")
       .orderBy(admin.firestore.FieldPath.documentId(), "desc");
 
@@ -333,6 +338,7 @@ module.exports = function ({ functions, admin, costOptimizedDataFunctions, requi
     const bookRef = db.collection("readingBooks").doc();
     const bookId = bookRef.id;
 
+    const isWantToRead = validation.status === policy.BOOK_STATUSES.WANT_TO_READ;
     const bookData = {
       userId: uid,
       title: validation.title,
@@ -351,14 +357,15 @@ module.exports = function ({ functions, admin, costOptimizedDataFunctions, requi
         reviewedAssignmentCount: 0,
         version: 1,
       },
-      startedAt: customTimestamp,
+      wantedAt: isWantToRead ? customTimestamp : null,
+      startedAt: isWantToRead ? null : customTimestamp,
       completedAt: validation.status === policy.BOOK_STATUSES.COMPLETED ? customTimestamp : null,
       pausedAt: validation.status === policy.BOOK_STATUSES.PAUSED ? customTimestamp : null,
       statusUpdatedAt: nowTimestamp,
       archivedAt: null,
       createdAt: nowTimestamp,
       updatedAt: nowTimestamp,
-      schemaVersion: 1,
+      schemaVersion: 2,
     };
 
     const resultPayload = { bookId, title: validation.title, author: validation.author, status: validation.status };
@@ -453,7 +460,12 @@ module.exports = function ({ functions, admin, costOptimizedDataFunctions, requi
         updatedAt: nowTimestamp,
       };
 
-      if (targetStatus === policy.BOOK_STATUSES.COMPLETED) {
+      if (prevStatus === policy.BOOK_STATUSES.WANT_TO_READ && targetStatus === policy.BOOK_STATUSES.READING) {
+        updates.startedAt = book.startedAt || nowTimestamp;
+      }
+      if (targetStatus === policy.BOOK_STATUSES.WANT_TO_READ) {
+        updates.wantedAt = book.wantedAt || nowTimestamp;
+      } else if (targetStatus === policy.BOOK_STATUSES.COMPLETED) {
         updates.completedAt = nowTimestamp;
       } else if (targetStatus === policy.BOOK_STATUSES.PAUSED) {
         updates.pausedAt = nowTimestamp;
@@ -573,6 +585,9 @@ module.exports = function ({ functions, admin, costOptimizedDataFunctions, requi
       const book = bookSnap.data() || {};
       if (book.userId !== uid) {
         throw new functions.https.HttpsError("permission-denied", "본인의 책만 수정할 수 있습니다.", { code: policy.ERROR_CODES.BOOK_FORBIDDEN });
+      }
+      if (book.status === policy.BOOK_STATUSES.WANT_TO_READ) {
+        throw new functions.https.HttpsError("failed-precondition", "읽기 시작하지 않은 책에는 독서 기록을 남길 수 없습니다.", { code: policy.ERROR_CODES.BOOK_NOT_STARTED });
       }
       if (!userSnap.exists) {
         throw new functions.https.HttpsError("failed-precondition", "사용자 문서를 찾을 수 없습니다.");
@@ -965,6 +980,9 @@ module.exports = function ({ functions, admin, costOptimizedDataFunctions, requi
         const book = bookSnap.data() || {};
         if (book.userId !== uid) {
           throw new functions.https.HttpsError("permission-denied", "본인의 책에만 과제를 제출할 수 있습니다.", { code: policy.ERROR_CODES.BOOK_FORBIDDEN });
+        }
+        if (book.status === policy.BOOK_STATUSES.WANT_TO_READ) {
+          throw new functions.https.HttpsError("failed-precondition", "읽기 시작하지 않은 책으로는 과제를 제출할 수 없습니다.", { code: policy.ERROR_CODES.BOOK_NOT_STARTED });
         }
         if (!userSnap.exists) {
           throw new functions.https.HttpsError("failed-precondition", "사용자 문서를 찾을 수 없습니다.");

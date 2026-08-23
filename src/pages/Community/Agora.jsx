@@ -10,6 +10,7 @@ import SpaceNavbar from '../../components/Space/SpaceNavbar';
 import AgoraLiveTicker from '../../components/Community/AgoraLiveTicker';
 import StarMessageInput from '../../components/Community/StarMessageInput';
 import AgoraMotivationPanel from '../../components/Community/AgoraMotivationPanel';
+import ReadingLoungeSidebar from '../../components/Community/ReadingLounge/ReadingLoungeSidebar';
 import AssignmentShareFeed from '../../components/Community/AssignmentShareFeed';
 import ReadingLoungeView from '../../components/Community/ReadingLounge/ReadingLoungeView';
 import { useLatestReadingShare } from '../../hooks/useReadingSocial';
@@ -387,9 +388,15 @@ export default function Agora() {
         )}
           </main>
           
-          <AgoraMotivationPanel 
-            userData={userData} 
-          />
+          {filter === 'reading' ? (
+            <aside className="agora-side-panel">
+              <ReadingLoungeSidebar />
+            </aside>
+          ) : (
+            <AgoraMotivationPanel
+              userData={userData}
+            />
+          )}
         </div>
 
       <button className="floating-ask-btn action-flare" onClick={() => setIsModalOpen(true)}>

@@ -159,11 +159,105 @@ export function useMyReadingReaction(shareId, { enabled = false } = {}) {
       const ref = doc(db, 'readingShares', shareId, 'reactions', user.uid);
       const snap = await getDoc(ref);
       if (!snap.exists()) return null;
-      return snap.data()?.type || null;
+      const data = snap.data() || {};
+      const resonated = data.resonated ?? data.type === 'resonated';
+      const readingIntent = data.readingIntent ?? (data.type === 'want_to_read' ? 'want_to_read' : null);
+      return {
+        resonated: Boolean(resonated),
+        readingIntent: readingIntent || null,
+        linkedBookId: data.linkedBookId || null,
+        schemaVersion: data.schemaVersion || 1,
+        // Legacy compatibility:
+        type: data.type || (resonated ? 'resonated' : readingIntent),
+      };
     },
     enabled: Boolean(user?.uid && shareId && enabled),
     staleTime: SOCIAL_STALE_TIME,
     gcTime: SOCIAL_GC_TIME,
+    refetchOnWindowFocus: false,
+  });
+}
+
+/**
+ * 3-1. useReadingShareReplies
+ * Lazy-load replies for a specific root comment (initial 3, then 10 at a time)
+ */
+export function useReadingShareReplies(shareId, rootCommentId, { enabled = false } = {}) {
+  const { user } = useAuth();
+  const REPLIES_INITIAL_SIZE = 3;
+  const REPLIES_PAGE_SIZE = 10;
+
+  return useInfiniteQuery({
+    queryKey: ['readingShareReplies', shareId, rootCommentId],
+    queryFn: async ({ pageParam = null }) => {
+      const repliesColl = collection(db, 'readingShares', shareId, 'comments', rootCommentId, 'replies');
+      const pageSize = pageParam ? REPLIES_PAGE_SIZE : REPLIES_INITIAL_SIZE;
+
+      let q = query(
+        repliesColl,
+        where('status', 'in', ['visible', 'deleted']),
+        orderBy('createdAt', 'asc'),
+        orderBy('__name__', 'asc'),
+        limit(pageSize + 1)
+      );
+
+      if (pageParam) {
+        q = query(
+          repliesColl,
+          where('status', 'in', ['visible', 'deleted']),
+          orderBy('createdAt', 'asc'),
+          orderBy('__name__', 'asc'),
+          startAfter(pageParam.createdAt, pageParam.id),
+          limit(pageSize + 1)
+        );
+      }
+
+      const snap = await getDocs(q);
+      const docs = snap.docs;
+      const hasMore = docs.length > pageSize;
+      const replies = docs.slice(0, pageSize).map((d) => ({
+        id: d.id,
+        ...d.data(),
+      }));
+
+      const lastDoc = docs[docs.length - 2] || docs[docs.length - 1];
+      const nextCursor = hasMore && lastDoc
+        ? {
+            createdAt: lastDoc.data()?.createdAt,
+            id: lastDoc.id,
+          }
+        : null;
+
+      return { replies, nextCursor };
+    },
+    getNextPageParam: (lastPage) => lastPage.nextCursor,
+    enabled: Boolean(user && shareId && rootCommentId && enabled),
+    staleTime: SOCIAL_STALE_TIME,
+    gcTime: SOCIAL_GC_TIME,
+    refetchOnWindowFocus: false,
+  });
+}
+
+/**
+ * 3-2. useReadingShareReactionUsers
+ * Lazy-loads the list of users who reacted to a share with a specific reaction
+ */
+export function useReadingShareReactionUsers(shareId, reactionType, { enabled = false } = {}) {
+  const { user } = useAuth();
+
+  return useInfiniteQuery({
+    queryKey: ['readingShareReactionUsers', shareId, reactionType],
+    queryFn: async ({ pageParam = null }) => {
+      if (!shareId || !reactionType) return { users: [], nextCursor: null };
+      const callFn = httpsCallable(functions, 'getReadingShareReactionUsers');
+      const res = await callFn({ shareId, reactionType, cursor: pageParam });
+      return res.data || { users: [], nextCursor: null };
+    },
+    initialPageParam: null,
+    getNextPageParam: (lastPage) => lastPage.nextCursor || undefined,
+    enabled: Boolean(user && shareId && reactionType && enabled),
+    staleTime: 1000 * 60, // 1 minute
+    retry: false,
     refetchOnWindowFocus: false,
   });
 }
@@ -391,57 +485,127 @@ export function useWithdrawReadingShare() {
   });
 }
 
+// Link Reading Share Book (want_to_read or completed)
+export function useLinkReadingShareBook() {
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
+
+  return useMutation({
+    mutationFn: async ({ shareId, intent, completedDateKst }) => {
+      const commandId = generateCommandId('link_book');
+      const callFn = httpsCallable(functions, 'linkReadingShareBook');
+      const res = await callFn({ commandId, shareId, intent, completedDateKst });
+      return res.data;
+    },
+    onSuccess: (data, variables) => {
+      const { shareId } = variables;
+      const { readingIntent, reactionCounts } = data;
+
+      if (user?.uid) {
+        queryClient.setQueryData(['myReadingReaction', shareId, user.uid], (old) => ({
+          resonated: Boolean(old?.resonated),
+          readingIntent,
+          linkedBookId: data.bookId || old?.linkedBookId || null,
+          schemaVersion: 2,
+        }));
+      }
+
+      if (reactionCounts) {
+        queryClient.setQueryData(['readingShare', shareId], (old) => {
+          if (!old) return old;
+          return { ...old, reactionCounts };
+        });
+
+        queryClient.setQueriesData({ queryKey: ['readingShareFeed'] }, (old) => {
+          if (!old?.pages) return old;
+          return {
+            ...old,
+            pages: old.pages.map((page) => ({
+              ...page,
+              items: page.items.map((item) => {
+                if (item.id !== shareId) return item;
+                return { ...item, reactionCounts };
+              }),
+            })),
+          };
+        });
+
+        queryClient.setQueryData(['readingShareFeatured', 'latest'], (old) => {
+          if (!old || old.id !== shareId) return old;
+          return { ...old, reactionCounts };
+        });
+      }
+
+      // Invalidate bookshelf to show newly linked/created book
+      queryClient.invalidateQueries({ queryKey: ['readingBooks'] });
+      queryClient.invalidateQueries({ queryKey: ['readingBook'] });
+      queryClient.invalidateQueries({ queryKey: ['readingShareReactionUsers', shareId] });
+    },
+  });
+}
+
 // Set Reaction (Goal-based, Localized Query Data update)
 export function useSetReadingShareReaction() {
   const queryClient = useQueryClient();
   const { user } = useAuth();
 
   return useMutation({
-    mutationFn: async ({ shareId, reactionType }) => {
+    mutationFn: async ({ shareId, resonated, reactionType }) => {
       const callFn = httpsCallable(functions, 'setReadingShareReaction');
-      const res = await callFn({ shareId, reactionType });
+      const payload = typeof resonated === 'boolean'
+        ? { shareId, resonated }
+        : { shareId, reactionType };
+      const res = await callFn(payload);
       return res.data;
     },
     onSuccess: (data, variables) => {
       const { shareId } = variables;
-      const { reactionType, reactionCounts } = data;
+      const { resonated, readingIntent, reactionCounts } = data;
 
       // Update my reaction query data
       if (user?.uid) {
-        queryClient.setQueryData(['myReadingReaction', shareId, user.uid], reactionType);
+        queryClient.setQueryData(['myReadingReaction', shareId, user.uid], (old) => ({
+          resonated: Boolean(resonated ?? old?.resonated),
+          readingIntent: readingIntent ?? old?.readingIntent ?? null,
+          linkedBookId: old?.linkedBookId || null,
+          schemaVersion: 2,
+        }));
       }
 
       // Update single share query data if open
-      queryClient.setQueryData(['readingShare', shareId], (old) => {
-        if (!old) return old;
-        return {
-          ...old,
-          reactionCounts,
-        };
-      });
+      if (reactionCounts) {
+        queryClient.setQueryData(['readingShare', shareId], (old) => {
+          if (!old) return old;
+          return {
+            ...old,
+            reactionCounts,
+          };
+        });
 
-      // Update feed cards query data locally (NO feed refetch!)
-      queryClient.setQueriesData({ queryKey: ['readingShareFeed'] }, (old) => {
-        if (!old?.pages) return old;
-        return {
-          ...old,
-          pages: old.pages.map((page) => ({
-            ...page,
-            items: page.items.map((item) => {
-              if (item.id !== shareId) return item;
-              return {
-                ...item,
-                reactionCounts,
-              };
-            }),
-          })),
-        };
-      });
+        // Update feed cards query data locally (NO feed refetch!)
+        queryClient.setQueriesData({ queryKey: ['readingShareFeed'] }, (old) => {
+          if (!old?.pages) return old;
+          return {
+            ...old,
+            pages: old.pages.map((page) => ({
+              ...page,
+              items: page.items.map((item) => {
+                if (item.id !== shareId) return item;
+                return {
+                  ...item,
+                  reactionCounts,
+                };
+              }),
+            })),
+          };
+        });
 
-      queryClient.setQueryData(['readingShareFeatured', 'latest'], (old) => {
-        if (!old || old.id !== shareId) return old;
-        return { ...old, reactionCounts };
-      });
+        queryClient.setQueryData(['readingShareFeatured', 'latest'], (old) => {
+          if (!old || old.id !== shareId) return old;
+          return { ...old, reactionCounts };
+        });
+      }
+      queryClient.invalidateQueries({ queryKey: ['readingShareReactionUsers', shareId] });
     },
   });
 }
@@ -571,6 +735,169 @@ export function useDeleteReadingShareComment() {
           commentCount: data.commentCount ?? Math.max(0, (old.commentCount || 0) - 1),
         };
       });
+    },
+  });
+}
+
+// Add Reply to Comment
+export function useReplyToReadingShareComment() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ shareId, rootCommentId, content }) => {
+      const commandId = generateCommandId('reply');
+      const callFn = httpsCallable(functions, 'replyToReadingShareComment');
+      const res = await callFn({
+        commandId,
+        shareId,
+        rootCommentId,
+        content,
+      });
+      return res.data;
+    },
+    onSuccess: (data, variables) => {
+      const { shareId, rootCommentId } = variables;
+      const { reply, replyCount, commentCount } = data;
+
+      // Append new reply to replies query cache
+      queryClient.setQueryData(['readingShareReplies', shareId, rootCommentId], (old) => {
+        if (!old?.pages) {
+          return {
+            pages: [{ replies: [reply], nextCursor: null }],
+            pageParams: [null],
+          };
+        }
+        const pages = [...old.pages];
+        const lastPageIdx = pages.length - 1;
+        const lastPage = pages[lastPageIdx];
+        pages[lastPageIdx] = {
+          ...lastPage,
+          replies: [...(lastPage.replies || []), reply],
+        };
+        return { ...old, pages };
+      });
+
+      // Update root comment's replyCount in comments query cache
+      queryClient.setQueryData(['readingShareComments', shareId], (old) => {
+        if (!old?.pages) return old;
+        return {
+          ...old,
+          pages: old.pages.map((page) => ({
+            ...page,
+            comments: page.comments.map((c) => {
+              if (c.id !== rootCommentId) return c;
+              return { ...c, replyCount: replyCount ?? (c.replyCount || 0) + 1 };
+            }),
+          })),
+        };
+      });
+
+      // Update parent share commentCount
+      if (commentCount !== undefined) {
+        queryClient.setQueryData(['readingShare', shareId], (old) => {
+          if (!old) return old;
+          return { ...old, commentCount };
+        });
+
+        queryClient.setQueriesData({ queryKey: ['readingShareFeed'] }, (old) => {
+          if (!old?.pages) return old;
+          return {
+            ...old,
+            pages: old.pages.map((page) => ({
+              ...page,
+              items: page.items.map((item) => {
+                if (item.id !== shareId) return item;
+                return { ...item, commentCount };
+              }),
+            })),
+          };
+        });
+
+        queryClient.setQueryData(['readingShareFeatured', 'latest'], (old) => {
+          if (!old || old.id !== shareId) return old;
+          return { ...old, commentCount };
+        });
+      }
+    },
+  });
+}
+
+// Delete Reply
+export function useDeleteReadingShareReply() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ shareId, rootCommentId, replyId }) => {
+      const commandId = generateCommandId('del_reply');
+      const callFn = httpsCallable(functions, 'deleteReadingShareReply');
+      const res = await callFn({ commandId, shareId, rootCommentId, replyId });
+      return res.data;
+    },
+    onSuccess: (data, variables) => {
+      const { shareId, rootCommentId, replyId } = variables;
+      const { replyCount, commentCount } = data;
+
+      // Soft delete in replies query cache
+      queryClient.setQueryData(['readingShareReplies', shareId, rootCommentId], (old) => {
+        if (!old?.pages) return old;
+        return {
+          ...old,
+          pages: old.pages.map((page) => ({
+            ...page,
+            replies: page.replies.map((r) => {
+              if (r.id !== replyId) return r;
+              return {
+                ...r,
+                content: '',
+                status: 'deleted',
+                userSnapshot: { displayName: '삭제된 댓글' },
+              };
+            }),
+          })),
+        };
+      });
+
+      // Update root comment's replyCount
+      queryClient.setQueryData(['readingShareComments', shareId], (old) => {
+        if (!old?.pages) return old;
+        return {
+          ...old,
+          pages: old.pages.map((page) => ({
+            ...page,
+            comments: page.comments.map((c) => {
+              if (c.id !== rootCommentId) return c;
+              return { ...c, replyCount: replyCount ?? Math.max(0, (c.replyCount || 0) - 1) };
+            }),
+          })),
+        };
+      });
+
+      // Update parent share commentCount
+      if (commentCount !== undefined) {
+        queryClient.setQueryData(['readingShare', shareId], (old) => {
+          if (!old) return old;
+          return { ...old, commentCount };
+        });
+
+        queryClient.setQueriesData({ queryKey: ['readingShareFeed'] }, (old) => {
+          if (!old?.pages) return old;
+          return {
+            ...old,
+            pages: old.pages.map((page) => ({
+              ...page,
+              items: page.items.map((item) => {
+                if (item.id !== shareId) return item;
+                return { ...item, commentCount };
+              }),
+            })),
+          };
+        });
+
+        queryClient.setQueryData(['readingShareFeatured', 'latest'], (old) => {
+          if (!old || old.id !== shareId) return old;
+          return { ...old, commentCount };
+        });
+      }
     },
   });
 }

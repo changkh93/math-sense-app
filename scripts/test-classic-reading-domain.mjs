@@ -18,9 +18,12 @@ import { filterWesternClassicRegions } from '../src/constants/westernClassicNavi
 
 console.log('=== Running client reading domain & time tests ===');
 
-// 1. Domain form validations
 const validForm = validateBookForm({ title: '어린 왕자', author: '생텍쥐페리' });
 assert.strictEqual(validForm.valid, true);
+
+const wantToReadForm = validateBookForm({ title: '80일간의 세계 일주', author: '쥘 베른', status: BOOK_STATUSES.WANT_TO_READ });
+assert.strictEqual(wantToReadForm.valid, true);
+assert.strictEqual(wantToReadForm.status, 'want_to_read');
 
 const invalidTitle = validateBookForm({ title: '', author: '저자' });
 assert.strictEqual(invalidTitle.valid, false);

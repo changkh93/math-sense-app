@@ -12,6 +12,7 @@ export default function ReadingShareCard({ share, onSelect }) {
   const isBlind = hasSpoiler && !showSpoiler;
 
   const wantToReadCount = reactionCounts?.wantToRead || 0;
+  const readCount = reactionCounts?.read || 0;
   const resonatedCount = reactionCounts?.resonated || 0;
 
   const handleSpoilerToggle = (e) => {
@@ -98,10 +99,16 @@ export default function ReadingShareCard({ share, onSelect }) {
         </div>
 
         <div className="share-card-counts">
-          <div className="share-count-item want" title="읽어보고 싶어요">
+          <div className="share-count-item want" title="읽고 싶어요">
             <Bookmark size={14} />
             <span>{wantToReadCount}</span>
           </div>
+          {readCount > 0 && (
+            <div className="share-count-item read" title="저도 읽었어요" style={{ color: '#34d399' }}>
+              <BookOpen size={14} />
+              <span>{readCount}</span>
+            </div>
+          )}
           <div className="share-count-item resonated" title="생각이 이어졌어요">
             <Sparkles size={14} />
             <span>{resonatedCount}</span>

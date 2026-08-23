@@ -795,6 +795,18 @@ service cloud.firestore {
           resource.data.status == 'deleted'
         );
         allow write: if false;
+
+        match /replies/{replyId} {
+          allow read: if isAuth() && (
+            get(/databases/$(database)/documents/readingShares/$(shareId)).data.status == 'active' ||
+            get(/databases/$(database)/documents/readingShares/$(shareId)).data.ownerId == request.auth.uid ||
+            isAdmin()
+          ) && (
+            resource.data.status == 'visible' ||
+            resource.data.status == 'deleted'
+          );
+          allow write: if false;
+        }
       }
     }
 

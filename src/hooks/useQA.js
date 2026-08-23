@@ -175,7 +175,7 @@ export function useQuestionAnswers(questionId) {
 
 // --- Q&A Mutations ---
 // --- Fetch Top Helpers (Ranking) ---
-export function useQARanking() {
+export function useQARanking(options = {}) {
   return useQuery({
     queryKey: ['qaRanking'],
     queryFn: async () => {
@@ -188,7 +188,8 @@ export function useQARanking() {
       const snap = await getDocs(q);
       return snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
     },
-    staleTime: 1000 * 60 * 5 // 5 minutes
+    staleTime: 1000 * 60 * 5, // 5 minutes
+    ...options,
   });
 }
 

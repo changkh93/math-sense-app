@@ -137,12 +137,13 @@ export default function ReadingBookFormModal({ isOpen, onClose, existingBooks = 
                 onChange={(e) => setStatus(e.target.value)}
               >
                 <option value={BOOK_STATUSES.READING}>{BOOK_STATUS_LABELS.reading}</option>
+                <option value={BOOK_STATUSES.WANT_TO_READ}>{BOOK_STATUS_LABELS.want_to_read}</option>
                 <option value={BOOK_STATUSES.COMPLETED}>{BOOK_STATUS_LABELS.completed}</option>
                 <option value={BOOK_STATUSES.PAUSED}>{BOOK_STATUS_LABELS.paused}</option>
               </select>
             </div>
 
-            {status !== BOOK_STATUSES.READING && (
+            {(status === BOOK_STATUSES.COMPLETED || status === BOOK_STATUSES.PAUSED) && (
               <div className="reading-form-group">
                 <label htmlFor="reading-book-date" className="reading-form-label">
                   {status === BOOK_STATUSES.COMPLETED ? '완독 일자' : '중단 일자'}

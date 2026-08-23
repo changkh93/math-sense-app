@@ -1,16 +1,24 @@
 export const BOOK_STATUSES = {
+  WANT_TO_READ: 'want_to_read',
   READING: 'reading',
   COMPLETED: 'completed',
   PAUSED: 'paused'
 };
 
 export const BOOK_STATUS_LABELS = {
+  [BOOK_STATUSES.WANT_TO_READ]: '읽고 싶어요',
   [BOOK_STATUSES.READING]: '읽고 있어요',
   [BOOK_STATUSES.COMPLETED]: '완독했어요',
-  [BOOK_STATUSES.PAUSED]: '읽기 중단 중입니다'
+  [BOOK_STATUSES.PAUSED]: '읽기 중단'
 };
 
 export const BOOK_STATUS_COLORS = {
+  [BOOK_STATUSES.WANT_TO_READ]: {
+    border: '#38bdf8',
+    bg: 'rgba(56, 189, 248, 0.12)',
+    text: '#38bdf8',
+    badgeBg: 'rgba(56, 189, 248, 0.2)'
+  },
   [BOOK_STATUSES.READING]: {
     border: '#00f3ff',
     bg: 'rgba(0, 243, 255, 0.12)',
@@ -39,12 +47,14 @@ export const LOG_EVENT_TYPES = {
 
 export const LOG_SOURCES = {
   ASSIGNMENT: 'assignment',
-  BOOKSHELF: 'bookshelf'
+  BOOKSHELF: 'bookshelf',
+  READING_LOUNGE: 'reading_lounge'
 };
 
 export const ERROR_MESSAGES = {
   BOOK_NOT_FOUND: '선택한 책을 찾을 수 없거나 보관 처리되었습니다.',
   BOOK_FORBIDDEN: '책에 대한 접근 권한이 없습니다.',
+  BOOK_NOT_STARTED: "먼저 '읽기 시작'으로 상태를 바꿔 주세요.",
   INVALID_BOOK_TITLE: '책 제목은 1~200자 사이여야 합니다.',
   INVALID_BOOK_AUTHOR: '저자는 1~120자 사이여야 합니다.',
   INVALID_BOOK_STATUS: '올바른 독서 상태를 선택해 주세요.',

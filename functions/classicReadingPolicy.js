@@ -1,6 +1,7 @@
 const crypto = require("crypto");
 
 const BOOK_STATUSES = {
+  WANT_TO_READ: "want_to_read",
   READING: "reading",
   COMPLETED: "completed",
   PAUSED: "paused",
@@ -19,6 +20,7 @@ const ALLOWED_LOG_EVENT_TYPES = new Set(Object.values(LOG_EVENT_TYPES));
 const LOG_SOURCES = {
   ASSIGNMENT: "assignment",
   BOOKSHELF: "bookshelf",
+  READING_LOUNGE: "reading_lounge",
 };
 
 const ALLOWED_LOG_SOURCES = new Set(Object.values(LOG_SOURCES));
@@ -26,6 +28,7 @@ const ALLOWED_LOG_SOURCES = new Set(Object.values(LOG_SOURCES));
 const ERROR_CODES = {
   BOOK_NOT_FOUND: "BOOK_NOT_FOUND",
   BOOK_FORBIDDEN: "BOOK_FORBIDDEN",
+  BOOK_NOT_STARTED: "BOOK_NOT_STARTED",
   INVALID_BOOK_TITLE: "INVALID_BOOK_TITLE",
   INVALID_BOOK_AUTHOR: "INVALID_BOOK_AUTHOR",
   INVALID_BOOK_STATUS: "INVALID_BOOK_STATUS",

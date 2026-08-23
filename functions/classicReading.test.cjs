@@ -108,6 +108,10 @@ assert.strictEqual(incrementalTie.latestReadPage, 50);
 assert.strictEqual(incrementalTie.furthestPage, 99);
 
 // 7. Status transitions
+assert.strictEqual(policy.validateStatusTransition("want_to_read", "reading").allowed, true);
+assert.strictEqual(policy.validateStatusTransition("want_to_read", "completed").allowed, true);
+assert.strictEqual(policy.validateStatusTransition("want_to_read", "paused").allowed, true);
+assert.strictEqual(policy.validateStatusTransition("reading", "want_to_read").allowed, true);
 assert.strictEqual(policy.validateStatusTransition("reading", "completed").allowed, true);
 assert.strictEqual(policy.validateStatusTransition("reading", "paused").allowed, true);
 assert.strictEqual(policy.validateStatusTransition("paused", "reading").allowed, true);

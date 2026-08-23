@@ -100,6 +100,43 @@ export default function ReadingBookDetailDrawer({ isOpen, onClose, book, onOpenP
               {currentBook.author}
             </p>
 
+            {/* Discovery attribution banner if linked from Reading Lounge */}
+            {currentBook.discovery && (
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: '0.8rem',
+                  padding: '0.75rem 1rem',
+                  borderRadius: 12,
+                  background: 'rgba(56, 189, 248, 0.1)',
+                  border: '1px solid rgba(56, 189, 248, 0.25)',
+                  marginBottom: '1rem',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.82rem', color: '#e0f2fe' }}>
+                  <Sparkles size={16} color="#38bdf8" />
+                  <span>
+                    독서 라운지에서 <strong>{currentBook.discovery.recommenderDisplayName || '별빛 탐험가'}</strong> 님의 추천으로 담은 책
+                  </span>
+                </div>
+                {currentBook.discovery.firstShareId && (
+                  <button
+                    type="button"
+                    className="lounge-tab-btn"
+                    style={{ fontSize: '0.74rem', padding: '0.25rem 0.6rem', shrink: 0 }}
+                    onClick={() => {
+                      onClose();
+                      navigate(`/?view=agora&filter=reading&highlight=${currentBook.discovery.firstShareId}`);
+                    }}
+                  >
+                    추천 글 보기
+                  </button>
+                )}
+              </div>
+            )}
+
             {/* Lifecycle Metadata */}
             <div
               style={{
@@ -117,10 +154,17 @@ export default function ReadingBookDetailDrawer({ isOpen, onClose, book, onOpenP
                 <span style={{ color: 'rgba(224, 242, 254, 0.55)', display: 'block' }}>최대 읽은 쪽</span>
                 <strong style={{ color: '#5eead4', fontSize: '1.05rem' }}>{furthestPage > 0 ? `${furthestPage}쪽` : '없음'}</strong>
               </div>
-              <div>
-                <span style={{ color: 'rgba(224, 242, 254, 0.55)', display: 'block' }}>독서 시작일</span>
-                <span style={{ color: '#fff' }}>{formatKSTShortDate(currentBook.startedAt || currentBook.createdAt)}</span>
-              </div>
+              {status === BOOK_STATUSES.WANT_TO_READ ? (
+                <div>
+                  <span style={{ color: 'rgba(224, 242, 254, 0.55)', display: 'block' }}>관심 등록일</span>
+                  <span style={{ color: '#38bdf8' }}>{formatKSTShortDate(currentBook.wantedAt || currentBook.createdAt)}</span>
+                </div>
+              ) : (
+                <div>
+                  <span style={{ color: 'rgba(224, 242, 254, 0.55)', display: 'block' }}>독서 시작일</span>
+                  <span style={{ color: '#fff' }}>{formatKSTShortDate(currentBook.startedAt || currentBook.createdAt)}</span>
+                </div>
+              )}
               {currentBook.completedAt && (
                 <div>
                   <span style={{ color: 'rgba(224, 242, 254, 0.55)', display: 'block' }}>완독 일자</span>
@@ -137,6 +181,31 @@ export default function ReadingBookDetailDrawer({ isOpen, onClose, book, onOpenP
 
             {/* Quick Actions */}
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '1.4rem' }}>
+              {status === BOOK_STATUSES.WANT_TO_READ && (
+                <>
+                  <button
+                    type="button"
+                    className="bookshelf-add-btn font-tech"
+                    onClick={() => handleStatusChange(BOOK_STATUSES.READING)}
+                    disabled={updateStatusMutation.isPending}
+                    style={{ fontSize: '0.82rem', padding: '0.45rem 0.85rem' }}
+                  >
+                    <PlayCircle size={14} />
+                    독서 시작하기
+                  </button>
+                  <button
+                    type="button"
+                    className="space-nav-link font-tech"
+                    onClick={() => handleStatusChange(BOOK_STATUSES.COMPLETED)}
+                    disabled={updateStatusMutation.isPending}
+                    style={{ fontSize: '0.82rem', padding: '0.45rem 0.85rem', color: '#34d399' }}
+                  >
+                    <CheckCircle2 size={14} />
+                    완독으로 등록
+                  </button>
+                </>
+              )}
+
               {status === BOOK_STATUSES.READING && (
                 <>
                   <button
@@ -200,42 +269,44 @@ export default function ReadingBookDetailDrawer({ isOpen, onClose, book, onOpenP
               )}
 
               {/* Recommendation Actions */}
-              {currentBook.publicShare?.status === 'active' ? (
-                <div style={{ display: 'flex', gap: '0.4rem' }}>
+              {status !== BOOK_STATUSES.WANT_TO_READ && (
+                currentBook.publicShare?.status === 'active' ? (
+                  <div style={{ display: 'flex', gap: '0.4rem' }}>
+                    <button
+                      type="button"
+                      className="bookshelf-add-btn font-tech"
+                      style={{ fontSize: '0.82rem', padding: '0.45rem 0.85rem', background: 'rgba(56, 189, 248, 0.2)', borderColor: '#38bdf8', color: '#38bdf8' }}
+                      onClick={() => {
+                        onClose();
+                        navigate(`/?view=agora&filter=reading&highlight=${currentBook.publicShare.shareId}`);
+                      }}
+                    >
+                      <Sparkles size={14} />
+                      추천 글 보기
+                    </button>
+                    <button
+                      type="button"
+                      className="space-nav-link font-tech"
+                      style={{ fontSize: '0.82rem', padding: '0.45rem 0.85rem' }}
+                      onClick={() => {
+                        onClose();
+                        navigate(`/?view=agora&filter=reading&highlight=${currentBook.publicShare.shareId}`);
+                      }}
+                    >
+                      수정
+                    </button>
+                  </div>
+                ) : (
                   <button
                     type="button"
                     className="bookshelf-add-btn font-tech"
-                    style={{ fontSize: '0.82rem', padding: '0.45rem 0.85rem', background: 'rgba(56, 189, 248, 0.2)', borderColor: '#38bdf8', color: '#38bdf8' }}
-                    onClick={() => {
-                      onClose();
-                      navigate(`/?view=agora&filter=reading&highlight=${currentBook.publicShare.shareId}`);
-                    }}
+                    onClick={() => setIsComposerOpen(true)}
+                    style={{ fontSize: '0.82rem', padding: '0.45rem 0.85rem', background: 'rgba(56, 189, 248, 0.15)', borderColor: 'rgba(56, 189, 248, 0.4)', color: '#38bdf8' }}
                   >
-                    <Sparkles size={14} />
-                    추천 글 보기
+                    <Share2 size={14} />
+                    이 책 추천하기
                   </button>
-                  <button
-                    type="button"
-                    className="space-nav-link font-tech"
-                    style={{ fontSize: '0.82rem', padding: '0.45rem 0.85rem' }}
-                    onClick={() => {
-                      onClose();
-                      navigate(`/?view=agora&filter=reading&highlight=${currentBook.publicShare.shareId}`);
-                    }}
-                  >
-                    수정
-                  </button>
-                </div>
-              ) : (
-                <button
-                  type="button"
-                  className="bookshelf-add-btn font-tech"
-                  onClick={() => setIsComposerOpen(true)}
-                  style={{ fontSize: '0.82rem', padding: '0.45rem 0.85rem', background: 'rgba(56, 189, 248, 0.15)', borderColor: 'rgba(56, 189, 248, 0.4)', color: '#38bdf8' }}
-                >
-                  <Share2 size={14} />
-                  이 책 추천하기
-                </button>
+                )
               )}
 
               <button
