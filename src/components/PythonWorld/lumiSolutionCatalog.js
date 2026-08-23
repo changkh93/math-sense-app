@@ -22,13 +22,24 @@ lumi.move(steps)`,
     lumi.move(world.steps_to_target)`,
 
   // ACT 1 · Command Core
-  'lumi-act1-01': `lumi.move(2)
-lumi.turn(90)
+  'lumi-act1-01': `from msense import lumi
+
 lumi.move(2)`,
-  'lumi-act1-02': `lumi.move(2 + 3)`,
-  'lumi-act1-03': `print("LUMI ONLINE")
+  'lumi-act1-02': `from msense import lumi
+
+lumi.move(1)
+lumi.turn(90)
+lumi.move(2)
+lumi.turn(-90)
 lumi.move(3)`,
-  'lumi-act1-04': `from metasense import lumi, world
+  'lumi-act1-03': `from msense import lumi
+
+lumi.move(2 + 3)`,
+  'lumi-act1-04': `from msense import lumi
+
+print("LUMI ONLINE")
+lumi.move(3)`,
+  'lumi-act1-05': `from msense import lumi
 
 # 위험한 직진 명령은 실행하지 않습니다.
 # lumi.move(4)
@@ -36,35 +47,44 @@ lumi.move(3)`,
 lumi.turn(90)
 lumi.move(2)
 lumi.turn(-90)
-lumi.move(world.target_distance)`,
-  'lumi-act1-05': `from metasense import lumi, world
+lumi.move(3)`,
+  'lumi-act1-06': `from msense import lumi
 
 print("COMMAND CORE 100%")
 lumi.move(1 + 2)
 lumi.turn(90)
 lumi.move(2)
 lumi.turn(-90)
-lumi.move(world.target_distance)`,
+lumi.move(2)`,
 
   // ACT 2 · Memory Core
-  'lumi-act2-01': `steps = 3
-lumi.move(steps)`,
-  'lumi-act2-02': `target_steps = 4
-lumi.move(target_steps)`,
-  'lumi-act2-03': `energy = 5
-energy = energy - 2
+  'lumi-act2-01': `from msense import lumi
 
-# 실제 항로가 바뀌어도 도착하도록 현재 거리를 사용합니다.
-distance = world.target_distance
-lumi.move(distance)`,
-  'lumi-act2-04': `val_type = type(100)
+steps = 3
+lumi.move(steps)`,
+  'lumi-act2-02': `from msense import lumi
+
+target_steps = 4
+lumi.move(target_steps)`,
+  'lumi-act2-03': `from msense import lumi
+
+energy = 5
+energy = energy - 2
+lumi.move(energy)`,
+  'lumi-act2-04': `from msense import lumi
+
+val_type = type(100)
 lumi.say(val_type)
 lumi.move(3)`,
-  'lumi-act2-05': `energy = 100
+  'lumi-act2-05': `from msense import lumi
+
+energy = 100
 msg = f"ENERGY {energy}"
 lumi.say(msg)
 lumi.move(3)`,
-  'lumi-act2-06': `steps_text = input("이동 신호")
+  'lumi-act2-06': `from msense import lumi
+
+steps_text = input("이동 신호")
 steps = int(steps_text)
 lumi.move(steps)`,
 
@@ -84,33 +104,33 @@ lumi.say(safe_distance)`,
 lumi.say(can_depart)`,
 
   // ACT 4 · Decision Core
-  'if-charge-01': `from metasense import lumi
+  'if-charge-01': `from msense import lumi
 
 if lumi.energy < 30:
     lumi.charge()`,
-  'if-launch-02': `from metasense import lumi, world
+  'if-launch-02': `from msense import lumi, world
 
 distance = world.target_distance
 if lumi.energy >= distance:
     lumi.move(distance)`,
-  'if-signal-03': `from metasense import lumi
+  'if-signal-03': `from msense import lumi
 
 objects = lumi.scan()
 for obj in objects:
     if obj.strength >= 5:
         lumi.collect(obj)`,
-  'if-route-04': `from metasense import lumi, world
+  'if-route-04': `from msense import lumi, world
 
 if world.snapshot()["target"]["x"] < lumi.x:
     lumi.turn(180)
 
 lumi.move(world.target_distance)`,
-  'if-dual-05': `from metasense import lumi, world
+  'if-dual-05': `from msense import lumi, world
 
 distance = world.target_distance
 if lumi.energy >= distance and distance <= 6:
     lumi.move(distance)`,
-  'if-rescue-06': `from metasense import lumi, world
+  'if-rescue-06': `from msense import lumi, world
 
 if lumi.energy < world.target_distance:
     lumi.charge()
@@ -158,18 +178,18 @@ for row in range(rows):
 lumi.say(cells)`,
 
   // ACT 6 · Persistence Core
-  'while-approach-01': `from metasense import lumi, world
+  'while-approach-01': `from msense import lumi, world
 
 # target_distance는 이동할 때마다 다시 계산되는 현재 거리입니다.
 while world.target_distance > 0:
     lumi.move(1)`,
-  'while-charge-02': `from metasense import lumi, world
+  'while-charge-02': `from msense import lumi, world
 
 while lumi.energy < 50:
     lumi.charge()
 
 lumi.move(world.target_distance)`,
-  'while-collect-03': `from metasense import lumi, world
+  'while-collect-03': `from msense import lumi, world
 
 # 수집할 때마다 world.objects에서 해당 신호가 사라집니다.
 while world.objects:
@@ -182,11 +202,11 @@ while count > 0:
     count = count - 1
 
 print("LAUNCH")`,
-  'while-energy-05': `from metasense import lumi, world
+  'while-energy-05': `from msense import lumi, world
 
 while lumi.energy > 0 and world.target_distance > 0:
     lumi.move(1)`,
-  'while-rescue-06': `from metasense import lumi, world
+  'while-rescue-06': `from msense import lumi, world
 
 # 첫 번째 반복: 남은 신호를 모두 회수합니다.
 while world.objects:
@@ -212,26 +232,26 @@ print(target)`,
 print(status.get("energy", 0))`,
 
   // ACT 8 · Ability Core
-  'function-move-01': `from metasense import lumi, world
+  'function-move-01': `from msense import lumi, world
 
 def move_to_beacon():
     lumi.move(world.target_distance)
 
 move_to_beacon()`,
-  'function-parameter-02': `from metasense import lumi, world
+  'function-parameter-02': `from msense import lumi, world
 
 def travel(distance):
     lumi.move(distance)
 
 travel(world.target_distance)`,
-  'function-return-03': `from metasense import lumi
+  'function-return-03': `from msense import lumi
 
 def is_safe():
     return lumi.energy >= 30
 
 if is_safe():
     print("SAFE")`,
-  'function-collect-04': `from metasense import lumi
+  'function-collect-04': `from msense import lumi
 
 def rescue(signal):
     if signal.priority >= 3:
@@ -239,7 +259,7 @@ def rescue(signal):
 
 for signal in lumi.scan():
     rescue(signal)`,
-  'function-charge-05': `from metasense import lumi, world
+  'function-charge-05': `from msense import lumi, world
 
 def ensure_energy(required):
     if lumi.energy < required:
@@ -248,7 +268,7 @@ def ensure_energy(required):
 distance = world.target_distance
 ensure_energy(distance)
 lumi.move(distance)`,
-  'function-expedition-06': `from metasense import lumi, world
+  'function-expedition-06': `from msense import lumi, world
 
 def prepare():
     if lumi.energy < world.target_distance:

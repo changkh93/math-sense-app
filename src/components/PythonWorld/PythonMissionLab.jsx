@@ -168,6 +168,9 @@ export default function PythonMissionLab({ unit, missionSet, initialMissionIndex
   const [result, setResult] = useState(null)
   const [runtimeMetadata, setRuntimeMetadata] = useState(null)
   const [inspectorTab, setInspectorTab] = useState('trace')
+  const [inspectorHeight, setInspectorHeight] = useState(140)
+  const [isResizingInspector, setIsResizingInspector] = useState(false)
+  const resizeStartRef = useRef({ startY: 0, startHeight: 140 })
   const [hintLevel, setHintLevel] = useState(0)
   const [solutionReviewUsed, setSolutionReviewUsed] = useState(false)
   const [solutionSession, setSolutionSession] = useState(null)
@@ -184,6 +187,37 @@ export default function PythonMissionLab({ unit, missionSet, initialMissionIndex
   const runIdRef = useRef(0)
   const celebratedRunIdsRef = useRef(new Set())
   const pendingResultRef = useRef(null)
+
+  const handleStartResize = useCallback((e) => {
+    e.preventDefault()
+    setIsResizingInspector(true)
+    resizeStartRef.current = {
+      startY: e.clientY,
+      startHeight: inspectorHeight,
+    }
+  }, [inspectorHeight])
+
+  useEffect(() => {
+    if (!isResizingInspector) return undefined
+
+    const handleMouseMove = (e) => {
+      const deltaY = resizeStartRef.current.startY - e.clientY
+      const nextHeight = Math.max(60, Math.min(500, resizeStartRef.current.startHeight + deltaY))
+      setInspectorHeight(nextHeight)
+    }
+
+    const handleMouseUp = () => {
+      setIsResizingInspector(false)
+    }
+
+    window.addEventListener('mousemove', handleMouseMove)
+    window.addEventListener('mouseup', handleMouseUp)
+
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove)
+      window.removeEventListener('mouseup', handleMouseUp)
+    }
+  }, [isResizingInspector])
   const scaffoldMeta = useMemo(() => getLumiScaffoldMeta(mission), [mission])
   const learningSteps = useMemo(() => getLumiLearningSteps(mission), [mission])
   const missionHints = useMemo(() => getLumiMissionHints(mission), [mission])
@@ -218,6 +252,19 @@ export default function PythonMissionLab({ unit, missionSet, initialMissionIndex
       }
     }
   }, [initialProgress, missions])
+
+  useEffect(() => {
+    if (!mission) return
+    const isPrintFocused =
+      mission.id === 'lumi-act1-04' ||
+      mission.conceptEvidence?.mustCall?.includes('print') ||
+      mission.goals?.some((g) => g.type === 'stdoutIncludes' || g.type === 'stdoutLineCountAtLeast')
+    if (isPrintFocused) {
+      setInspectorTab('output')
+    } else {
+      setInspectorTab('trace')
+    }
+  }, [mission?.id])
 
   const toggleSound = useCallback(() => {
     setSoundMuted((prev) => {
@@ -409,11 +456,10 @@ export default function PythonMissionLab({ unit, missionSet, initialMissionIndex
   const showTimeline = visibleTools.includes('step') || visibleTools.includes('timeline') || visibleTools.includes('replay')
   // 학습에 필요한 새 도구의 설명은 미션별 UI 옵션과 관계없이 항상 제공합니다.
   const showApi = relevantApi.length > 0
-  const showMemoryCore = visibleTools.includes('memory')
-  const showMissionTabs = missionSet.kind !== 'prototype' || visibleTools.includes('mission-tabs')
+  const showMissionTabs = missions.length > 1
   const showHud = missionSet.kind !== 'prototype' || visibleTools.includes('hud')
   const showSensor = missionSet.kind !== 'prototype' || visibleTools.includes('sensor')
-  const showInspector = !scaffold.visibleTools || visibleTools.includes('inspector') || visibleTools.includes('trace') || showMemoryCore
+  const showInspector = true
   const isViewOnly = scaffold.mode === 'view-only'
   const firstUnfinishedIndex = missions.findIndex((item) => !completedIds.has(item.id))
   const maxUnlockedMissionIndex = firstUnfinishedIndex < 0 ? missions.length - 1 : firstUnfinishedIndex
@@ -449,7 +495,16 @@ export default function PythonMissionLab({ unit, missionSet, initialMissionIndex
       // ignore
     }
 
-    if (nextProgress.completed || (nextProgress.completedMissionIds?.length >= missions.length)) {
+    const wasActCompletedBefore = Boolean(
+      progress?.completed ||
+      (progress?.completedMissionIds && progress.completedMissionIds.length >= missions.length)
+    )
+    const isActNowCompleted = Boolean(
+      nextProgress.completed ||
+      (nextProgress.completedMissionIds && nextProgress.completedMissionIds.length >= missions.length)
+    )
+
+    if (!wasActCompletedBefore && isActNowCompleted) {
       setTimeout(() => {
         setShowActCelebration(true)
         playLumiSound('clear_core')
@@ -1113,9 +1168,17 @@ export default function PythonMissionLab({ unit, missionSet, initialMissionIndex
           </div>
           {showInspector && (
             <>
+              <div
+                className={`python-lab__inspector-resizer ${isResizingInspector ? 'is-resizing' : ''}`}
+                onMouseDown={handleStartResize}
+                role="separator"
+                aria-orientation="horizontal"
+                aria-label="출력 패널 높이 조절"
+                title="마우스로 위/아래로 끌어 높이를 조절할 수 있습니다"
+              />
               <div className="python-lab__inspector-tabs">
                 <button type="button" className={inspectorTab === 'trace' ? 'is-active' : ''} onClick={() => setInspectorTab('trace')}>
-                  {showMemoryCore ? '변수 기록 (MEMORY)' : '실행 추적 (TRACE)'}
+                  변수 기록 (MEMORY)
                 </button>
                 {registeredClasses.length > 0 && (
                   <button type="button" className={inspectorTab === 'blueprint' ? 'is-active' : ''} onClick={() => setInspectorTab('blueprint')}>
@@ -1141,7 +1204,7 @@ export default function PythonMissionLab({ unit, missionSet, initialMissionIndex
                   💻 출력 (OUTPUT)
                 </button>
               </div>
-              <div className="python-lab__inspector">
+              <div className="python-lab__inspector" style={{ height: `${inspectorHeight}px` }}>
                 {inspectorTab === 'tactical' ? (
                   <LumiTacticalInspector tacticalState={tacticalState} />
                 ) : inspectorTab === 'trace' ? (
@@ -1304,7 +1367,24 @@ export default function PythonMissionLab({ unit, missionSet, initialMissionIndex
                       </div>
                     ))}
                   </div>
-                ) : <pre>{stdout || '출력 없음'}</pre>}
+                ) : (
+                  <div className="python-lab__output-container">
+                    {stdout ? (
+                      <div className="python-lab__output-filled">
+                        <pre className="python-lab__stdout-box">{stdout}</pre>
+                        <div className="python-lab__output-success-hint">
+                          <span>💡 <code>print()</code>에 넣은 글자가 화면(OUTPUT)에 정상적으로 출력되었습니다.</span>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="python-lab__output-empty">
+                        <span className="python-lab__output-icon">💻</span>
+                        <strong>아직 출력된 메시지가 없습니다.</strong>
+                        <small>코드를 작성하고 <strong>▶ RUN</strong>을 누르면 <code>print()</code>로 출력한 내용이 여기에 나타납니다.</small>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             </>
           )}

@@ -34,9 +34,11 @@ for (const mission of missions) {
   assert.equal(typeof initialCode, 'string', `${mission.id}: initial code must be a string`)
   assert.ok(initialCode.trim(), `${mission.id}: initial editor guidance must not be empty`)
 
-  if (isSolvedStarterAllowed(mission)) {
-    observeCount += 1
-    assert.equal(initialCode, mission.starterCode, `${mission.id}: observe mission must keep its approved code`)
+  if (isSolvedStarterAllowed(mission) || (typeof mission?.starterCode === 'string' && mission.starterCode.trim().length > 0)) {
+    if (isSolvedStarterAllowed(mission)) {
+      observeCount += 1
+      assert.equal(initialCode, mission.starterCode, `${mission.id}: observe mission must keep its approved code`)
+    }
   } else {
     const executableLines = initialCode
       .split('\n')

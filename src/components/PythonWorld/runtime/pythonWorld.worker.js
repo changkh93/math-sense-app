@@ -238,9 +238,13 @@ def _analyze(tree, code=""):
                 parts.append(current.id)
                 calls.add(".".join(reversed(parts)))
         elif isinstance(node, ast.Import):
-            violations.append("Mission Lab에서는 지정된 metasense 모듈만 불러올 수 있습니다.")
-        elif isinstance(node, ast.ImportFrom) and node.module != "metasense":
-            violations.append("Mission Lab에서는 지정된 metasense 모듈만 불러올 수 있습니다.")
+            violations.append("Mission Lab에서는 지정된 msense 모듈만 불러올 수 있습니다.")
+        elif isinstance(node, ast.ImportFrom):
+            if node.module in ("msense", "metasense"):
+                concepts.add("import")
+                concepts.add("from")
+            else:
+                violations.append("Mission Lab에서는 지정된 msense 모듈만 불러올 수 있습니다.")
     return sorted(concepts), sorted(calls), violations, classes_metadata
 
 
@@ -645,11 +649,12 @@ def _run_mission(payload_json, code):
 
     world = World()
 
-    metasense = types.ModuleType("metasense")
-    metasense.lumi = lumi
-    metasense.world = world
-    metasense.Rover = Rover
-    sys.modules["metasense"] = metasense
+    msense = types.ModuleType("msense")
+    msense.lumi = lumi
+    msense.world = world
+    msense.Rover = Rover
+    sys.modules["msense"] = msense
+    sys.modules["metasense"] = msense
 
     class SafeType:
         def __init__(self, name):
@@ -681,9 +686,9 @@ def _run_mission(payload_json, code):
         return val
 
     def safe_import(name, globals=None, locals=None, fromlist=(), level=0):
-        if level != 0 or name != "metasense":
-            raise PermissionError("Mission Lab에서는 metasense 모듈만 불러올 수 있습니다.")
-        return metasense
+        if level != 0 or (name != "msense" and name != "metasense"):
+            raise PermissionError("Mission Lab에서는 msense 모듈만 불러올 수 있습니다.")
+        return msense
 
     stdout = io.StringIO()
     concepts = []
@@ -913,6 +918,7 @@ def _run_mission(payload_json, code):
         }
     finally:
         sys.settrace(None)
+        sys.modules.pop("msense", None)
         sys.modules.pop("metasense", None)
 
     return json.dumps({

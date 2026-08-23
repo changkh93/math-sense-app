@@ -12,14 +12,24 @@ const STAGE_META = Object.freeze({
 
 const API_REFERENCE = Object.freeze([
   {
+    signature: 'from msense import lumi', token: 'from msense import lumi',
+    description: 'msense에서 lumi를 가져와 코드에서 사용할 수 있게 준비합니다.',
+    detail: 'LUMI에게 명령을 내리기 전에 항상 맨 첫 줄에 작성합니다.',
+  },
+  {
+    signature: '# 주석 (실행 끄기 / 설명)', token: '#',
+    description: '줄 맨 앞에 #을 붙이면 Python이 해당 코드를 실행하지 않고 건너뜁니다.',
+    detail: '예: # lumi.move(4)처럼 위험한 명령을 비활성화하거나 메모를 남길 때 사용합니다.',
+  },
+  {
     signature: 'lumi.move(distance)', token: 'lumi.move',
-    description: '루미가 현재 바라보는 방향으로 distance칸 이동합니다.',
-    detail: 'distance에는 숫자뿐 아니라 변수나 world에서 읽은 거리도 넣을 수 있습니다. 이동하면 좌표와 목표까지의 거리가 함께 바뀝니다.',
+    description: 'LUMI를 앞으로 distance칸 이동합니다.',
+    detail: '예: lumi.move(2)를 작성하면 앞으로 2칸 이동합니다.',
   },
   {
     signature: 'lumi.turn(degrees)', token: 'lumi.turn',
-    description: '루미의 방향을 degrees도만큼 회전합니다.',
-    detail: '90은 오른쪽, -90은 왼쪽, 180은 뒤쪽을 향하게 합니다. 회전만으로 위치는 바뀌지 않습니다.',
+    description: 'LUMI의 방향을 degrees도만큼 회전합니다.',
+    detail: '90은 오른쪽(시계 방향), -90은 왼쪽(반시계 방향)으로 회전합니다.',
   },
   {
     signature: 'lumi.say(message)', token: 'lumi.say',
@@ -98,8 +108,8 @@ const API_REFERENCE = Object.freeze([
   },
   {
     signature: 'print(value)', token: 'print',
-    description: '값을 오른쪽 출력 창에 표시합니다.',
-    detail: '문자열, 숫자, 변수, 계산 결과를 확인할 때 사용합니다. 루미의 월드 상태를 바꾸는 명령은 아닙니다.',
+    description: '글자나 숫자를 화면(OUTPUT 창)에 보여줍니다.',
+    detail: '예: print("LUMI ONLINE")을 실행하면 오른쪽 아래 OUTPUT 창에 글자가 나타납니다. 글자는 항상 큰따옴표(" ") 안에 넣습니다.',
   },
   {
     signature: 'len(items)', token: 'len',
@@ -136,6 +146,15 @@ const CONCEPT_REFERENCE = Object.freeze([
 ])
 
 const MISSION_STEPS = Object.freeze({
+  'lumi-act1-01': ['msense에서 lumi를 불러옵니다. (from msense import lumi)', 'LUMI를 앞으로 2칸 이동시킵니다. (lumi.move(2))'],
+  'lumi-act1-02': ['지뢰 앞까지 1칸 전진합니다. (lumi.move(1))', '오른쪽으로 90도 회전합니다. (lumi.turn(90))', '아래로 2칸 이동합니다. (lumi.move(2))', '왼쪽으로 -90도 회전합니다. (lumi.turn(-90))', '앞으로 3칸 이동해 비콘에 도착합니다. (lumi.move(3))'],
+  'lumi-act1-03': ['lumi.move() 괄호 안에 덧셈 수식(2 + 3)을 입력합니다.'],
+  'lumi-act1-04': [
+    'print("LUMI ONLINE")으로 화면에 메시지를 출력합니다. (원하는 메시지를 3줄까지 써도 좋아요!)',
+    'lumi.move(3)으로 비콘에 도착합니다.',
+  ],
+  'lumi-act1-05': ['위험한 직진 명령 맨 앞에 #을 붙여 끕니다. (# lumi.move(4))', '오른쪽으로 돌아가는 안전한 이동 코드를 작성합니다.'],
+  'lumi-act1-06': ['print("COMMAND CORE 100%")를 출력합니다.', '1 + 2 계산으로 3칸 전진합니다.', '회전과 이동을 조합하여 최종 비콘에 도착합니다.'],
   'while-approach-01': ['world.target_distance가 0보다 큰 동안 반복하는 while 조건을 만드세요.', '반복 블록 안에서 루미를 한 칸 이동시켜 남은 거리가 줄어들게 하세요.'],
   'while-charge-02': ['lumi.energy가 50보다 작은 동안 반복하는 조건을 만드세요.', '반복 블록 안에서 lumi.charge()를 실행하세요.', '반복이 끝난 뒤, 들여쓰기를 끝내고 현재 목표 거리만큼 이동하세요.'],
   'while-collect-03': ['world.objects에 객체가 남아 있는 동안 반복하세요.', '반복할 때마다 world.objects[0]으로 첫 번째 객체를 하나 선택해 변수에 저장하세요.', '선택한 객체를 lumi.collect()에 전달하세요. 수집되면 목록에서 사라지고 다음 객체가 0번이 됩니다.'],
@@ -193,6 +212,9 @@ export function getLumiLearningSteps(mission = {}) {
 }
 
 export function getLumiInitialCode(mission = {}) {
+  if (typeof mission?.starterCode === 'string' && mission.starterCode.trim().length > 0) {
+    return mission.starterCode
+  }
   if (isSolvedStarterAllowed(mission)) return String(mission?.starterCode || '')
   if (mission?.scaffold?.exposure === 'minimal-skeleton' && typeof mission?.scaffold?.initialCode === 'string') return mission.scaffold.initialCode
   return `${['# 아래 순서대로 코드를 작성하세요.', ...getLumiLearningSteps(mission).map((step, index) => `# ${index + 1}. ${step}`)].join('\n')}\n\n`
@@ -229,7 +251,24 @@ export function getRelevantMissionApi(mission = {}) {
     const signature = String(item?.signature || '')
     const token = item?.token || signature.split('(')[0]
     if (!signature || seen.has(signature)) continue
-    if (requiredCalls.has(token) || text.includes(token)) {
+
+    const isExactRequired = requiredCalls.has(token)
+    let isMatchedInText = false
+    if (token === 'int') {
+      isMatchedInText = /\bint\s*\(/.test(text)
+    } else if (token === 'print') {
+      isMatchedInText = /\bprint\s*\(/.test(text)
+    } else if (token === 'type') {
+      isMatchedInText = /\btype\s*\(/.test(text)
+    } else if (token === 'len') {
+      isMatchedInText = /\blen\s*\(/.test(text)
+    } else if (token === 'input') {
+      isMatchedInText = /\binput\s*\(/.test(text)
+    } else {
+      isMatchedInText = text.includes(token)
+    }
+
+    if (isExactRequired || isMatchedInText) {
       const reference = API_REFERENCE.find((candidate) => candidate.signature === signature || candidate.token === token)
       seen.add(signature)
       selected.push({ ...reference, ...item, signature })
@@ -242,13 +281,18 @@ export function getRelevantMissionApi(mission = {}) {
     selected.push(item)
   }
   if (requiredCalls.has('lumi.charge')) appendReference('lumi.energy')
-  if (requiredCalls.has('input') || text.includes('input')) appendReference('int')
-  if (requiredCalls.has('print') || text.includes('print')) appendReference('print')
-  if (requiredCalls.has('type') || text.includes('type(')) appendReference('type')
-  if (requiredCalls.has('len') || text.includes('len(')) appendReference('len')
+  if (requiredCalls.has('input') || /\binput\s*\(/.test(text)) {
+    if (requiredCalls.has('int') || /\bint\s*\(/.test(text)) appendReference('int')
+  }
+  if (requiredCalls.has('print') || /\bprint\s*\(/.test(text)) appendReference('print')
+  if (requiredCalls.has('type') || /\btype\s*\(/.test(text)) appendReference('type')
+  if (requiredCalls.has('len') || /\blen\s*\(/.test(text)) appendReference('len')
   if (text.includes('world.objects')) {
     appendReference('world.objects')
     if (text.includes('[0]') || mission?.id === 'while-collect-03' || mission?.id === 'while-rescue-06') appendReference('world.objects[0]')
+  }
+  if (mission?.id === 'lumi-act1-05' || mission?.concepts?.some(c => String(c).includes('주석')) || text.includes('주석')) {
+    appendReference('#')
   }
   if (requiredCalls.has('lumi.move') && text.includes('world.target_distance')) appendReference('world.target_distance')
   return selected.length > 0 ? selected : catalogItems.slice(0, 3)

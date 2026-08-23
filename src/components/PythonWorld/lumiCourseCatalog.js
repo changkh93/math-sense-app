@@ -582,13 +582,13 @@ export const ACT_1_MISSIONS = [
     actId: 'act-1-command',
     order: 1,
     difficulty: 'core',
-    title: '다중 명령 순차 실행',
-    eyebrow: 'ACT 1 · COMMAND CORE',
-    objective: '이동과 회전 명령을 연속으로 호출하여 꺾인 L자 항로의 에너지 비콘에 도달하세요.',
-    briefing: '명령 코어가 2단계로 전원을 인가받았습니다. `lumi.move()`와 `lumi.turn()`을 순서대로 조합하여 경로를 완주하세요.',
-    concepts: ['함수 호출', '순차 실행', '각도 인자'],
-    restorationLevel: 20,
-    lumiVoice: '2연속 명령 수신 완료! 항로 추적 성공.',
+    title: 'LUMI 불러오기',
+    eyebrow: 'ACT 1 · LUMI 불러오기',
+    objective: 'LUMI를 불러온 뒤 앞으로 2칸 이동시키세요.',
+    briefing: 'LUMI가 출발 준비를 하고 있어요. LUMI에게 명령을 내리기 전에 먼저 Python 코드에서 사용할 수 있게 불러와 봅시다.',
+    concepts: ['LUMI 불러오기', '앞으로 이동'],
+    restorationLevel: 15,
+    lumiVoice: 'LUMI 연결 성공! 전방으로 출발합니다.',
     reward: {
       policyVersion: 'reward-v1',
       tier: 'core',
@@ -596,8 +596,8 @@ export const ACT_1_MISSIONS = [
       firstCompletionOnly: true,
     },
     memoryFragment: {
-      label: '손상된 L자 궤도 신호',
-      code: 'lumi.move(___)\nlumi.turn(90)\nlumi.move(___)',
+      label: 'LUMI 불러오기 패턴',
+      code: 'from msense import lumi\nlumi.move(___)',
       duration: 3000,
       autoPlay: true,
     },
@@ -605,32 +605,30 @@ export const ACT_1_MISSIONS = [
       mode: 'edit',
       visibleTools: ['run', 'reset', 'step', 'timeline'],
     },
-    starterCode: `# [L자 항로 비행 지시서]
-# 1. 동쪽(전방)으로 2칸 전진하세요.
+    starterCode: `# [LUMI 불러오기]
+# 1. msense에서 lumi를 불러옵니다.
+from msense import lumi
 
-
-# 2. 남쪽으로 방향을 90도 회전하세요.
-
-
-# 3. 남쪽으로 2칸 전진하여 비콘에 도달하세요.
-
+# 2. LUMI를 앞으로 2칸 이동시킵니다.
+lumi.move(2)
 `,
     world: {
       width: 6,
-      height: 6,
-      rover: { x: 1, y: 1, direction: 0, energy: 100, awake: true },
-      target: { x: 3, y: 3, kind: 'beacon' },
-      obstacles: [{ x: 4, y: 1 }, { x: 3, y: 0 }],
+      height: 5,
+      rover: { x: 1, y: 2, direction: 0, energy: 100, awake: true },
+      target: { x: 3, y: 2, kind: 'beacon' },
+      obstacles: [],
     },
     goals: [
-      { type: 'position', x: 3, y: 3 },
+      { type: 'position', x: 3, y: 2 },
     ],
     conceptEvidence: {
-      mustCall: ['lumi.move', 'lumi.turn'],
+      mustUse: ['import'],
+      mustCall: ['lumi.move'],
     },
     hints: [
-      { level: 1, type: 'context', text: '먼저 동쪽으로 2칸 이동한 뒤, 90도 회전하여 남쪽으로 2칸 이동하세요.' },
-      { level: 2, type: 'concept', text: '`lumi.move(2)` 다음에 `lumi.turn(90)`을 실행하면 우측으로 방향을 끕니다.' },
+      { level: 1, type: 'context', text: '첫 번째 줄에 `from msense import lumi`를 적고, 두 번째 줄에 `lumi.move(2)`를 작성하세요.' },
+      { level: 2, type: 'concept', text: '`import`는 가져온다는 뜻이에요. msense에서 lumi를 가져와 사용할 준비를 합니다.' },
     ],
     hiddenVariants: [],
   },
@@ -640,12 +638,87 @@ export const ACT_1_MISSIONS = [
     actId: 'act-1-command',
     order: 2,
     difficulty: 'core',
-    title: '수식 표현식 인자',
-    eyebrow: 'ACT 1 · COMMAND CORE',
-    objective: '인자에 덧셈 표현식(예: 2 + 3)을 직접 전달하여 5칸 거리의 장거리 비콘에 도달하세요.',
-    briefing: 'Python은 함수의 괄호 안에서 수식을 먼저 계산한 뒤 결과를 전달합니다. `lumi.move(2 + 3)`을 실행해보세요.',
-    concepts: ['표현식', '산술 연산', '인자 평가'],
-    restorationLevel: 40,
+    title: '앞으로 움직이기',
+    eyebrow: 'ACT 1 · 장애물 회피',
+    objective: '우주 지뢰를 피해 이동과 회전을 조합하여 목표 비콘에 도착하세요.',
+    briefing: '전방에 위험한 우주 지뢰들이 감지되었습니다! 지뢰에 부딪히지 않도록 이동과 회전을 조합하여 안전한 우회 경로로 비콘까지 이동해 봅시다.',
+    concepts: ['장애물 피하기', '방향 회전'],
+    restorationLevel: 30,
+    lumiVoice: '지뢰 회피 성공! 안전하게 목표 비콘에 도달했습니다.',
+    reward: {
+      policyVersion: 'reward-v1',
+      tier: 'core',
+      baseCrystals: 4,
+      firstCompletionOnly: true,
+    },
+    memoryFragment: {
+      label: '지뢰 우회 이동 신호',
+      code: 'from msense import lumi\nlumi.move(1)\nlumi.turn(90)\nlumi.move(2)\nlumi.turn(-90)\nlumi.move(3)',
+      duration: 3500,
+      autoPlay: true,
+    },
+    scaffold: {
+      mode: 'edit',
+      visibleTools: ['run', 'reset', 'step', 'timeline'],
+    },
+    starterCode: `from msense import lumi
+
+# [장애물 지뢰를 피해 목표 비콘으로 이동하세요]
+# 1. 지뢰 앞까지 앞으로 1칸 이동
+lumi.move(1)
+
+# 2. 오른쪽으로 90도 회전
+lumi.turn(90)
+
+# 3. 아래로 2칸 이동
+
+
+# 4. 왼쪽으로 -90도 회전
+
+
+# 5. 앞으로 3칸 이동하여 비콘에 도착
+
+`,
+    world: {
+      width: 7,
+      height: 5,
+      rover: { x: 1, y: 1, direction: 0, energy: 100, awake: true },
+      target: { x: 5, y: 3, kind: 'beacon' },
+      obstacles: [
+        { x: 3, y: 1 },
+        { x: 4, y: 1 },
+        { x: 1, y: 3 },
+        { x: 3, y: 2 },
+        { x: 5, y: 1 },
+        { x: 4, y: 4 },
+      ],
+    },
+    goals: [
+      { type: 'position', x: 5, y: 3 },
+      { type: 'noCollision' },
+    ],
+    conceptEvidence: {
+      mustUse: ['import'],
+      mustCall: ['lumi.move', 'lumi.turn'],
+    },
+    hints: [
+      { level: 1, type: 'context', text: '1. `lumi.move(1)` 후 2. `lumi.turn(90)`으로 우회전하고, 3. `lumi.move(2)`로 아래로 내려가세요.' },
+      { level: 2, type: 'concept', text: '4. `lumi.turn(-90)`으로 다시 동쪽을 보고, 5. `lumi.move(3)`을 실행하면 지뢰를 피해 비콘에 도착합니다.' },
+    ],
+    hiddenVariants: [],
+  },
+  {
+    id: 'lumi-act1-03',
+    codeName: '1-3',
+    actId: 'act-1-command',
+    order: 3,
+    difficulty: 'core',
+    title: '숫자 계산해서 이동하기',
+    eyebrow: 'ACT 1 · 수식 계산',
+    objective: '괄호 안에 덧셈 수식(2 + 3)을 직접 넣어 5칸 거리의 비콘에 도착하세요.',
+    briefing: 'Python은 괄호 안의 덧셈을 먼저 계산한 뒤 움직입니다. 2 + 3을 넣어서 5칸 앞의 비콘까지 가봅시다.',
+    concepts: ['숫자 계산', '더하기(+)'],
+    restorationLevel: 50,
     lumiVoice: '표현식 연산 일치! 5칸 가속 이동 완료.',
     reward: {
       policyVersion: 'reward-v1',
@@ -654,8 +727,8 @@ export const ACT_1_MISSIONS = [
       firstCompletionOnly: true,
     },
     memoryFragment: {
-      label: '수식 인자 계산 패턴',
-      code: 'lumi.move(___ + ___)',
+      label: '덧셈 계산 이동 패턴',
+      code: 'from msense import lumi\nlumi.move(___ + ___)',
       duration: 3000,
       autoPlay: true,
     },
@@ -663,9 +736,11 @@ export const ACT_1_MISSIONS = [
       mode: 'edit',
       visibleTools: ['run', 'reset', 'step', 'timeline'],
     },
-    starterCode: `# [수식 인자 전달 지시서]
+    starterCode: `from msense import lumi
+
+# [숫자 계산해서 이동하기]
 # 목표 비콘은 전방 5칸 거리에 있습니다.
-# 덧셈 수식(예: 2 + 3)을 lumi.move() 괄호 안에 입력하여 이동하세요.
+# lumi.move() 괄호 안에 2 + 3을 직접 입력하여 이동하세요.
 
 `,
     world: {
@@ -679,39 +754,28 @@ export const ACT_1_MISSIONS = [
       { type: 'position', x: 6, y: 2 },
     ],
     conceptEvidence: {
-      mustUse: ['+'],
+      mustUse: ['import', '+'],
       mustCall: ['lumi.move'],
     },
     hints: [
-      { level: 1, type: 'context', text: '비콘은 현재 위치에서 5칸 떨어져 있습니다. 2 + 3 수식을 인자로 넣어보세요.' },
-      { level: 2, type: 'concept', text: '`lumi.move(2 + 3)`처럼 숫자를 직접 더하는 수식을 전달할 수 있습니다.' },
+      { level: 1, type: 'context', text: '`lumi.move(2 + 3)`처럼 괄호 안에 더하기 기호(+)를 사용해 숫자를 더하세요.' },
+      { level: 2, type: 'concept', text: 'Python은 2 + 3을 먼저 계산해서 5로 만든 뒤 move 명령을 실행합니다.' },
     ],
-    hiddenVariants: [
-      {
-        world: {
-          width: 10,
-          height: 5,
-          rover: { x: 1, y: 2, direction: 0, energy: 100, awake: true },
-          target: { x: 8, y: 2, kind: 'beacon' },
-          obstacles: [],
-        },
-        goals: [{ type: 'position', x: 8, y: 2 }],
-      },
-    ],
+    hiddenVariants: [],
   },
   {
-    id: 'lumi-act1-03',
-    codeName: '1-3',
+    id: 'lumi-act1-04',
+    codeName: '1-4',
     actId: 'act-1-command',
-    order: 3,
+    order: 4,
     difficulty: 'core',
-    title: '콘솔 출력 시스템',
-    eyebrow: 'ACT 1 · COMMAND CORE',
-    objective: 'print("LUMI ONLINE") 명령으로 관제 센터에 텔레메트리를 출력하고 목표 비콘으로 이동하세요.',
-    briefing: '`print(...)` 함수는 컴퓨터 터미널(OUTPUT 창)에 텍스트를 출력하는 가장 기본적인 표준 명령입니다. 코드를 실행하고 OUTPUT 탭을 확인하세요.',
-    concepts: ['print()', '표준 출력', '문자열 인자'],
-    restorationLevel: 60,
-    lumiVoice: '텔레메트리 출력 확인! 관제 센터와 통신 연결.',
+    title: '메시지 출력하기',
+    eyebrow: 'ACT 1 · 메시지 출력 (print)',
+    objective: 'print("LUMI ONLINE")으로 메시지를 출력하고 3칸 앞의 비콘으로 이동하세요.',
+    briefing: '탐사 기록창에 메시지를 남겨볼까요? Python에서는 print()를 사용하면 원하는 글자를 화면(OUTPUT 창)에 보여줄 수 있어요. 자유롭게 3줄까지 메시지를 출력해 보고 LUMI를 비콘으로 움직여 봅시다.',
+    concepts: ['메시지 출력', 'print()'],
+    restorationLevel: 70,
+    lumiVoice: '메시지 출력 확인! 관제 센터와 통신 연결.',
     reward: {
       policyVersion: 'reward-v1',
       tier: 'core',
@@ -719,8 +783,8 @@ export const ACT_1_MISSIONS = [
       firstCompletionOnly: true,
     },
     memoryFragment: {
-      label: '관제 텔레메트리 프로토콜',
-      code: 'print("...")\nlumi.move(___)',
+      label: '메시지 출력 프로토콜',
+      code: 'from msense import lumi\nprint("LUMI ONLINE")\nlumi.move(3)',
       duration: 3000,
       autoPlay: true,
     },
@@ -728,12 +792,14 @@ export const ACT_1_MISSIONS = [
       mode: 'edit',
       visibleTools: ['run', 'reset', 'step', 'timeline', 'inspector'],
     },
-    starterCode: `# [콘솔 텔레메트리 출력 지시서]
-# 1. print() 함수를 사용해 "LUMI ONLINE" 메시지를 터미널에 출력하세요.
+    starterCode: `from msense import lumi
 
+# [메시지 출력하기]
+# 1. 화면에 "LUMI ONLINE" 글자를 출력하세요. (원하는 메시지를 3줄까지 써도 좋아요!)
+print("LUMI ONLINE")
 
-# 2. 목표 비콘이 있는 3칸 전방으로 이동하세요.
-
+# 2. 앞으로 3칸 이동하세요.
+lumi.move(3)
 `,
     world: {
       width: 7,
@@ -747,26 +813,28 @@ export const ACT_1_MISSIONS = [
       { type: 'stdoutIncludes', value: 'LUMI ONLINE' },
     ],
     conceptEvidence: {
+      mustUse: ['import'],
       mustCall: ['print', 'lumi.move'],
     },
     hints: [
-      { level: 1, type: 'context', text: '첫 번째 줄에 `print("LUMI ONLINE")`을 작성하고 다음 줄에 이동 명령을 추가하세요.' },
-      { level: 2, type: 'concept', text: '`print(...)`는 터미널에 메시지를 출력하는 내장 함수입니다.' },
+      { level: 1, type: 'concept', text: '화면에 글자를 보여주는 명령은 `print()`예요. 큰따옴표(" ") 안에 출력할 글자를 넣습니다.' },
+      { level: 2, type: 'context', text: '`print("LUMI ONLINE")` 다음 줄에 `lumi.move(3)`을 작성하세요.' },
+      { level: 3, type: 'concept', text: '💡 팁: `print("탐사를 시작합니다!")` 처럼 따옴표 안의 글자를 바꾸면 출력되는 내용도 달라집니다.' },
     ],
     hiddenVariants: [],
   },
   {
-    id: 'lumi-act1-04',
-    codeName: '1-4',
+    id: 'lumi-act1-05',
+    codeName: '1-5',
     actId: 'act-1-command',
-    order: 4,
+    order: 5,
     difficulty: 'core',
-    title: '주석 처리와 디버깅',
-    eyebrow: 'ACT 1 · COMMAND CORE',
-    objective: '전방 장애물로 직진할 수 없는 위험 명령(# lumi.move(4))을 주석 처리하고, 안전한 우회 항로로 비콘에 도달하세요.',
-    briefing: '전방에 거대한 크레이터 장애물이 있습니다. 직진 명령 앞에 #을 붙여 주석(Comment) 처리하여 비활성화하고, 아래쪽으로 우회하여 비콘에 도달하세요.',
-    concepts: ['주석(#)', '디버깅', '코드 비활성화'],
-    restorationLevel: 80,
+    title: '실수 고치기 (주석)',
+    eyebrow: 'ACT 1 · 주석과 디버깅',
+    objective: '위험한 직진 명령(# lumi.move(4)) 앞에 #을 붙여 끄고, 아래로 우회하여 비콘에 도착하세요.',
+    briefing: '앞에 위험한 크레이터 구덩이가 있습니다. 잘못된 명령 앞에 \'#\'을 붙이면 컴퓨터가 실행하지 않습니다. 위험한 줄을 끄고 안전하게 돌아가 봅시다.',
+    concepts: ['주석(#)', '실수 고치기'],
+    restorationLevel: 85,
     lumiVoice: '위험 직진 무력화 완료! 안전 우회 항로 통과.',
     reward: {
       policyVersion: 'reward-v1',
@@ -775,8 +843,8 @@ export const ACT_1_MISSIONS = [
       firstCompletionOnly: true,
     },
     memoryFragment: {
-      label: '장애물 감지 및 우회 힌트',
-      code: '# 위험 명령 무력화: # lumi.move(...)\nlumi.turn(90)\nlumi.move(___)',
+      label: '위험 명령 끄기와 우회 힌트',
+      code: 'from msense import lumi\n# 위험 명령 끄기: # lumi.move(...)\nlumi.turn(90)\nlumi.move(___)',
       duration: 3500,
       autoPlay: true,
     },
@@ -784,12 +852,14 @@ export const ACT_1_MISSIONS = [
       mode: 'edit',
       visibleTools: ['run', 'reset', 'step', 'timeline'],
     },
-    starterCode: `# [위험 디버깅 지시서]
-# 아래 직진 명령은 전방 크레이터와 충돌합니다. 맨 앞에 '#'을 추가하여 주석 처리하세요.
+    starterCode: `from msense import lumi
+
+# [실수 고치기]
+# 1. 아래 직진 명령은 구덩이에 빠집니다. 맨 앞에 '#'을 붙여 끄세요.
 lumi.move(4)
 
-# [안전 우회 항로 작성]
-# 남쪽으로 90도 회전 -> 2칸 전진 -> -90도 회전 -> 3칸 전진하여 비콘에 도달하세요.
+# 2. 아래쪽으로 안전하게 돌아가세요.
+# 오른쪽으로 90도 회전 -> 2칸 이동 -> 왼쪽으로 -90도 회전 -> 3칸 이동
 
 `,
     world: {
@@ -807,49 +877,31 @@ lumi.move(4)
     goals: [
       { type: 'position', x: 4, y: 4 },
       { type: 'noCollision' },
-      { type: 'commentedOutCall', call: 'lumi.move' },
+      { type: 'commentedOutCall', call: 'lumi.move', argument: 4 },
     ],
     conceptEvidence: {
+      mustUse: ['import'],
       mustCall: ['lumi.turn', 'lumi.move'],
     },
     hints: [
-      { level: 1, type: 'context', text: '전방(y=2)에 장애물이 있으므로 `# lumi.move(4)`처럼 주석 처리하고 남쪽(90도)으로 우회하세요.' },
-      { level: 2, type: 'concept', text: '`#` 기호가 붙은 줄은 Python이 실행하지 않으므로 위험한 명령을 비활성화할 수 있습니다.' },
+      { level: 1, type: 'context', text: '`lumi.move(4)` 맨 앞에 `#`을 붙여 `# lumi.move(4)`로 만드세요.' },
+      { level: 2, type: 'concept', text: '`#`이 붙은 줄은 Python이 건너뜁니다. 그 아래에 안전하게 돌아가는 코드를 적으세요.' },
     ],
-    hiddenVariants: [
-      {
-        world: {
-          width: 7,
-          height: 6,
-          rover: { x: 1, y: 2, direction: 0, energy: 100, awake: true },
-          target: { x: 5, y: 4, kind: 'beacon' },
-          obstacles: [
-            { x: 2, y: 2 },
-            { x: 3, y: 2 },
-            { x: 4, y: 2 },
-          ],
-        },
-        goals: [
-          { type: 'position', x: 5, y: 4 },
-          { type: 'noCollision' },
-          { type: 'commentedOutCall', call: 'lumi.move' },
-        ],
-      },
-    ],
+    hiddenVariants: [],
   },
   {
-    id: 'lumi-act1-05',
-    codeName: '1-5',
+    id: 'lumi-act1-06',
+    codeName: '1-6',
     actId: 'act-1-command',
-    order: 5,
+    order: 6,
     difficulty: 'field-test',
-    title: 'Field Test: 명령 코어 마스터',
-    eyebrow: 'ACT 1 · COMMAND CORE',
-    objective: '순차 호출, 수식 계산, 텔레메트리 출력을 총동원하여 복잡한 크레이터를 극복하고 명령 코어를 100% 복원하세요.',
-    briefing: '명령 코어 복원의 최종 테스트입니다. print("COMMAND CORE 100%")를 출력하고 지그재그 항로를 정밀하게 비행하여 최종 비콘에 도달하세요.',
-    concepts: ['명령 코어 종합', '수식 인자', '텔레메트리', '정밀 항법'],
+    title: '첫 번째 탐사 미션',
+    eyebrow: 'ACT 1 · 종합 미션',
+    objective: '메시지 출력, 계산 이동, 회전을 조합하여 최종 비콘에 도착하세요.',
+    briefing: '지금까지 배운 모든 방법을 활용할 시간입니다! 메시지를 출력하고, 계산해서 이동하며, 지그재그 길을 완주하세요.',
+    concepts: ['탐사 종합', '계산과 회전'],
     restorationLevel: 100,
-    lumiVoice: 'COMMAND CORE 100% 복원 완료! 관제 신호 완벽 수신.',
+    lumiVoice: '첫 번째 탐사 미션 완수! 관제 신호 완벽 수신.',
     reward: {
       policyVersion: 'reward-v1',
       tier: 'field-test',
@@ -857,8 +909,8 @@ lumi.move(4)
       firstCompletionOnly: true,
     },
     memoryFragment: {
-      label: '명령 코어 마스터 종합 개요',
-      code: 'print("COMMAND CORE 100%")\nlumi.move(___ + ___)\n# 지그재그 항로 기동',
+      label: '첫 번째 탐사 종합 개요',
+      code: 'from msense import lumi\nprint("COMMAND CORE 100%")\nlumi.move(___ + ___)\n# 지그재그 이동',
       duration: 3500,
       autoPlay: true,
     },
@@ -866,14 +918,16 @@ lumi.move(4)
       mode: 'edit',
       visibleTools: ['run', 'reset', 'step', 'timeline', 'inspector'],
     },
-    starterCode: `# === ACT 1 FIELD TEST: 명령 코어 마스터 ===
-# 1. print() 함수로 "COMMAND CORE 100%"를 출력하세요.
+    starterCode: `from msense import lumi
+
+# === 첫 번째 탐사 미션 ===
+# 1. 화면에 "COMMAND CORE 100%" 메시지를 출력하세요.
 
 
-# 2. 덧셈 수식(1 + 2)을 사용해 전방으로 3칸 이동하세요.
+# 2. 1 + 2 계산을 넣어 앞으로 3칸 이동하세요.
 
 
-# 3. 우회전(90도) -> 2칸 전진 -> 좌회전(-90도) -> 2칸 전진하여 최종 비콘에 도달하세요.
+# 3. 오른쪽으로 90도 회전 -> 2칸 이동 -> 왼쪽으로 -90도 회전 -> 2칸 이동하여 도착하세요.
 
 `,
     world: {
@@ -889,28 +943,14 @@ lumi.move(4)
       { type: 'stdoutIncludes', value: 'COMMAND CORE 100%' },
     ],
     conceptEvidence: {
+      mustUse: ['import'],
       mustCall: ['print', 'lumi.move', 'lumi.turn'],
     },
     hints: [
-      { level: 1, type: 'context', text: '1. print("COMMAND CORE 100%")를 출력하세요. 2. 3칸 전진(1 + 2) 후 우회전(90도), 2칸 전진 후 좌회전(-90도), 2칸 전진하세요.' },
-      { level: 2, type: 'concept', text: '모든 명령을 순서대로 조합하면 비콘에 무사히 도달할 수 있습니다.' },
+      { level: 1, type: 'context', text: '1. print("COMMAND CORE 100%") 출력, 2. lumi.move(1 + 2) 이동, 3. 회전과 이동을 순서대로 작성하세요.' },
+      { level: 2, type: 'concept', text: '지금까지 배운 명령들을 순서대로 조합하면 비콘에 도착할 수 있습니다.' },
     ],
-    hiddenVariants: [
-      {
-        world: {
-          width: 8,
-          height: 6,
-          rover: { x: 0, y: 1, direction: 0, energy: 100, awake: true },
-          target: { x: 5, y: 3, kind: 'beacon' },
-          obstacles: [{ x: 4, y: 1 }, { x: 2, y: 2 }, { x: 3, y: 4 }],
-        },
-        goals: [
-          { type: 'position', x: 5, y: 3 },
-          { type: 'noCollision' },
-          { type: 'stdoutIncludes', value: 'COMMAND CORE 100%' },
-        ],
-      },
-    ],
+    hiddenVariants: [],
   },
 ]
 
@@ -921,8 +961,8 @@ export const LUMI_ACT_1_SET = Object.freeze({
   actId: 'act-1-command',
   unitId: 'lumi_protocol_act_1_command',
   lumiCourseId: 'lumi-season-1',
-  title: 'ACT 1. COMMAND CORE (명령 코어)',
-  description: '함수 호출, 수식 계산 표현식, 콘솔 출력 및 주석 디버깅을 마스터하는 5개 정규 미션',
+  title: 'ACT 1. LUMI 불러오기와 움직이기',
+  description: 'LUMI를 불러오고, 이동·회전·계산·출력·주석을 단계별로 익히는 6개 입문 미션',
   missions: ACT_1_MISSIONS,
 })
 
@@ -956,7 +996,9 @@ export const ACT_2_MISSIONS = [
       mode: 'edit',
       visibleTools: ['run', 'reset', 'step', 'timeline', 'inspector'],
     },
-    starterCode: `# [기억 슬롯(변수) 생성 지시서]
+    starterCode: `from msense import lumi
+
+# [기억 슬롯(변수) 생성 지시서]
 # 1. steps 라는 이름의 변수를 만들고 숫자 3을 저장(대입)하세요.
 
 
@@ -1005,7 +1047,7 @@ export const ACT_2_MISSIONS = [
     },
     memoryFragment: {
       label: '식별자 명명 신호',
-      code: 'target_steps = ___\nlumi.move(target_steps)',
+      code: 'from msense import lumi\ntarget_steps = ___\nlumi.move(target_steps)',
       duration: 3000,
       autoPlay: true,
     },
@@ -1013,7 +1055,9 @@ export const ACT_2_MISSIONS = [
       mode: 'edit',
       visibleTools: ['run', 'reset', 'step', 'timeline', 'inspector'],
     },
-    starterCode: `# [식별자 명명 지시서]
+    starterCode: `from msense import lumi
+
+# [식별자 명명 지시서]
 # 1. target_steps 라는 이름의 변수를 만들고 숫자 4를 저장하세요.
 
 
@@ -1061,7 +1105,7 @@ export const ACT_2_MISSIONS = [
     },
     memoryFragment: {
       label: '에너지 갱신 연산식',
-      code: 'energy = 5\nenergy = energy - ___\nlumi.move(energy)',
+      code: 'from msense import lumi\nenergy = 5\nenergy = energy - ___\nlumi.move(energy)',
       duration: 3000,
       autoPlay: true,
     },
@@ -1069,7 +1113,9 @@ export const ACT_2_MISSIONS = [
       mode: 'edit',
       visibleTools: ['run', 'reset', 'step', 'timeline', 'inspector'],
     },
-    starterCode: `# 초기 에너지 5가 충전되어 있습니다.
+    starterCode: `from msense import lumi
+
+# 초기 에너지 5가 충전되어 있습니다.
 energy = 5
 
 # [에너지 갱신 지시서]
@@ -1131,7 +1177,7 @@ energy = 5
     },
     memoryFragment: {
       label: '자료형 판별 시그니처',
-      code: 'val_type = type(...)\nlumi.say(val_type)\nlumi.move(3)',
+      code: 'from msense import lumi\nval_type = type(...)\nlumi.say(val_type)\nlumi.move(3)',
       duration: 3000,
       autoPlay: true,
     },
@@ -1139,7 +1185,9 @@ energy = 5
       mode: 'edit',
       visibleTools: ['run', 'reset', 'step', 'timeline', 'inspector'],
     },
-    starterCode: `# [자료형 확인 지시서]
+    starterCode: `from msense import lumi
+
+# [자료형 확인 지시서]
 # 1. type(100)을 실행하여 정수 자료형 이름을 val_type 변수에 저장하세요.
 
 
@@ -1191,7 +1239,7 @@ energy = 5
     },
     memoryFragment: {
       label: 'f-string 템플릿 구조',
-      code: 'energy = 100\nmsg = f"ENERGY {___}"\nlumi.say(msg)\nlumi.move(3)',
+      code: 'from msense import lumi\nenergy = 100\nmsg = f"ENERGY {___}"\nlumi.say(msg)\nlumi.move(3)',
       duration: 3000,
       autoPlay: true,
     },
@@ -1199,7 +1247,9 @@ energy = 5
       mode: 'edit',
       visibleTools: ['run', 'reset', 'step', 'timeline', 'inspector'],
     },
-    starterCode: `# 현재 에너지가 100으로 설정되어 있습니다.
+    starterCode: `from msense import lumi
+
+# 현재 에너지가 100으로 설정되어 있습니다.
 energy = 100
 
 # [f-string 상태 보고 지시서]
@@ -1258,7 +1308,7 @@ energy = 100
     inputValues: ['4'],
     memoryFragment: {
       label: '관제 입력 프로토콜 스키마',
-      code: 'steps_text = input("...")\nsteps = int(steps_text)\nlumi.move(steps)',
+      code: 'from msense import lumi\nsteps_text = input("...")\nsteps = int(steps_text)\nlumi.move(steps)',
       duration: 3500,
       autoPlay: true,
     },
@@ -1266,7 +1316,9 @@ energy = 100
       mode: 'edit',
       visibleTools: ['run', 'reset', 'step', 'timeline', 'inspector'],
     },
-    starterCode: `# === ACT 2 FIELD TEST: 관제 신호 수신 및 형 변환 ===
+    starterCode: `from msense import lumi
+
+# === ACT 2 FIELD TEST: 관제 신호 수신 및 형 변환 ===
 # 1. input()으로 관제 신호를 수신해 steps_text 변수에 저장하세요.
 
 

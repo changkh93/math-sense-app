@@ -105,8 +105,19 @@ export default function PythonWorldCanvas({
             className="python-world__obstacle"
             key={`${obstacle.x}-${obstacle.y}-${index}`}
             style={cellStyle(obstacle.x, obstacle.y)}
+            title={`위험 지뢰 장애물 (${obstacle.x}, ${obstacle.y})`}
           >
-            ◆
+            <div className="python-world__mine-hazard">
+              <span className="python-world__mine-pulse" />
+              <svg className="python-world__mine-icon" viewBox="0 0 36 36" fill="none">
+                <circle cx="18" cy="18" r="15" stroke="#ff2d55" strokeWidth="1.5" strokeDasharray="3 2.5" opacity="0.85" />
+                <path d="M18 2 L18 6 M18 30 L18 34 M2 18 L6 18 M30 18 L34 18 M6.7 6.7 L9.5 9.5 M26.5 26.5 L29.3 29.3 M6.7 29.3 L9.5 26.5 M26.5 9.5 L29.3 6.7" stroke="#ff4d6d" strokeWidth="2.2" strokeLinecap="round" />
+                <circle cx="18" cy="18" r="9.5" fill="#240710" stroke="#ff3355" strokeWidth="2" />
+                <circle cx="18" cy="18" r="4" fill="#ff1744" className="python-world__mine-core-glow" />
+                <path d="M14 14 L22 22 M22 14 L14 22" stroke="#ffffff" strokeWidth="1.8" strokeLinecap="round" />
+              </svg>
+            </div>
+            <span className="python-world__obstacle-label">DANGER</span>
           </div>
         ))}
         {objects.map((item, index) => (

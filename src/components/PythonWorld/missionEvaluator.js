@@ -93,7 +93,15 @@ function hasReachedSingleGoal(goal, ctx) {
   if (goal.type === 'commentedOutCall') {
     // Verifies dangerous command was disabled and NOT executed
     const executedEventType = EXECUTED_CALL_EVENT[goal.call]
-    const executed = executedEventType ? events.some((event) => event.type === executedEventType && (!goal.argument || event.payload?.distance === goal.argument)) : false
+    const executed = executedEventType
+      ? events.some((event) => {
+          if (event.type !== executedEventType) return false
+          if (goal.argument !== undefined) {
+            return event.payload?.distance === goal.argument || event.payload?.steps === goal.argument
+          }
+          return event.payload?.blocked === true
+        })
+      : false
     return !executed
   }
   if (goal.type === 'eventOccurred') {
@@ -459,8 +467,20 @@ export function evaluateMissionAttempt({
   const score = stars === 3 ? 100 : stars === 2 ? 80 : stars === 1 ? 60 : 0
   const mastered = stars === 3
 
-  const goalEvaluation = getDetailedGoalEvaluation(mission, runtimeResult)
-  const failureReason = goalEvaluation.failureReason || (conceptEvidence.missingMustUse?.length > 0 ? `필수 개념 미사용: ${conceptEvidence.missingMustUse.join(', ')}` : '')
+  let conceptMissingMsg = ''
+  if (conceptEvidence.missingMustUse?.length > 0) {
+    if (conceptEvidence.missingMustUse.includes('import')) {
+      conceptMissingMsg = "맨 첫 줄에 'from msense import lumi'를 작성하여 LUMI를 불러와야 합니다."
+    } else {
+      conceptMissingMsg = `필수 개념 미사용: '${conceptEvidence.missingMustUse.join(', ')}'을(를) 코드에 사용하세요.`
+    }
+  }
+
+  const failureReason =
+    goalEvaluation.failureReason ||
+    conceptMissingMsg ||
+    (conceptEvidence.missingMustCall?.length > 0 ? `필수 함수 호출 누락: ${conceptEvidence.missingMustCall.join(', ')}()를 호출하세요.` : '') ||
+    (!transferPassed && hasVariants ? '숨겨진 검증 맵 테스트를 통과하지 못했습니다. 일반화된 코드를 작성해보세요.' : '')
   const message = passed
     ? '축하합니다! 미션의 모든 조건을 성공적으로 달성했습니다.'
     : (failureReason ? `${failureReason}` : '미션 완료 조건을 다시 확인해 보세요.')
@@ -537,6 +557,28 @@ export function getDetailedGoalEvaluation(mission, runtimeResult) {
     } else if (goal.type === 'instanceAttributeEquals') {
       label = label || `${goal.binding || '인스턴스'}의 ${goal.attribute} 속성 = ${goal.value}`
       if (!passed) hint = `${goal.binding || '인스턴스'}의 ${goal.attribute} 값이 ${goal.value}가 되도록 하세요.`
+    } else if (goal.type === 'position') {
+      label = label || `목표 좌표 (${goal.x}, ${goal.y}) 도달`
+      if (!passed) hint = `LUMI가 목표 좌표 (${goal.x}, ${goal.y})에 도달하지 못했습니다. (현재 위치: (${ctx.finalRover?.x ?? '?'}, ${ctx.finalRover?.y ?? '?'}) → 이동 칸 수를 확인하세요.)`
+    } else if (goal.type === 'noCollision') {
+      label = label || '충돌 없이 안전 운행'
+      if (!passed) hint = '이동 중 장애물이나 벽에 충돌했습니다. 회전과 이동 순서를 다시 확인해주세요.'
+    } else if (goal.type === 'stdoutIncludes') {
+      label = label || `'${goal.value}' 콘솔 출력`
+      if (!passed) hint = `print("${goal.value}") 함수로 지정된 문구를 출력해야 합니다.`
+    } else if (goal.type === 'eventOccurred') {
+      label = label || (goal.eventType === 'rover_spoke' ? '교신(say) 신호 전송' : '필수 이벤트 완료')
+      if (!passed) hint = goal.eventType === 'rover_spoke' ? 'lumi.say("...") 함수를 호출하여 교신 신호를 보내세요.' : '필수 이벤트가 발생하지 않았습니다.'
+    } else if (goal.type === 'variableDefined') {
+      label = label || `변수 '${goal.name}' 생성 및 대입`
+      if (!passed) hint = `${goal.name} = ... 형태로 변수를 정의하고 값을 저장하세요.`
+    } else if (goal.type === 'variableChanged') {
+      label = label || `변수 '${goal.name}' 값 갱신`
+      if (!passed) hint = `${goal.name} 변수의 값을 ${goal.expectedFinal !== undefined ? goal.expectedFinal + '로 ' : ''}연산하여 갱신하세요.`
+    } else if (goal.type === 'commentedOutCall') {
+      const callText = goal.argument !== undefined ? `${goal.call}(${goal.argument})` : goal.call
+      label = label || `'${callText}' 주석(#) 비활성화`
+      if (!passed) hint = `위험한 ${callText} 명령어 맨 앞에 #을 붙여 주석 처리하세요.`
     } else if (goal.type === 'tile') {
       label = label || `목표 좌표 (${goal.x}, ${goal.y}) 도달`
       if (!passed) hint = `LUMI를 좌표 (${goal.x}, ${goal.y})로 이동시키세요.`
@@ -584,7 +626,11 @@ export function evaluateMissionRun(mission, runtimeResult, hiddenPassed = null) 
   }
 
   const goalEvaluation = getDetailedGoalEvaluation(mission, runtimeResult)
-  const failureReason = goalEvaluation.failureReason || (conceptEvidence.missingMustUse?.length > 0 ? `필수 개념 미사용: ${conceptEvidence.missingMustUse.join(', ')}` : '')
+  const failureReason =
+    goalEvaluation.failureReason ||
+    (conceptEvidence.missingMustCall?.length > 0 ? `필수 함수 호출 누락: ${conceptEvidence.missingMustCall.join(', ')}()를 호출하세요.` : '') ||
+    (conceptEvidence.missingMustUse?.length > 0 ? `필수 개념 미사용: '${conceptEvidence.missingMustUse.join(', ')}'을(를) 코드에 사용하세요.` : '') ||
+    (!transferPassed && hasVariants ? '숨겨진 검증 맵 테스트를 통과하지 못했습니다. 일반화된 코드를 작성해보세요.' : '')
   const message = passed
     ? '축하합니다! 미션의 모든 조건을 성공적으로 달성했습니다.'
     : (failureReason ? `${failureReason}` : '미션 완료 조건을 다시 확인해 보세요.')

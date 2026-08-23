@@ -112,7 +112,16 @@ const PythonEditor = forwardRef(function PythonEditor({ value, onChange, activeL
           }),
           EditorView.theme({
             '&': { height: '100%', backgroundColor: '#07101f', color: '#dcecff' },
-            '.cm-scroller': { fontFamily: 'JetBrains Mono, SFMono-Regular, Consolas, monospace', overflow: 'auto' },
+            '.cm-scroller': {
+              fontFamily: 'JetBrains Mono, SFMono-Regular, Consolas, monospace',
+              overflow: 'auto',
+              scrollbarWidth: 'thin',
+              scrollbarColor: 'rgba(73, 233, 255, 0.28) #071222',
+            },
+            '.cm-scroller::-webkit-scrollbar': { width: '6px', height: '6px' },
+            '.cm-scroller::-webkit-scrollbar-track': { background: '#071222' },
+            '.cm-scroller::-webkit-scrollbar-thumb': { background: '#1c3554', borderRadius: '4px' },
+            '.cm-scroller::-webkit-scrollbar-thumb:hover': { background: '#2b517e' },
             '.cm-content': { padding: '14px 0', caretColor: '#56f1d5' },
             '.cm-gutters': { backgroundColor: '#0a1428', color: '#60718d', border: 'none' },
             '.cm-activeLineGutter': { backgroundColor: '#142743', color: '#b8d8ff' },
