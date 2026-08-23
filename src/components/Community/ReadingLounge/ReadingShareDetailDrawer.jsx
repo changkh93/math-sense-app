@@ -45,6 +45,11 @@ export default function ReadingShareDetailDrawer({ isOpen, onClose, share }) {
   if (!isOpen || !currentShare) return null;
 
   const isOwner = user?.uid === currentShare.ownerId;
+  const bookTitle = currentShare.bookSnapshot?.title || currentShare.bookTitle || currentShare.title || '추천 도서';
+  const bookAuthor = currentShare.bookSnapshot?.author || currentShare.bookAuthor || currentShare.author || '저자 미상';
+  const bookPage = currentShare.bookSnapshot?.page || currentShare.page;
+  const bookCategory = currentShare.bookSnapshot?.category || currentShare.category;
+
   const wantToReadCount = currentShare.reactionCounts?.wantToRead || 0;
   const readCount = currentShare.reactionCounts?.read || 0;
   const resonatedCount = currentShare.reactionCounts?.resonated || 0;
@@ -156,17 +161,16 @@ export default function ReadingShareDetailDrawer({ isOpen, onClose, share }) {
         >
           {/* Header */}
           <div className="reading-drawer-header">
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-              <div className="share-book-spine" style={{ width: '32px', height: '42px', fontSize: '0.9rem' }}>
-                <BookOpen size={15} />
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', minWidth: 0 }}>
+              <div className="share-book-spine" style={{ width: '28px', height: '36px', fontSize: '0.85rem', flexShrink: 0 }}>
+                <BookOpen size={14} />
               </div>
-              <div>
-                <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: '#fff' }}>
-                  {currentShare.bookSnapshot?.title}
+              <div style={{ minWidth: 0 }}>
+                <h3 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 800, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  {bookTitle}
                 </h3>
-                <p style={{ margin: 0, fontSize: '0.8rem', color: 'rgba(255,255,255,0.6)' }}>
-                  {currentShare.bookSnapshot?.author}
-                  {currentShare.bookSnapshot?.page ? ` · ${currentShare.bookSnapshot.page}쪽` : ''}
+                <p style={{ margin: 0, fontSize: '0.75rem', color: 'rgba(255,255,255,0.5)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  {bookAuthor}
                 </p>
               </div>
             </div>
@@ -174,7 +178,7 @@ export default function ReadingShareDetailDrawer({ isOpen, onClose, share }) {
             <button
               type="button"
               onClick={onClose}
-              style={{ background: 'transparent', border: 'none', color: 'rgba(255,255,255,0.6)', cursor: 'pointer' }}
+              style={{ background: 'transparent', border: 'none', color: 'rgba(255,255,255,0.6)', cursor: 'pointer', padding: '0.4rem' }}
               aria-label="닫기"
             >
               <X size={20} />
@@ -183,6 +187,85 @@ export default function ReadingShareDetailDrawer({ isOpen, onClose, share }) {
 
           {/* Body */}
           <div className="reading-drawer-body">
+            {/* 1. Book Hero Card */}
+            <div
+              className="drawer-book-hero glass"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '1rem',
+                padding: '1.1rem 1.25rem',
+                borderRadius: '16px',
+                background: 'linear-gradient(135deg, rgba(56, 189, 248, 0.12), rgba(167, 139, 250, 0.08))',
+                border: '1px solid rgba(56, 189, 248, 0.25)',
+                boxShadow: '0 4px 20px rgba(0, 0, 0, 0.25)',
+              }}
+            >
+              <div
+                className="share-book-spine"
+                style={{
+                  width: '44px',
+                  height: '58px',
+                  fontSize: '1.2rem',
+                  borderRadius: '8px',
+                  boxShadow: '0 4px 12px rgba(0, 0, 0, 0.4)',
+                  flexShrink: 0,
+                }}
+              >
+                <BookOpen size={22} color="#38bdf8" />
+              </div>
+
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '0.25rem' }}>
+                  <span
+                    style={{
+                      fontSize: '0.72rem',
+                      fontWeight: 800,
+                      color: '#38bdf8',
+                      background: 'rgba(56, 189, 248, 0.15)',
+                      padding: '0.15rem 0.5rem',
+                      borderRadius: '6px',
+                      letterSpacing: '0.02em',
+                    }}
+                  >
+                    추천 도서
+                  </span>
+                  {bookCategory && (
+                    <span style={{ fontSize: '0.72rem', color: 'rgba(255,255,255,0.5)' }}>
+                      {bookCategory}
+                    </span>
+                  )}
+                </div>
+
+                <h2
+                  style={{
+                    margin: 0,
+                    fontSize: '1.2rem',
+                    fontWeight: 900,
+                    color: '#ffffff',
+                    lineHeight: 1.35,
+                    wordBreak: 'keep-all',
+                  }}
+                >
+                  {bookTitle}
+                </h2>
+
+                <p
+                  style={{
+                    margin: '0.3rem 0 0',
+                    fontSize: '0.84rem',
+                    color: 'rgba(255, 255, 255, 0.7)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.4rem',
+                  }}
+                >
+                  <span>{bookAuthor}</span>
+                  {bookPage ? <span>· {bookPage}쪽까지 읽음</span> : null}
+                </p>
+              </div>
+            </div>
+
             {/* Author info & Profile link */}
             <div
               style={{
