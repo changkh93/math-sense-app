@@ -320,6 +320,29 @@
   cursor: not-allowed;
 }
 
+.drawer-reaction-dropdown-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 0.5rem;
+  background: rgba(255, 255, 255, 0.04);
+  border: none;
+  border-left: 1px solid rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.7);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.drawer-reaction-dropdown-toggle:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+}
+
+.drawer-reaction-dropdown-toggle.active {
+  background: rgba(255, 255, 255, 0.18);
+  color: #fff;
+}
+
 .drawer-reaction-count-pill {
   display: flex;
   align-items: center;

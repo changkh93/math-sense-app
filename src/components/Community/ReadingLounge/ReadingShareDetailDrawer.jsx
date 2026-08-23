@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Bookmark, Sparkles, BookOpen, User, ShieldAlert, Edit3, Archive, CheckCircle2 } from 'lucide-react';
+import { X, Bookmark, Sparkles, BookOpen, User, ShieldAlert, Edit3, Archive, CheckCircle2, ChevronDown, ChevronUp } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../../hooks/useAuth';
 import {
@@ -13,7 +13,7 @@ import {
 import ReadingShareComments from './ReadingShareComments';
 import ReadingShareReportModal from './ReadingShareReportModal';
 import ReadingShareComposer from './ReadingShareComposer';
-import ReadingReactionUsersModal from './ReadingReactionUsersModal';
+import ReadingReactionUsersPanel from './ReadingReactionUsersPanel';
 import './ReadingLounge.css';
 
 const MotionDiv = motion.div;
@@ -23,9 +23,12 @@ export default function ReadingShareDetailDrawer({ isOpen, onClose, share }) {
   const { user } = useAuth();
   const [isReportModalOpen, setIsReportModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-  const [isReadConfirmModalOpen, setIsReadConfirmModalOpen] = useState(false);
-  const [reactionUsersModalType, setReactionUsersModalType] = useState(null);
+  const [expandedReactionType, setExpandedReactionType] = useState(null);
   const [feedbackMessage, setFeedbackMessage] = useState('');
+
+  const toggleExpanded = (type) => {
+    setExpandedReactionType((prev) => (prev === type ? null : type));
+  };
 
   const { data: cachedShare } = useReadingShare(share?.id, {
     enabled: isOpen,
@@ -99,16 +102,20 @@ export default function ReadingShareDetailDrawer({ isOpen, onClose, share }) {
     }
   };
 
-  const handleReadConfirm = async () => {
-    if (isOwner || linkBookMutation.isPending) return;
+  const handleAlreadyReadClick = async () => {
+    if (isOwner) {
+      alert('자신의 추천 글에는 책 연결을 할 수 없습니다.');
+      return;
+    }
+    if (linkBookMutation.isPending) return;
+
     try {
       const res = await linkBookMutation.mutateAsync({
         shareId: currentShare.id,
         intent: 'read',
       });
-      setIsReadConfirmModalOpen(false);
       if (res.created) {
-        showTemporaryFeedback('📖 완독으로 등록되어 내 책장에 저장되었습니다!');
+        showTemporaryFeedback('📖 완독 도서로 내 책장에 등록되었습니다!');
       } else {
         showTemporaryFeedback('📖 기존 책과 연결되어 완독 처리되었습니다!');
       }
@@ -259,27 +266,28 @@ export default function ReadingShareDetailDrawer({ isOpen, onClose, share }) {
               </div>
             )}
 
-            {/* Reactions Bar (3-way) with Counts & User List Trigger */}
+            {/* Reactions Bar (3-way) with Naver-style Split Dropdown */}
             <div className="drawer-reaction-bar" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.5rem' }}>
               {/* 1. Resonated / 공감 */}
               <div className={`drawer-reaction-btn-group resonated ${isResonated ? 'active' : ''}`}>
                 <button
                   type="button"
                   className="drawer-reaction-action-part"
-                  onClick={isOwner ? () => setReactionUsersModalType('resonated') : handleResonateClick}
+                  onClick={isOwner ? () => toggleExpanded('resonated') : handleResonateClick}
                   disabled={setReactionMutation.isPending}
                   title={isOwner ? '공감한 탐험가 목록 보기' : '생각이 이어졌어요'}
                 >
                   <Sparkles size={14} />
-                  <span>공감</span>
+                  <span>공감 {resonatedCount}</span>
                 </button>
                 <button
                   type="button"
-                  className="drawer-reaction-count-pill font-tech"
-                  onClick={() => setReactionUsersModalType('resonated')}
-                  title="공감한 탐험가 목록 보기"
+                  className={`drawer-reaction-dropdown-toggle ${expandedReactionType === 'resonated' ? 'active' : ''}`}
+                  onClick={() => toggleExpanded('resonated')}
+                  title="공감한 탐험가 목록 열기/접기"
+                  aria-label="공감한 탐험가 목록 열기/접기"
                 >
-                  {resonatedCount}
+                  {expandedReactionType === 'resonated' ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
                 </button>
               </div>
 
@@ -288,20 +296,21 @@ export default function ReadingShareDetailDrawer({ isOpen, onClose, share }) {
                 <button
                   type="button"
                   className="drawer-reaction-action-part"
-                  onClick={isOwner ? () => setReactionUsersModalType('want_to_read') : handleWantToReadClick}
+                  onClick={isOwner ? () => toggleExpanded('want_to_read') : handleWantToReadClick}
                   disabled={linkBookMutation.isPending}
                   title={isOwner ? '관심 도서로 담은 탐험가 목록 보기' : '내 책장에 관심 도서로 저장'}
                 >
                   <Bookmark size={14} />
-                  <span>{isWantToRead ? '저장됨' : '읽고 싶어요'}</span>
+                  <span>{isWantToRead ? '저장됨' : '읽고 싶어요'} {wantToReadCount}</span>
                 </button>
                 <button
                   type="button"
-                  className="drawer-reaction-count-pill font-tech"
-                  onClick={() => setReactionUsersModalType('want_to_read')}
-                  title="관심 도서로 담은 탐험가 목록 보기"
+                  className={`drawer-reaction-dropdown-toggle ${expandedReactionType === 'want_to_read' ? 'active' : ''}`}
+                  onClick={() => toggleExpanded('want_to_read')}
+                  title="관심 도서로 담은 탐험가 목록 열기/접기"
+                  aria-label="관심 도서로 담은 탐험가 목록 열기/접기"
                 >
-                  {wantToReadCount}
+                  {expandedReactionType === 'want_to_read' ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
                 </button>
               </div>
 
@@ -310,23 +319,41 @@ export default function ReadingShareDetailDrawer({ isOpen, onClose, share }) {
                 <button
                   type="button"
                   className="drawer-reaction-action-part"
-                  onClick={isOwner ? () => setReactionUsersModalType('read') : () => setIsReadConfirmModalOpen(true)}
+                  onClick={isOwner ? () => toggleExpanded('read') : handleAlreadyReadClick}
                   disabled={linkBookMutation.isPending}
                   title={isOwner ? '함께 완독한 탐험가 목록 보기' : '내 책장에 완독으로 등록'}
                 >
                   <BookOpen size={14} />
-                  <span>{isRead ? '완독됨' : '저도 읽었어요'}</span>
+                  <span>{isRead ? '완독됨' : '저도 읽었어요'} {readCount}</span>
                 </button>
                 <button
                   type="button"
-                  className="drawer-reaction-count-pill font-tech"
-                  onClick={() => setReactionUsersModalType('read')}
-                  title="함께 완독한 탐험가 목록 보기"
+                  className={`drawer-reaction-dropdown-toggle ${expandedReactionType === 'read' ? 'active' : ''}`}
+                  onClick={() => toggleExpanded('read')}
+                  title="함께 완독한 탐험가 목록 열기/접기"
+                  aria-label="함께 완독한 탐험가 목록 열기/접기"
                 >
-                  {readCount}
+                  {expandedReactionType === 'read' ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
                 </button>
               </div>
             </div>
+
+            {/* Inline Reaction Users Dropdown Panel */}
+            {expandedReactionType && (
+              <ReadingReactionUsersPanel
+                isOpen={Boolean(expandedReactionType)}
+                onClose={() => setExpandedReactionType(null)}
+                shareId={currentShare.id}
+                reactionType={expandedReactionType}
+                count={
+                  expandedReactionType === 'resonated'
+                    ? resonatedCount
+                    : expandedReactionType === 'want_to_read'
+                    ? wantToReadCount
+                    : readCount
+                }
+              />
+            )}
 
             {/* Comments Section */}
             <ReadingShareComments
@@ -374,50 +401,6 @@ export default function ReadingShareDetailDrawer({ isOpen, onClose, share }) {
         </MotionDiv>
       </div>
 
-      {/* Already Read Confirmation Modal */}
-      {isReadConfirmModalOpen && (
-        <div className="reading-composer-backdrop" onClick={() => setIsReadConfirmModalOpen(false)}>
-          <div
-            className="reading-composer-modal glass"
-            style={{ maxWidth: '420px', padding: '1.5rem' }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '1rem' }}>
-              <div className="share-book-spine" style={{ width: '28px', height: '36px' }}>
-                <BookOpen size={14} />
-              </div>
-              <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: '#fff' }}>
-                저도 이 책 읽었어요
-              </h3>
-            </div>
-
-            <p style={{ fontSize: '0.88rem', color: '#cbd5e1', lineHeight: 1.6, marginBottom: '1.2rem' }}>
-              <strong style={{ color: '#38bdf8' }}>'{currentShare.bookSnapshot?.title}'</strong>을(를) 나의 고전 서재에 <strong>'완독'</strong> 도서로 등록하거나 기존 책과 연결하시겠습니까?
-            </p>
-
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.6rem' }}>
-              <button
-                type="button"
-                className="lounge-tab-btn"
-                onClick={() => setIsReadConfirmModalOpen(false)}
-                disabled={linkBookMutation.isPending}
-              >
-                취소
-              </button>
-              <button
-                type="button"
-                className="composer-submit-btn"
-                style={{ width: 'auto', padding: '0.5rem 1.2rem' }}
-                onClick={handleReadConfirm}
-                disabled={linkBookMutation.isPending}
-              >
-                {linkBookMutation.isPending ? '처리 중...' : '완독으로 등록'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* Edit Modal */}
       {isEditModalOpen && (
         <ReadingShareComposer
@@ -433,17 +416,6 @@ export default function ReadingShareDetailDrawer({ isOpen, onClose, share }) {
           isOpen={isReportModalOpen}
           onClose={() => setIsReportModalOpen(false)}
           share={currentShare}
-        />
-      )}
-
-      {/* Reaction Users Modal */}
-      {reactionUsersModalType && (
-        <ReadingReactionUsersModal
-          isOpen={Boolean(reactionUsersModalType)}
-          onClose={() => setReactionUsersModalType(null)}
-          shareId={currentShare.id}
-          initialType={reactionUsersModalType}
-          reactionCounts={currentShare.reactionCounts || {}}
         />
       )}
     </AnimatePresence>

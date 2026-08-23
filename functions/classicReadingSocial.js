@@ -1716,13 +1716,6 @@ module.exports = function ({
     if (shareData.status !== policy.SHARE_STATUSES.ACTIVE && shareData.ownerId !== uid) {
       throw new functions.https.HttpsError("failed-precondition", "활성화된 추천 글의 반응만 조회할 수 있습니다.");
     }
-    const countKey = targetType === "resonated"
-      ? "resonated"
-      : targetType === "read" ? "read" : "wantToRead";
-    if (Number(shareData.reactionCounts?.[countKey] || 0) <= 0) {
-      return { users: [], nextCursor: null };
-    }
-
     const nowKST = getKSTDateString();
     const usageRef = db.collection("readingSocialUsage").doc(policy.getDailyUsageDocId(uid, nowKST));
     await db.runTransaction(async (tx) => {
@@ -1741,17 +1734,19 @@ module.exports = function ({
     const filterValue = targetType === "resonated" ? true : targetType;
     let reactionsQuery = shareRef.collection("reactions")
       .where(filterField, "==", filterValue)
-      .orderBy(admin.firestore.FieldPath.documentId())
       .limit(pageSize + 1);
     if (cursor) reactionsQuery = reactionsQuery.startAfter(cursor);
 
     // During the v1 -> v2 transition, old reaction documents use `type`.
-    // Query that indexed field separately instead of scanning the subcollection.
     let legacyQuery = null;
-    if (targetType !== "read") {
+    if (targetType === "resonated") {
       legacyQuery = shareRef.collection("reactions")
-        .where("type", "==", targetType)
-        .orderBy(admin.firestore.FieldPath.documentId())
+        .where("type", "in", ["resonate", "resonated"])
+        .limit(pageSize + 1);
+      if (cursor) legacyQuery = legacyQuery.startAfter(cursor);
+    } else if (targetType === "want_to_read") {
+      legacyQuery = shareRef.collection("reactions")
+        .where("type", "in", ["want", "want_to_read"])
         .limit(pageSize + 1);
       if (cursor) legacyQuery = legacyQuery.startAfter(cursor);
     }
