@@ -492,30 +492,6 @@
     },
     {
       "collectionGroup": "reactions",
-      "queryScope": "COLLECTION",
-      "fields": [
-        { "fieldPath": "resonated", "order": "ASCENDING" },
-        { "fieldPath": "__name__", "order": "ASCENDING" }
-      ]
-    },
-    {
-      "collectionGroup": "reactions",
-      "queryScope": "COLLECTION",
-      "fields": [
-        { "fieldPath": "readingIntent", "order": "ASCENDING" },
-        { "fieldPath": "__name__", "order": "ASCENDING" }
-      ]
-    },
-    {
-      "collectionGroup": "reactions",
-      "queryScope": "COLLECTION",
-      "fields": [
-        { "fieldPath": "type", "order": "ASCENDING" },
-        { "fieldPath": "__name__", "order": "ASCENDING" }
-      ]
-    },
-    {
-      "collectionGroup": "reactions",
       "queryScope": "COLLECTION_GROUP",
       "fields": [
         { "fieldPath": "kind", "order": "ASCENDING" },
