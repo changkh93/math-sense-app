@@ -108,19 +108,17 @@ export default function ReadingShareCard({ share, onSelect }) {
         </div>
 
         <div className="share-card-counts">
+          <div className="share-count-item resonated" title="공감">
+            <Sparkles size={14} />
+            <span>{resonatedCount}</span>
+          </div>
           <div className="share-count-item want" title="읽고 싶어요">
             <Bookmark size={14} />
             <span>{wantToReadCount}</span>
           </div>
-          {readCount > 0 && (
-            <div className="share-count-item read" title="저도 읽었어요" style={{ color: '#34d399' }}>
-              <BookOpen size={14} />
-              <span>{readCount}</span>
-            </div>
-          )}
-          <div className="share-count-item resonated" title="생각이 이어졌어요">
-            <Sparkles size={14} />
-            <span>{resonatedCount}</span>
+          <div className="share-count-item read" title="저도 읽었어요">
+            <BookOpen size={14} />
+            <span>{readCount}</span>
           </div>
           <div className="share-count-item" title="댓글">
             <MessageSquare size={14} />

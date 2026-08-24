@@ -222,12 +222,16 @@
   font-size: 0.82rem;
 }
 
+.share-count-item.resonated {
+  color: #a78bfa;
+}
+
 .share-count-item.want {
   color: #38bdf8;
 }
 
-.share-count-item.resonated {
-  color: #a78bfa;
+.share-count-item.read {
+  color: #34d399;
 }
 
 /* Detail Drawer */

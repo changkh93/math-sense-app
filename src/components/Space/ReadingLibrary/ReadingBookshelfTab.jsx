@@ -269,7 +269,9 @@ export default function ReadingBookshelfTab({
               const review = share.review || {};
               const owner = share.ownerSnapshot || {};
               const shareStage = getReadingShareStage(share);
+              const resonatedCount = share.reactionCounts?.resonated || 0;
               const wantCount = share.reactionCounts?.wantToRead || 0;
+              const readCount = share.reactionCounts?.read || 0;
               const commentCount = share.commentCount || 0;
 
               return (
@@ -313,7 +315,9 @@ export default function ReadingBookshelfTab({
                       👤 {owner.displayName || '탐사대원'}
                     </span>
                     <div className="bookshelf-lounge-card-counts">
-                      {wantCount > 0 && <span title="읽고 싶어요">🔖 {wantCount}</span>}
+                      <span title="공감" style={{ color: '#a78bfa' }}>✨ {resonatedCount}</span>
+                      <span title="읽고 싶어요" style={{ color: '#38bdf8' }}>🔖 {wantCount}</span>
+                      <span title="저도 읽었어요" style={{ color: '#34d399' }}>📖 {readCount}</span>
                       {commentCount > 0 && <span title="댓글/생각">💬 {commentCount}</span>}
                     </div>
                   </div>
