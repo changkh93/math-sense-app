@@ -325,15 +325,24 @@ module.exports = function ({ functions, admin, costOptimizedDataFunctions, requi
       throw new functions.https.HttpsError("invalid-argument", validation.message, { code: validation.error });
     }
 
-    const command = prepareCommand(uid, commandId, { title, author, status, dateInput });
-
     const now = new Date();
     const nowTimestamp = Timestamp.fromDate(now);
-    const customDate = dateInput ? parseKSTDateTime(dateInput, "12:00") : now;
-    if (!customDate || customDate.getTime() > now.getTime() + 5 * 60 * 1000) {
-      throw new functions.https.HttpsError("invalid-argument", "독서 상태 일자가 올바르지 않습니다.");
+    const todayKst = getKSTDateString(now);
+    let customTimestamp = nowTimestamp;
+
+    if (dateInput) {
+      if (dateInput === todayKst) {
+        customTimestamp = nowTimestamp;
+      } else if (dateInput > todayKst) {
+        throw new functions.https.HttpsError("invalid-argument", "독서 상태 일자가 올바르지 않습니다. (미래 날짜는 선택할 수 없습니다)");
+      } else {
+        const customDate = parseKSTDateTime(dateInput, "12:00");
+        if (!customDate) {
+          throw new functions.https.HttpsError("invalid-argument", "독서 상태 일자 형식이 올바르지 않습니다.");
+        }
+        customTimestamp = Timestamp.fromDate(customDate);
+      }
     }
-    const customTimestamp = Timestamp.fromDate(customDate);
 
     const bookRef = db.collection("readingBooks").doc();
     const bookId = bookRef.id;

@@ -51,7 +51,7 @@ export default function ReadingBookFormModal({ isOpen, onClose, existingBooks = 
         title: validation.title,
         author: validation.author,
         status: validation.status,
-        dateInput: status !== BOOK_STATUSES.READING ? dateInput : null,
+        dateInput: (status === BOOK_STATUSES.COMPLETED || status === BOOK_STATUSES.PAUSED) ? dateInput : null,
       });
 
       if (onBookCreated) {
