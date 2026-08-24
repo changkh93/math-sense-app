@@ -516,11 +516,25 @@
         { "fieldPath": "kind", "order": "ASCENDING" },
         { "fieldPath": "authorId", "order": "ASCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "assignments",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "userId", "order": "ASCENDING" },
+        { "fieldPath": "date", "order": "ASCENDING" }
+      ]
     }
   ],
   "fieldOverrides": [
     {
       "collectionGroup": "readingCommands",
+      "fieldPath": "expiresAt",
+      "ttl": true,
+      "indexes": []
+    },
+    {
+      "collectionGroup": "weeklyGrowthCommands",
       "fieldPath": "expiresAt",
       "ttl": true,
       "indexes": []

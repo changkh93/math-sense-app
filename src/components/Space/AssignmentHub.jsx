@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useMemo, useRef, useEffect, useCallback, lazy, Suspense } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import ReactMarkdown from 'react-markdown';
 import { useAuth } from '../../hooks/useAuth';
@@ -33,6 +33,7 @@ import ReadingShareComposer from '../Community/ReadingLounge/ReadingShareCompose
 import './ReadingLibrary/ReadingLibrary.css';
 
 const MotionDiv = motion.div;
+const WeeklyGrowthLoopDrawer = lazy(() => import('./WeeklyGrowthLoop/WeeklyGrowthLoopDrawer'));
 const ASSIGNMENT_MISSING_GRACE_MS = 12 * 60 * 60 * 1000;
 const WARNING_POLICY_MESSAGE = '경고 3회 누적 시 수강료가 10% 인상될 수 있습니다.';
 const ACTIVE_WARNING_STATUSES = ['active', 'appealed'];
@@ -43,6 +44,14 @@ const ASSIGNMENT_DRAFT_FILE_DB_VERSION = 1;
 const ASSIGNMENT_DRAFT_FILE_STORE = 'files';
 
 const isDateKey = (value) => /^\d{4}-\d{2}-\d{2}$/.test(String(value || ''));
+
+const getMondayDateKey = (dateKey) => {
+  if (!isDateKey(dateKey)) return '';
+  const date = new Date(`${dateKey}T12:00:00Z`);
+  const mondayOffset = (date.getUTCDay() + 6) % 7;
+  date.setUTCDate(date.getUTCDate() - mondayOffset);
+  return date.toISOString().slice(0, 10);
+};
 
 const getAssignmentDraftStorageKey = ({ userId, clusterId, dateStr }) => {
   if (!userId || !dateStr) return '';
@@ -209,7 +218,7 @@ const formatReadingClockTime = (readAt) => {
       hour12: false,
       timeZone: 'Asia/Seoul'
     }).format(new Date(ms));
-  } catch (e) {
+  } catch {
     return '';
   }
 };
@@ -277,6 +286,8 @@ export default function AssignmentHub({ clusterId, regionId, initialDateStr, onC
   const [currentDate, setCurrentDate] = useState(() => new Date(`${normalizedInitialDateStr || getTodayKST()}T12:00:00Z`));
   const [selectedDateStr, setSelectedDateStr] = useState(normalizedInitialDateStr); // The date the user clicked on
   const [showChronicle, setShowChronicle] = useState(false);
+  const [showWeeklyGrowthLoop, setShowWeeklyGrowthLoop] = useState(false);
+  const [weeklyGrowthStatus, setWeeklyGrowthStatus] = useState(null);
   const [penaltyCheckNow, setPenaltyCheckNow] = useState(0);
   const [optimisticAssignmentsByDate, setOptimisticAssignmentsByDate] = useState({});
   const [submissionNotice, setSubmissionNotice] = useState(null);
@@ -284,6 +295,9 @@ export default function AssignmentHub({ clusterId, regionId, initialDateStr, onC
   const unsentDraftRef = useRef({ dirty: false });
   const previousTodayRef = useRef(todayKST);
   const penaltySweepKeyRef = useRef('');
+  const currentWeeklyGrowthWeekKey = useMemo(() => getMondayDateKey(todayKST), [todayKST]);
+  const isCurrentWeeklyGrowthCompleted = weeklyGrowthStatus?.weekStartKey === currentWeeklyGrowthWeekKey
+    && weeklyGrowthStatus?.status === 'completed';
 
   // Keep the archive aligned with the Korean teaching day, even across midnight.
   useEffect(() => {
@@ -625,7 +639,7 @@ export default function AssignmentHub({ clusterId, regionId, initialDateStr, onC
           gap: isMobile ? '0.5rem' : '2rem'
         }}>
           {isMobile ? (
-            <div style={{ display: 'flex', width: '100%', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div style={{ display: 'flex', width: '100%', justifyContent: 'space-between', alignItems: 'center', gap: '0.4rem' }}>
               <button 
                 className="space-nav-link font-tech"
                 onClick={handleCloseArchive}
@@ -633,15 +647,24 @@ export default function AssignmentHub({ clusterId, regionId, initialDateStr, onC
               >
                 ← RETURN
               </button>
-              <button 
-                className="space-btn cosmic-btn font-tech" 
-                onClick={() => {
-                  if (confirmDraftNavigation()) setShowChronicle(true);
-                }}
-                style={{ padding: '0.4rem 0.8rem', fontSize: '0.8rem', whiteSpace: 'nowrap' }}
-              >
-                 항해 일지 열기
-              </button>
+              <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
+                <button
+                  className="space-btn cosmic-btn font-tech"
+                  onClick={() => setShowWeeklyGrowthLoop(true)}
+                  style={{ padding: '0.4rem 0.65rem', fontSize: '0.78rem', whiteSpace: 'nowrap', borderColor: 'rgba(0, 229, 255, 0.4)' }}
+                >
+                  {isCurrentWeeklyGrowthCompleted ? '✅ 항로 설정 완료' : '🧭 이번 주 항로'}
+                </button>
+                <button
+                  className="space-btn cosmic-btn font-tech"
+                  onClick={() => {
+                    if (confirmDraftNavigation()) setShowChronicle(true);
+                  }}
+                  style={{ padding: '0.4rem 0.65rem', fontSize: '0.78rem', whiteSpace: 'nowrap' }}
+                >
+                  항해 일지
+                </button>
+              </div>
             </div>
           ) : (
             <button 
@@ -670,15 +693,24 @@ export default function AssignmentHub({ clusterId, regionId, initialDateStr, onC
           </h2>
 
           {!isMobile && (
-            <button 
-              className="space-btn cosmic-btn font-tech" 
-              onClick={() => {
-                if (confirmDraftNavigation()) setShowChronicle(true);
-              }}
-              style={{ padding: '0.5rem 1.2rem', display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem', whiteSpace: 'nowrap' }}
-            >
-               항해 일지 열기
-            </button>
+            <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center' }}>
+              <button
+                className="space-btn cosmic-btn font-tech"
+                onClick={() => setShowWeeklyGrowthLoop(true)}
+                style={{ padding: '0.5rem 1rem', display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.85rem', whiteSpace: 'nowrap', borderColor: 'rgba(0, 229, 255, 0.4)' }}
+              >
+                {isCurrentWeeklyGrowthCompleted ? '✅ 항로 설정 완료' : '🧭 이번 주 항로'}
+              </button>
+              <button
+                className="space-btn cosmic-btn font-tech"
+                onClick={() => {
+                  if (confirmDraftNavigation()) setShowChronicle(true);
+                }}
+                style={{ padding: '0.5rem 1.2rem', display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem', whiteSpace: 'nowrap' }}
+              >
+                항해 일지 열기
+              </button>
+            </div>
           )}
         </div>
       </div>
@@ -1031,6 +1063,17 @@ export default function AssignmentHub({ clusterId, regionId, initialDateStr, onC
           onClose={() => setShareModalBook(null)}
           initialBook={shareModalBook}
         />
+      )}
+
+      {/* Weekly Growth Loop ('이번 주 항로') Drawer */}
+      {showWeeklyGrowthLoop && (
+        <Suspense fallback={null}>
+          <WeeklyGrowthLoopDrawer
+            isOpen
+            onClose={() => setShowWeeklyGrowthLoop(false)}
+            onStatusChange={setWeeklyGrowthStatus}
+          />
+        </Suspense>
       )}
     </div>
   );

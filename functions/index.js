@@ -59,6 +59,14 @@ Object.assign(exports, require("./galaxyGame")({
   regionalFunctions,
   galaxyPlayTime: galaxyPlayTime.internal,
 }));
+
+const weeklyGrowthLoop = require("./weeklyGrowthLoop")({
+  functions,
+  admin,
+  regionalFunctions,
+  costOptimizedDataFunctions,
+});
+Object.assign(exports, weeklyGrowthLoop.functions);
 const DIRECT_MEMO_MAX_LENGTH = 2000;
 const CRYSTAL_GIFT_DAILY_LIMIT = 100;
 const QUIZ_BATTLE_TIE_TOLERANCE_MS = 3000;
@@ -7168,6 +7176,8 @@ async function deleteUserOwnedData(uid, options = {}) {
     await deleteQueryDocs(db.collection("directMemos").where("senderId", "==", uid), stats, "directMemosDeleted");
     await deleteQueryDocs(db.collection("directMemos").where("recipientId", "==", uid), stats, "directMemosDeleted");
     await deleteQueryDocs(db.collection("starMessages").where("userId", "==", uid), stats, "starMessagesDeleted");
+    await deleteQueryDocs(db.collection("weeklyGrowthLoops").where("ownerId", "==", uid), stats, "weeklyGrowthLoopsDeleted");
+    await deleteQueryDocs(db.collection("weeklyGrowthCommands").where("ownerId", "==", uid), stats, "weeklyGrowthCommandsDeleted");
     await deleteQueryDocs(db.collection("referrals").where("referrerStudentUid", "==", uid), stats, "referralsDeleted");
     await deleteQueryDocs(db.collection("referrals").where("referredStudentUid", "==", uid), stats, "referralsDeleted");
     await deleteQueryDocs(db.collection("referralInvites").where("referrerStudentUid", "==", uid), stats, "referralInvitesDeleted");

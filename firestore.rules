@@ -1042,6 +1042,18 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
+    // Weekly Growth Loop ('이번 주 항로')
+    // Read allowed for owner or admin. All writes must go through Cloud Functions.
+    match /weeklyGrowthLoops/{loopId} {
+      allow read: if isAuth() && (resource.data.ownerId == request.auth.uid || isAdmin());
+      allow write: if false;
+    }
+
+    // Weekly Growth Commands (Idempotency ledger - Server only)
+    match /weeklyGrowthCommands/{commandId} {
+      allow read, write: if false;
+    }
+
     // Collection Group: history (for Region/Chapter leaderboards)
     // Allows authenticated users to query quiz history across all users
     // for scope-specific ranking (e.g. all scores within a Region or Chapter).

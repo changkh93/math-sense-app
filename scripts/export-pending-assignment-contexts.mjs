@@ -1,9 +1,6 @@
 import admin from 'firebase-admin';
 import { readFileSync, writeFileSync } from 'fs';
 import {
-  belongsToCourse,
-  isPythonExclusiveActivity,
-  normalizeCourseId,
   sanitizeLearningSummaryForCourse,
 } from '../src/services/coursePolicyUtils.js';
 
