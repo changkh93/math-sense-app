@@ -120,6 +120,16 @@ function getTimeMs(value) {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
+function getDeterministicColorHash(str = '') {
+  const text = String(str || '');
+  let hash = 0;
+  for (let i = 0; i < text.length; i++) {
+    hash = (hash << 5) - hash + text.charCodeAt(i);
+    hash |= 0;
+  }
+  return hash;
+}
+
 function getProfileBookStyle(book = {}) {
   const hash = getDeterministicColorHash(`${book.title || ''}__${book.author || ''}__${book.id || ''}`);
   const palette = PROFILE_BOOK_PALETTES[Math.abs(hash) % PROFILE_BOOK_PALETTES.length];
