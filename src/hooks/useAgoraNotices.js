@@ -117,3 +117,58 @@ export function useCreateAgoraNotice() {
     },
   });
 }
+
+export function useUpdateAgoraNotice() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ noticeId, title, content }) => {
+      const callable = httpsCallable(functions, 'updateAgoraNotice');
+      const response = await callable({ noticeId, title, content });
+      return response.data;
+    },
+    onSuccess: ({ notice, featureItems }) => {
+      if (featureItems) {
+        queryClient.setQueryData(agoraNoticeKeys.feature, featureItems);
+      }
+      queryClient.setQueryData(agoraNoticeKeys.list, (previous) => {
+        if (!previous?.pages?.length || !notice) return previous;
+        return {
+          ...previous,
+          pages: previous.pages.map((page) => ({
+            ...page,
+            items: page.items.map((item) => (item.id === notice.id ? { ...item, ...notice } : item)),
+          })),
+        };
+      });
+    },
+  });
+}
+
+export function useDeleteAgoraNotice() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ noticeId }) => {
+      const callable = httpsCallable(functions, 'deleteAgoraNotice');
+      const response = await callable({ noticeId });
+      return response.data;
+    },
+    onSuccess: ({ noticeId, featureItems }) => {
+      if (featureItems) {
+        queryClient.setQueryData(agoraNoticeKeys.feature, featureItems);
+      }
+      queryClient.setQueryData(agoraNoticeKeys.list, (previous) => {
+        if (!previous?.pages?.length || !noticeId) return previous;
+        return {
+          ...previous,
+          pages: previous.pages.map((page) => ({
+            ...page,
+            items: page.items.filter((item) => item.id !== noticeId),
+          })),
+        };
+      });
+    },
+  });
+}
+

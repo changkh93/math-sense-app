@@ -1,10 +1,12 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Loader, Megaphone, Plus, X } from 'lucide-react';
+import { Edit2, Loader, Megaphone, Plus, Trash2, X } from 'lucide-react';
 import {
   AGORA_NOTICE_OPERATOR_EMAIL,
   createNoticeCommandId,
   useAgoraNotices,
   useCreateAgoraNotice,
+  useDeleteAgoraNotice,
+  useUpdateAgoraNotice,
 } from '../../hooks/useAgoraNotices';
 import { parseInlineFormatting } from '../../utils/formatUtils';
 import './AgoraNoticeBoard.css';
@@ -25,25 +27,37 @@ function formatNoticeDate(notice) {
   }).format(new Date(millis));
 }
 
-function NoticeComposer({ onClose }) {
+function NoticeComposer({ editingNotice = null, onClose }) {
+  const isEditing = Boolean(editingNotice?.id);
   const commandIdRef = useRef(createNoticeCommandId());
-  const [title, setTitle] = useState('');
-  const [content, setContent] = useState('');
+  const [title, setTitle] = useState(editingNotice?.title || '');
+  const [content, setContent] = useState(editingNotice?.content || '');
   const createNotice = useCreateAgoraNotice();
+  const updateNotice = useUpdateAgoraNotice();
+  const activeMutation = isEditing ? updateNotice : createNotice;
+
   const normalizedTitle = title.trim();
   const normalizedContent = content.trim();
+  const isPending = activeMutation.isPending;
   const canSubmit = normalizedTitle.length > 0
     && normalizedTitle.length <= 100
     && normalizedContent.length > 0
     && normalizedContent.length <= 3000
-    && !createNotice.isPending;
-  const isDirty = Boolean(normalizedTitle || normalizedContent);
+    && !isPending;
+
+  const initialTitle = editingNotice?.title || '';
+  const initialContent = editingNotice?.content || '';
+  const isDirty = isEditing
+    ? normalizedTitle !== initialTitle.trim() || normalizedContent !== initialContent.trim()
+    : Boolean(normalizedTitle || normalizedContent);
 
   const requestClose = useCallback(() => {
-    if (createNotice.isPending) return;
-    if (isDirty && !window.confirm('작성 중인 공지 내용이 사라집니다. 닫을까요?')) return;
+    if (isPending) return;
+    if (isDirty && !window.confirm(isEditing ? '수정 중인 내용이 사라집니다. 닫을까요?' : '작성 중인 공지 내용이 사라집니다. 닫을까요?')) {
+      return;
+    }
     onClose();
-  }, [createNotice.isPending, isDirty, onClose]);
+  }, [isPending, isDirty, isEditing, onClose]);
 
   useEffect(() => {
     const handleKeyDown = (event) => {
@@ -58,10 +72,18 @@ function NoticeComposer({ onClose }) {
   const handleSubmit = (event) => {
     event.preventDefault();
     if (!canSubmit) return;
-    createNotice.mutate(
-      { title: normalizedTitle, content: normalizedContent, commandId: commandIdRef.current },
-      { onSuccess: onClose },
-    );
+
+    if (isEditing) {
+      updateNotice.mutate(
+        { noticeId: editingNotice.id, title: normalizedTitle, content: normalizedContent },
+        { onSuccess: onClose },
+      );
+    } else {
+      createNotice.mutate(
+        { title: normalizedTitle, content: normalizedContent, commandId: commandIdRef.current },
+        { onSuccess: onClose },
+      );
+    }
   };
 
   return (
@@ -76,9 +98,9 @@ function NoticeComposer({ onClose }) {
         <div className="agora-notice-modal-header">
           <div>
             <span>운영자 전용</span>
-            <h2 id="agora-notice-compose-title">공지사항 작성</h2>
+            <h2 id="agora-notice-compose-title">{isEditing ? '공지사항 수정' : '공지사항 작성'}</h2>
           </div>
-          <button type="button" aria-label="닫기" onClick={requestClose} disabled={createNotice.isPending}>
+          <button type="button" aria-label="닫기" onClick={requestClose} disabled={isPending}>
             <X size={20} />
           </button>
         </div>
@@ -103,15 +125,19 @@ function NoticeComposer({ onClose }) {
               placeholder="학생들에게 안내할 내용을 입력하세요"
             />
           </label>
-          {createNotice.isError && (
+          {activeMutation.isError && (
             <p className="agora-notice-form-error" role="alert">
-              {createNotice.error?.message || '공지를 저장하지 못했습니다.'}
+              {activeMutation.error?.message || (isEditing ? '공지를 수정하지 못했습니다.' : '공지를 저장하지 못했습니다.')}
             </p>
           )}
           <div className="agora-notice-modal-actions">
-            <button type="button" className="secondary" onClick={requestClose} disabled={createNotice.isPending}>취소</button>
+            <button type="button" className="secondary" onClick={requestClose} disabled={isPending}>취소</button>
             <button type="submit" className="primary" disabled={!canSubmit}>
-              {createNotice.isPending ? <><Loader size={16} className="spin-icon" /> 저장 중</> : '공지 등록'}
+              {isPending ? (
+                <><Loader size={16} className="spin-icon" /> {isEditing ? '수정 중' : '저장 중'}</>
+              ) : (
+                isEditing ? '수정 완료' : '공지 등록'
+              )}
             </button>
           </div>
         </form>
@@ -126,13 +152,46 @@ export default function AgoraNoticeBoard({
   isAuthenticated = false,
 }) {
   const [isComposerOpen, setIsComposerOpen] = useState(false);
+  const [editingNotice, setEditingNotice] = useState(null);
+  const [deletingId, setDeletingId] = useState(null);
+
   const noticeQuery = useAgoraNotices({ enabled: isAuthenticated });
+  const deleteNotice = useDeleteAgoraNotice();
+
   const notices = useMemo(
     () => noticeQuery.data?.pages?.flatMap((page) => page.items) || [],
     [noticeQuery.data],
   );
   const isOperator = userEmailVerified === true
     && String(userEmail).trim().toLowerCase() === AGORA_NOTICE_OPERATOR_EMAIL;
+
+  const handleDeleteNotice = (noticeId) => {
+    if (deleteNotice.isPending || deletingId) return;
+    if (!window.confirm('이 공지사항을 삭제(보관)하시겠습니까?')) return;
+
+    setDeletingId(noticeId);
+    deleteNotice.mutate(
+      { noticeId },
+      {
+        onSettled: () => setDeletingId(null),
+      },
+    );
+  };
+
+  const handleOpenCreate = () => {
+    setEditingNotice(null);
+    setIsComposerOpen(true);
+  };
+
+  const handleOpenEdit = (notice) => {
+    setEditingNotice(notice);
+    setIsComposerOpen(true);
+  };
+
+  const handleCloseComposer = () => {
+    setIsComposerOpen(false);
+    setEditingNotice(null);
+  };
 
   return (
     <section className="agora-notice-board" aria-labelledby="agora-notice-heading">
@@ -143,7 +202,7 @@ export default function AgoraNoticeBoard({
           <p>아고라와 학습 활동에 필요한 안내를 확인해 주세요.</p>
         </div>
         {isOperator && (
-          <button type="button" className="agora-notice-create" onClick={() => setIsComposerOpen(true)}>
+          <button type="button" className="agora-notice-create" onClick={handleOpenCreate}>
             <Plus size={17} /> 공지 작성
           </button>
         )}
@@ -159,21 +218,48 @@ export default function AgoraNoticeBoard({
         <div className="agora-notice-state">등록된 공지사항이 없습니다.</div>
       ) : (
         <div className="agora-notice-list">
-          {notices.map((notice) => (
-            <article key={notice.id} className="agora-notice-card glass">
-              <div className="agora-notice-card-meta">
-                <span>공지</span>
-                <time>{formatNoticeDate(notice)}</time>
-              </div>
-              <h3>{notice.title}</h3>
-              <div className="agora-notice-card-content">
-                {parseInlineFormatting(notice.content, {
-                  keyPrefix: `agora-notice-${notice.id}`,
-                  linkColor: '#7dd3fc',
-                })}
-              </div>
-            </article>
-          ))}
+          {notices.map((notice) => {
+            const isDeletingThis = deletingId === notice.id;
+            return (
+              <article key={notice.id} className="agora-notice-card glass">
+                <div className="agora-notice-card-meta">
+                  <div className="agora-notice-card-meta-info">
+                    <span>공지</span>
+                    <time>{formatNoticeDate(notice)}</time>
+                  </div>
+                  {isOperator && (
+                    <div className="agora-notice-card-actions">
+                      <button
+                        type="button"
+                        className="agora-notice-action-btn edit"
+                        onClick={() => handleOpenEdit(notice)}
+                        disabled={isDeletingThis}
+                        title="공지 수정"
+                      >
+                        <Edit2 size={13} /> 수정
+                      </button>
+                      <button
+                        type="button"
+                        className="agora-notice-action-btn delete"
+                        onClick={() => handleDeleteNotice(notice.id)}
+                        disabled={isDeletingThis || deleteNotice.isPending}
+                        title="공지 삭제"
+                      >
+                        {isDeletingThis ? <Loader size={13} className="spin-icon" /> : <><Trash2 size={13} /> 삭제</>}
+                      </button>
+                    </div>
+                  )}
+                </div>
+                <h3>{notice.title}</h3>
+                <div className="agora-notice-card-content">
+                  {parseInlineFormatting(notice.content, {
+                    keyPrefix: `agora-notice-${notice.id}`,
+                    linkColor: '#7dd3fc',
+                  })}
+                </div>
+              </article>
+            );
+          })}
         </div>
       )}
 
@@ -188,7 +274,13 @@ export default function AgoraNoticeBoard({
         </button>
       )}
 
-      {isComposerOpen && <NoticeComposer onClose={() => setIsComposerOpen(false)} />}
+      {isComposerOpen && (
+        <NoticeComposer
+          editingNotice={editingNotice}
+          onClose={handleCloseComposer}
+        />
+      )}
     </section>
   );
 }
+
