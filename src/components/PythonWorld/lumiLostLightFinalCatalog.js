@@ -35,6 +35,7 @@ export const LOST_LIGHT_FINAL_MISSIONS = [
     },
     scaffold: {
       mode: 'code',
+      autoImport: true,
       visibleTools: ['run', 'reset', 'step', 'replay', 'inspector'],
     },
     storyIntro: '조난 신호가 여러 개 감지되었습니다. 오염도가 가장 높은 긴급 대상을 먼저 찾아 구조해야 합니다.',
@@ -198,6 +199,7 @@ total_corruption = sum(d.corruption for d in fleet)
     },
     scaffold: {
       mode: 'code',
+      autoImport: true,
       visibleTools: ['run', 'reset', 'step', 'replay', 'inspector'],
     },
     storyIntro: '관제사님! 마침내 사라진 빛의 중심부에 도달했습니다. 우리가 지금까지 배운 모든 파이썬 역량을 발휘하여 항로의 모든 릴레이 비콘을 재가동하세요!',

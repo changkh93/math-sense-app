@@ -127,6 +127,9 @@ export function normalizeRuntimeEvents(rawEvents = []) {
         sensor: raw.sensor ?? raw.payload?.sensor,
         value: raw.value ?? raw.payload?.value,
       }
+    } else if (raw.payload && typeof raw.payload === 'object') {
+      type = raw.type
+      payload = { ...raw.payload }
     } else {
       payload = { ...raw }
       delete payload.type

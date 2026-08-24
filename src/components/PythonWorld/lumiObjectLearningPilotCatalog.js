@@ -32,6 +32,7 @@ export const PILOT_OBJECT_MISSIONS = [
     },
     scaffold: {
       mode: 'code',
+      autoImport: true,
       visibleTools: ['run', 'reset', 'step', 'replay', 'inspector'],
     },
     storyIntro: '관제사님! 지금까지 우리를 안내하던 LUMI는 단순한 게임 명령어가 아닙니다. Rover 클래스로 조립된 상태(속성)와 행동(메서드)을 가진 실제 객체입니다.',

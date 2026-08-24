@@ -268,10 +268,11 @@ export const VERTICAL_SLICE_MISSIONS = [
       obstacles: [],
     },
     goals: [
-      { type: 'eventOccurred', eventType: 'rover_spoke' },
+      { type: 'spokenMessage', label: '루미가 따옴표 안의 메시지를 말합니다.' },
     ],
     conceptEvidence: {
       mustCall: ['lumi.say'],
+      mustUse: ['string'],
     },
     hints: [
       { level: 1, type: 'context', text: '따옴표 `" "` 안에 원하는 인사말(예: "신호 수신")을 넣고 실행해 보세요.' },

@@ -32,7 +32,7 @@ console.log('  -> Total base crystals verified: 48');
 
 // 2. Check ACT 1 Catalog Rewards
 console.log('[Test 2] ACT 1 Missions Catalog Reward configuration...');
-assert.equal(ACT_1_MISSIONS.length, 5, 'ACT 1 must have 5 missions');
+assert.equal(ACT_1_MISSIONS.length, 6, 'ACT 1 must have 6 missions');
 ACT_1_MISSIONS.forEach((m) => {
   assert.ok(m.reward, `ACT 1 mission ${m.id} must have reward metadata`);
   if (m.reward.tier === 'field-test') {
@@ -71,7 +71,7 @@ assert.equal(vs06Canonical.reward.baseCrystals, 8);
 const act11Canonical = getCanonicalLumiMission('1-1');
 assert.equal(act11Canonical.id, 'lumi-act1-01');
 assert.equal(act11Canonical.unitId, 'lumi_protocol_act_1_command');
-assert.equal(act11Canonical.totalMissionCount, 5);
+assert.equal(act11Canonical.totalMissionCount, 6);
 
 console.log('  -> Canonical mission mappings verified');
 

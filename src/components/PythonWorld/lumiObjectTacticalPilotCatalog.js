@@ -37,6 +37,7 @@ export const PILOT_TACTICAL_MISSIONS = [
     },
     scaffold: {
       mode: 'code',
+      autoImport: true,
       visibleTools: ['run', 'reset', 'step', 'replay', 'inspector'],
     },
     tacticalProjection: {

@@ -110,8 +110,9 @@ function hasReachedSingleGoal(goal, ctx) {
   if (goal.type === 'spokenMessage') {
     return events.some((event) => {
       if (event.type !== 'rover_spoke') return false
+      const msg = String(event.payload?.message ?? event.message ?? '').toLowerCase().trim()
+      if (msg === '' || msg === 'ellipsis' || msg === '...' || msg === 'none') return false
       if (!goal.includes) return true
-      const msg = String(event.payload?.message || '').toLowerCase().trim()
       const expected = String(goal.includes).toLowerCase().trim()
       return msg.includes(expected)
     })
@@ -467,10 +468,14 @@ export function evaluateMissionAttempt({
   const score = stars === 3 ? 100 : stars === 2 ? 80 : stars === 1 ? 60 : 0
   const mastered = stars === 3
 
+  const goalEvaluation = getDetailedGoalEvaluation(mission, runtimeResult)
+
   let conceptMissingMsg = ''
   if (conceptEvidence.missingMustUse?.length > 0) {
     if (conceptEvidence.missingMustUse.includes('import')) {
       conceptMissingMsg = "맨 첫 줄에 'from msense import lumi'를 작성하여 LUMI를 불러와야 합니다."
+    } else if (conceptEvidence.missingMustUse.includes('string') || conceptEvidence.missingMustUse.includes('str')) {
+      conceptMissingMsg = '따옴표(" ")로 감싼 문자열 메시지를 코드에 사용하세요. 예: "신호 수신"'
     } else {
       conceptMissingMsg = `필수 개념 미사용: '${conceptEvidence.missingMustUse.join(', ')}'을(를) 코드에 사용하세요.`
     }

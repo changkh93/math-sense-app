@@ -169,6 +169,10 @@ def _analyze(tree, code=""):
             concepts.add("for")
             if any(isinstance(child, ast.For) for child in ast.walk(node) if child is not node):
                 concepts.add("nested_for")
+        elif isinstance(node, ast.Constant):
+            if isinstance(node.value, str):
+                concepts.add("string")
+                concepts.add("str")
         elif isinstance(node, (ast.List, ast.ListComp)):
             concepts.add("list")
         elif isinstance(node, ast.Dict):
@@ -727,12 +731,16 @@ def _run_mission(payload_json, code):
             "type": safe_type,
             "zip": zip,
         }
+        is_act_0 = mission.get("actId") == "act-0-awakening" or str(mission.get("id", "")).startswith("lumi-vs-")
+        auto_import = bool(mission.get("scaffold", {}).get("autoImport", is_act_0))
+
         student_globals = {
             "__builtins__": allowed_builtins,
             "__name__": "__main__",
-            "lumi": lumi,
-            "world": world,
         }
+        if auto_import:
+            student_globals["lumi"] = lumi
+            student_globals["world"] = world
 
         frame_snapshots = {
             "main": {

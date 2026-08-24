@@ -42,6 +42,7 @@ function automationMission({
     },
     scaffold: {
       mode: 'edit',
+      autoImport: true,
       visibleTools: ['run', 'reset', 'step', 'replay', 'memory', 'mission-tabs', 'hud'],
     },
     world: {

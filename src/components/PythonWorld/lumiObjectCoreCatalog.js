@@ -31,6 +31,7 @@ export const OBJECT_CORE_MISSIONS = [
     },
     scaffold: {
       mode: 'code',
+      autoImport: true,
       visibleTools: ['run', 'reset', 'step', 'replay', 'inspector'],
     },
     storyIntro: '관제사님! 지금까지 우리와 함께한 LUMI는 단순한 함수 모음이 아니라, Rover 클래스로 조립된 실제 객체입니다.',
@@ -379,6 +380,7 @@ d3 = Drone("D-3", 10)
     },
     scaffold: {
       mode: 'code',
+      autoImport: true,
       visibleTools: ['run', 'reset', 'step', 'replay', 'inspector'],
     },
     storyIntro: '관제사님! Object Core의 마지막 검증입니다. 클래스 정의, 생성자, 메서드, 리스트, for 반복문을 종합하여 조난된 편대를 구출하세요.',
