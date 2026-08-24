@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Bookmark, Sparkles, MessageSquare, AlertTriangle, Eye, EyeOff, BookOpen } from 'lucide-react';
+import { getReadingShareStage } from '../../../utils/readingSharePresentation';
 import './ReadingLounge.css';
 
 export default function ReadingShareCard({ share, onSelect }) {
@@ -10,6 +11,7 @@ export default function ReadingShareCard({ share, onSelect }) {
   const { bookSnapshot, ownerSnapshot, review, reactionCounts, commentCount } = share;
   const hasSpoiler = Boolean(review?.hasSpoiler);
   const isBlind = hasSpoiler && !showSpoiler;
+  const shareStage = getReadingShareStage(share);
 
   const wantToReadCount = reactionCounts?.wantToRead || 0;
   const readCount = reactionCounts?.read || 0;
@@ -38,10 +40,12 @@ export default function ReadingShareCard({ share, onSelect }) {
           <BookOpen size={18} />
         </div>
         <div className="share-card-book-info">
+          <div style={{ fontSize: '0.7rem', fontWeight: 800, color: shareStage.kind === 'completed_recommendation' ? '#34d399' : '#38bdf8', marginBottom: '0.15rem' }}>
+            {shareStage.kind === 'completed_recommendation' ? '✓' : '📖'} {shareStage.shortLabel}
+          </div>
           <h3 className="share-card-book-title">{bookSnapshot?.title || '제목 없음'}</h3>
           <p className="share-card-book-author">
             {bookSnapshot?.author || '저자 미상'}
-            {bookSnapshot?.page ? ` · ${bookSnapshot.page}쪽까지 읽음` : ''}
           </p>
         </div>
       </div>
@@ -70,6 +74,11 @@ export default function ReadingShareCard({ share, onSelect }) {
             <p className="share-card-oneline">“{review?.oneLine}”</p>
             {review?.reason && (
               <p className="share-card-reason-preview">{review.reason}</p>
+            )}
+            {review?.sharedNotes?.length > 0 && (
+              <div style={{ marginTop: '0.5rem', fontSize: '0.75rem', color: '#7dd3fc', fontWeight: 700 }}>
+                ✨ 독서 기록 {review.sharedNotes.length}개 함께 공개
+              </div>
             )}
             {hasSpoiler && showSpoiler && (
               <div

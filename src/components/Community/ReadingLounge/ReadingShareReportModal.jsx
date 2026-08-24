@@ -45,7 +45,7 @@ export default function ReadingShareReportModal({ isOpen, onClose, share }) {
         <div className="composer-modal-header">
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#f87171' }}>
             <ShieldAlert size={20} />
-            <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800 }}>추천 글 신고</h3>
+            <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800 }}>공유 글 신고</h3>
           </div>
           <button
             type="button"
@@ -58,7 +58,7 @@ export default function ReadingShareReportModal({ isOpen, onClose, share }) {
 
         <form onSubmit={handleSubmit} className="composer-modal-body">
           <p style={{ fontSize: '0.88rem', color: 'rgba(255,255,255,0.7)', margin: 0 }}>
-            '{share.bookSnapshot?.title}'에 대한 추천 글을 신고하시는 사유를 선택해 주세요.
+            '{share.bookSnapshot?.title}'에 대한 공유 글을 신고하시는 사유를 선택해 주세요.
           </p>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>

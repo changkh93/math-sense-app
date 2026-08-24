@@ -61,7 +61,7 @@ export default function ReadingLoungeView() {
             onClick={() => setActiveTab('all')}
           >
             <Sparkles size={16} />
-            <span>최근 추천</span>
+            <span>최근 공유</span>
           </button>
           <button
             type="button"
@@ -69,7 +69,7 @@ export default function ReadingLoungeView() {
             onClick={() => setActiveTab('my')}
           >
             <UserCheck size={16} />
-            <span>내가 추천한 책</span>
+            <span>내가 공유한 책</span>
           </button>
         </div>
 
@@ -79,7 +79,7 @@ export default function ReadingLoungeView() {
           onClick={() => setIsComposerOpen(true)}
         >
           <Plus size={16} />
-          <span>추천 글 쓰기</span>
+          <span>책 공유하기</span>
         </button>
       </div>
 
@@ -87,22 +87,22 @@ export default function ReadingLoungeView() {
       {isLoading ? (
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '240px', gap: '0.8rem', color: 'rgba(255,255,255,0.6)' }}>
           <Loader size={28} className="animate-spin" color="#38bdf8" />
-          <span>독서 라운지의 추천들을 불러오는 중...</span>
+          <span>독서 라운지의 책 이야기를 불러오는 중...</span>
         </div>
       ) : isError ? (
         <div className="glass" style={{ padding: '2rem', textAlign: 'center', borderRadius: '16px' }}>
-          <p style={{ color: '#fca5a5', fontWeight: 700 }}>추천 글을 불러오지 못했습니다.</p>
+          <p style={{ color: '#fca5a5', fontWeight: 700 }}>공유 글을 불러오지 못했습니다.</p>
           <p style={{ fontSize: '0.85rem', color: 'rgba(255,255,255,0.6)' }}>{error?.message || '잠시 후 다시 시도해 주세요.'}</p>
         </div>
       ) : shares.length === 0 ? (
         <div className="empty-state glass">
           <Telescope size={48} opacity={0.3} className="empty-icon" />
           <div className="empty-text">
-            <h3>{activeTab === 'my' ? '아직 추천한 책이 없어요' : '독서 라운지가 아직 조용하네요'}</h3>
+            <h3>{activeTab === 'my' ? '아직 공유한 책이 없어요' : '독서 라운지가 아직 조용하네요'}</h3>
             <p>
               {activeTab === 'my'
-                ? '내 서재에서 인상 깊게 읽은 책을 추천해 보세요!'
-                : '스스로 읽고 느낀 생각을 나누는 첫 번째 추천 글을 남겨보세요.'}
+                ? '읽고 있는 책이나 완독한 책의 이야기를 나눠보세요!'
+                : '스스로 읽고 느낀 생각을 나누는 첫 번째 공유 글을 남겨보세요.'}
             </p>
             <button
               type="button"
@@ -111,7 +111,7 @@ export default function ReadingLoungeView() {
               onClick={() => setIsComposerOpen(true)}
             >
               <Plus size={16} />
-              <span>추천 글 작성하기</span>
+              <span>책 공유하기</span>
             </button>
           </div>
         </div>
@@ -135,7 +135,7 @@ export default function ReadingLoungeView() {
                 onClick={() => fetchNextPage()}
                 disabled={isFetchingNextPage}
               >
-                {isFetchingNextPage ? '더 불러오는 중...' : '추천 글 더 보기'}
+                {isFetchingNextPage ? '더 불러오는 중...' : '공유 글 더 보기'}
               </button>
             </div>
           )}

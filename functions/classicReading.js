@@ -454,6 +454,20 @@ module.exports = function ({ functions, admin, costOptimizedDataFunctions, requi
         return;
       }
 
+      // Keep the low-cost denormalized lounge stage accurate when a shared book
+      // crosses between the two public stages. We intentionally do not update the
+      // share on every page log, which would turn ordinary reading into extra writes.
+      let publicShareRef = null;
+      let publicShareSnap = null;
+      if (
+        book.publicShare?.status === "active" &&
+        book.publicShare?.shareId &&
+        [policy.BOOK_STATUSES.READING, policy.BOOK_STATUSES.COMPLETED].includes(targetStatus)
+      ) {
+        publicShareRef = db.collection("readingShares").doc(book.publicShare.shareId);
+        publicShareSnap = await tx.get(publicShareRef);
+      }
+
       const updates = {
         status: targetStatus,
         statusUpdatedAt: nowTimestamp,
@@ -472,6 +486,28 @@ module.exports = function ({ functions, admin, costOptimizedDataFunctions, requi
       }
 
       tx.update(bookRef, updates);
+
+      if (
+        publicShareRef &&
+        publicShareSnap?.exists &&
+        publicShareSnap.data()?.ownerId === uid &&
+        publicShareSnap.data()?.sourceBookId === bookId &&
+        publicShareSnap.data()?.status === "active"
+      ) {
+        const totalPages = Number(book.totalPages || 0);
+        const furthestPage = Number(book.progress?.furthestPage || 0);
+        const progressPercent = targetStatus === policy.BOOK_STATUSES.READING && totalPages > 0
+          ? Math.max(0, Math.min(100, Math.round((furthestPage / totalPages) * 100)))
+          : null;
+        tx.update(publicShareRef, {
+          shareKind: targetStatus === policy.BOOK_STATUSES.COMPLETED
+            ? "completed_recommendation"
+            : "reading_invitation",
+          "bookSnapshot.status": targetStatus,
+          "bookSnapshot.progressPercent": progressPercent,
+          updatedAt: nowTimestamp,
+        });
+      }
 
       const logRef = db.collection("readingLogs").doc();
       tx.set(logRef, {

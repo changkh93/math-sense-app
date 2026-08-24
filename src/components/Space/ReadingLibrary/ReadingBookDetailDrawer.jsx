@@ -158,7 +158,7 @@ export default function ReadingBookDetailDrawer({ isOpen, onClose, book, bookDat
                         navigate(`/agora?filter=reading&highlight=${currentBook.discovery.firstShareId}`);
                     }}
                   >
-                    추천 글 보기
+                    공유 글 보기
                   </button>
                 )}
               </div>
@@ -299,9 +299,8 @@ export default function ReadingBookDetailDrawer({ isOpen, onClose, book, bookDat
                     </button>
                   )}
 
-                  {/* Recommendation Actions */}
-                  {status !== BOOK_STATUSES.WANT_TO_READ && (
-                    currentBook.publicShare?.status === 'active' ? (
+                  {/* Reading Lounge share actions */}
+                  {currentBook.publicShare?.status === 'active' ? (
                       <div style={{ display: 'flex', gap: '0.4rem' }}>
                         <button
                           type="button"
@@ -313,7 +312,7 @@ export default function ReadingBookDetailDrawer({ isOpen, onClose, book, bookDat
                           }}
                         >
                           <Sparkles size={14} />
-                          추천 글 보기
+                          공유 글 보기
                         </button>
                         <button
                           type="button"
@@ -324,7 +323,7 @@ export default function ReadingBookDetailDrawer({ isOpen, onClose, book, bookDat
                           수정
                         </button>
                       </div>
-                    ) : (
+                    ) : [BOOK_STATUSES.READING, BOOK_STATUSES.COMPLETED].includes(status) ? (
                       <button
                         type="button"
                         className="bookshelf-add-btn font-tech"
@@ -332,10 +331,9 @@ export default function ReadingBookDetailDrawer({ isOpen, onClose, book, bookDat
                         style={{ fontSize: '0.82rem', padding: '0.45rem 0.85rem', background: 'rgba(56, 189, 248, 0.15)', borderColor: 'rgba(56, 189, 248, 0.4)', color: '#38bdf8' }}
                       >
                         <Share2 size={14} />
-                        이 책 추천하기
+                        라운지에 책 공유하기
                       </button>
-                    )
-                  )}
+                    ) : null}
 
                   <button
                     type="button"
@@ -401,8 +399,8 @@ export default function ReadingBookDetailDrawer({ isOpen, onClose, book, bookDat
           <div className="composer-modal-card" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 420 }}>
             <p style={{ color: '#e0f2fe', margin: 0 }}>
               {existingShareError
-                ? '추천 글을 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.'
-                : existingShareLoading ? '추천 글을 불러오는 중…' : '추천 글을 찾을 수 없습니다.'}
+                ? '공유 글을 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.'
+                : existingShareLoading ? '공유 글을 불러오는 중…' : '공유 글을 찾을 수 없습니다.'}
             </p>
             <button
               type="button"

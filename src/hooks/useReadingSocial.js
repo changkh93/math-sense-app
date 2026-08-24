@@ -353,7 +353,7 @@ export function useReadingShareComments(shareId, { enabled = false } = {}) {
 
 /**
  * 5. useReadingShareDraftSources
- * Fetch recent notes/assignments for drafting a share
+ * Fetch up to 12 deduplicated recent notes to attach to a share
  */
 export function useReadingShareDraftSources(bookId, { enabled = false } = {}) {
   const { user } = useAuth();
@@ -369,6 +369,7 @@ export function useReadingShareDraftSources(bookId, { enabled = false } = {}) {
     enabled: Boolean(user && bookId && enabled),
     staleTime: 5 * 60 * 1000,
     refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
   });
 }
 
@@ -381,7 +382,7 @@ export function usePublishReadingShare() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async ({ bookId, oneLine, reason, question, hasSpoiler, isPagePublic, page }) => {
+    mutationFn: async ({ bookId, oneLine, reason, question, hasSpoiler, sharedNotes }) => {
       const commandId = generateCommandId('publish_share');
       const callFn = httpsCallable(functions, 'publishReadingShare');
       const res = await callFn({
@@ -391,8 +392,7 @@ export function usePublishReadingShare() {
         reason,
         question,
         hasSpoiler,
-        isPagePublic,
-        page,
+        sharedNotes,
       });
       return res.data;
     },
@@ -411,7 +411,7 @@ export function useUpdateReadingShare() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async ({ shareId, oneLine, reason, question, hasSpoiler, isPagePublic, page }) => {
+    mutationFn: async ({ shareId, oneLine, reason, question, hasSpoiler, sharedNotes }) => {
       const commandId = generateCommandId('update_share');
       const callFn = httpsCallable(functions, 'updateReadingShare');
       const res = await callFn({
@@ -421,8 +421,7 @@ export function useUpdateReadingShare() {
         reason,
         question,
         hasSpoiler,
-        isPagePublic,
-        page,
+        sharedNotes,
       });
       return res.data;
     },
@@ -438,10 +437,11 @@ export function useUpdateReadingShare() {
             reason: variables.reason || '',
             question: variables.question || '',
             hasSpoiler: Boolean(variables.hasSpoiler),
+            sharedNotes: variables.sharedNotes || [],
           },
           bookSnapshot: {
             ...old.bookSnapshot,
-            page: variables.isPagePublic ? variables.page : null,
+            page: null,
           },
           updatedAt: data.updatedAt,
         };
@@ -464,10 +464,11 @@ export function useUpdateReadingShare() {
                   reason: variables.reason || '',
                   question: variables.question || '',
                   hasSpoiler: Boolean(variables.hasSpoiler),
+                  sharedNotes: variables.sharedNotes || [],
                 },
                 bookSnapshot: {
                   ...item.bookSnapshot,
-                  page: variables.isPagePublic ? variables.page : null,
+                  page: null,
                 },
               };
             }),
@@ -485,10 +486,11 @@ export function useUpdateReadingShare() {
             reason: variables.reason || '',
             question: variables.question || '',
             hasSpoiler: Boolean(variables.hasSpoiler),
+            sharedNotes: variables.sharedNotes || [],
           },
           bookSnapshot: {
             ...old.bookSnapshot,
-            page: variables.isPagePublic ? variables.page : null,
+            page: null,
           },
         };
       });

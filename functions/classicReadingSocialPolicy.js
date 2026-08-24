@@ -33,6 +33,13 @@ const SHARE_STATUSES = {
 
 const ALLOWED_SHARE_STATUSES = new Set(Object.values(SHARE_STATUSES));
 
+const SHARE_KINDS = {
+  READING_INVITATION: "reading_invitation",
+  COMPLETED_RECOMMENDATION: "completed_recommendation",
+};
+
+const SHAREABLE_BOOK_STATUSES = new Set(["reading", "completed"]);
+
 const COMMENT_STATUSES = {
   VISIBLE: "visible",
   DELETED: "deleted",
@@ -55,6 +62,7 @@ const ERROR_CODES = {
   BOOK_NOT_FOUND: "BOOK_NOT_FOUND",
   BOOK_FORBIDDEN: "BOOK_FORBIDDEN",
   BOOK_NOT_STARTED: "BOOK_NOT_STARTED",
+  BOOK_NOT_SHAREABLE: "BOOK_NOT_SHAREABLE",
   CANNOT_LINK_OWN_SHARE: "CANNOT_LINK_OWN_SHARE",
   ROOT_COMMENT_NOT_FOUND: "ROOT_COMMENT_NOT_FOUND",
   ROOT_COMMENT_INACTIVE: "ROOT_COMMENT_INACTIVE",
@@ -62,6 +70,7 @@ const ERROR_CODES = {
   INVALID_ONE_LINE: "INVALID_ONE_LINE",
   INVALID_REASON: "INVALID_REASON",
   INVALID_QUESTION: "INVALID_QUESTION",
+  INVALID_SHARED_NOTES: "INVALID_SHARED_NOTES",
   INVALID_COMMENT: "INVALID_COMMENT",
   INVALID_REPLY: "INVALID_REPLY",
   INVALID_INTENT: "INVALID_INTENT",
@@ -104,7 +113,32 @@ function cleanSingleLineText(val = "", maxLen = 200) {
     .slice(0, maxLen);
 }
 
-function validateReadingShareInput({ oneLine, reason = "", question = "", hasSpoiler = false, isPagePublic = false, page = null }) {
+function validateSharedNotes(sharedNotes = []) {
+  if (!Array.isArray(sharedNotes) || sharedNotes.length > 12) {
+    return { valid: false, message: "함께 공개할 독서 기록은 최대 12개까지 선택할 수 있습니다." };
+  }
+
+  const seen = new Set();
+  const notes = [];
+  for (const raw of sharedNotes) {
+    if (!raw || typeof raw !== "object") continue;
+    const id = cleanSingleLineText(raw.id, 500);
+    const text = sanitizeText(raw.text, 301);
+    if (!id || !text || text.length > 300 || seen.has(id)) continue;
+    seen.add(id);
+    const numericPage = Number(raw.page);
+    notes.push({
+      id,
+      text,
+      source: raw.source === "assignment" ? "assignment" : "reading_log",
+      date: cleanSingleLineText(raw.date, 20),
+      page: Number.isInteger(numericPage) && numericPage > 0 && numericPage <= 99999 ? numericPage : null,
+    });
+  }
+  return { valid: true, notes };
+}
+
+function validateReadingShareInput({ oneLine, reason = "", question = "", hasSpoiler = false, sharedNotes = [], isPagePublic = false, page = null }) {
   // Normalize first and reject overlong input instead of silently truncating it.
   // Silent truncation can publish wording the author never approved in preview.
   const cleanedOneLine = cleanSingleLineText(oneLine, 10000);
@@ -115,7 +149,7 @@ function validateReadingShareInput({ oneLine, reason = "", question = "", hasSpo
     return {
       valid: false,
       error: ERROR_CODES.INVALID_ONE_LINE,
-      message: "한 줄 평은 10자 이상 160자 이하로 작성해 주세요.",
+      message: "친구들에게 소개하는 한마디는 10자 이상 160자 이하로 작성해 주세요.",
     };
   }
 
@@ -123,7 +157,7 @@ function validateReadingShareInput({ oneLine, reason = "", question = "", hasSpo
     return {
       valid: false,
       error: ERROR_CODES.INVALID_REASON,
-      message: "추천 이유는 600자 이하로 작성해 주세요.",
+      message: "덧붙이는 이야기는 600자 이하로 작성해 주세요.",
     };
   }
 
@@ -132,6 +166,15 @@ function validateReadingShareInput({ oneLine, reason = "", question = "", hasSpo
       valid: false,
       error: ERROR_CODES.INVALID_QUESTION,
       message: "함께 나눌 질문은 200자 이하로 작성해 주세요.",
+    };
+  }
+
+  const validatedNotes = validateSharedNotes(sharedNotes);
+  if (!validatedNotes.valid || validatedNotes.notes.length !== sharedNotes.length) {
+    return {
+      valid: false,
+      error: ERROR_CODES.INVALID_SHARED_NOTES,
+      message: validatedNotes.message || "함께 공개할 독서 기록 형식이 올바르지 않습니다.",
     };
   }
 
@@ -155,6 +198,7 @@ function validateReadingShareInput({ oneLine, reason = "", question = "", hasSpo
       reason: cleanedReason || "",
       question: cleanedQuestion || "",
       hasSpoiler: Boolean(hasSpoiler),
+      sharedNotes: validatedNotes.notes,
     },
     page: finalPage,
   };
@@ -216,6 +260,16 @@ function getReadingShareId(ownerId, bookId) {
   const safeUid = String(ownerId || "").trim();
   const safeBookId = String(bookId || "").trim();
   return `${safeUid}__${safeBookId}`;
+}
+
+function getShareKindForBookStatus(status) {
+  return status === "completed"
+    ? SHARE_KINDS.COMPLETED_RECOMMENDATION
+    : SHARE_KINDS.READING_INVITATION;
+}
+
+function isShareableBookStatus(status) {
+  return SHAREABLE_BOOK_STATUSES.has(status);
 }
 
 function getReadingShareReportId(shareId, reporterId) {
@@ -375,6 +429,8 @@ module.exports = {
   ALLOWED_REPORT_REASONS,
   SHARE_STATUSES,
   ALLOWED_SHARE_STATUSES,
+  SHARE_KINDS,
+  SHAREABLE_BOOK_STATUSES,
   COMMENT_STATUSES,
   DAILY_LIMITS,
   ERROR_CODES,
@@ -382,12 +438,15 @@ module.exports = {
   cleanSingleLineText,
   normalizeString,
   validateReadingShareInput,
+  validateSharedNotes,
   validateCommentInput,
   validateReplyInput,
   validateReadingIntent,
   validateReactionType,
   validateReportInput,
   getReadingShareId,
+  getShareKindForBookStatus,
+  isShareableBookStatus,
   getReadingShareReportId,
   getDailyUsageDocId,
   getDeterministicCommentId,

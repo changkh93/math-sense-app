@@ -5,6 +5,18 @@ const createClassicReadingSocial = require("./classicReadingSocial");
 assert.strictEqual(typeof createClassicReadingSocial, "function", "Functions module must load successfully");
 assert.strictEqual(policy.DAILY_LIMITS.LINK_BOOK, 20);
 assert.strictEqual(policy.DAILY_LIMITS.REACTION_LIST, 60);
+assert.strictEqual(policy.isShareableBookStatus("reading"), true);
+assert.strictEqual(policy.isShareableBookStatus("completed"), true);
+assert.strictEqual(policy.isShareableBookStatus("want_to_read"), false);
+assert.strictEqual(policy.isShareableBookStatus("paused"), false);
+assert.strictEqual(
+  policy.getShareKindForBookStatus("completed"),
+  policy.SHARE_KINDS.COMPLETED_RECOMMENDATION
+);
+assert.strictEqual(
+  policy.getShareKindForBookStatus("reading"),
+  policy.SHARE_KINDS.READING_INVITATION
+);
 
 {
   const firestore = () => ({});
@@ -62,6 +74,24 @@ console.log("=== Running classicReadingSocialPolicy unit tests ===");
   });
   assert.strictEqual(invalidPublicPage.valid, false);
   assert.strictEqual(invalidPublicPage.error, policy.ERROR_CODES.INVALID_PAGE);
+
+  const withSharedNotes = policy.validateReadingShareInput({
+    oneLine: "함께 읽고 싶은 충분히 긴 소개 문장입니다.",
+    sharedNotes: [
+      { id: "log-1", text: "인상 깊었던 메모입니다.", source: "reading_log", date: "2026-08-24", page: 12 },
+      { id: "log-2", text: "과제로 남긴 생각입니다.", source: "assignment", date: "2026-08-23", page: 20 },
+    ],
+  });
+  assert.strictEqual(withSharedNotes.valid, true);
+  assert.strictEqual(withSharedNotes.review.sharedNotes.length, 2);
+  assert.strictEqual(withSharedNotes.review.sharedNotes[1].source, "assignment");
+
+  const tooManySharedNotes = policy.validateReadingShareInput({
+    oneLine: "함께 읽고 싶은 충분히 긴 소개 문장입니다.",
+    sharedNotes: Array.from({ length: 13 }, (_, index) => ({ id: `log-${index}`, text: "공개할 기록" })),
+  });
+  assert.strictEqual(tooManySharedNotes.valid, false);
+  assert.strictEqual(tooManySharedNotes.error, policy.ERROR_CODES.INVALID_SHARED_NOTES);
 }
 
 // 2. Sanitize and HTML tag removal

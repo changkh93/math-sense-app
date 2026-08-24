@@ -14,6 +14,7 @@ import ReadingShareComments from './ReadingShareComments';
 import ReadingShareReportModal from './ReadingShareReportModal';
 import ReadingShareComposer from './ReadingShareComposer';
 import ReadingReactionUsersPanel from './ReadingReactionUsersPanel';
+import { getReadingShareStage } from '../../../utils/readingSharePresentation';
 import './ReadingLounge.css';
 
 const MotionDiv = motion.div;
@@ -47,8 +48,8 @@ export default function ReadingShareDetailDrawer({ isOpen, onClose, share }) {
   const isOwner = user?.uid === currentShare.ownerId;
   const bookTitle = currentShare.bookSnapshot?.title || currentShare.bookTitle || currentShare.title || '추천 도서';
   const bookAuthor = currentShare.bookSnapshot?.author || currentShare.bookAuthor || currentShare.author || '저자 미상';
-  const bookPage = currentShare.bookSnapshot?.page || currentShare.page;
   const bookCategory = currentShare.bookSnapshot?.category || currentShare.category;
+  const shareStage = getReadingShareStage(currentShare);
 
   const wantToReadCount = currentShare.reactionCounts?.wantToRead || 0;
   const readCount = currentShare.reactionCounts?.read || 0;
@@ -65,7 +66,7 @@ export default function ReadingShareDetailDrawer({ isOpen, onClose, share }) {
 
   const handleResonateClick = async () => {
     if (isOwner) {
-      alert('자신의 추천 글에는 반응할 수 없습니다.');
+      alert('자신의 공유 글에는 반응할 수 없습니다.');
       return;
     }
     if (setReactionMutation.isPending) return;
@@ -85,7 +86,7 @@ export default function ReadingShareDetailDrawer({ isOpen, onClose, share }) {
 
   const handleWantToReadClick = async () => {
     if (isOwner) {
-      alert('자신의 추천 글에는 책 연결을 할 수 없습니다.');
+      alert('자신의 공유 글에는 책 연결을 할 수 없습니다.');
       return;
     }
     if (linkBookMutation.isPending) return;
@@ -109,7 +110,7 @@ export default function ReadingShareDetailDrawer({ isOpen, onClose, share }) {
 
   const handleAlreadyReadClick = async () => {
     if (isOwner) {
-      alert('자신의 추천 글에는 책 연결을 할 수 없습니다.');
+      alert('자신의 공유 글에는 책 연결을 할 수 없습니다.');
       return;
     }
     if (linkBookMutation.isPending) return;
@@ -130,15 +131,15 @@ export default function ReadingShareDetailDrawer({ isOpen, onClose, share }) {
   };
 
   const handleWithdraw = async () => {
-    if (!window.confirm('이 추천 글을 라운지에서 거두시겠습니까? (이후 다시 공개할 수 있습니다.)')) {
+    if (!window.confirm('이 공유 글을 라운지에서 거두시겠습니까? (이후 다시 공개할 수 있습니다.)')) {
       return;
     }
     try {
       await withdrawMutation.mutateAsync({ shareId: currentShare.id });
-      alert('추천 글을 거두었습니다.');
+      alert('공유 글을 거두었습니다.');
       onClose();
     } catch (err) {
-      alert(err.message || '추천 글 거두기에 실패했습니다.');
+      alert(err.message || '공유 글 거두기에 실패했습니다.');
     }
   };
 
@@ -228,7 +229,7 @@ export default function ReadingShareDetailDrawer({ isOpen, onClose, share }) {
                       letterSpacing: '0.02em',
                     }}
                   >
-                    추천 도서
+                    {shareStage.kind === 'completed_recommendation' ? '✓' : '📖'} {shareStage.label}
                   </span>
                   {bookCategory && (
                     <span style={{ fontSize: '0.72rem', color: 'rgba(255,255,255,0.5)' }}>
@@ -261,7 +262,6 @@ export default function ReadingShareDetailDrawer({ isOpen, onClose, share }) {
                   }}
                 >
                   <span>{bookAuthor}</span>
-                  {bookPage ? <span>· {bookPage}쪽까지 읽음</span> : null}
                 </p>
               </div>
             </div>
@@ -297,7 +297,7 @@ export default function ReadingShareDetailDrawer({ isOpen, onClose, share }) {
             {/* One line */}
             <div style={{ padding: '1rem', borderRadius: '14px', background: 'rgba(56, 189, 248, 0.08)', border: '1px solid rgba(56, 189, 248, 0.2)' }}>
               <div style={{ fontSize: '0.8rem', fontWeight: 800, color: '#38bdf8', marginBottom: '0.3rem' }}>
-                한 줄 평
+                친구들에게 소개하는 한마디
               </div>
               <div style={{ fontSize: '1.05rem', fontWeight: 800, color: '#f8fafc', lineHeight: 1.5 }}>
                 “{currentShare.review?.oneLine}”
@@ -308,11 +308,30 @@ export default function ReadingShareDetailDrawer({ isOpen, onClose, share }) {
             {currentShare.review?.reason && (
               <div>
                 <div style={{ fontSize: '0.85rem', fontWeight: 800, color: 'rgba(255,255,255,0.7)', marginBottom: '0.4rem' }}>
-                  추천하는 이유
+                  같이 읽고 싶은 이유
                 </div>
                 <p style={{ fontSize: '0.92rem', color: '#e2e8f0', lineHeight: 1.6, whiteSpace: 'pre-wrap', margin: 0 }}>
                   {currentShare.review.reason}
                 </p>
+              </div>
+            )}
+
+            {currentShare.review?.sharedNotes?.length > 0 && (
+              <div>
+                <div style={{ fontSize: '0.85rem', fontWeight: 800, color: '#7dd3fc', marginBottom: '0.5rem' }}>
+                  함께 공개한 독서 기록 · {currentShare.review.sharedNotes.length}개
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.45rem' }}>
+                  {currentShare.review.sharedNotes.map((note) => (
+                    <div key={note.id} style={{ padding: '0.7rem 0.8rem', borderRadius: '10px', background: 'rgba(56,189,248,0.06)', border: '1px solid rgba(56,189,248,0.14)', color: '#e2e8f0', fontSize: '0.86rem', lineHeight: 1.5 }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.5rem', marginBottom: '0.2rem', color: '#38bdf8', fontSize: '0.72rem', fontWeight: 800 }}>
+                        <span>{note.source === 'assignment' ? '과제' : '메모'}</span>
+                        <span style={{ color: 'rgba(255,255,255,0.45)', fontWeight: 600 }}>{note.date || ''}</span>
+                      </div>
+                      <div style={{ whiteSpace: 'pre-wrap' }}>{note.text}</div>
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
 
@@ -456,7 +475,7 @@ export default function ReadingShareDetailDrawer({ isOpen, onClose, share }) {
                     onClick={() => setIsEditModalOpen(true)}
                   >
                     <Edit3 size={14} />
-                    <span>추천 글 수정</span>
+                    <span>공유 글 수정</span>
                   </button>
                   <button
                     type="button"

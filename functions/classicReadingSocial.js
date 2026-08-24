@@ -167,7 +167,9 @@ module.exports = function ({
 
   /**
    * 1. getReadingShareDraftSources
-   * Retrieve recent notes (readingLogs) and assignment submissions for drafting a share
+   * Retrieve a bounded, deduplicated set of recent notes to attach to a share.
+   * Assignment submissions are already projected into readingLogs, so querying both
+   * collections duplicated content and doubled the variable read cost.
    */
   const getReadingShareDraftSources = costOptimizedDataFunctions.https.onCall(async (data, context) => {
     const uid = await requireAuthUid(context);
@@ -176,53 +178,35 @@ module.exports = function ({
 
     requireSafeDocumentId(bookId, "책");
 
-    const bookSnap = await db.collection("readingBooks").doc(bookId).get();
-    if (!bookSnap.exists || bookSnap.data()?.userId !== uid) {
-      throw new functions.https.HttpsError("not-found", "책 정보를 찾을 수 없습니다.");
-    }
+    const logsSnap = await db.collection("readingLogs")
+      .where("userId", "==", uid)
+      .where("bookId", "==", bookId)
+      .orderBy("readDateKst", "desc")
+      .orderBy("readAt", "desc")
+      .limit(12)
+      .get();
 
-    const [logsSnap, assignmentsSnap] = await Promise.all([
-      db.collection("readingLogs")
-        .where("userId", "==", uid)
-        .where("bookId", "==", bookId)
-        .orderBy("readDateKst", "desc")
-        .orderBy("readAt", "desc")
-        .limit(3)
-        .get(),
-      db.collection("assignments")
-        .where("userId", "==", uid)
-        .where("reading.bookId", "==", bookId)
-        .orderBy("submittedAt", "desc")
-        .limit(3)
-        .get(),
-    ]);
-
-    const logCandidates = logsSnap.docs
+    const seenText = new Set();
+    const sources = logsSnap.docs
       .map((d) => ({ id: d.id, ...(d.data() || {}) }))
       .filter((d) => d.summary && String(d.summary).trim().length > 0)
-      .slice(0, 3)
       .map((d) => ({
         id: d.id || "",
-        text: String(d.summary).trim(),
+        text: String(d.summary).trim().slice(0, 300),
         page: d.page || null,
         date: d.readDateKst || "",
-        source: "reading_log",
-      }));
-
-    const assignmentCandidates = assignmentsSnap.docs
-      .map((d) => ({ id: d.id, ...(d.data() || {}) }))
-      .filter((d) => d.content && String(d.content).trim().length > 0)
-      .slice(0, 3)
-      .map((d) => ({
-        id: d.id || "",
-        text: String(d.content).trim(),
-        page: d.reading?.page || null,
-        date: d.date || "",
-        source: "assignment",
-      }));
+        source: d.source === "assignment" ? "assignment" : "reading_log",
+      }))
+      .filter((source) => {
+        const key = source.text.replace(/\s+/g, " ").toLowerCase();
+        if (seenText.has(key)) return false;
+        seenText.add(key);
+        return true;
+      })
+      .slice(0, 12);
 
     return {
-      sources: [...logCandidates, ...assignmentCandidates],
+      sources,
     };
   });
 
@@ -252,8 +236,7 @@ module.exports = function ({
       reason: data?.reason,
       question: data?.question,
       hasSpoiler: data?.hasSpoiler,
-      isPagePublic: data?.isPagePublic,
-      page: data?.page,
+      sharedNotes: data?.sharedNotes,
     });
 
     if (!validated.valid) {
@@ -283,9 +266,9 @@ module.exports = function ({
       const bookData = bookSnap.data() || {};
       const userData = userSnap.data() || {};
 
-      if (bookData.status === "want_to_read") {
-        throw new functions.https.HttpsError("failed-precondition", "읽기 시작하지 않은 관심 책은 추천 글을 쓸 수 없습니다.", {
-          code: policy.ERROR_CODES.BOOK_NOT_STARTED,
+      if (!policy.isShareableBookStatus(bookData.status)) {
+        throw new functions.https.HttpsError("failed-precondition", "읽고 있거나 완독한 책만 라운지에 공유할 수 있습니다.", {
+          code: policy.ERROR_CODES.BOOK_NOT_SHAREABLE,
         });
       }
 
@@ -318,10 +301,17 @@ module.exports = function ({
         featuredBadgeId: userData.featuredBadgeId || null,
       };
 
+      const shareKind = policy.getShareKindForBookStatus(bookData.status);
+      const totalPages = Number(bookData.totalPages || 0);
+      const furthestPage = Number(bookData.progress?.furthestPage || 0);
+      const progressPercent = bookData.status === "reading" && totalPages > 0
+        ? Math.max(0, Math.min(100, Math.round((furthestPage / totalPages) * 100)))
+        : null;
       const bookSnapshot = {
         title: String(bookData.title || "").slice(0, 200),
         author: String(bookData.author || "").slice(0, 120),
-        status: bookData.status || "reading",
+        status: bookData.status,
+        progressPercent,
         page: validated.page,
       };
 
@@ -332,6 +322,7 @@ module.exports = function ({
         ownerId: uid,
         ownerSnapshot,
         sourceBookId: bookId,
+        shareKind,
         bookSnapshot,
         review: validated.review,
         reactionCounts: existingData.reactionCounts || {
@@ -343,7 +334,7 @@ module.exports = function ({
         status: policy.SHARE_STATUSES.ACTIVE,
         publishedAt: isReactivation && existingData.publishedAt ? existingData.publishedAt : nowTimestamp,
         updatedAt: nowTimestamp,
-        schemaVersion: 1,
+        schemaVersion: 3,
       };
 
       tx.set(shareRef, shareDocData);
@@ -402,8 +393,7 @@ module.exports = function ({
       reason: data?.reason,
       question: data?.question,
       hasSpoiler: data?.hasSpoiler,
-      isPagePublic: data?.isPagePublic,
-      page: data?.page,
+      sharedNotes: data?.sharedNotes,
     });
 
     if (!validated.valid) {
@@ -444,6 +434,7 @@ module.exports = function ({
         review: validated.review,
         "bookSnapshot.page": validated.page,
         updatedAt: nowTimestamp,
+        schemaVersion: 3,
       };
 
       tx.update(shareRef, updates);

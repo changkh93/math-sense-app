@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { BOOK_STATUSES, BOOK_STATUS_LABELS } from '../../../utils/readingDomain';
+import { getReadingShareStage } from '../../../utils/readingSharePresentation';
 import { useRecentReadingShares } from '../../../hooks/useReadingSocial';
 import ReadingBookSpine from './ReadingBookSpine';
 import ReadingBookCard from './ReadingBookCard';
@@ -232,7 +233,7 @@ export default function ReadingBookshelfTab({
               <span>대원들과 함께 읽는 독서 라운지</span>
             </div>
             <p className="bookshelf-lounge-header-desc">
-              다른 탐사대원들이 추천한 명작과 나누고 싶은 생각들을 만나보세요.
+              다른 탐사대원들이 읽는 책과 완독 후 추천을 만나보세요.
             </p>
           </div>
 
@@ -248,7 +249,7 @@ export default function ReadingBookshelfTab({
 
         {sharesLoading ? (
           <div style={{ textAlign: 'center', padding: '1.5rem', color: 'rgba(224,242,254,0.5)', fontSize: '0.86rem' }}>
-            라운지 추천 글을 불러오는 중...
+            라운지 공유 글을 불러오는 중...
           </div>
         ) : recentShares.length === 0 ? (
           <div style={{
@@ -259,7 +260,7 @@ export default function ReadingBookshelfTab({
             color: 'rgba(224,242,254,0.65)',
             fontSize: '0.88rem'
           }}>
-            아직 등록된 공개 독서 추천이 없습니다. 내가 읽은 고전을 라운지에 가장 먼저 추천해보세요!
+            아직 공개된 책 이야기가 없습니다. 읽고 있는 책이나 완독한 책을 먼저 공유해보세요!
           </div>
         ) : (
           <div className="bookshelf-lounge-cards-grid">
@@ -267,6 +268,7 @@ export default function ReadingBookshelfTab({
               const book = share.bookSnapshot || {};
               const review = share.review || {};
               const owner = share.ownerSnapshot || {};
+              const shareStage = getReadingShareStage(share);
               const wantCount = share.reactionCounts?.wantToRead || 0;
               const commentCount = share.commentCount || 0;
 
@@ -289,17 +291,20 @@ export default function ReadingBookshelfTab({
                         <BookOpen size={16} />
                       </div>
                       <div style={{ minWidth: 0, flex: 1 }}>
+                        <div style={{ fontSize: '0.67rem', fontWeight: 800, color: shareStage.kind === 'completed_recommendation' ? '#34d399' : '#38bdf8', marginBottom: '0.12rem' }}>
+                          {shareStage.kind === 'completed_recommendation' ? '✓' : '📖'} {shareStage.shortLabel}
+                        </div>
                         <div className="bookshelf-lounge-card-book-title" title={book.title}>
                           {book.title || '고전 도서'}
                         </div>
                         <div className="bookshelf-lounge-card-book-author" title={book.author}>
-                          {book.author || '저자 미상'}{book.page ? ` · ${book.page}p` : ''}
+                          {book.author || '저자 미상'}
                         </div>
                       </div>
                     </div>
 
                     <div className="bookshelf-lounge-card-quote">
-                      “{review.oneLine || '추천 한 줄 평이 없습니다.'}”
+                      “{review.oneLine || '소개하는 한마디가 없습니다.'}”
                     </div>
                   </div>
 
