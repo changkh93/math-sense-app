@@ -201,7 +201,7 @@ function ProfileBookSpine({ book, variant = 'preview' }) {
 
   const handleClick = () => {
     if (book.publicShareId) {
-      navigate(`/?view=agora&filter=reading&highlight=${book.publicShareId}`);
+      navigate(`/agora?filter=reading&highlight=${book.publicShareId}`);
     }
   };
 

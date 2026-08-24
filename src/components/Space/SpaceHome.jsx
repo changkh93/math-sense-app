@@ -37,6 +37,7 @@ import { buildStreakWriteAudit, calculateStreakUpdate, getTodayKST, getKSTCompon
 import { recordCrystalTransaction } from '../../utils/crystalLedger'
 import { applyCrystalRewardMultiplier } from '../../utils/holidayUtils'
 import { calculateGrowthUpdates } from '../../utils/rankingUtils'
+import { normalizeNotificationLink } from '../../utils/socialUtils'
 import { StreakCelebrationModal, StreakToast } from './StreakCelebration'
 import { getAttendanceDockingStatus } from '../../utils/attendanceUtils'
 import { mergeSummaryWithRecentHistory } from '../../utils/learningSummaryUtils'
@@ -187,6 +188,7 @@ function getNotificationPreview(notification = {}) {
 }
 
 function RealtimeTopAlerts({ userId }) {
+  const navigate = useNavigate()
   const [latestNotification, setLatestNotification] = useState(null)
   const [dismissedIds, setDismissedIds] = useState({})
   const [activeAlert, setActiveAlert] = useState(null)
@@ -434,18 +436,34 @@ function RealtimeTopAlerts({ userId }) {
                 {activeAlert.detailBody || activeAlert.text}
               </div>
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.55rem', padding: '0 1rem 1rem' }}>
-                {activeAlert.kind === 'notification' && activeAlert.source.link && (
-                  <button
-                    type="button"
-                    className="space-btn font-tech"
-                    onClick={() => {
-                      window.open(activeAlert.source.link, '_blank', 'noopener,noreferrer')
-                    }}
-                    style={{ borderRadius: 9, minHeight: 36, padding: '0 0.8rem', color: activeAlert.color }}
-                  >
-                    새 탭에서 열기
-                  </button>
-                )}
+                {activeAlert.kind === 'notification' && activeAlert.source.link && (() => {
+                  const targetLink = normalizeNotificationLink(activeAlert.source.link)
+                  return (
+                    <>
+                      <button
+                        type="button"
+                        className="space-btn font-tech"
+                        onClick={() => {
+                          setActiveAlert(null)
+                          navigate(targetLink)
+                        }}
+                        style={{ borderRadius: 9, minHeight: 36, padding: '0 0.8rem', color: activeAlert.color, borderColor: `${activeAlert.color}66` }}
+                      >
+                        바로 확인하기
+                      </button>
+                      <button
+                        type="button"
+                        className="space-nav-link font-tech"
+                        onClick={() => {
+                          window.open(targetLink, '_blank', 'noopener,noreferrer')
+                        }}
+                        style={{ borderRadius: 9, minHeight: 36, padding: '0 0.8rem' }}
+                      >
+                        새 탭에서 열기
+                      </button>
+                    </>
+                  )
+                })()}
                 <button
                   type="button"
                   className="space-nav-link font-tech"
@@ -671,6 +689,16 @@ function SpaceHome() {
       Boolean(user?.isAnonymous || userData?.isGuest),
     )
   }, [user, userData?.isGuest])
+
+  // Legacy/query fallback: redirect /?view=agora&... to /agora?...
+  useEffect(() => {
+    const params = new URLSearchParams(location.search)
+    if (params.get('view') === 'agora') {
+      params.delete('view')
+      const remaining = params.toString()
+      navigate(remaining ? `/agora?${remaining}` : '/agora', { replace: true })
+    }
+  }, [location.search, navigate])
 
   const handleGuestInviteLogin = useCallback(() => {
     const rawLink = guestInviteLink.trim()

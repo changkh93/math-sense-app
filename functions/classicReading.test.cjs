@@ -198,4 +198,19 @@ assert.strictEqual(
   "Reading-day history must not require a descending document-ID index"
 );
 
+// 12. Archiving is a book-level state change. It must not fan out writes to
+// every reading log or clear genuinely voided correction history on restore.
+assert.strictEqual(
+  classicReadingSource.includes("linkedLogsSnap"),
+  false,
+  "Archive/restore must not read and rewrite every linked reading log"
+);
+const unarchiveSection = classicReadingSource.match(
+  /const unarchiveReadingBook[\s\S]*?\/\*\*\s*\n\s*\* 4-1\./
+)?.[0] || "";
+assert.ok(
+  unarchiveSection.includes("reconcileReadingBookCredit"),
+  "Restoring an eligible completed book must reconcile completion credit"
+);
+
 console.log("All classicReadingPolicy unit tests passed successfully!");

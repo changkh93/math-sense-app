@@ -707,19 +707,20 @@ module.exports = function ({ functions, admin, costOptimizedDataFunctions, requi
     const bookRef = db.collection("readingBooks").doc(bookId);
     const now = new Date();
     const nowTimestamp = Timestamp.fromDate(now);
-    const resultPayload = { bookId, archived: true };
+    const pendingAssignmentQuery = db.collection("readingLogs")
+      .where("userId", "==", uid)
+      .where("bookId", "==", bookId)
+      .where("source", "==", policy.LOG_SOURCES.ASSIGNMENT)
+      .where("lockedAt", "==", null)
+      .where("voidedAt", "==", null)
+      .limit(1);
 
     return db.runTransaction(async (tx) => {
-      const creditRefs = getReadingCreditRefs(uid, bookId);
-      const [commandSnap, bookSnap, linkedLogsSnap, userSnap, bookCreditSnap] = await Promise.all([
-        tx.get(command.cmdRef),
-        tx.get(bookRef),
-        tx.get(db.collection("readingLogs").where("bookId", "==", bookId)),
-        tx.get(creditRefs.userRef),
-        tx.get(creditRefs.bookCreditRef),
-      ]);
+      const commandSnap = await tx.get(command.cmdRef);
       const existing = resolveCommandSnapshot(commandSnap, command.payloadHash);
       if (existing.isDuplicate) return existing.result;
+
+      const bookSnap = await tx.get(bookRef);
       if (!bookSnap.exists) {
         throw new functions.https.HttpsError("not-found", "책을 찾을 수 없습니다.", { code: policy.ERROR_CODES.BOOK_NOT_FOUND });
       }
@@ -727,11 +728,29 @@ module.exports = function ({ functions, admin, costOptimizedDataFunctions, requi
       if (book.userId !== uid) {
         throw new functions.https.HttpsError("permission-denied", "본인의 책만 보관할 수 있습니다.", { code: policy.ERROR_CODES.BOOK_FORBIDDEN });
       }
-      const hasUnlockedAssignment = linkedLogsSnap.docs.some((docSnap) => {
-        const log = docSnap.data() || {};
-        return log.source === policy.LOG_SOURCES.ASSIGNMENT && !log.lockedAt && !log.voidedAt;
-      });
-      if (hasUnlockedAssignment) {
+
+      if (book.archivedAt) {
+        const unchangedResult = { bookId, archived: true, unchanged: true };
+        tx.set(command.cmdRef, buildCommandData({
+          uid,
+          commandId,
+          type: "archive_book",
+          payloadHash: command.payloadHash,
+          targetId: bookId,
+          result: unchangedResult,
+          now,
+          nowTimestamp,
+        }));
+        return unchangedResult;
+      }
+
+      const creditRefs = getReadingCreditRefs(uid, bookId);
+      const [pendingAssignmentSnap, userSnap, bookCreditSnap] = await Promise.all([
+        tx.get(pendingAssignmentQuery),
+        tx.get(creditRefs.userRef),
+        tx.get(creditRefs.bookCreditRef),
+      ]);
+      if (!pendingAssignmentSnap.empty) {
         throw new functions.https.HttpsError(
           "failed-precondition",
           "검토가 끝나지 않은 과제에 연결된 책은 보관할 수 없습니다."
@@ -739,9 +758,6 @@ module.exports = function ({ functions, admin, costOptimizedDataFunctions, requi
       }
 
       tx.update(bookRef, { archivedAt: nowTimestamp, updatedAt: nowTimestamp });
-      linkedLogsSnap.docs.forEach((logDoc) => {
-        tx.update(logDoc.ref, { voidedAt: nowTimestamp, archivedAt: nowTimestamp, updatedAt: nowTimestamp });
-      });
 
       const updatedBookData = {
         ...book,
@@ -758,10 +774,92 @@ module.exports = function ({ functions, admin, costOptimizedDataFunctions, requi
         bookCreditSnap,
       });
 
+      const resultPayload = { bookId, archived: true };
       tx.set(command.cmdRef, buildCommandData({
         uid,
         commandId,
         type: "archive_book",
+        payloadHash: command.payloadHash,
+        targetId: bookId,
+        result: resultPayload,
+        now,
+        nowTimestamp,
+      }));
+      return resultPayload;
+    });
+  });
+
+  /**
+   * 4-0. unarchiveReadingBook (Restore book back to shelf)
+   */
+  const unarchiveReadingBook = costOptimizedDataFunctions.https.onCall(async (data, context) => {
+    const uid = await requireAuthUid(context);
+    const commandId = String(data?.commandId || "").trim();
+    const bookId = String(data?.bookId || "").trim();
+
+    if (!bookId) throw new functions.https.HttpsError("invalid-argument", "책 ID가 필요합니다.");
+
+    const command = prepareCommand(uid, commandId, { bookId });
+    const bookRef = db.collection("readingBooks").doc(bookId);
+    const now = new Date();
+    const nowTimestamp = Timestamp.fromDate(now);
+
+    return db.runTransaction(async (tx) => {
+      const commandSnap = await tx.get(command.cmdRef);
+      const existing = resolveCommandSnapshot(commandSnap, command.payloadHash);
+      if (existing.isDuplicate) return existing.result;
+
+      const bookSnap = await tx.get(bookRef);
+      if (!bookSnap.exists) {
+        throw new functions.https.HttpsError("not-found", "책을 찾을 수 없습니다.", { code: policy.ERROR_CODES.BOOK_NOT_FOUND });
+      }
+      const book = bookSnap.data() || {};
+      if (book.userId !== uid) {
+        throw new functions.https.HttpsError("permission-denied", "본인의 책만 복원할 수 있습니다.", { code: policy.ERROR_CODES.BOOK_FORBIDDEN });
+      }
+
+      if (!book.archivedAt) {
+        const unchangedResult = { bookId, unarchived: true, unchanged: true };
+        tx.set(command.cmdRef, buildCommandData({
+          uid,
+          commandId,
+          type: "unarchive_book",
+          payloadHash: command.payloadHash,
+          targetId: bookId,
+          result: unchangedResult,
+          now,
+          nowTimestamp,
+        }));
+        return unchangedResult;
+      }
+
+      const creditRefs = getReadingCreditRefs(uid, bookId);
+      const [userSnap, bookCreditSnap] = await Promise.all([
+        tx.get(creditRefs.userRef),
+        tx.get(creditRefs.bookCreditRef),
+      ]);
+      const restoredBookData = {
+        ...book,
+        archivedAt: null,
+        updatedAt: nowTimestamp,
+        progress: book.progress || {},
+      };
+      await reconcileReadingBookCredit(tx, {
+        uid,
+        bookId,
+        bookData: restoredBookData,
+        nowTimestamp,
+        userSnap,
+        bookCreditSnap,
+      });
+
+      tx.update(bookRef, { archivedAt: null, updatedAt: nowTimestamp });
+
+      const resultPayload = { bookId, unarchived: true };
+      tx.set(command.cmdRef, buildCommandData({
+        uid,
+        commandId,
+        type: "unarchive_book",
         payloadHash: command.payloadHash,
         targetId: bookId,
         result: resultPayload,
@@ -1542,6 +1640,7 @@ module.exports = function ({ functions, admin, costOptimizedDataFunctions, requi
       updateReadingBookDetails,
       saveReadingProgress,
       archiveReadingBook,
+      unarchiveReadingBook,
       submitClassicReadingAssignment,
       reviewClassicReadingAssignment,
       adminCorrectAssignmentBook,

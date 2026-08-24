@@ -20,10 +20,13 @@ function toMillis(value) {
  * Hook to fetch all books owned by a user
  */
 export function useReadingBooks(userId, options = {}) {
-  const { status } = options;
+  const { status, includeArchived = false } = options;
 
   return useQuery({
-    queryKey: ['readingBooks', userId, status || 'all'],
+    // Keep one canonical cache entry per user. View-level filters are applied
+    // with `select`, so switching tabs or mounting another consumer never
+    // creates another full Firestore query.
+    queryKey: ['readingBooks', userId],
     queryFn: async () => {
       if (!userId) return [];
       const q = query(
@@ -32,32 +35,51 @@ export function useReadingBooks(userId, options = {}) {
       );
 
       const snap = await getDocs(q);
-      const books = snap.docs
-        .map((docSnap) => ({ id: docSnap.id, ...docSnap.data() }))
-        .filter((book) => !book.archivedAt);
+      const allBooks = snap.docs.map((docSnap) => {
+        const data = docSnap.data();
+        return {
+          id: docSnap.id,
+          ...data,
+          isArchived: Boolean(data?.archivedAt),
+        };
+      });
 
-      if (status && status !== 'all') {
-        return books.filter((book) => book.status === status);
-      }
-
-      // Sort: reading first, then want_to_read, then completed, then paused; then updatedAt desc
+      // Sort: active books first (reading -> want_to_read -> completed -> paused), then archived; then updatedAt desc
       const statusOrder = { reading: 1, want_to_read: 2, completed: 3, paused: 4 };
-      return books.sort((a, b) => {
+      return allBooks.sort((a, b) => {
+        if (a.isArchived !== b.isArchived) return a.isArchived ? 1 : -1;
         const orderA = statusOrder[a.status] || 99;
         const orderB = statusOrder[b.status] || 99;
         if (orderA !== orderB) return orderA - orderB;
         return toMillis(b.updatedAt || b.createdAt) - toMillis(a.updatedAt || a.createdAt);
       });
     },
+    select: (allBooks) => {
+      if (status === 'archived') {
+        return allBooks
+          .filter((book) => book.isArchived)
+          .sort((a, b) => toMillis(b.archivedAt || b.updatedAt) - toMillis(a.archivedAt || a.updatedAt));
+      }
+      const visibleBooks = includeArchived
+        ? allBooks
+        : allBooks.filter((book) => !book.isArchived);
+      if (status && status !== 'all') {
+        return visibleBooks.filter((book) => !book.isArchived && book.status === status);
+      }
+      return visibleBooks;
+    },
     enabled: !!userId,
-    staleTime: 1000 * 60 * 2, // 2 minutes
+    staleTime: 1000 * 60 * 3, // 3 minutes
+    gcTime: 1000 * 60 * 20, // 20 minutes
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
   });
 }
 
 /**
  * Hook to fetch a single book details
  */
-export function useReadingBook(bookId) {
+export function useReadingBook(bookId, options = {}) {
   return useQuery({
     queryKey: ['readingBook', bookId],
     queryFn: async () => {
@@ -67,7 +89,12 @@ export function useReadingBook(bookId) {
       return { id: snap.id, ...snap.data() };
     },
     enabled: !!bookId,
-    staleTime: 1000 * 60 * 2,
+    initialData: options.initialData,
+    initialDataUpdatedAt: options.initialDataUpdatedAt,
+    staleTime: 1000 * 60 * 3,
+    gcTime: 1000 * 60 * 20,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
   });
 }
 
@@ -75,7 +102,7 @@ export function useReadingBook(bookId) {
  * Hook to fetch paginated reading logs with single-criterion filters + date range
  */
 export function useReadingLogs(userId, filters = {}) {
-  const { bookId, eventType, source, dateFrom, dateTo } = filters;
+  const { bookId, eventType, source, dateFrom, dateTo, enabled = true } = filters;
 
   return useInfiniteQuery({
     queryKey: ['readingLogs', userId, { bookId, eventType, source, dateFrom, dateTo }],
@@ -107,17 +134,23 @@ export function useReadingLogs(userId, filters = {}) {
           : startAfter(pageParam.lastReadAt, pageParam.lastId));
       }
 
-      constraints.push(limit(PAGE_SIZE));
+      constraints.push(limit(PAGE_SIZE + 1));
 
       const q = query(collection(db, 'readingLogs'), ...constraints);
       const snap = await getDocs(q);
 
-      const logs = snap.docs
+      const pageDocs = snap.docs.slice(0, PAGE_SIZE);
+      const logs = pageDocs
         .map((docSnap) => ({ id: docSnap.id, ...docSnap.data() }))
-        .filter((log) => !log.archivedAt && !log.voidedAt);
+        .filter((log) => {
+          if (!log.voidedAt) return true;
+          // Older archive operations set both timestamps together. Those
+          // entries are preserved history, not genuinely voided corrections.
+          return Boolean(log.archivedAt) && toMillis(log.archivedAt) === toMillis(log.voidedAt);
+        });
 
-      const lastDoc = snap.docs[snap.docs.length - 1];
-      const hasMore = snap.docs.length === PAGE_SIZE;
+      const lastDoc = pageDocs[pageDocs.length - 1];
+      const hasMore = snap.docs.length > PAGE_SIZE;
       const nextCursor = hasMore && lastDoc ? {
         lastReadDateKst: lastDoc.data().readDateKst,
         lastReadAt: lastDoc.data().readAt,
@@ -127,8 +160,11 @@ export function useReadingLogs(userId, filters = {}) {
       return { logs, nextCursor, hasMore };
     },
     getNextPageParam: (lastPage) => lastPage.nextCursor,
-    enabled: !!userId,
-    staleTime: 1000 * 60,
+    enabled: Boolean(userId && enabled),
+    staleTime: 1000 * 60 * 2,
+    gcTime: 1000 * 60 * 20,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
   });
 }
 
@@ -244,6 +280,28 @@ export function useArchiveReadingBook() {
     mutationFn: async ({ bookId }) => {
       const commandId = generateCommandId();
       return callReadingFunction('archiveReadingBook', { commandId, bookId }, '책 보관 처리에 실패했습니다.');
+    },
+    onSuccess: (_, variables) => {
+      const uid = auth.currentUser?.uid;
+      if (uid) {
+        queryClient.invalidateQueries({ queryKey: ['readingBooks', uid] });
+        queryClient.invalidateQueries({ queryKey: ['readingBook', variables.bookId] });
+        queryClient.invalidateQueries({ queryKey: ['readingLogs', uid] });
+      }
+    },
+  });
+}
+
+/**
+ * Mutation: Unarchive / Restore a book back to shelf
+ */
+export function useUnarchiveReadingBook() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ bookId }) => {
+      const commandId = generateCommandId();
+      return callReadingFunction('unarchiveReadingBook', { commandId, bookId }, '책 복원 처리에 실패했습니다.');
     },
     onSuccess: (_, variables) => {
       const uid = auth.currentUser?.uid;

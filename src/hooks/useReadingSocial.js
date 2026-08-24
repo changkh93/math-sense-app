@@ -122,6 +122,36 @@ export function useLatestReadingShare({ enabled = true } = {}) {
 }
 
 /**
+ * Fetch top recent public shares for the bookshelf featured section.
+ */
+export function useRecentReadingShares(limitCount = 3, { enabled = true } = {}) {
+  const { user } = useAuth();
+  const safeLimit = Number.isInteger(limitCount)
+    ? Math.min(4, Math.max(1, limitCount))
+    : 3;
+
+  return useQuery({
+    queryKey: ['readingShareFeatured', 'recent', safeLimit],
+    queryFn: async () => {
+      const recentQuery = query(
+        collection(db, 'readingShares'),
+        where('status', '==', 'active'),
+        orderBy('publishedAt', 'desc'),
+        orderBy('__name__', 'desc'),
+        limit(safeLimit)
+      );
+      const snap = await getDocs(recentQuery);
+      return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+    },
+    enabled: Boolean(user && enabled),
+    staleTime: 3 * 60 * 1000,
+    gcTime: 20 * 60 * 1000,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+  });
+}
+
+/**
  * 2. useReadingShare
  * Fetch single reading share document
  */
@@ -141,6 +171,7 @@ export function useReadingShare(shareId, options = {}) {
     initialData: options.initialData,
     staleTime: SOCIAL_STALE_TIME,
     gcTime: SOCIAL_GC_TIME,
+    retry: false,
     refetchOnWindowFocus: false,
   });
 }

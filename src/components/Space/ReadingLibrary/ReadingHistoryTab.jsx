@@ -53,7 +53,7 @@ export default function ReadingHistoryTab({
     isFetchingNextPage,
     fetchNextPage,
     hasNextPage,
-  } = useReadingLogs(userId, queryFilters);
+  } = useReadingLogs(userId, { ...queryFilters, enabled: viewMode === 'timeline' });
 
   const allLogs = data?.pages?.flatMap((page) => page.logs) || [];
 

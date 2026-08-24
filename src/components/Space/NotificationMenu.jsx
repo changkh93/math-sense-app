@@ -4,6 +4,7 @@ import { collection, query, where, orderBy, limit, onSnapshot, updateDoc, doc } 
 import { db, auth } from '../../firebase';
 import { AlertTriangle, Award, CalendarX, Gem, Mail, Megaphone, MessageCircle } from 'lucide-react';
 import { getEvaluationPeriodLabel, getScholarshipCourseLabel } from '../../utils/scholarshipAwards';
+import { normalizeNotificationLink } from '../../utils/socialUtils';
 import './NotificationMenu.css';
 
 function NotificationIcon({ type }) {
@@ -122,12 +123,13 @@ export default function NotificationMenu() {
 
     // Deep Link Navigation
     if (notification.link) {
-      if (notification.link.match(/^\/agora\/[^/]+$/)) {
+      const normalizedLink = normalizeNotificationLink(notification.link);
+      if (normalizedLink.match(/^\/agora\/[^/]+$/)) {
          // Convert /agora/ID to /agora?highlight=ID to show in list view
-         const id = notification.link.split('/').pop();
+         const id = normalizedLink.split('/').pop();
          navigate(`/agora?highlight=${id}&filter=my`); // Assuming it's usually 'my' question
       } else {
-         navigate(notification.link);
+         navigate(normalizedLink);
       }
     }
     setIsOpen(false);

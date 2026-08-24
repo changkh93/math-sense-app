@@ -14,20 +14,25 @@ export default function ReadingLibraryView({ onBack }) {
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState('bookshelf'); // 'bookshelf' | 'history'
 
-  const { data: books = [], isLoading: booksLoading } = useReadingBooks(user?.uid);
+  const {
+    data: books = [],
+    isLoading: booksLoading,
+    dataUpdatedAt: booksUpdatedAt,
+  } = useReadingBooks(user?.uid, { includeArchived: true });
 
   // Modals state
   const [isNewBookModalOpen, setIsNewBookModalOpen] = useState(false);
   const [progressModalTargetBook, setProgressModalTargetBook] = useState(null);
   const [detailDrawerTargetBook, setDetailDrawerTargetBook] = useState(null);
 
-  // Top stats summary computed from `books`
+  // Top stats summary computed from `books` (excluding archived)
   const stats = useMemo(() => {
-    const readingCount = books.filter((b) => b.status === BOOK_STATUSES.READING).length;
-    const completedCount = books.filter((b) => b.status === BOOK_STATUSES.COMPLETED).length;
-    const pausedCount = books.filter((b) => b.status === BOOK_STATUSES.PAUSED).length;
+    const activeBooks = books.filter((b) => !b.isArchived);
+    const readingCount = activeBooks.filter((b) => b.status === BOOK_STATUSES.READING).length;
+    const completedCount = activeBooks.filter((b) => b.status === BOOK_STATUSES.COMPLETED).length;
+    const pausedCount = activeBooks.filter((b) => b.status === BOOK_STATUSES.PAUSED).length;
 
-    const booksWithProgress = [...books]
+    const booksWithProgress = [...activeBooks]
       .filter((b) => b.progress?.latestReadAt)
       .sort((a, b) => {
         const aMs = a.progress.latestReadAt.toMillis ? a.progress.latestReadAt.toMillis() : new Date(a.progress.latestReadAt).getTime();
@@ -41,7 +46,7 @@ export default function ReadingLibraryView({ onBack }) {
       readingCount,
       completedCount,
       pausedCount,
-      totalCount: books.length,
+      totalCount: activeBooks.length,
       latestBookTitle: latestBook?.title || '없음',
       latestBookPage: latestBook?.progress?.latestReadPage || latestBook?.progress?.furthestPage || 0,
     };
@@ -179,6 +184,7 @@ export default function ReadingLibraryView({ onBack }) {
         isOpen={Boolean(detailDrawerTargetBook)}
         onClose={() => setDetailDrawerTargetBook(null)}
         book={detailDrawerTargetBook}
+        bookDataUpdatedAt={booksUpdatedAt}
         onOpenProgress={(book) => {
           setDetailDrawerTargetBook(null);
           setProgressModalTargetBook(book);

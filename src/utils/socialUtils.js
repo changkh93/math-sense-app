@@ -509,3 +509,33 @@ export function createCrewInviteCode(seed = '') {
 
   return code;
 }
+
+export function normalizeNotificationLink(link) {
+  if (!link || typeof link !== 'string') return '';
+  const trimmed = link.trim();
+
+  // Convert /?view=agora&... or /?view=agora to /agora?... or /agora
+  if (trimmed.startsWith('/?view=agora') || trimmed.startsWith('?view=agora')) {
+    const queryPart = trimmed.includes('?') ? trimmed.slice(trimmed.indexOf('?') + 1) : '';
+    const params = new URLSearchParams(queryPart);
+    params.delete('view');
+    const remaining = params.toString();
+    return remaining ? `/agora?${remaining}` : '/agora';
+  }
+
+  // Convert full URL if it has /?view=agora
+  try {
+    if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+      const url = new URL(trimmed);
+      if (url.searchParams.get('view') === 'agora') {
+        url.searchParams.delete('view');
+        const remaining = url.searchParams.toString();
+        return `${url.origin}/agora${remaining ? `?${remaining}` : ''}`;
+      }
+    }
+  } catch {
+    // Ignore parse error
+  }
+
+  return trimmed;
+}

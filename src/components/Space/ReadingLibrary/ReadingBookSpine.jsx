@@ -1,7 +1,7 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 import { BOOK_STATUSES, BOOK_STATUS_LABELS } from '../../../utils/readingDomain';
-import { Star, Bookmark, Pause, Check, BookOpen, Clock } from 'lucide-react';
+import { Star, Bookmark, Pause, Check, BookOpen, Clock, Archive } from 'lucide-react';
 import './ReadingLibrary.css';
 
 const MotionDiv = motion.div;
@@ -48,6 +48,7 @@ function getSpineDimensions(book) {
 export default function ReadingBookSpine({ book, onOpenProgress, onOpenDetail }) {
   if (!book) return null;
 
+  const isArchived = Boolean(book.archivedAt || book.isArchived);
   const status = book.status || BOOK_STATUSES.READING;
   const furthestPage = book.progress?.furthestPage || book.progress?.latestReadPage || 0;
   const isCompleted = status === BOOK_STATUSES.COMPLETED;
@@ -59,7 +60,7 @@ export default function ReadingBookSpine({ book, onOpenProgress, onOpenDetail })
   const { height, width } = getSpineDimensions(book);
 
   const handleClick = () => {
-    if (isWantToRead) {
+    if (isArchived || isWantToRead) {
       if (onOpenDetail) onOpenDetail(book);
       else if (onOpenProgress) onOpenProgress(book);
     } else if (onOpenProgress) {
@@ -90,48 +91,57 @@ export default function ReadingBookSpine({ book, onOpenProgress, onOpenDetail })
             handleClick();
           }
         }}
-        className={`book-spine-card ${isCompleted ? 'spine-completed' : ''} ${isPaused ? 'spine-paused' : ''}`}
+        className={`book-spine-card ${isCompleted ? 'spine-completed' : ''} ${isPaused ? 'spine-paused' : ''} ${isArchived ? 'spine-archived' : ''}`}
         style={{
           width: `${width}px`,
           height: `${height}px`,
-          background: palette.bg,
-          boxShadow: `0 14px 28px ${palette.shadow}, inset 2px 0 4px rgba(255,255,255,0.25), inset -2px 0 6px rgba(0,0,0,0.6)`,
+          background: isArchived ? 'linear-gradient(180deg, #374151 0%, #1f2937 100%)' : palette.bg,
+          boxShadow: `0 14px 28px ${isArchived ? 'rgba(0,0,0,0.7)' : palette.shadow}, inset 2px 0 4px rgba(255,255,255,0.25), inset -2px 0 6px rgba(0,0,0,0.6)`,
           borderLeft: `1px solid rgba(255, 255, 255, 0.25)`,
           borderRight: `1px solid rgba(0, 0, 0, 0.5)`,
         }}
-        title={`${book.title} - ${book.author} (${BOOK_STATUS_LABELS[status]}, ${furthestPage > 0 ? furthestPage + '쪽' : '기록 없음'})`}
+        title={`${book.title} - ${book.author} (${isArchived ? '보관됨' : BOOK_STATUS_LABELS[status]}, ${furthestPage > 0 ? furthestPage + '쪽' : '기록 없음'})`}
       >
         {/* Top Gold Embossed Lines */}
         <div className="spine-emboss-band top">
-          <div className="spine-foil-line" style={{ background: isCompleted ? '#fbbf24' : palette.foil }} />
-          <div className="spine-foil-line thin" style={{ background: isCompleted ? '#fef08a' : palette.foil }} />
+          <div className="spine-foil-line" style={{ background: isCompleted ? '#fbbf24' : (isArchived ? '#9ca3af' : palette.foil) }} />
+          <div className="spine-foil-line thin" style={{ background: isCompleted ? '#fef08a' : (isArchived ? '#d1d5db' : palette.foil) }} />
         </div>
 
         {/* Status Badge & Ribbon on top */}
         <div className="spine-top-status">
-          {isCompleted && (
-            <div className="spine-status-badge completed" title="완독">
-              <Star size={13} fill="#fbbf24" color="#fbbf24" className="spin-on-hover" />
-              <span className="spine-badge-text">완독</span>
+          {isArchived ? (
+            <div className="spine-status-badge archived" title="보관됨" style={{ background: 'rgba(167, 139, 250, 0.2)', borderColor: '#a78bfa' }}>
+              <Archive size={11} color="#c084fc" />
+              <span className="spine-badge-text" style={{ color: '#c084fc' }}>보관</span>
             </div>
-          )}
-          {isWantToRead && (
-            <div className="spine-status-badge want_to_read" title="관심 도서" style={{ background: 'rgba(56, 189, 248, 0.2)', borderColor: '#38bdf8' }}>
-              <Bookmark size={11} color="#38bdf8" />
-              <span className="spine-badge-text" style={{ color: '#38bdf8' }}>관심</span>
-            </div>
-          )}
-          {isReading && (
-            <div className="spine-status-badge reading" title="읽는 중">
-              <BookOpen size={12} color="#5eead4" />
-              <span className="spine-badge-text">읽는중</span>
-            </div>
-          )}
-          {isPaused && (
-            <div className="spine-status-badge paused" title="읽기 보류">
-              <Pause size={11} color="#e9d5ff" />
-              <span className="spine-badge-text">보류</span>
-            </div>
+          ) : (
+            <>
+              {isCompleted && (
+                <div className="spine-status-badge completed" title="완독">
+                  <Star size={13} fill="#fbbf24" color="#fbbf24" className="spin-on-hover" />
+                  <span className="spine-badge-text">완독</span>
+                </div>
+              )}
+              {isWantToRead && (
+                <div className="spine-status-badge want_to_read" title="관심 도서" style={{ background: 'rgba(56, 189, 248, 0.2)', borderColor: '#38bdf8' }}>
+                  <Bookmark size={11} color="#38bdf8" />
+                  <span className="spine-badge-text" style={{ color: '#38bdf8' }}>관심</span>
+                </div>
+              )}
+              {isReading && (
+                <div className="spine-status-badge reading" title="읽는 중">
+                  <BookOpen size={12} color="#5eead4" />
+                  <span className="spine-badge-text">읽는중</span>
+                </div>
+              )}
+              {isPaused && (
+                <div className="spine-status-badge paused" title="읽기 보류">
+                  <Pause size={11} color="#e9d5ff" />
+                  <span className="spine-badge-text">보류</span>
+                </div>
+              )}
+            </>
           )}
         </div>
 

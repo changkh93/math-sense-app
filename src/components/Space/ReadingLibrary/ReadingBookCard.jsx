@@ -9,9 +9,12 @@ const MotionDiv = motion.div;
 export default function ReadingBookCard({ book, onOpenProgress, onOpenDetail }) {
   if (!book) return null;
 
+  const isArchived = Boolean(book.archivedAt || book.isArchived);
   const status = book.status || BOOK_STATUSES.READING;
-  const statusLabel = BOOK_STATUS_LABELS[status] || '읽고 있어요';
-  const colorScheme = BOOK_STATUS_COLORS[status] || BOOK_STATUS_COLORS.reading;
+  const statusLabel = isArchived ? '보관됨' : (BOOK_STATUS_LABELS[status] || '읽고 있어요');
+  const colorScheme = isArchived
+    ? { border: '#a78bfa', bg: 'rgba(167, 139, 250, 0.12)', text: '#c084fc', badgeBg: 'rgba(167, 139, 250, 0.2)' }
+    : (BOOK_STATUS_COLORS[status] || BOOK_STATUS_COLORS.reading);
 
   const furthestPage = book.progress?.furthestPage || book.progress?.latestReadPage || 0;
   const latestReadAt = book.progress?.latestReadAt;
@@ -19,6 +22,7 @@ export default function ReadingBookCard({ book, onOpenProgress, onOpenDetail }) 
   const isWantToRead = status === BOOK_STATUSES.WANT_TO_READ;
 
   const getSpineIcon = () => {
+    if (isArchived) return '🗄️';
     if (status === BOOK_STATUSES.COMPLETED) return '🏆';
     if (status === BOOK_STATUSES.PAUSED) return '⏸️';
     if (status === BOOK_STATUSES.WANT_TO_READ) return '🔖';
@@ -26,7 +30,7 @@ export default function ReadingBookCard({ book, onOpenProgress, onOpenDetail }) 
   };
 
   const handleClick = () => {
-    if (isWantToRead) {
+    if (isArchived || isWantToRead) {
       if (onOpenDetail) onOpenDetail(book);
       else if (onOpenProgress) onOpenProgress(book);
     } else if (onOpenProgress) {

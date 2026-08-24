@@ -1134,7 +1134,7 @@ module.exports = function ({
           type: "reading_share_comment",
           title: "내 독서 추천에 새로운 생각이 도착했어요",
           message: `${authorDisplayName}님이 '${shareData.bookSnapshot?.title || "추천 책"}'에 댓글을 남겼습니다.`,
-          link: `/?view=agora&filter=reading&highlight=${shareId}`,
+          link: `/agora?filter=reading&highlight=${shareId}`,
           isRead: false,
           createdAt: nowTimestamp,
         });
@@ -1540,7 +1540,7 @@ module.exports = function ({
           type: "reading_share_reply",
           title: "내 생각에 새로운 답글이 도착했어요",
           message: `${authorDisplayName}님이 '${shareData.bookSnapshot?.title || "추천 책"}' 대화에 답글을 남겼습니다.`,
-          link: `/?view=agora&filter=reading&highlight=${shareId}`,
+          link: `/agora?filter=reading&highlight=${shareId}`,
           isRead: false,
           createdAt: nowTimestamp,
         });

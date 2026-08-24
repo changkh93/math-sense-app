@@ -2,7 +2,8 @@ import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { BOOK_STATUSES, BOOK_STATUS_LABELS, BOOK_STATUS_COLORS } from '../../../utils/readingDomain';
 import { formatKSTFullDateTime, formatKSTShortDate } from '../../../utils/readingTime';
-import { useReadingBook, useReadingLogs, useUpdateReadingBookStatus, useArchiveReadingBook } from '../../../hooks/useReadingLibrary';
+import { useReadingBook, useReadingLogs, useUpdateReadingBookStatus, useArchiveReadingBook, useUnarchiveReadingBook } from '../../../hooks/useReadingLibrary';
+import { useReadingShare } from '../../../hooks/useReadingSocial';
 import { X, BookOpen, Clock, Calendar, CheckCircle2, PauseCircle, PlayCircle, Archive, RotateCcw, Share2, Sparkles } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import ReadingShareComposer from '../../Community/ReadingLounge/ReadingShareComposer';
@@ -10,22 +11,39 @@ import './ReadingLibrary.css';
 
 const MotionDiv = motion.div;
 
-export default function ReadingBookDetailDrawer({ isOpen, onClose, book, onOpenProgress }) {
+export default function ReadingBookDetailDrawer({ isOpen, onClose, book, bookDataUpdatedAt, onOpenProgress }) {
   const navigate = useNavigate();
   const [isComposerOpen, setIsComposerOpen] = useState(false);
   const updateStatusMutation = useUpdateReadingBookStatus();
   const archiveBookMutation = useArchiveReadingBook();
-  const { data: refreshedBook } = useReadingBook(book?.id);
+  const unarchiveBookMutation = useUnarchiveReadingBook();
+  const { data: refreshedBook } = useReadingBook(book?.id, {
+    initialData: book,
+    initialDataUpdatedAt: bookDataUpdatedAt,
+  });
   const currentBook = refreshedBook || book;
+
+  const publicShareId = currentBook?.publicShare?.shareId;
+  const hasActiveShare = Boolean(publicShareId && currentBook?.publicShare?.status === 'active');
+  const {
+    data: existingShare,
+    isLoading: existingShareLoading,
+    isError: existingShareError,
+  } = useReadingShare(publicShareId, {
+    enabled: Boolean(isComposerOpen && hasActiveShare),
+  });
 
   const { data: logsData, isLoading: logsLoading } = useReadingLogs(currentBook?.userId, { bookId: currentBook?.id });
   const logs = logsData?.pages?.flatMap((p) => p.logs) || [];
 
   if (!isOpen || !book) return null;
 
+  const isArchived = Boolean(currentBook.archivedAt || currentBook.isArchived);
   const status = currentBook.status || BOOK_STATUSES.READING;
-  const statusLabel = BOOK_STATUS_LABELS[status] || '읽고 있어요';
-  const colorScheme = BOOK_STATUS_COLORS[status] || BOOK_STATUS_COLORS.reading;
+  const statusLabel = isArchived ? '보관된 도서' : (BOOK_STATUS_LABELS[status] || '읽고 있어요');
+  const colorScheme = isArchived
+    ? { border: '#a78bfa', bg: 'rgba(167, 139, 250, 0.12)', text: '#c084fc', badgeBg: 'rgba(167, 139, 250, 0.2)' }
+    : (BOOK_STATUS_COLORS[status] || BOOK_STATUS_COLORS.reading);
   const furthestPage = currentBook.progress?.furthestPage || 0;
 
   const handleStatusChange = async (nextStatus) => {
@@ -40,7 +58,7 @@ export default function ReadingBookDetailDrawer({ isOpen, onClose, book, onOpenP
   };
 
   const handleArchive = async () => {
-    if (!window.confirm('이 책을 책장에서 보관 처리하시겠습니까? (기존 독서 기록은 삭제되지 않고 안전하게 보존됩니다.)')) {
+    if (!window.confirm('이 책을 책장에서 보관 처리하시겠습니까?\n\n기존 독서 기록은 안전하게 보존되며, 상단 [보관함] 탭에서 언제든 다시 책장으로 복원할 수 있습니다.')) {
       return;
     }
     try {
@@ -48,6 +66,15 @@ export default function ReadingBookDetailDrawer({ isOpen, onClose, book, onOpenP
       onClose();
     } catch (err) {
       alert(err.message || '책 보관 처리에 실패했습니다.');
+    }
+  };
+
+  const handleUnarchive = async () => {
+    try {
+      await unarchiveBookMutation.mutateAsync({ bookId: currentBook.id });
+      onClose();
+    } catch (err) {
+      alert(err.message || '책 복원 처리에 실패했습니다.');
     }
   };
 
@@ -128,7 +155,7 @@ export default function ReadingBookDetailDrawer({ isOpen, onClose, book, onOpenP
                     style={{ fontSize: '0.74rem', padding: '0.25rem 0.6rem', shrink: 0 }}
                     onClick={() => {
                       onClose();
-                      navigate(`/?view=agora&filter=reading&highlight=${currentBook.discovery.firstShareId}`);
+                        navigate(`/agora?filter=reading&highlight=${currentBook.discovery.firstShareId}`);
                     }}
                   >
                     추천 글 보기
@@ -179,146 +206,149 @@ export default function ReadingBookDetailDrawer({ isOpen, onClose, book, onOpenP
               )}
             </div>
 
-            {/* Quick Actions */}
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '1.4rem' }}>
-              {status === BOOK_STATUSES.WANT_TO_READ && (
-                <>
+            {/* Status Change & Recommendation Actions */}
+            <div style={{ display: 'flex', gap: '0.45rem', flexWrap: 'wrap', margin: '0.4rem 0 1.2rem', alignItems: 'center' }}>
+              {isArchived ? (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', width: '100%' }}>
+                  <span style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.84rem' }}>
+                    🗄️ 현재 보관함에 보관된 책입니다.
+                  </span>
                   <button
                     type="button"
                     className="bookshelf-add-btn font-tech"
-                    onClick={() => handleStatusChange(BOOK_STATUSES.READING)}
-                    disabled={updateStatusMutation.isPending}
-                    style={{ fontSize: '0.82rem', padding: '0.45rem 0.85rem' }}
+                    onClick={handleUnarchive}
+                    disabled={unarchiveBookMutation.isPending}
+                    style={{ fontSize: '0.82rem', padding: '0.45rem 0.85rem', marginLeft: 'auto' }}
                   >
-                    <PlayCircle size={14} />
-                    독서 시작하기
+                    <RotateCcw size={14} />
+                    책장으로 복원
                   </button>
-                  <button
-                    type="button"
-                    className="space-nav-link font-tech"
-                    onClick={() => handleStatusChange(BOOK_STATUSES.COMPLETED)}
-                    disabled={updateStatusMutation.isPending}
-                    style={{ fontSize: '0.82rem', padding: '0.45rem 0.85rem', color: '#34d399' }}
-                  >
-                    <CheckCircle2 size={14} />
-                    완독으로 등록
-                  </button>
-                </>
-              )}
-
-              {status === BOOK_STATUSES.READING && (
+                </div>
+              ) : (
                 <>
-                  <button
-                    type="button"
-                    className="bookshelf-add-btn font-tech"
-                    onClick={() => {
-                      onClose();
-                      onOpenProgress?.(currentBook);
-                    }}
-                    style={{ fontSize: '0.82rem', padding: '0.45rem 0.85rem' }}
-                  >
-                    + 페이지 기록
-                  </button>
-                  <button
-                    type="button"
-                    className="space-nav-link font-tech"
-                    onClick={() => handleStatusChange(BOOK_STATUSES.COMPLETED)}
-                    disabled={updateStatusMutation.isPending}
-                    style={{ fontSize: '0.82rem', padding: '0.45rem 0.85rem', color: '#34d399' }}
-                  >
-                    <CheckCircle2 size={14} />
-                    완독으로 변경
-                  </button>
-                  <button
-                    type="button"
-                    className="space-nav-link font-tech"
-                    onClick={() => handleStatusChange(BOOK_STATUSES.PAUSED)}
-                    disabled={updateStatusMutation.isPending}
-                    style={{ fontSize: '0.82rem', padding: '0.45rem 0.85rem', color: '#c084fc' }}
-                  >
-                    <PauseCircle size={14} />
-                    읽기 중단
-                  </button>
-                </>
-              )}
+                  {status === BOOK_STATUSES.READING && (
+                    <>
+                      <button
+                        type="button"
+                        className="bookshelf-add-btn font-tech"
+                        onClick={() => onOpenProgress?.(currentBook)}
+                        style={{ fontSize: '0.82rem', padding: '0.45rem 0.85rem' }}
+                      >
+                        <BookOpen size={14} />
+                        페이지 기록
+                      </button>
+                      <button
+                        type="button"
+                        className="space-nav-link font-tech"
+                        onClick={() => handleStatusChange(BOOK_STATUSES.COMPLETED)}
+                        disabled={updateStatusMutation.isPending}
+                        style={{ fontSize: '0.82rem', padding: '0.45rem 0.85rem', color: '#34d399' }}
+                      >
+                        <CheckCircle2 size={14} />
+                        완독으로 변경
+                      </button>
+                      <button
+                        type="button"
+                        className="space-nav-link font-tech"
+                        onClick={() => handleStatusChange(BOOK_STATUSES.PAUSED)}
+                        disabled={updateStatusMutation.isPending}
+                        style={{ fontSize: '0.82rem', padding: '0.45rem 0.85rem', color: '#c084fc' }}
+                      >
+                        <PauseCircle size={14} />
+                        읽기 중단
+                      </button>
+                    </>
+                  )}
 
-              {status === BOOK_STATUSES.COMPLETED && (
-                <button
-                  type="button"
-                  className="bookshelf-add-btn font-tech"
-                  onClick={() => handleStatusChange(BOOK_STATUSES.READING)}
-                  disabled={updateStatusMutation.isPending}
-                  style={{ fontSize: '0.82rem', padding: '0.45rem 0.85rem' }}
-                >
-                  <RotateCcw size={14} />
-                  다시 읽기
-                </button>
-              )}
-
-              {status === BOOK_STATUSES.PAUSED && (
-                <button
-                  type="button"
-                  className="bookshelf-add-btn font-tech"
-                  onClick={() => handleStatusChange(BOOK_STATUSES.READING)}
-                  disabled={updateStatusMutation.isPending}
-                  style={{ fontSize: '0.82rem', padding: '0.45rem 0.85rem' }}
-                >
-                  <PlayCircle size={14} />
-                  읽기 재개
-                </button>
-              )}
-
-              {/* Recommendation Actions */}
-              {status !== BOOK_STATUSES.WANT_TO_READ && (
-                currentBook.publicShare?.status === 'active' ? (
-                  <div style={{ display: 'flex', gap: '0.4rem' }}>
+                  {status === BOOK_STATUSES.WANT_TO_READ && (
                     <button
                       type="button"
                       className="bookshelf-add-btn font-tech"
-                      style={{ fontSize: '0.82rem', padding: '0.45rem 0.85rem', background: 'rgba(56, 189, 248, 0.2)', borderColor: '#38bdf8', color: '#38bdf8' }}
-                      onClick={() => {
-                        onClose();
-                        navigate(`/?view=agora&filter=reading&highlight=${currentBook.publicShare.shareId}`);
-                      }}
+                      onClick={() => handleStatusChange(BOOK_STATUSES.READING)}
+                      disabled={updateStatusMutation.isPending}
+                      style={{ fontSize: '0.82rem', padding: '0.45rem 0.85rem' }}
                     >
-                      <Sparkles size={14} />
-                      추천 글 보기
+                      <PlayCircle size={14} />
+                      읽기 시작
                     </button>
+                  )}
+
+                  {status === BOOK_STATUSES.COMPLETED && (
                     <button
                       type="button"
-                      className="space-nav-link font-tech"
+                      className="bookshelf-add-btn font-tech"
+                      onClick={() => handleStatusChange(BOOK_STATUSES.READING)}
+                      disabled={updateStatusMutation.isPending}
                       style={{ fontSize: '0.82rem', padding: '0.45rem 0.85rem' }}
-                      onClick={() => {
-                        onClose();
-                        navigate(`/?view=agora&filter=reading&highlight=${currentBook.publicShare.shareId}`);
-                      }}
                     >
-                      수정
+                      <RotateCcw size={14} />
+                      다시 읽기
                     </button>
-                  </div>
-                ) : (
+                  )}
+
+                  {status === BOOK_STATUSES.PAUSED && (
+                    <button
+                      type="button"
+                      className="bookshelf-add-btn font-tech"
+                      onClick={() => handleStatusChange(BOOK_STATUSES.READING)}
+                      disabled={updateStatusMutation.isPending}
+                      style={{ fontSize: '0.82rem', padding: '0.45rem 0.85rem' }}
+                    >
+                      <PlayCircle size={14} />
+                      읽기 재개
+                    </button>
+                  )}
+
+                  {/* Recommendation Actions */}
+                  {status !== BOOK_STATUSES.WANT_TO_READ && (
+                    currentBook.publicShare?.status === 'active' ? (
+                      <div style={{ display: 'flex', gap: '0.4rem' }}>
+                        <button
+                          type="button"
+                          className="bookshelf-add-btn font-tech"
+                          style={{ fontSize: '0.82rem', padding: '0.45rem 0.85rem', background: 'rgba(56, 189, 248, 0.2)', borderColor: '#38bdf8', color: '#38bdf8' }}
+                          onClick={() => {
+                            onClose();
+                            navigate(`/agora?filter=reading&highlight=${currentBook.publicShare.shareId}`);
+                          }}
+                        >
+                          <Sparkles size={14} />
+                          추천 글 보기
+                        </button>
+                        <button
+                          type="button"
+                          className="space-nav-link font-tech"
+                          style={{ fontSize: '0.82rem', padding: '0.45rem 0.85rem' }}
+                          onClick={() => setIsComposerOpen(true)}
+                        >
+                          수정
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        className="bookshelf-add-btn font-tech"
+                        onClick={() => setIsComposerOpen(true)}
+                        style={{ fontSize: '0.82rem', padding: '0.45rem 0.85rem', background: 'rgba(56, 189, 248, 0.15)', borderColor: 'rgba(56, 189, 248, 0.4)', color: '#38bdf8' }}
+                      >
+                        <Share2 size={14} />
+                        이 책 추천하기
+                      </button>
+                    )
+                  )}
+
                   <button
                     type="button"
-                    className="bookshelf-add-btn font-tech"
-                    onClick={() => setIsComposerOpen(true)}
-                    style={{ fontSize: '0.82rem', padding: '0.45rem 0.85rem', background: 'rgba(56, 189, 248, 0.15)', borderColor: 'rgba(56, 189, 248, 0.4)', color: '#38bdf8' }}
+                    className="space-nav-link font-tech"
+                    onClick={handleArchive}
+                    disabled={archiveBookMutation.isPending}
+                    style={{ fontSize: '0.82rem', padding: '0.45rem 0.85rem', color: 'rgba(255,255,255,0.45)', marginLeft: 'auto' }}
                   >
-                    <Share2 size={14} />
-                    이 책 추천하기
+                    <Archive size={14} />
+                    보관
                   </button>
-                )
+                </>
               )}
-
-              <button
-                type="button"
-                className="space-nav-link font-tech"
-                onClick={handleArchive}
-                disabled={archiveBookMutation.isPending}
-                style={{ fontSize: '0.82rem', padding: '0.45rem 0.85rem', color: 'rgba(255,255,255,0.45)', marginLeft: 'auto' }}
-              >
-                <Archive size={14} />
-                보관
-              </button>
             </div>
 
             {/* Reading Timeline for this book */}
@@ -366,11 +396,32 @@ export default function ReadingBookDetailDrawer({ isOpen, onClose, book, onOpenP
         </MotionDiv>
       </div>
 
-      {isComposerOpen && (
+      {isComposerOpen && hasActiveShare && !existingShare && (
+        <div className="composer-modal-backdrop" onClick={() => setIsComposerOpen(false)}>
+          <div className="composer-modal-card" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 420 }}>
+            <p style={{ color: '#e0f2fe', margin: 0 }}>
+              {existingShareError
+                ? '추천 글을 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.'
+                : existingShareLoading ? '추천 글을 불러오는 중…' : '추천 글을 찾을 수 없습니다.'}
+            </p>
+            <button
+              type="button"
+              className="space-nav-link font-tech"
+              onClick={() => setIsComposerOpen(false)}
+              style={{ marginTop: '1rem' }}
+            >
+              닫기
+            </button>
+          </div>
+        </div>
+      )}
+
+      {isComposerOpen && (!hasActiveShare || existingShare) && (
         <ReadingShareComposer
           isOpen={isComposerOpen}
           onClose={() => setIsComposerOpen(false)}
           initialBook={currentBook}
+          existingShare={existingShare}
         />
       )}
     </AnimatePresence>
