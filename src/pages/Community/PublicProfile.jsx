@@ -121,11 +121,7 @@ function getTimeMs(value) {
 }
 
 function getProfileBookStyle(book = {}) {
-  const seed = String(book.id || `${book.title}-${book.author}` || 'classic');
-  let hash = 0;
-  for (let index = 0; index < seed.length; index += 1) {
-    hash = ((hash << 5) - hash + seed.charCodeAt(index)) | 0;
-  }
+  const hash = getDeterministicColorHash(`${book.title || ''}__${book.author || ''}__${book.id || ''}`);
   const palette = PROFILE_BOOK_PALETTES[Math.abs(hash) % PROFILE_BOOK_PALETTES.length];
   const titleLength = Array.from(String(book.title || '')).length;
   return {
@@ -133,8 +129,8 @@ function getProfileBookStyle(book = {}) {
     '--profile-book-shade': palette.shade,
     '--profile-book-edge': palette.edge,
     '--profile-book-foil': palette.foil,
-    '--profile-book-width': `${54 + (Math.abs(hash) % 4) * 5}px`,
-    '--profile-book-height': `${190 + (titleLength % 5) * 8}px`,
+    '--profile-book-width': `${56 + (Math.abs(hash) % 3) * 6}px`,
+    '--profile-book-height': `${245 + (titleLength % 5) * 6}px`,
   };
 }
 
@@ -200,9 +196,9 @@ function ProfileBookSpine({ book, variant = 'preview' }) {
   const rawTitle = String(book.title || '').trim();
   const rawAuthor = String(book.author || '').trim();
 
-  // Truncate long title/author for vertical spine aesthetic
-  const displayTitle = rawTitle.length > 8 ? rawTitle.slice(0, 7) + '…' : rawTitle;
-  const displayAuthor = rawAuthor.length > 7 ? rawAuthor.slice(0, 6) + '…' : rawAuthor;
+  // Truncate long title/author for vertical spine aesthetic (fits comfortably in taller spine)
+  const displayTitle = rawTitle.length > 12 ? rawTitle.slice(0, 11) + '…' : rawTitle;
+  const displayAuthor = rawAuthor.length > 8 ? rawAuthor.slice(0, 7) + '…' : rawAuthor;
 
   const fullLabel = `${rawTitle} · ${rawAuthor} (${status.label}${book.currentPage > 0 ? `, ${book.currentPage}쪽` : ''}${book.publicShareId ? ' · 추천 글' : ''})`;
 
@@ -295,9 +291,6 @@ function ProfileBookshelf({ books = [], hasMore, isOwnProfile, onOpenLibrary, on
           </div>
 
           <div className="public-profile-bookshelf-cabinet">
-            <div className="public-profile-bookshelf-plaque">
-              <BookOpen size={14} /> THE PERSONAL ARCHIVE
-            </div>
             <div className="public-profile-bookshelf-scroll">
               <div className="public-profile-bookshelf-books" role="list" aria-label="등록한 책 목록">
                 {books.map((book) => (

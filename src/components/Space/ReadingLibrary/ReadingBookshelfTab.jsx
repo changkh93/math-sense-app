@@ -19,7 +19,7 @@ export default function ReadingBookshelfTab({
   const [filterStatus, setFilterStatus] = useState('all');
   const [viewMode, setViewMode] = useState('shelf'); // 'shelf' | 'card'
 
-  const { data: recentShares = [], isLoading: sharesLoading } = useRecentReadingShares(4);
+  const { data: recentShares = [], isLoading: sharesLoading } = useRecentReadingShares(3);
 
   const activeBooks = useMemo(() => books.filter((b) => !b.isArchived), [books]);
   const archivedBooks = useMemo(() => books.filter((b) => b.isArchived), [books]);

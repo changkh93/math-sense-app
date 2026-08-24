@@ -325,6 +325,8 @@ module.exports = function ({ functions, admin, costOptimizedDataFunctions, requi
       throw new functions.https.HttpsError("invalid-argument", validation.message, { code: validation.error });
     }
 
+    const command = prepareCommand(uid, commandId, { title, author, status, dateInput });
+
     const now = new Date();
     const nowTimestamp = Timestamp.fromDate(now);
     const todayKst = getKSTDateString(now);

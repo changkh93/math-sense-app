@@ -812,14 +812,14 @@
   overflow-x: auto;
   overflow-y: hidden;
   /* Tall books and the hover lift need headroom inside this clipped scroller. */
-  padding: 1.4rem 0.35rem 0;
+  padding: 0.8rem 0.35rem 0;
   scrollbar-width: thin;
   scrollbar-color: rgba(217, 179, 103, 0.42) rgba(255, 255, 255, 0.035);
 }
 
 .public-profile-bookshelf-books {
   min-width: min-content;
-  height: 244px;
+  height: 285px;
   display: flex;
   align-items: flex-end;
   gap: 3px;
@@ -830,12 +830,12 @@
   position: relative;
   flex: 0 0 var(--profile-book-width, 58px);
   width: var(--profile-book-width, 58px);
-  height: var(--profile-book-height, 206px);
+  height: var(--profile-book-height, 250px);
   display: flex;
   flex-direction: column;
   justify-content: space-between;
   align-items: center;
-  padding: 0.45rem 0.35rem 0.55rem;
+  padding: 0.5rem 0.35rem 0.6rem;
   overflow: hidden;
   border: 0;
   border-left: 2px solid color-mix(in srgb, var(--profile-book-edge) 58%, transparent);
@@ -897,24 +897,24 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  margin: 0.2rem 0;
+  margin: 0.25rem 0;
   overflow: hidden;
 }
 
 .public-profile-book-spine strong {
   color: #fffdf7;
   font-family: inherit;
-  font-size: 0.76rem;
+  font-size: 0.8rem;
   font-weight: 800;
-  line-height: 1.18;
-  letter-spacing: 0.06em;
+  line-height: 1.2;
+  letter-spacing: 0.07em;
   writing-mode: vertical-rl;
   text-orientation: upright;
   text-align: center;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  max-height: 112px;
+  max-height: 150px;
   text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9);
 }
 

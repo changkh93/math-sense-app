@@ -213,4 +213,13 @@ assert.ok(
   "Restoring an eligible completed book must reconcile completion credit"
 );
 
+// 13. createReadingBook must prepare idempotent command
+const createBookSection = classicReadingSource.match(
+  /const createReadingBook[\s\S]*?\/\*\*\s*\n\s*\* 2\./
+)?.[0] || "";
+assert.ok(
+  createBookSection.includes("const command = prepareCommand"),
+  "createReadingBook must define command with prepareCommand"
+);
+
 console.log("All classicReadingPolicy unit tests passed successfully!");
