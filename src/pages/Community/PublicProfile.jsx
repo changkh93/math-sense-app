@@ -197,7 +197,14 @@ async function fetchProfileBookshelfPage({ userId, cursor = null, pageSize = PRO
 function ProfileBookSpine({ book, variant = 'preview' }) {
   const navigate = useNavigate();
   const status = PROFILE_BOOK_STATUS_META[book.status] || PROFILE_BOOK_STATUS_META.reading;
-  const label = `${book.title}, ${book.author}, ${status.label}${book.currentPage > 0 ? `, ${book.currentPage}쪽` : ''}${book.publicShareId ? ' (독서 추천 글 있음)' : ''}`;
+  const rawTitle = String(book.title || '').trim();
+  const rawAuthor = String(book.author || '').trim();
+
+  // Truncate long title/author for vertical spine aesthetic
+  const displayTitle = rawTitle.length > 8 ? rawTitle.slice(0, 7) + '…' : rawTitle;
+  const displayAuthor = rawAuthor.length > 7 ? rawAuthor.slice(0, 6) + '…' : rawAuthor;
+
+  const fullLabel = `${rawTitle} · ${rawAuthor} (${status.label}${book.currentPage > 0 ? `, ${book.currentPage}쪽` : ''}${book.publicShareId ? ' · 추천 글' : ''})`;
 
   const handleClick = () => {
     if (book.publicShareId) {
@@ -215,32 +222,33 @@ function ProfileBookSpine({ book, variant = 'preview' }) {
       }}
       whileHover={{ y: -12, rotate: -0.7 }}
       onClick={handleClick}
-      aria-label={label}
-      title={label}
+      aria-label={fullLabel}
+      title={fullLabel}
     >
-      <span className="public-profile-book-spine-status" aria-hidden="true">
-        {book.publicShareId ? '✨' : status.icon}
-      </span>
-      <span className="public-profile-book-spine-band is-top" aria-hidden="true" />
-      <strong>{book.title}</strong>
-      <small>{book.author}</small>
-      {book.currentPage > 0 && <em>{book.currentPage}p</em>}
-      {book.publicShareId && (
-        <span
-          style={{
-            fontSize: '0.68rem',
-            color: '#38bdf8',
-            fontWeight: 800,
-            background: 'rgba(0,0,0,0.4)',
-            padding: '2px 4px',
-            borderRadius: '4px',
-            marginTop: '2px',
-          }}
-        >
-          추천 글
+      {/* Top status icon & gold foil band */}
+      <div className="public-profile-book-spine-top">
+        <span className="public-profile-book-spine-status" aria-hidden="true">
+          {book.publicShareId ? '✨' : status.icon}
         </span>
-      )}
-      <span className="public-profile-book-spine-band is-bottom" aria-hidden="true" />
+        <span className="public-profile-book-spine-band is-top" aria-hidden="true" />
+      </div>
+
+      {/* Center vertical title section */}
+      <div className="public-profile-book-spine-title-area">
+        <strong>{displayTitle}</strong>
+      </div>
+
+      {/* Bottom author, badges, page number and bottom band */}
+      <div className="public-profile-book-spine-bottom">
+        <small>{displayAuthor}</small>
+        {book.publicShareId && (
+          <span className="public-profile-book-share-tag">추천 글</span>
+        )}
+        {book.currentPage > 0 && (
+          <em>{book.currentPage}p</em>
+        )}
+        <span className="public-profile-book-spine-band is-bottom" aria-hidden="true" />
+      </div>
     </motion.div>
   );
 }
