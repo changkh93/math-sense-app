@@ -6741,6 +6741,14 @@ const classicReadingSocial = require("./classicReadingSocial")({
 });
 Object.assign(exports, classicReadingSocial.functions);
 
+const agoraNotices = require("./agoraNotices")({
+  functions,
+  admin,
+  costOptimizedDataFunctions,
+  operatorEmail: OPERATOR_GIFT_EMAIL,
+});
+Object.assign(exports, agoraNotices.functions);
+
 function getGlmApiKey() {
   return process.env.GLM_API_KEY || "";
 }

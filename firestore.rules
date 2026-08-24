@@ -1034,6 +1034,19 @@ service cloud.firestore {
       allow update: if isAuth();
     }
 
+    // Agora notices are published by a server callable after verifying the
+    // operator's signed-in email. Clients can never write either collection.
+    match /agoraNotices/{noticeId} {
+      allow read: if isAuth() && resource.data.status == 'published';
+      allow write: if false;
+    }
+
+    // Denormalized latest-three snapshot: one read on the Agora landing page.
+    match /agoraNoticeFeeds/{feedId} {
+      allow read: if isAuth() && feedId == 'current';
+      allow write: if false;
+    }
+
     // Attendance (Warp Gate Docking)
     match /attendance/{attendanceId} {
       allow read: if isAuth();

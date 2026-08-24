@@ -14,6 +14,7 @@ import {
   where,
 } from 'firebase/firestore'
 import { httpsCallable } from 'firebase/functions'
+import { createSustainedBlurGuard } from '../../utils/quizFocusGuard'
 import { db, functions } from '../../firebase'
 import { useAuth } from '../../hooks/useAuth'
 import { useQuizBattlePresence } from '../../hooks/useQuizBattlePresence'
@@ -715,7 +716,6 @@ export default function QuizBattleView({
   useEffect(() => {
     if (!battleId || battle?.status !== 'active' || isBattleFinished) return undefined
 
-    let blurTimer = null
     const fullscreenSupported = Boolean(document.documentElement.requestFullscreen)
     const isInternalCapture = () => document.body.classList.contains('is-capturing')
     const isEntryTransition = () => (
@@ -739,12 +739,12 @@ export default function QuizBattleView({
 
     const reportIntegrityEvent = async (eventType) => {
       if (isInternalCapture()) return
-      document.body.classList.add('quiz-battle-window-blurred')
-      setIsFocusLocked(true)
 
       const now = Date.now()
       if (now - lastIntegrityReportRef.current < 4000) return
       lastIntegrityReportRef.current = now
+      document.body.classList.add('quiz-battle-window-blurred')
+      setIsFocusLocked(true)
       try {
         const report = httpsCallable(functions, 'reportQuizBattleIntegrityEvent')
         const res = await report({ battleId, eventType })
@@ -781,20 +781,18 @@ export default function QuizBattleView({
         reportIntegrityEvent('fullscreen_exit')
       }
     }
-    const handleBlur = () => {
-      if (isInternalCapture() || isEntryTransition()) return
-      document.body.classList.add('quiz-battle-window-blurred')
-      setIsFocusLocked(true)
-      setFocusLockReason('퀴즈 화면을 벗어나 배틀이 잠시 멈췄습니다.')
-      blurTimer = window.setTimeout(() => {
-        if (!document.hasFocus() && !isInternalCapture() && !isEntryTransition()) {
-          reportIntegrityEvent('window_blur')
-        }
-      }, 700)
-    }
-    const handleFocus = () => {
-      if (blurTimer) window.clearTimeout(blurTimer)
-    }
+    const blurGuard = createSustainedBlurGuard({
+      canStart: () => !isInternalCapture() && !isEntryTransition(),
+      shouldConfirm: () => !document.hasFocus() && !isInternalCapture() && !isEntryTransition(),
+      onConfirmed: () => {
+        setFocusLockReason('퀴즈 화면을 벗어난 상태가 지속되어 배틀이 잠시 멈췄습니다.')
+        void reportIntegrityEvent('window_blur')
+      },
+      setTimer: (callback, delayMs) => window.setTimeout(callback, delayMs),
+      clearTimer: timerId => window.clearTimeout(timerId),
+    })
+    const handleBlur = () => blurGuard.start()
+    const handleFocus = () => blurGuard.cancel()
     const handleKeyDown = (event) => {
       if (!isBattleCaptureShortcut(event) || isInternalCapture()) return
       event.preventDefault()
@@ -826,7 +824,7 @@ export default function QuizBattleView({
     window.addEventListener('beforeprint', handleBeforePrint)
     window.addEventListener('beforeunload', handleBeforeUnload)
     return () => {
-      if (blurTimer) window.clearTimeout(blurTimer)
+      blurGuard.dispose()
       document.body.classList.remove('quiz-battle-window-blurred')
       document.removeEventListener('visibilitychange', handleVisibility)
       document.removeEventListener('fullscreenchange', handleFullscreenChange)

@@ -23,7 +23,7 @@
     "test:weekly-growth-loop": "node --test functions/weeklyGrowthLoopPolicy.test.cjs && node scripts/test-weekly-growth-loop-domain.mjs",
     "test:explorer-level": "node scripts/test-explorer-level-utils.mjs",
     "test:mistake-notebook-ai": "node scripts/test-mistake-notebook-ai.mjs",
-    "test:quiz-session": "node scripts/test-quiz-session-guards.mjs",
+    "test:quiz-session": "node scripts/test-quiz-session-guards.mjs && node scripts/test-quiz-focus-guard.mjs",
     "test:frontier-audio": "node scripts/test-frontier-audio-utils.mjs",
     "test:astra-builder": "node scripts/test-astra-builder-model.mjs",
     "test:astra-builder:performance": "node scripts/benchmark-astra-builder.mjs",

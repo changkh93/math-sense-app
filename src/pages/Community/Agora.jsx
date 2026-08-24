@@ -14,11 +14,37 @@ import ReadingLoungeSidebar from '../../components/Community/ReadingLounge/Readi
 import AssignmentShareFeed from '../../components/Community/AssignmentShareFeed';
 import ReadingLoungeView from '../../components/Community/ReadingLounge/ReadingLoungeView';
 import { useLatestReadingShare } from '../../hooks/useReadingSocial';
+import { useAgoraNoticeFeature } from '../../hooks/useAgoraNotices';
 import { useAuth } from '../../hooks/useAuth';
 import { LinkPreviewList, parseInlineFormatting } from '../../utils/formatUtils';
 import './Agora.css';
 
 const MotionDiv = motion.div;
+const AgoraNoticeBoard = React.lazy(() => import('../../components/Community/AgoraNoticeBoard'));
+
+function AgoraNoticeFeature({ items, onOpen }) {
+  if (!items?.length) return null;
+
+  return (
+    <section className="agora-notice-feature" aria-labelledby="agora-notice-feature-title">
+      <div className="agora-notice-feature-heading">
+        <span><Megaphone size={16} aria-hidden="true" /></span>
+        <strong id="agora-notice-feature-title">공지사항</strong>
+      </div>
+      <div className="agora-notice-feature-lines">
+        {items.slice(0, 3).map((item) => (
+          <button type="button" key={item.id} onClick={onOpen} title={item.title}>
+            <span aria-hidden="true">•</span>
+            <span>{item.title}</span>
+          </button>
+        ))}
+      </div>
+      <button type="button" className="agora-notice-feature-more" onClick={onOpen}>
+        공지사항 더보기 <ArrowRight size={15} aria-hidden="true" />
+      </button>
+    </section>
+  );
+}
 
 function FeaturedReadingShare({ share, onOpen }) {
   if (!share) return null;
@@ -77,11 +103,15 @@ export default function Agora() {
     hasNextPage, 
     isFetchingNextPage 
   } = usePublicQuestions(filter, {
-    // Dedicated archive/reading feeds render instead of the question board.
+    // Dedicated feeds render instead of the question board.
     // Disabling this query avoids 20 unrelated question reads on every visit.
-    enabled: filter !== 'reading' && filter !== 'archive',
+    enabled: !['reading', 'archive', 'notices'].includes(filter),
   });
   const shouldFeatureReading = filter === 'all' && !searchTerm.trim();
+  const shouldFeatureNotices = filter === 'all' && !searchTerm.trim();
+  const { data: featuredNotices = [] } = useAgoraNoticeFeature({
+    enabled: Boolean(user && shouldFeatureNotices),
+  });
   const { data: featuredReadingShare } = useLatestReadingShare({
     enabled: shouldFeatureReading,
   });
@@ -136,7 +166,7 @@ export default function Agora() {
   const filters = [
     { id: 'all', label: '전체 질문', icon: '🌌' },
     { id: 'unanswered', label: '대기 중', icon: '🚨' },
-    { id: 'solved', label: '해결됨', icon: '✅' },
+    { id: 'notices', label: '공지사항', icon: '📢' },
     { id: 'archive', label: '기록 공개', icon: '📖' },
     { id: 'reading', label: '독서 라운지', icon: '📚' },
     { id: 'my', label: '내 질문', icon: '🧑‍🚀' }
@@ -155,6 +185,17 @@ export default function Agora() {
       const next = new URLSearchParams(prev);
       next.set('filter', 'reading');
       next.set('highlight', featuredReadingShare.id);
+      next.delete('search');
+      return next;
+    });
+  };
+
+  const handleOpenNotices = () => {
+    setSearchTerm('');
+    setSearchParams(prev => {
+      const next = new URLSearchParams(prev);
+      next.set('filter', 'notices');
+      next.delete('highlight');
       next.delete('search');
       return next;
     });
@@ -202,7 +243,7 @@ export default function Agora() {
             ))}
           </div>
           
-          {filter !== 'reading' && (
+          {!['reading', 'archive', 'notices'].includes(filter) && (
             <div className="agora-search-bar glass">
               <Search size={18} className="search-icon" />
               <input
@@ -221,13 +262,24 @@ export default function Agora() {
         </div>
         <div className="agora-layout-grid">
           <main className="agora-main">
+            {shouldFeatureNotices && (
+              <AgoraNoticeFeature items={featuredNotices} onOpen={handleOpenNotices} />
+            )}
             {shouldFeatureReading && featuredReadingShare && (
               <FeaturedReadingShare
                 share={featuredReadingShare}
                 onOpen={handleOpenFeaturedReading}
               />
             )}
-            {filter === 'reading' ? (
+            {filter === 'notices' ? (
+              <React.Suspense fallback={<div className="loading-state">공지사항을 불러오는 중...</div>}>
+                <AgoraNoticeBoard
+                  userEmail={user?.email || ''}
+                  userEmailVerified={user?.emailVerified === true}
+                  isAuthenticated={Boolean(user)}
+                />
+              </React.Suspense>
+            ) : filter === 'reading' ? (
               <ReadingLoungeView />
             ) : filter === 'archive' ? (
               <AssignmentShareFeed highlightId={highlightId} />
@@ -399,10 +451,12 @@ export default function Agora() {
           )}
         </div>
 
-      <button className="floating-ask-btn action-flare" onClick={() => setIsModalOpen(true)}>
-        <span className="btn-icon">✨</span>
-        <span className="btn-text font-title">별 쏘아올리기</span>
-      </button>
+      {filter !== 'notices' && (
+        <button className="floating-ask-btn action-flare" onClick={() => setIsModalOpen(true)}>
+          <span className="btn-icon">✨</span>
+          <span className="btn-text font-title">별 쏘아올리기</span>
+        </button>
+      )}
 
       <QuestionModal 
         isOpen={isModalOpen} 

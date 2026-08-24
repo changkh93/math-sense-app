@@ -21,6 +21,7 @@ import {
   getUnansweredQuizQuestions,
   hasCompleteQuizQuestionSet,
 } from '../../utils/quizSessionGuards'
+import { createSustainedBlurGuard } from '../../utils/quizFocusGuard'
 
 // Fisher-Yates 셔플 알고리즘
 const shuffleArray = (array) => {
@@ -724,13 +725,13 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
   const reportFocusViolation = useCallback((eventType, reason) => {
     if (integrityTerminatedRef.current || document.body.classList.contains('is-capturing')) return
 
-    document.body.classList.add('field-test-window-blurred')
-    setIsFocusLocked(true)
-    setFocusLockReason(reason)
-
     const now = Date.now()
     if (now - lastFocusViolationAtRef.current < 4000) return
     lastFocusViolationAtRef.current = now
+
+    document.body.classList.add('field-test-window-blurred')
+    setIsFocusLocked(true)
+    setFocusLockReason(reason)
 
     const nextCount = Math.min(FIELD_TEST_MAX_FOCUS_VIOLATIONS, focusViolationCountRef.current + 1)
     focusViolationCountRef.current = nextCount
@@ -766,7 +767,6 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
     if (document.fullscreenElement) {
       focusTransitionGraceUntilRef.current = Date.now() + 2500
     }
-    let blurTimer = null
     const isInternalCapture = () => document.body.classList.contains('is-capturing')
     const isEntryTransition = () => (
       !focusProtectionArmedRef.current || Date.now() < focusTransitionGraceUntilRef.current
@@ -791,20 +791,17 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
         reportFocusViolation('fullscreen_exit', '전체화면 해제가 감지되어 문제 화면을 잠갔습니다.')
       }
     }
-    const handleBlur = () => {
-      if (isInternalCapture() || isEntryTransition()) return
-      document.body.classList.add('field-test-window-blurred')
-      setIsFocusLocked(true)
-      setFocusLockReason('창 포커스 이탈이 감지되어 문제 화면을 잠갔습니다.')
-      blurTimer = window.setTimeout(() => {
-        if (!document.hasFocus() && !isInternalCapture() && !isEntryTransition()) {
-          reportFocusViolation('window_blur', '창 포커스 이탈이 감지되어 문제 화면을 잠갔습니다.')
-        }
-      }, 700)
-    }
-    const handleFocus = () => {
-      if (blurTimer) window.clearTimeout(blurTimer)
-    }
+    const blurGuard = createSustainedBlurGuard({
+      canStart: () => !isInternalCapture() && !isEntryTransition(),
+      shouldConfirm: () => !document.hasFocus() && !isInternalCapture() && !isEntryTransition(),
+      onConfirmed: () => {
+        reportFocusViolation('window_blur', '창 포커스 이탈이 지속되어 문제 화면을 잠갔습니다.')
+      },
+      setTimer: (callback, delayMs) => window.setTimeout(callback, delayMs),
+      clearTimer: timerId => window.clearTimeout(timerId),
+    })
+    const handleBlur = () => blurGuard.start()
+    const handleFocus = () => blurGuard.cancel()
     const handleKeyDown = (event) => {
       if (!isCaptureShortcut(event) || isInternalCapture()) return
       event.preventDefault()
@@ -849,7 +846,7 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
     }, 3000)
 
     return () => {
-      if (blurTimer) window.clearTimeout(blurTimer)
+      blurGuard.dispose()
       window.clearTimeout(fullscreenCheckTimer)
       document.body.classList.remove('field-test-window-blurred')
       document.removeEventListener('visibilitychange', handleVisibility)
