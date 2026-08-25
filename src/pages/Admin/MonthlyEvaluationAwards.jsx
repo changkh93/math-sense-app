@@ -16,6 +16,7 @@ import ScholarshipAwards from './ScholarshipAwards'
 import {
   MONTHLY_EVALUATION_COURSES,
   STUDENT_GRADE_OPTIONS,
+  buildDiscoveredMonthlyUnitConfig,
   buildMonthlyAwardId,
   formatKoreanDateFromString,
   getConfiguredUnitIdsForMonth,
@@ -78,6 +79,7 @@ export default function MonthlyEvaluationAwards() {
   const [awardFilter, setAwardFilter] = useState('all')
   const [searchTerm, setSearchTerm] = useState('')
   const [users, setUsers] = useState([])
+  const [discoveredUnitConfig, setDiscoveredUnitConfig] = useState({})
   const [historyByStudentUnit, setHistoryByStudentUnit] = useState({})
   const [awards, setAwards] = useState({})
   const [loading, setLoading] = useState(false)
@@ -90,18 +92,45 @@ export default function MonthlyEvaluationAwards() {
     setLoading(true)
     setError('')
     try {
-      const unitIds = getConfiguredUnitIdsForMonth(year, month)
-      const [usersSnap, awardsSnap, historySnap] = await Promise.all([
+      const [usersSnap, awardsSnap, regionsSnap, chaptersSnap, unitsSnap] = await Promise.all([
         getDocs(collection(db, 'users')),
         getDocs(query(
           collection(db, 'monthlyEvaluationAwards'),
           where('year', '==', Number(year)),
           where('month', '==', Number(month)),
         )),
-        unitIds.length
-          ? getDocs(query(collectionGroup(db, 'history'), where('unitId', 'in', unitIds)))
-          : Promise.resolve({ docs: [] }),
+        getDocs(collection(db, 'regions')),
+        getDocs(collection(db, 'chapters')),
+        getDocs(collection(db, 'units')),
       ])
+
+      const chaptersMap = {}
+      chaptersSnap.docs.forEach(d => {
+        chaptersMap[d.id] = { id: d.id, ...d.data() }
+      })
+      const regionsMap = {}
+      regionsSnap.docs.forEach(d => {
+        regionsMap[d.id] = { id: d.id, ...d.data() }
+      })
+      const rawUnits = unitsSnap.docs.map(d => ({ id: d.id, docId: d.id, ...d.data() }))
+
+      const dynamicConfig = buildDiscoveredMonthlyUnitConfig(rawUnits, chaptersMap, regionsMap)
+      setDiscoveredUnitConfig(dynamicConfig)
+
+      const unitIds = getConfiguredUnitIdsForMonth(year, month, dynamicConfig)
+
+      let historyDocs = []
+      if (unitIds.length > 0) {
+        // Chunk by 30 to comply with Firestore 'in' limit
+        const chunks = []
+        for (let i = 0; i < unitIds.length; i += 30) {
+          chunks.push(unitIds.slice(i, i + 30))
+        }
+        const historySnaps = await Promise.all(
+          chunks.map(chunk => getDocs(query(collectionGroup(db, 'history'), where('unitId', 'in', chunk))))
+        )
+        historyDocs = historySnaps.flatMap(snap => snap.docs)
+      }
 
       const nextUsers = usersSnap.docs
         .map(docSnap => ({ uid: docSnap.id, ...docSnap.data() }))
@@ -113,7 +142,7 @@ export default function MonthlyEvaluationAwards() {
       })
 
       const groupedHistory = {}
-      historySnap.docs.forEach(docSnap => {
+      historyDocs.forEach(docSnap => {
         const data = docSnap.data()
         const studentId = docSnap.ref.parent.parent?.id
         if (!studentId || !data?.unitId) return
@@ -140,7 +169,7 @@ export default function MonthlyEvaluationAwards() {
   const rows = useMemo(() => {
     const term = searchTerm.trim().toLowerCase()
     const builtRows = []
-    const evaluationEntries = getEvaluationUnitEntriesForMonth(year, month)
+    const evaluationEntries = getEvaluationUnitEntriesForMonth(year, month, discoveredUnitConfig)
 
     users.forEach(user => {
       const savedGrade = normalizeGradeValue(user.grade)
@@ -184,7 +213,7 @@ export default function MonthlyEvaluationAwards() {
         ))
 
         activeCourses.forEach(course => {
-          const unitId = gradeEntry.unitId || getEvaluationUnitIdForGrade(year, month, normalizedGrade)
+          const unitId = gradeEntry.unitId || getEvaluationUnitIdForGrade(year, month, normalizedGrade, discoveredUnitConfig)
           const historyRecords = unitId ? historyByStudentUnit[`${user.uid}_${unitId}`] || [] : []
           const quizRecords = historyRecords.filter(isQuizRecord)
           const bestHistory = getBestHistory(historyRecords)
@@ -237,7 +266,7 @@ export default function MonthlyEvaluationAwards() {
         if ((b.score || 0) !== (a.score || 0)) return (b.score || 0) - (a.score || 0)
         return a.studentName.localeCompare(b.studentName, 'ko')
       })
-  }, [awardFilter, awards, courseFilter, gradeFilter, historyByStudentUnit, month, searchTerm, users, year])
+  }, [awardFilter, awards, courseFilter, discoveredUnitConfig, gradeFilter, historyByStudentUnit, month, searchTerm, users, year])
 
   const stats = useMemo(() => ({
     total: rows.length,

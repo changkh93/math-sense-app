@@ -124,6 +124,88 @@ export const MONTHLY_EVALUATION_UNIT_CONFIG = {
     middle2: 'reg_1774698354292_chap_1774698491426_unit_1785150704995',
     middle3: 'reg_1774698354292_chap_1774698491426_unit_1785150713487',
   },
+  '2026-8': {
+    elementary3: 'reg_1774390167801_chap_1774390176943_unit_1787551996415',
+    elementary4: 'reg_1774390167801_chap_1774390191809_unit_1787552005685',
+    elementary5: 'reg_1774390167801_chap_1774390199371_unit_1787552011981',
+    elementary6: 'reg_1774390167801_chap_1774390206639_unit_1787552056949',
+    middle1: 'reg_1774698354292_chap_1774698491426_unit_1787555107499',
+    middle2: 'reg_1774698354292_chap_1774698491426_unit_1787555119532',
+    middle3: 'reg_1774698354292_chap_1774698491426_unit_1787555131298',
+  },
+}
+
+export function parseMonthlyEvaluationUnit(unit = {}, chapter = {}, region = {}) {
+  const chapTitle = (chapter?.title || '').trim()
+  const unitTitle = (unit?.title || '').trim()
+  const regTitle = (region?.title || '').trim()
+  const clusterId = region?.clusterId || ''
+  const regionId = chapter?.regionId || region?.id || ''
+
+  const isElementaryMonthly =
+    regionId === 'reg_1774390167801' ||
+    regTitle.includes('초등수학 월간평가') ||
+    (clusterId === 'cluster_elementary' && (regTitle.includes('월간평가') || chapTitle.includes('월간평가')))
+
+  const isMiddleMonthly =
+    (regionId === 'reg_1774698354292' && chapTitle.includes('월간평가')) ||
+    (clusterId === 'middle-math' && (chapTitle.includes('월간평가') || unitTitle.includes('월평가') || unitTitle.includes('월 평가')))
+
+  if (!isElementaryMonthly && !isMiddleMonthly) return null
+
+  let grade = null
+  let month = null
+  let year = unit.year || 2026
+
+  if (isElementaryMonthly) {
+    if (chapTitle.includes('2학년') || chapTitle.includes('초2')) grade = 'elementary2'
+    else if (chapTitle.includes('3학년') || chapTitle.includes('초3')) grade = 'elementary3'
+    else if (chapTitle.includes('4학년') || chapTitle.includes('초4')) grade = 'elementary4'
+    else if (chapTitle.includes('5학년') || chapTitle.includes('초5')) grade = 'elementary5'
+    else if (chapTitle.includes('6학년') || chapTitle.includes('초6')) grade = 'elementary6'
+
+    const monthMatch = unitTitle.match(/(\d{1,2})\s*월/)
+    if (monthMatch) month = parseInt(monthMatch[1], 10)
+    const yearMatch = unitTitle.match(/(20\d{2})\s*년/)
+    if (yearMatch) year = parseInt(yearMatch[1], 10)
+  } else if (isMiddleMonthly) {
+    if (unitTitle.includes('중1') || unitTitle.includes('1학년')) grade = 'middle1'
+    else if (unitTitle.includes('중2') || unitTitle.includes('2학년')) grade = 'middle2'
+    else if (unitTitle.includes('중3') || unitTitle.includes('3학년')) grade = 'middle3'
+
+    const monthMatch = unitTitle.match(/(\d{1,2})\s*월/)
+    if (monthMatch) month = parseInt(monthMatch[1], 10)
+    const yearMatch = unitTitle.match(/(20\d{2})\s*년/)
+    if (yearMatch) year = parseInt(yearMatch[1], 10)
+  }
+
+  if (grade && month) {
+    const unitId = unit.docId || unit.id
+    return {
+      unitId,
+      unitTitle,
+      year: Number(year),
+      month: Number(month),
+      grade,
+      courseClusterId: isElementaryMonthly ? ELEMENTARY_MATH_CLUSTER_ID : MIDDLE_MATH_CLUSTER_ID,
+    }
+  }
+  return null
+}
+
+export function buildDiscoveredMonthlyUnitConfig(units = [], chaptersMap = {}, regionsMap = {}) {
+  const result = {}
+  units.forEach(unit => {
+    const chap = chaptersMap[unit.chapterId] || {}
+    const reg = regionsMap[chap.regionId] || {}
+    const parsed = parseMonthlyEvaluationUnit(unit, chap, reg)
+    if (parsed) {
+      const key = getEvaluationKey(parsed.year, parsed.month)
+      if (!result[key]) result[key] = {}
+      result[key][parsed.grade] = parsed.unitId
+    }
+  })
+  return result
 }
 
 export function normalizeGradeValue(rawGrade) {
@@ -152,17 +234,31 @@ export function getEvaluationKey(year, month) {
   return `${Number(year)}-${Number(month)}`
 }
 
-export function getEvaluationUnitIdForGrade(year, month, gradeValue) {
-  return MONTHLY_EVALUATION_UNIT_CONFIG[getEvaluationKey(year, month)]?.[normalizeGradeValue(gradeValue)] || ''
+export function getEvaluationUnitIdForGrade(year, month, gradeValue, dynamicConfig = null) {
+  const key = getEvaluationKey(year, month)
+  const normalizedGrade = normalizeGradeValue(gradeValue)
+  if (dynamicConfig?.[key]?.[normalizedGrade]) {
+    return dynamicConfig[key][normalizedGrade]
+  }
+  return MONTHLY_EVALUATION_UNIT_CONFIG[key]?.[normalizedGrade] || ''
 }
 
-export function getConfiguredUnitIdsForMonth(year, month) {
-  return Object.values(MONTHLY_EVALUATION_UNIT_CONFIG[getEvaluationKey(year, month)] || {}).filter(Boolean)
+export function getConfiguredUnitIdsForMonth(year, month, dynamicConfig = null) {
+  const key = getEvaluationKey(year, month)
+  const combined = {
+    ...(MONTHLY_EVALUATION_UNIT_CONFIG[key] || {}),
+    ...(dynamicConfig?.[key] || {}),
+  }
+  return Object.values(combined).filter(Boolean)
 }
 
-export function getEvaluationUnitEntriesForMonth(year, month) {
-  const config = MONTHLY_EVALUATION_UNIT_CONFIG[getEvaluationKey(year, month)] || {}
-  return Object.entries(config)
+export function getEvaluationUnitEntriesForMonth(year, month, dynamicConfig = null) {
+  const key = getEvaluationKey(year, month)
+  const combined = {
+    ...(MONTHLY_EVALUATION_UNIT_CONFIG[key] || {}),
+    ...(dynamicConfig?.[key] || {}),
+  }
+  return Object.entries(combined)
     .map(([grade, unitId]) => {
       const gradeOption = getGradeOption(grade)
       return {
