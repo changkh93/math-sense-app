@@ -24,13 +24,13 @@ function buildTestAgoraBadges(userData = {}) {
     {
       id: 'agora_helper',
       title: '아고라 조력자',
-      requirements: [{ key: 'accepted', label: '채택 답변', current: acceptedAnswerCount, target: 1, unit: '개', completed: acceptedAnswerCount >= 1 }],
+      requirements: [{ key: 'accepted', label: '채택받은 답변', current: acceptedAnswerCount, target: 1, unit: '개', completed: acceptedAnswerCount >= 1 }],
       unlocked: acceptedAnswerCount >= 1
     },
     {
       id: 'kind_solver',
       title: '친절한 해결사',
-      requirements: [{ key: 'accepted', label: '채택 답변', current: acceptedAnswerCount, target: 5, unit: '개', completed: acceptedAnswerCount >= 5 }],
+      requirements: [{ key: 'accepted', label: '채택받은 답변', current: acceptedAnswerCount, target: 5, unit: '개', completed: acceptedAnswerCount >= 5 }],
       unlocked: acceptedAnswerCount >= 5
     },
     {
@@ -60,7 +60,7 @@ function buildTestAgoraBadges(userData = {}) {
     {
       id: 'trusted_guide',
       title: '신뢰받는 길잡이',
-      requirements: [{ key: 'accepted', label: '채택 답변', current: acceptedAnswerCount, target: 15, unit: '개', completed: acceptedAnswerCount >= 15 }],
+      requirements: [{ key: 'accepted', label: '채택받은 답변', current: acceptedAnswerCount, target: 15, unit: '개', completed: acceptedAnswerCount >= 15 }],
       unlocked: acceptedAnswerCount >= 15
     },
     {
@@ -68,7 +68,7 @@ function buildTestAgoraBadges(userData = {}) {
       title: '문제 해결 파일럿',
       requirements: [
         { key: 'answer', label: '답변한 질문', current: answeredQuestionCount, target: 20, unit: '개', completed: answeredQuestionCount >= 20 },
-        { key: 'accepted', label: '채택 답변', current: acceptedAnswerCount, target: 5, unit: '개', completed: acceptedAnswerCount >= 5 },
+        { key: 'accepted', label: '채택받은 답변', current: acceptedAnswerCount, target: 5, unit: '개', completed: acceptedAnswerCount >= 5 },
         { key: 'level', label: '탐사 등급', current: explorerLvl, target: 5, unit: 'Lv.', prefix: 'Lv.', completed: explorerLvl >= 5 }
       ],
       unlocked: answeredQuestionCount >= 20 && acceptedAnswerCount >= 5 && explorerLvl >= 5
@@ -78,7 +78,7 @@ function buildTestAgoraBadges(userData = {}) {
       title: '은하 멘토',
       requirements: [
         { key: 'answer', label: '답변한 질문', current: answeredQuestionCount, target: 50, unit: '개', completed: answeredQuestionCount >= 50 },
-        { key: 'accepted', label: '채택 답변', current: acceptedAnswerCount, target: 15, unit: '개', completed: acceptedAnswerCount >= 15 },
+        { key: 'accepted', label: '채택받은 답변', current: acceptedAnswerCount, target: 15, unit: '개', completed: acceptedAnswerCount >= 15 },
         { key: 'level', label: '탐사 등급', current: explorerLvl, target: 7, unit: 'Lv.', prefix: 'Lv.', completed: explorerLvl >= 7 }
       ],
       unlocked: answeredQuestionCount >= 50 && acceptedAnswerCount >= 15 && explorerLvl >= 7
@@ -92,7 +92,7 @@ function buildTestAgoraBadges(userData = {}) {
     {
       id: 'agora_sage',
       title: '아고라 현자',
-      requirements: [{ key: 'accepted', label: '채택 답변', current: acceptedAnswerCount, target: 50, unit: '개', completed: acceptedAnswerCount >= 50 }],
+      requirements: [{ key: 'accepted', label: '채택받은 답변', current: acceptedAnswerCount, target: 50, unit: '개', completed: acceptedAnswerCount >= 50 }],
       unlocked: acceptedAnswerCount >= 50
     },
     {
@@ -100,7 +100,7 @@ function buildTestAgoraBadges(userData = {}) {
       title: '아고라의 아르키메데스',
       requirements: [
         { key: 'answer', label: '답변한 질문', current: answeredQuestionCount, target: 100, unit: '개', completed: answeredQuestionCount >= 100 },
-        { key: 'accepted', label: '채택 답변', current: acceptedAnswerCount, target: 50, unit: '개', completed: acceptedAnswerCount >= 50 },
+        { key: 'accepted', label: '채택받은 답변', current: acceptedAnswerCount, target: 50, unit: '개', completed: acceptedAnswerCount >= 50 },
         { key: 'level', label: '탐사 등급', current: explorerLvl, target: 11, unit: 'Lv.', prefix: 'Lv.', completed: explorerLvl >= 11 }
       ],
       unlocked: answeredQuestionCount >= 100 && acceptedAnswerCount >= 50 && explorerLvl >= 11

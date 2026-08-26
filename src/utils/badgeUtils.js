@@ -320,7 +320,7 @@ export function buildAgoraBadges(userData = {}) {
       icon: '🤝',
       category: 'agora',
       requirements: [
-        { key: 'accepted', label: '채택 답변', current: acceptedAnswerCount, target: 1, unit: '개', completed: acceptedAnswerCount >= 1 }
+        { key: 'accepted', label: '채택받은 답변', current: acceptedAnswerCount, target: 1, unit: '개', completed: acceptedAnswerCount >= 1 }
       ],
       unlocked: acceptedAnswerCount >= 1,
       desc: '채택된 답변을 보유했습니다.'
@@ -331,7 +331,7 @@ export function buildAgoraBadges(userData = {}) {
       icon: '🌟',
       category: 'agora',
       requirements: [
-        { key: 'accepted', label: '채택 답변', current: acceptedAnswerCount, target: 5, unit: '개', completed: acceptedAnswerCount >= 5 }
+        { key: 'accepted', label: '채택받은 답변', current: acceptedAnswerCount, target: 5, unit: '개', completed: acceptedAnswerCount >= 5 }
       ],
       unlocked: acceptedAnswerCount >= 5,
       desc: '도움 5회(채택 답변 5개) 이상을 달성했습니다.'
@@ -388,7 +388,7 @@ export function buildAgoraBadges(userData = {}) {
       icon: '🧭',
       category: 'agora',
       requirements: [
-        { key: 'accepted', label: '채택 답변', current: acceptedAnswerCount, target: 15, unit: '개', completed: acceptedAnswerCount >= 15 }
+        { key: 'accepted', label: '채택받은 답변', current: acceptedAnswerCount, target: 15, unit: '개', completed: acceptedAnswerCount >= 15 }
       ],
       unlocked: acceptedAnswerCount >= 15,
       desc: '15개 이상의 답변이 친구들에게 채택된 신뢰받는 길잡이입니다.'
@@ -400,7 +400,7 @@ export function buildAgoraBadges(userData = {}) {
       category: 'agora',
       requirements: [
         { key: 'answer', label: '답변한 질문', current: answeredQuestionCount, target: 20, unit: '개', completed: answeredQuestionCount >= 20 },
-        { key: 'accepted', label: '채택 답변', current: acceptedAnswerCount, target: 5, unit: '개', completed: acceptedAnswerCount >= 5 },
+        { key: 'accepted', label: '채택받은 답변', current: acceptedAnswerCount, target: 5, unit: '개', completed: acceptedAnswerCount >= 5 },
         { key: 'level', label: '탐사 등급', current: explorerLvl, target: 5, unit: 'Lv.', prefix: 'Lv.', completed: explorerLvl >= 5 }
       ],
       unlocked: answeredQuestionCount >= 20 && acceptedAnswerCount >= 5 && explorerLvl >= 5,
@@ -413,7 +413,7 @@ export function buildAgoraBadges(userData = {}) {
       category: 'agora',
       requirements: [
         { key: 'answer', label: '답변한 질문', current: answeredQuestionCount, target: 50, unit: '개', completed: answeredQuestionCount >= 50 },
-        { key: 'accepted', label: '채택 답변', current: acceptedAnswerCount, target: 15, unit: '개', completed: acceptedAnswerCount >= 15 },
+        { key: 'accepted', label: '채택받은 답변', current: acceptedAnswerCount, target: 15, unit: '개', completed: acceptedAnswerCount >= 15 },
         { key: 'level', label: '탐사 등급', current: explorerLvl, target: 7, unit: 'Lv.', prefix: 'Lv.', completed: explorerLvl >= 7 }
       ],
       unlocked: answeredQuestionCount >= 50 && acceptedAnswerCount >= 15 && explorerLvl >= 7,
@@ -438,7 +438,7 @@ export function buildAgoraBadges(userData = {}) {
       icon: '📜',
       category: 'agora',
       requirements: [
-        { key: 'accepted', label: '채택 답변', current: acceptedAnswerCount, target: 50, unit: '개', completed: acceptedAnswerCount >= 50 }
+        { key: 'accepted', label: '채택받은 답변', current: acceptedAnswerCount, target: 50, unit: '개', completed: acceptedAnswerCount >= 50 }
       ],
       unlocked: acceptedAnswerCount >= 50,
       desc: '50개의 답변이 채택된 아고라의 위대한 현자입니다.'
@@ -450,7 +450,7 @@ export function buildAgoraBadges(userData = {}) {
       category: 'agora',
       requirements: [
         { key: 'answer', label: '답변한 질문', current: answeredQuestionCount, target: 100, unit: '개', completed: answeredQuestionCount >= 100 },
-        { key: 'accepted', label: '채택 답변', current: acceptedAnswerCount, target: 50, unit: '개', completed: acceptedAnswerCount >= 50 },
+        { key: 'accepted', label: '채택받은 답변', current: acceptedAnswerCount, target: 50, unit: '개', completed: acceptedAnswerCount >= 50 },
         { key: 'level', label: '탐사 등급', current: explorerLvl, target: 11, unit: 'Lv.', prefix: 'Lv.', completed: explorerLvl >= 11 }
       ],
       unlocked: answeredQuestionCount >= 100 && acceptedAnswerCount >= 50 && explorerLvl >= 11,
