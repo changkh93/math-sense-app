@@ -1,8 +1,9 @@
 const BASE_WORLD = Object.freeze({
   width: 8,
   height: 5,
+  scene: 'data',
   rover: { x: 1, y: 2, direction: 0, energy: 100, awake: true },
-  target: { x: 6, y: 2, kind: 'beacon' },
+  target: false,
   obstacles: [],
   objects: [],
   data: {
@@ -70,7 +71,7 @@ function dataMission({
       ...BASE_WORLD,
       ...world,
       rover: { ...BASE_WORLD.rover, ...(world.rover || {}) },
-      target: { ...BASE_WORLD.target, ...(world.target || {}) },
+      target: world.target !== undefined ? world.target : BASE_WORLD.target,
       data: { ...BASE_WORLD.data, ...(world.data || {}) },
     },
     goals,
@@ -392,7 +393,7 @@ export const LUMI_DATA_CORE_MISSIONS = [
       'print(target_pos) 로 저장된 좌표 쌍을 출력합니다.',
     ],
     world: {
-      target: { x: 4, y: 2 },
+      target: { x: 4, y: 2, kind: 'sos', label: '좌표 비콘' },
     },
     goals: [
       { type: 'variableTupleEquals', name: 'target_pos', value: [4, 2], label: '좌표 튜플 (4, 2) 저장' },

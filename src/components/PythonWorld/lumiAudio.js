@@ -581,6 +581,71 @@ export function playLumiSound(soundType, options = {}) {
       break
     }
 
+    case 'condition_true': {
+      // Crisp rising confirmation chime
+      const osc = ctx.createOscillator()
+      const gain = ctx.createGain()
+      osc.type = 'sine'
+      osc.frequency.setValueAtTime(880, now)
+      osc.frequency.exponentialRampToValueAtTime(1320, now + 0.12)
+      gain.gain.setValueAtTime(0.14, now)
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.18)
+      osc.connect(gain)
+      gain.connect(sfxBus)
+      osc.start(now)
+      osc.stop(now + 0.2)
+      break
+    }
+
+    case 'condition_false': {
+      // Subtle dry tick
+      const osc = ctx.createOscillator()
+      const gain = ctx.createGain()
+      osc.type = 'triangle'
+      osc.frequency.setValueAtTime(320, now)
+      osc.frequency.exponentialRampToValueAtTime(200, now + 0.08)
+      gain.gain.setValueAtTime(0.1, now)
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.1)
+      osc.connect(gain)
+      gain.connect(sfxBus)
+      osc.start(now)
+      osc.stop(now + 0.11)
+      break
+    }
+
+    case 'charge': {
+      // Electrical power surge / capacitor charge
+      const osc = ctx.createOscillator()
+      const gain = ctx.createGain()
+      osc.type = 'sawtooth'
+      osc.frequency.setValueAtTime(180, now)
+      osc.frequency.exponentialRampToValueAtTime(880, now + 0.35)
+      gain.gain.setValueAtTime(0.01, now)
+      gain.gain.linearRampToValueAtTime(0.18, now + 0.08)
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.4)
+      osc.connect(gain)
+      gain.connect(sfxBus)
+      osc.start(now)
+      osc.stop(now + 0.42)
+      break
+    }
+
+    case 'barrier_unlock': {
+      // Mechanical lock unlock and glass shimmer
+      const osc = ctx.createOscillator()
+      const gain = ctx.createGain()
+      osc.type = 'sine'
+      osc.frequency.setValueAtTime(520, now)
+      osc.frequency.exponentialRampToValueAtTime(1040, now + 0.15)
+      gain.gain.setValueAtTime(0.16, now)
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.25)
+      osc.connect(gain)
+      gain.connect(sfxBus)
+      osc.start(now)
+      osc.stop(now + 0.28)
+      break
+    }
+
     case 'pulse':
     case 'laser': {
       // Rapid downward laser chirp

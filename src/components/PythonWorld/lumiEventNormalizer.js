@@ -172,6 +172,29 @@ export function normalizeRuntimeEvents(rawEvents = []) {
     } else if (raw.type === 'enemy_purified') {
       type = 'enemy_purified'
       payload = { enemy: raw.enemy, rover: raw.end }
+    } else if (raw.type === 'condition_evaluated') {
+      type = 'condition_evaluated'
+      payload = {
+        expression: raw.expression ?? raw.payload?.expression,
+        result: Boolean(raw.result ?? raw.payload?.result),
+        left: raw.left ?? raw.payload?.left,
+        operator: raw.operator ?? raw.payload?.operator,
+        right: raw.right ?? raw.payload?.right,
+      }
+    } else if (raw.type === 'energy_changed') {
+      type = 'energy_changed'
+      payload = {
+        entityId: raw.entityId ?? raw.payload?.entityId ?? 'lumi',
+        fromEnergy: raw.fromEnergy ?? raw.payload?.fromEnergy,
+        toEnergy: raw.toEnergy ?? raw.payload?.toEnergy,
+        reason: raw.reason ?? raw.payload?.reason ?? 'charge',
+      }
+    } else if (raw.type === 'barrier_changed') {
+      type = 'barrier_changed'
+      payload = {
+        id: raw.id ?? raw.payload?.id ?? 'active_gate',
+        state: raw.state ?? raw.payload?.state ?? 'disabled',
+      }
     } else if (raw.payload && typeof raw.payload === 'object') {
       type = raw.type
       payload = { ...raw.payload }

@@ -1785,3 +1785,173 @@
   border-radius: 6px;
   border-left: 3px solid #818cf8;
 }
+
+/* ==========================================
+   Live Condition Evaluation Badge
+   ========================================== */
+.python-world__condition-badge {
+  position: absolute;
+  top: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 18px;
+  border-radius: 20px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.82rem;
+  font-weight: 700;
+  z-index: 15;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.7);
+  animation: conditionPop 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  pointer-events: none;
+}
+@keyframes conditionPop {
+  0% { transform: translateX(-50%) scale(0.8); opacity: 0; }
+  100% { transform: translateX(-50%) scale(1); opacity: 1; }
+}
+.python-world__condition-badge.is-true {
+  background: rgba(6, 78, 59, 0.95);
+  border: 1.5px solid #34d399;
+  color: #a7f3d0;
+  box-shadow: 0 0 16px rgba(52, 211, 153, 0.4);
+}
+.python-world__condition-badge.is-false {
+  background: rgba(69, 10, 10, 0.95);
+  border: 1.5px solid #f87171;
+  color: #fecaca;
+  box-shadow: 0 0 16px rgba(248, 113, 113, 0.4);
+}
+.python-world__condition-icon {
+  font-size: 0.9rem;
+  letter-spacing: 0.05em;
+}
+.python-world__condition-expr code {
+  color: #ffffff;
+  background: rgba(0, 0, 0, 0.3);
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+/* ==========================================
+   Charging Station Pad
+   ========================================== */
+.python-world__station-pad {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 58px;
+  height: 58px;
+  border-radius: 12px;
+  background: rgba(14, 116, 144, 0.25);
+  border: 1.5px dashed #06b6d4;
+  box-shadow: 0 0 12px rgba(6, 182, 212, 0.3);
+  transition: all 0.3s ease;
+  pointer-events: none;
+  z-index: 2;
+}
+.python-world__station-pad.is-active {
+  background: rgba(14, 116, 144, 0.5);
+  border: 2px solid #22d3ee;
+  box-shadow: 0 0 24px rgba(34, 211, 238, 0.7);
+}
+.python-world__station-icon {
+  font-size: 1.4rem;
+  filter: drop-shadow(0 0 8px #22d3ee);
+  animation: stationPulse 2s infinite ease-in-out;
+}
+@keyframes stationPulse {
+  0%, 100% { transform: scale(1); opacity: 0.9; }
+  50% { transform: scale(1.15); opacity: 1; }
+}
+.python-world__station-label {
+  font-size: 0.62rem;
+  font-weight: 800;
+  color: #67e8f9;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  margin-top: 1px;
+}
+
+/* ==========================================
+   Laser Energy Barriers
+   ========================================== */
+.python-world__barrier {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 4;
+  pointer-events: none;
+  transition: all 0.4s ease;
+}
+.python-world__barrier.is-column {
+  transform: translateX(-50%);
+  width: 8px;
+}
+.python-world__barrier-laser {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+  border-radius: 2px;
+  transition: all 0.4s ease;
+}
+.python-world__barrier.is-active .python-world__barrier-laser {
+  background: #f43f5e;
+  box-shadow: 0 0 16px #f43f5e, 0 0 32px #e11d48;
+}
+.python-world__barrier.is-disabled .python-world__barrier-laser {
+  background: #10b981;
+  opacity: 0.2;
+  box-shadow: 0 0 8px #10b981;
+}
+.python-world__barrier-tag {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%) rotate(-90deg);
+  white-space: nowrap;
+  font-size: 0.65rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  padding: 2px 8px;
+  border-radius: 4px;
+  transition: all 0.4s ease;
+}
+.python-world__barrier.is-active .python-world__barrier-tag {
+  color: #ffe4e6;
+  background: rgba(159, 18, 57, 0.85);
+  border: 1px solid #f43f5e;
+}
+.python-world__barrier.is-disabled .python-world__barrier-tag {
+  color: #a7f3d0;
+  background: rgba(6, 78, 59, 0.7);
+  border: 1px solid #10b981;
+}
+
+/* ==========================================
+   Semantic Contextual Targets
+   ========================================== */
+.python-world__beacon--sos .python-world__beacon-core {
+  background: radial-gradient(circle, #fbbf24 0%, #d97706 100%);
+  box-shadow: 0 0 18px #f59e0b;
+}
+.python-world__beacon--station .python-world__beacon-core {
+  background: radial-gradient(circle, #38bdf8 0%, #0284c7 100%);
+  box-shadow: 0 0 18px #0ea5e9;
+}
+.python-world__beacon--gate .python-world__beacon-core {
+  background: radial-gradient(circle, #a855f7 0%, #7e22ce 100%);
+  box-shadow: 0 0 18px #9333ea;
+}
+.python-world__beacon--crystal .python-world__beacon-core {
+  background: radial-gradient(circle, #34d399 0%, #059669 100%);
+  box-shadow: 0 0 18px #10b981;
+}
+

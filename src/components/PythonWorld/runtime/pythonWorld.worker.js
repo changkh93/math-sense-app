@@ -295,6 +295,27 @@ def _analyze(tree, code=""):
     return sorted(concepts), sorted(calls), violations, classes_metadata
 
 
+class _ConditionTransformer(ast.NodeTransformer):
+    def visit_If(self, node):
+        self.generic_visit(node)
+        expr_str = "condition"
+        try:
+            expr_str = ast.unparse(node.test)
+        except Exception:
+            pass
+        wrapped = ast.Call(
+            func=ast.Name(id="_trace_condition", ctx=ast.Load()),
+            args=[
+                node.test,
+                ast.Constant(value=getattr(node, "lineno", 1)),
+                ast.Constant(value=expr_str)
+            ],
+            keywords=[]
+        )
+        node.test = wrapped
+        return node
+
+
 def _run_mission(payload_json, code):
     mission = json.loads(payload_json)
     world_config = mission.get("world") or {}
@@ -680,6 +701,7 @@ def _run_mission(payload_json, code):
                 raise ValueError("충전소 위치에서 charge()를 사용해 주세요.")
             before = state.rover["energy"]
             state.rover["energy"] = state.max_energy
+            emit("energy_changed", entityId="lumi", fromEnergy=before, toEnergy=state.max_energy, reason="charge")
             emit("world", action="charge", before=before, end=dict(state.rover))
             return state.rover["energy"]
 
@@ -691,6 +713,7 @@ def _run_mission(payload_json, code):
             state.rover["shield"] = True
             state.incoming_pulse = False
             emit("shield_raised", energy=state.rover["energy"], incomingPulse=False, end=dict(state.rover))
+            emit("barrier_changed", id="active_gate", state="disabled")
             return True
 
         def dodge(self, direction="left"):
@@ -1102,6 +1125,17 @@ def _run_mission(payload_json, code):
             "type": safe_type,
             "zip": zip,
         }
+
+        def _trace_condition(val, line_no, expr_str):
+            emit(
+                "condition_evaluated",
+                expression=str(expr_str)[:120],
+                result=bool(val),
+                sourceLine=int(line_no)
+            )
+            return val
+
+        allowed_builtins["_trace_condition"] = _trace_condition
         is_act_0 = mission.get("actId") == "act-0-awakening" or str(mission.get("id", "")).startswith("lumi-vs-")
         auto_import = bool(mission.get("scaffold", {}).get("autoImport", is_act_0))
 
@@ -1253,6 +1287,13 @@ def _run_mission(payload_json, code):
                 )
 
             return trace_student
+
+        try:
+            transformer = _ConditionTransformer()
+            tree = transformer.visit(tree)
+            ast.fix_missing_locations(tree)
+        except Exception:
+            pass
 
         compiled = compile(tree, "<student>", "exec")
         with contextlib.redirect_stdout(stdout):

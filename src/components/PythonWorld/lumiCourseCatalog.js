@@ -1053,10 +1053,11 @@ export const ACT_2_MISSIONS = [
 # 다음 줄에서 그 변수를 HUD의 왼쪽 위에 표시하세요.
 `,
     world: {
+      scene: 'workbench',
       width: 7,
       height: 5,
       rover: { x: 2, y: 2, direction: 0, energy: 100, awake: true },
-      target: { x: 5, y: 2, kind: 'beacon' },
+      target: false,
       obstacles: [],
     },
     goals: [
@@ -1119,10 +1120,11 @@ export const ACT_2_MISSIONS = [
 # 마지막 줄에서 같은 변수의 값을 화면 아래에 표시하세요.
 `,
     world: {
+      scene: 'workbench',
       width: 7,
       height: 5,
       rover: { x: 2, y: 2, direction: 0, energy: 100, awake: true },
-      target: { x: 5, y: 2, kind: 'beacon' },
+      target: false,
       obstacles: [],
     },
     goals: [
@@ -1186,10 +1188,11 @@ export const ACT_2_MISSIONS = [
 # 마지막 줄에서 갱신된 shield를 최댓값 5인 HUD 바로 표시하세요.
 `,
     world: {
+      scene: 'workbench',
       width: 7,
       height: 5,
       rover: { x: 2, y: 2, direction: 0, energy: 100, awake: true },
-      target: { x: 5, y: 2, kind: 'beacon' },
+      target: false,
       obstacles: [],
     },
     goals: [

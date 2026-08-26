@@ -356,7 +356,20 @@ export default function PythonMissionLab({ unit, missionSet, initialMissionIndex
           playLumiSound('collect')
           break
         case 'rover_charged':
+        case 'energy_changed':
           playLumiSound('charge')
+          break
+        case 'condition_evaluated':
+          if (event.payload?.result) {
+            playLumiSound('condition_true')
+          } else {
+            playLumiSound('condition_false')
+          }
+          break
+        case 'barrier_changed':
+          if (event.payload?.state === 'disabled') {
+            playLumiSound('barrier_unlock')
+          }
           break
         case 'memory_changed':
           playLumiSound('memory')

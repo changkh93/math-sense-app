@@ -38,7 +38,10 @@ export default function PythonWorldCanvas({
   const width = Math.max(1, Number(worldState.width) || 8)
   const height = Math.max(1, Number(worldState.height) || 5)
   const rover = worldState.rover || { x: 0, y: 0, direction: 0, energy: 100, awake: true }
-  const target = worldState.target || { x: width - 1, y: Math.floor(height / 2), kind: 'beacon' }
+  const target = worldState.target
+  const stations = worldState.stations || []
+  const barriers = worldState.barriers || []
+  const activeCondition = worldState.activeCondition
   const obstacles = worldState.obstacles || []
   const objects = (worldState.objects || []).filter((item) => !item.collected)
   const isAwake = Boolean(rover.awake)
@@ -57,6 +60,17 @@ export default function PythonWorldCanvas({
   return (
     <section className={`python-world ${!isAwake ? 'is-dark-awakening' : ''} ${result?.cleared ? 'is-mission-cleared' : ''}`} aria-label="루미 미션 월드">
       <div className="python-world__sky" />
+
+      {/* Live Condition Evaluation Banner */}
+      {activeCondition && (
+        <div className={`python-world__condition-badge ${activeCondition.result ? 'is-true' : 'is-false'}`}>
+          <span className="python-world__condition-icon">{activeCondition.result ? '⚡ TRUE ✓' : '⚠ FALSE ✗'}</span>
+          <span className="python-world__condition-expr">
+            {activeCondition.sourceLine ? `Line ${activeCondition.sourceLine}: ` : ''}
+            <code>{activeCondition.expression}</code>
+          </span>
+        </div>
+      )}
 
       {/* Drone Assembly Header for Object Missions */}
       {isObjectMission && (
@@ -104,6 +118,40 @@ export default function PythonWorldCanvas({
         className="python-world__grid"
         style={{ '--grid-columns': width, '--grid-rows': height }}
       >
+        {/* Charging Stations Layer */}
+        {stations.map((st, sIdx) => {
+          const isLumiOnStation = rover.x === st.x && rover.y === st.y
+          return (
+            <div
+              key={st.id || `st-${sIdx}`}
+              className={`python-world__station-pad ${isLumiOnStation ? 'is-active' : ''}`}
+              style={cellStyle(st.x, st.y)}
+              title={st.label || '충전소'}
+            >
+              <div className="python-world__station-glow" />
+              <span className="python-world__station-icon">⚡</span>
+              <span className="python-world__station-label">{st.label || '충전소'}</span>
+            </div>
+          )
+        })}
+
+        {/* Laser Barriers Layer */}
+        {barriers.map((barrier, bIdx) => {
+          const isDisabled = barrier.state === 'disabled'
+          const isFullColumn = barrier.y === null || barrier.y === undefined
+          return (
+            <div
+              key={barrier.id || `barrier-${bIdx}`}
+              className={`python-world__barrier ${isDisabled ? 'is-disabled' : 'is-active'} ${isFullColumn ? 'is-column' : ''}`}
+              style={isFullColumn ? { left: `${((barrier.x + 0.5) / width) * 100}%`, top: '0', height: '100%' } : cellStyle(barrier.x, barrier.y)}
+              title={barrier.label || '에너지 장벽'}
+            >
+              <div className="python-world__barrier-laser" />
+              <span className="python-world__barrier-tag">{isDisabled ? '✓ PASSAGE OPEN' : (barrier.label || '║ 에너지 장벽 ║')}</span>
+            </div>
+          )
+        })}
+
         {obstacles.map((obstacle, index) => (
           <div
             className="python-world__obstacle"
@@ -134,10 +182,16 @@ export default function PythonWorldCanvas({
             {item.kind === 'charge' ? '⚡' : item.kind === 'sample' ? '◆' : '◈'}
           </div>
         ))}
-        {!isObjectMission && (
-          <div className="python-world__beacon" style={cellStyle(target.x, target.y)}>
-            <span className="python-world__beacon-core" />
-            <span className="python-world__beacon-label">TARGET</span>
+
+        {/* Semantic Contextual Target (Only if defined and visible) */}
+        {!isObjectMission && target && target.visible !== false && (
+          <div className={`python-world__beacon python-world__beacon--${target.kind || 'beacon'}`} style={cellStyle(target.x, target.y)}>
+            <span className="python-world__beacon-core">
+              {target.kind === 'sos' ? '📡' : target.kind === 'station' ? '⚡' : target.kind === 'gate' ? '🚪' : target.kind === 'crystal' ? '💎' : ''}
+            </span>
+            <span className="python-world__beacon-label">
+              {target.label || (target.kind === 'sos' ? 'SOS' : target.kind === 'station' ? 'STATION' : target.kind === 'gate' ? 'GATE' : target.kind === 'crystal' ? 'CRYSTAL' : 'TARGET')}
+            </span>
             {activeSensor !== undefined && (
               <span className="python-world__sensor-badge">{activeSensor} STEPS</span>
             )}

@@ -63,7 +63,7 @@ function decisionMission({
       ...BASE_WORLD,
       ...world,
       rover: { ...BASE_WORLD.rover, ...(world.rover || {}) },
-      target: { ...BASE_WORLD.target, ...(world.target || {}) },
+      target: world.target !== undefined ? world.target : BASE_WORLD.target,
     },
     goals,
     conceptEvidence: { mustUse, mustCall },
@@ -89,7 +89,11 @@ export const LUMI_DECISION_CORE_MISSIONS = [
       '조건문 아래에 네 칸 들여써서 lumi.charge()를 실행합니다.',
     ],
     world: {
+      scene: 'station',
+      target: false,
       rover: { x: 1, y: 2, direction: 0, energy: 12, maxEnergy: 100 },
+      stations: [{ id: 'station_dock', x: 1, y: 2, label: '파워 스테이션' }],
+      barriers: [{ id: 'gate-01', x: 4, label: '30% 미만 통제선', state: 'active' }],
       objects: [{ id: 'station', kind: 'charge', x: 1, y: 2 }],
     },
     goals: [
@@ -98,8 +102,9 @@ export const LUMI_DECISION_CORE_MISSIONS = [
     mustUse: ['if', 'comparison'],
     mustCall: ['lumi.charge'],
     hints: [
-      { level: 1, type: 'context', text: '에너지는 `lumi.energy`로 확인합니다.' },
-      { level: 2, type: 'concept', text: '`if lumi.energy < 30:` 작성 후 들여써서 `lumi.charge()`를 호출하세요.' },
+      { level: 1, type: 'context', text: '에너지가 부족할 때(30 미만)만 충전소를 가동하여 에너지를 보충해야 합니다.' },
+      { level: 2, type: 'concept', text: '어떤 조건이 참일 때만 실행하려면 `if 조건:` 문법을 사용합니다.' },
+      { level: 3, type: 'code', text: 'if lumi.energy < 30:\n    lumi.charge()' },
     ],
     hiddenVariants: [
       {
@@ -126,17 +131,20 @@ export const LUMI_DECISION_CORE_MISSIONS = [
       'else: 에서는 lumi.say("대기")로 관제소에 대기 신호를 전송합니다.',
     ],
     world: {
+      scene: 'gate',
       pathClear: true,
       rover: { x: 1, y: 2, direction: 0, energy: 100 },
-      target: { x: 6, y: 2 },
+      target: { x: 6, y: 2, kind: 'sos', label: 'SOS 기지' },
+      barriers: [{ id: 'gate-01', x: 4, label: '항로 관문', state: 'disabled' }],
     },
     goals: [
       { type: 'position', x: 6, y: 2, label: '열린 항로에서 비콘 도착' },
     ],
     mustUse: ['if', 'else'],
     hints: [
-      { level: 1, type: 'context', text: '`if world.path_clear:` 다음 줄에 전진, `else:` 다음 줄에 대기를 작성합니다.' },
-      { level: 2, type: 'concept', text: 'if와 else 아래의 실행 명령은 각각 네 칸씩 들여써야 합니다.' },
+      { level: 1, type: 'context', text: '항로가 열려 있을 때(world.path_clear)와 닫혀 있을 때 각각 다른 행동을 취해야 합니다.' },
+      { level: 2, type: 'concept', text: '`if 조건:`과 `else:`를 사용하여 두 갈래 분기를 만듭니다.' },
+      { level: 3, type: 'code', text: 'if world.path_clear:\n    lumi.move(world.target_distance)\nelse:\n    lumi.say("대기")' },
     ],
     hiddenVariants: [
       {
@@ -167,8 +175,10 @@ export const LUMI_DECISION_CORE_MISSIONS = [
       'else: 일 때 lumi.move(1) 로 전진합니다.',
     ],
     world: {
+      scene: 'gate',
+      rover: { x: 1, y: 2, direction: 0, energy: 100 },
       obstacles: [{ x: 3, y: 2 }], // dist = 2
-      target: { x: 7, y: 2 },
+      target: { x: 7, y: 2, kind: 'sos', label: '탐사 비콘' },
     },
     goals: [
       { type: 'shieldActive', label: '근접 위협(거리 2)에서 보호막 가동' },
@@ -176,8 +186,9 @@ export const LUMI_DECISION_CORE_MISSIONS = [
     mustUse: ['if', 'elif', 'else', 'comparison'],
     mustCall: ['world.obstacle_ahead_distance'],
     hints: [
-      { level: 1, type: 'context', text: '`if dist <= 2:`, `elif dist <= 4:`, `else:` 순서로 작성합니다.' },
-      { level: 2, type: 'concept', text: '각 조건 블록 안에서 요구된 동작(shield, dodge, move)을 호출하세요.' },
+      { level: 1, type: 'context', text: '전방 위협 거리(dist)에 따라 2 이하, 4 이하, 그 외 3단계로 대응해야 합니다.' },
+      { level: 2, type: 'concept', text: '3단계 이상 조건을 검사할 때는 `if`, `elif`, `else`를 순서대로 사용합니다.' },
+      { level: 3, type: 'code', text: 'dist = world.obstacle_ahead_distance\nif dist <= 2:\n    lumi.shield()\nelif dist <= 4:\n    lumi.dodge()\nelse:\n    lumi.move(1)' },
     ],
     hiddenVariants: [
       {
@@ -213,8 +224,9 @@ export const LUMI_DECISION_CORE_MISSIONS = [
       'lumi.move(world.target_distance)로 비콘에 도착합니다.',
     ],
     world: {
+      scene: 'nav',
       rover: { x: 6, y: 2, direction: 0, energy: 100 },
-      target: { x: 2, y: 2 },
+      target: { x: 2, y: 2, kind: 'sos', label: '후방 통신탑' },
     },
     goals: [
       { type: 'position', x: 2, y: 2, label: '왼쪽 비콘으로 안전하게 도착' },
@@ -223,8 +235,9 @@ export const LUMI_DECISION_CORE_MISSIONS = [
     mustUse: ['if', 'comparison'],
     mustCall: ['lumi.turn', 'lumi.move'],
     hints: [
-      { level: 1, type: 'context', text: '루미보다 목표의 x좌표가 작으면 뒤쪽에 있는 것입니다.' },
-      { level: 2, type: 'concept', text: '`if target_x < lumi.x:` 안에서 180도 회전하세요.' },
+      { level: 1, type: 'context', text: '비콘의 x좌표가 루미의 현재 위치보다 작다면(왼쪽), 선회 후 이동해야 합니다.' },
+      { level: 2, type: 'concept', text: '`target_x < lumi.x` 조건으로 목표가 뒤쪽에 있는지 판단합니다.' },
+      { level: 3, type: 'code', text: 'target_x = world.snapshot()["target"]["x"]\nif target_x < lumi.x:\n    lumi.turn(180)\nlumi.move(world.target_distance)' },
     ],
     hiddenVariants: [
       {
@@ -254,8 +267,9 @@ export const LUMI_DECISION_CORE_MISSIONS = [
       '조건이 참이면 lumi.move(distance)로 이동합니다.',
     ],
     world: {
+      scene: 'nav',
       rover: { x: 1, y: 2, direction: 0, energy: 100 },
-      target: { x: 6, y: 2 },
+      target: { x: 6, y: 2, kind: 'beacon', label: '목표 지점' },
     },
     goals: [
       { type: 'position', x: 6, y: 2, label: '복합 안전 조건을 통과하여 비콘 도착' },
@@ -263,8 +277,9 @@ export const LUMI_DECISION_CORE_MISSIONS = [
     mustUse: ['if', 'comparison', 'boolean'],
     mustCall: ['lumi.move'],
     hints: [
-      { level: 1, type: 'context', text: '`and`는 둘 다 참일 때, `or`는 둘 중 하나만 참이어도 참입니다.' },
-      { level: 2, type: 'concept', text: '`if (lumi.energy >= distance and distance <= 6) or world.emergency:` 를 완성하세요.' },
+      { level: 1, type: 'context', text: '에너지와 거리가 모두 안전하거나, 비상 신호가 발생했을 때 출발해야 합니다.' },
+      { level: 2, type: 'concept', text: '둘 다 만족할 때는 `and`, 하나라도 만족할 때는 `or` 연산자를 사용합니다.' },
+      { level: 3, type: 'code', text: 'dist = world.target_distance\nif (lumi.energy >= dist and dist <= 6) or world.emergency:\n    lumi.move(dist)' },
     ],
     hiddenVariants: [
       {
@@ -297,13 +312,15 @@ export const LUMI_DECISION_CORE_MISSIONS = [
       'lumi.move(world.target_distance)로 비콘에 도착합니다.',
     ],
     world: {
+      scene: 'station',
       rover: { x: 1, y: 2, direction: 0, energy: 10, maxEnergy: 100 },
       incomingPulse: true,
+      stations: [{ id: 'station_dock', x: 1, y: 2, label: '급속 충전소' }],
       objects: [
         { id: 'station', kind: 'charge', x: 1, y: 2 },
         { id: 'priority', kind: 'signal', x: 1, y: 2, strength: 8 },
       ],
-      target: { x: 6, y: 2 },
+      target: { x: 6, y: 2, kind: 'sos', label: '비상 탈출 비콘' },
     },
     goals: [
       { type: 'shieldActive', label: '적 펄스 방어막 가동' },
@@ -313,8 +330,9 @@ export const LUMI_DECISION_CORE_MISSIONS = [
     mustUse: ['if', 'comparison'],
     mustCall: ['lumi.charge', 'lumi.shield', 'lumi.move'],
     hints: [
-      { level: 1, type: 'context', text: '1. 충전 여부 판단 -> 2. 펄스 방어 -> 3. 신호 수집 -> 4. 이동 순서로 작성합니다.' },
-      { level: 2, type: 'concept', text: '각 단계마다 조건문을 작성해 상황에 맞게 실행되도록 하세요.' },
+      { level: 1, type: 'context', text: '에너지 충전(20 미만), 적 펄스 방어, 강한 신호 수집을 순서대로 판단해야 합니다.' },
+      { level: 2, type: 'concept', text: '각 단계마다 독립된 if 조건문을 작성해 필요한 행동만 순차 실행되도록 합니다.' },
+      { level: 3, type: 'code', text: 'if lumi.energy < 20:\n    lumi.charge()\nif world.incoming_pulse:\n    lumi.shield()\nfor item in lumi.scan():\n    if item.strength >= 5:\n        lumi.collect(item)\nlumi.move(world.target_distance)' },
     ],
     hiddenVariants: [
       {

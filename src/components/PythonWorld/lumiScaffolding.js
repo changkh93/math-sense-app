@@ -17,6 +17,16 @@ const API_REFERENCE = Object.freeze([
     detail: 'LUMI에게 명령을 내리기 전에 항상 맨 첫 줄에 작성합니다.',
   },
   {
+    signature: 'from msense import lumi, world', token: 'from msense import lumi, world',
+    description: '탐사 로봇(lumi)과 환경 관측 센서(world)를 불러옵니다.',
+    detail: '비콘 거리, 장애물 등 외부 환경을 감지하고 로봇을 제어하기 위해 맨 첫 줄에 작성합니다.',
+  },
+  {
+    signature: 'from msense import world', token: 'from msense import world',
+    description: '환경 및 관제 데이터(world)를 불러옵니다.',
+    detail: '신호 목록, 데이터 패킷, 상태 사전 등 관제 센터의 데이터를 분석할 때 사용합니다.',
+  },
+  {
     signature: 'from msense import game', token: 'from msense import game',
     description: 'LUMI의 학습용 게임 도구를 현재 Python 파일에서 사용할 수 있게 준비합니다.',
     detail: '실제 pygame을 불러오는 import pygame과는 다른 교육용 API입니다. 게임 제작의 개념과 실행 순서를 먼저 안전하게 연습합니다.',
@@ -244,6 +254,7 @@ const API_REFERENCE = Object.freeze([
 ])
 
 const CONCEPT_REFERENCE = Object.freeze([
+  { match: /world|센서|환경 관측/i, title: 'world는 탐사선 외부 환경의 정보를 담은 센서 모듈입니다', body: '탐사 로봇 lumi가 위치한 외부 세계의 비콘 거리(world.steps_to_target), 장애물 거리, 항로 안전(world.path_clear) 등의 실시간 센서 데이터를 제공합니다. 파이썬에서는 from msense import lumi, world (또는 from msense import world)로 불러와 사용합니다.' },
   { match: /input\s*\(|관제 입력|형 변환|\bint\s*\(/i, title: 'input()의 결과는 언제나 문자열입니다', body: '관제 패널에서 4를 보내도 Python은 "4"라는 str로 받습니다. 이동 칸 수처럼 숫자 계산에 쓰려면 int()로 정수로 바꾼 뒤 변수에 저장하세요.' },
   { match: /f-string|f문자열|f-문자열|\bf["']/i, title: 'f-string은 문자열 안에 변수 값을 넣습니다', body: '문자열 앞에 f를 붙이고 중괄호 안에 변수 이름을 씁니다. 예를 들어 변수의 현재 값이 문장 속에 들어가며 원래 변수는 바뀌지 않습니다.' },
   { match: /split|join|패킷/i, title: 'split()과 join()은 문자열과 리스트를 오갑니다', body: 'split()은 긴 문자열을 구분자로 잘라 리스트를 만들고, join()은 문자열 리스트의 항목 사이에 구분자를 넣어 한 문자열로 합칩니다.' },

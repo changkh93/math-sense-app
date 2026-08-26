@@ -8,6 +8,7 @@ const BASE_WORLD = Object.freeze({
 })
 
 const AUTOMATION_API = Object.freeze([
+  { signature: 'from msense import lumi, world', description: '탐사 로봇과 환경 센서를 불러옵니다.' },
   { signature: 'range(count)', description: '0부터 count 직전까지 반복에 사용할 숫자 흐름을 만듭니다.' },
   { signature: 'world.steps_to_target', description: '목표까지 필요한 현재 이동 칸 수를 읽습니다.' },
   { signature: 'world.survey_rows / world.survey_columns', description: '조사해야 할 격자의 행과 열 수를 읽습니다.' },
@@ -40,7 +41,8 @@ function automationMission({
       '# [ACT 5 · AUTOMATION CORE 자동화 지시서]',
       `# 임무: ${title}`,
       `# 이번에 사용할 개념: ${concepts.join(' · ')}`,
-      '# 아래 빈 줄부터 반복 구조를 직접 작성하세요.',
+      '# 1. 필요한 경우 from msense import lumi (또는 world)를 작성하세요.',
+      '# 2. 아래 빈 줄부터 반복 구조를 직접 작성하세요.',
       '',
     ].join('\n'),
     learningSteps,

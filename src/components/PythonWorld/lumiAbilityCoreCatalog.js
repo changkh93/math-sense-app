@@ -61,7 +61,7 @@ function abilityMission({
       ...BASE_WORLD,
       ...world,
       rover: { ...BASE_WORLD.rover, ...(world.rover || {}) },
-      target: { ...BASE_WORLD.target, ...(world.target || {}) },
+      target: world.target !== undefined ? world.target : BASE_WORLD.target,
     },
     goals,
     conceptEvidence: { mustUse, mustCall },
@@ -147,7 +147,7 @@ export const LUMI_ABILITY_CORE_MISSIONS = [
       'if is_safe(): 조건문으로 함수의 반환값을 확인합니다.',
       '참이면 print("SAFE")를 실행합니다.',
     ],
-    world: { target: { x: 1, y: 2 }, rover: { energy: 80 } },
+    world: { target: false, rover: { energy: 80 } },
     goals: [
       { type: 'stdoutIncludes', value: 'SAFE', label: '판단 결과 SAFE 출력' },
       { type: 'functionCalled', name: 'is_safe', label: 'is_safe 함수 호출 확인' },
@@ -182,7 +182,7 @@ export const LUMI_ABILITY_CORE_MISSIONS = [
       'for sig in lumi.scan(): 루프로 모든 신호에 대해 rescue(sig) 를 호출합니다.',
     ],
     world: {
-      target: { x: 1, y: 2 },
+      target: false,
       objects: [
         { id: 'low', kind: 'signal', x: 1, y: 2, priority: 1 },
         { id: 'high', kind: 'signal', x: 1, y: 2, priority: 4 },
@@ -227,7 +227,7 @@ export const LUMI_ABILITY_CORE_MISSIONS = [
       'total_power = calc_shield() 로 전역 변수에 반환값을 저장합니다.',
       'print(total_power) 로 전역에 저장된 총 파워를 출력합니다.',
     ],
-    world: { target: { x: 1, y: 2 } },
+    world: { target: false },
     goals: [
       { type: 'variableValueEquals', name: 'total_power', value: 10, label: '전역 total_power 10 저장' },
       { type: 'localVariableObserved', name: 'local_bonus', functionName: 'calc_shield', label: 'calc_shield 함수 안에서 local_bonus 지역 변수 생성' },
@@ -269,9 +269,11 @@ export const LUMI_ABILITY_CORE_MISSIONS = [
       'if check_energy(): 일 때 handle_charge() 를 호출합니다.',
     ],
     world: {
+      scene: 'station',
+      target: false,
       rover: { x: 1, y: 2, direction: 0, energy: 15, maxEnergy: 100 },
+      stations: [{ id: 'station_dock', x: 1, y: 2, label: '파워 스테이션' }],
       objects: [{ id: 'station', kind: 'charge', x: 1, y: 2 }],
-      target: { x: 6, y: 2 },
     },
     goals: [
       { type: 'minimumEnergy', value: 80, label: '함수 협력을 통한 에너지 완충' },

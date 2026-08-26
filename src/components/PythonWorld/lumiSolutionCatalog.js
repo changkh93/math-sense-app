@@ -139,15 +139,25 @@ while game.running:
 game.quit()`,
 
   // ACT 3 · Sensor Core
-  'lumi-sensor-3-01': `distance = world.steps_to_target
+  'lumi-sensor-3-01': `from msense import lumi, world
+
+distance = world.steps_to_target
 lumi.move(distance)`,
-  'lumi-sensor-3-02': `route_open = world.path_clear
+  'lumi-sensor-3-02': `from msense import lumi, world
+
+route_open = world.path_clear
 lumi.say(route_open)`,
-  'lumi-sensor-3-03': `obstacle_distance = world.obstacle_ahead_distance
+  'lumi-sensor-3-03': `from msense import lumi, world
+
+obstacle_distance = world.obstacle_ahead_distance
 lumi.say(obstacle_distance)`,
-  'lumi-sensor-3-04': `safe_distance = world.obstacle_ahead_distance >= 3
+  'lumi-sensor-3-04': `from msense import lumi, world
+
+safe_distance = world.obstacle_ahead_distance >= 3
 lumi.say(safe_distance)`,
-  'lumi-sensor-3-05': `can_depart = (
+  'lumi-sensor-3-05': `from msense import lumi, world
+
+can_depart = (
     world.path_clear
     and world.obstacle_ahead_distance > world.steps_to_target
 )
@@ -199,32 +209,46 @@ for obj in lumi.scan():
 lumi.move(world.target_distance)`,
 
   // ACT 5 · Automation Core
-  'lumi-automation-5-01': `for step in range(3):
+  'lumi-automation-5-01': `from msense import lumi
+
+for step in range(3):
     lumi.move(1)`,
-  'lumi-automation-5-02': `distance = world.steps_to_target
+  'lumi-automation-5-02': `from msense import lumi, world
+
+distance = world.steps_to_target
 for step in range(distance):
     lumi.move(1)`,
-  'lumi-automation-5-03': `row_count = world.survey_rows
+  'lumi-automation-5-03': `from msense import lumi, world
+
+row_count = world.survey_rows
 for step in range(row_count):
     lumi.say(step)`,
-  'lumi-automation-5-04': `signal_count = world.survey_columns
+  'lumi-automation-5-04': `from msense import world
+
+signal_count = world.survey_columns
 total = 0
 
 for energy in range(1, signal_count + 1):
     total = total + energy
 
 print(total)`,
-  'lumi-automation-5-05': `signals = lumi.scan()
+  'lumi-automation-5-05': `from msense import lumi
+
+signals = lumi.scan()
 
 for signal in signals:
     lumi.collect(signal)`,
-  'lumi-automation-5-06': `side_length = world.steps_to_target
+  'lumi-automation-5-06': `from msense import lumi, world
+
+side_length = world.steps_to_target
 
 for side in range(4):
     for step in range(side_length):
         lumi.move(1)
     lumi.turn(90)`,
-  'lumi-automation-5-07': `rows = world.survey_rows
+  'lumi-automation-5-07': `from msense import lumi, world
+
+rows = world.survey_rows
 columns = world.survey_columns
 cells = 0
 

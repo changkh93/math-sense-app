@@ -5,11 +5,26 @@
 
 export function createInitialWorldState(worldConfig = {}) {
   const rover = worldConfig.rover || {}
-  const target = worldConfig.target || {}
+  const targetConfig = worldConfig.target
+  const hasExplicitTarget = targetConfig !== false && targetConfig !== null
+  const target = hasExplicitTarget && targetConfig ? {
+    x: Number(targetConfig.x ?? (Number(worldConfig.width || 8) - 1)),
+    y: Number(targetConfig.y ?? Math.floor((Number(worldConfig.height || 5)) / 2)),
+    kind: String(targetConfig.kind || 'beacon'),
+    label: targetConfig.label || null,
+    visible: targetConfig.visible !== false,
+  } : (hasExplicitTarget && targetConfig === undefined ? {
+    x: Number(worldConfig.width || 8) - 1,
+    y: Math.floor((Number(worldConfig.height || 5)) / 2),
+    kind: 'beacon',
+    label: null,
+    visible: true,
+  } : null)
 
   return {
     width: Number(worldConfig.width || 8),
     height: Number(worldConfig.height || 5),
+    scene: String(worldConfig.scene || 'nav'),
     rover: {
       x: Number(rover.x || 0),
       y: Number(rover.y || 0),
@@ -18,15 +33,30 @@ export function createInitialWorldState(worldConfig = {}) {
       awake: Boolean(rover.awake ?? true),
       lastMessage: null,
     },
-    target: {
-      x: Number(target.x || 0),
-      y: Number(target.y || 0),
-      kind: String(target.kind || 'beacon'),
-    },
+    target,
     pathClear: Boolean(worldConfig.pathClear ?? true),
     obstacles: Array.isArray(worldConfig.obstacles)
       ? worldConfig.obstacles.map((obs) => ({ x: Number(obs.x), y: Number(obs.y) }))
       : [],
+    barriers: Array.isArray(worldConfig.barriers)
+      ? worldConfig.barriers.map((b, idx) => ({
+        id: String(b.id || `barrier_${idx + 1}`),
+        x: Number(b.x ?? 0),
+        y: b.y !== undefined && b.y !== null ? Number(b.y) : null,
+        label: b.label || '에너지 장벽',
+        state: b.state || 'active',
+      }))
+      : [],
+    stations: Array.isArray(worldConfig.stations)
+      ? worldConfig.stations.map((s, idx) => ({
+        id: String(s.id || `station_${idx + 1}`),
+        x: Number(s.x ?? 0),
+        y: Number(s.y ?? 0),
+        label: s.label || '충전소',
+        active: Boolean(s.active ?? true),
+      }))
+      : [],
+    activeCondition: null,
     objects: Array.isArray(worldConfig.objects)
       ? worldConfig.objects.map((obj, index) => ({
         id: String(obj.id || `object_${index + 1}`),
@@ -118,6 +148,28 @@ export function reduceLumiWorldState(initialWorld = {}, normalizedEvents = [], t
         if (payload.end) {
           state.rover = { ...state.rover, ...payload.end }
         }
+        state.rover.energy = 100
+        break
+      }
+      case 'condition_evaluated': {
+        state.activeCondition = {
+          expression: payload.expression || 'condition',
+          result: Boolean(payload.result),
+          sourceLine: event.sourceLine,
+        }
+        break
+      }
+      case 'energy_changed': {
+        if (payload.toEnergy !== undefined) {
+          state.rover.energy = Number(payload.toEnergy)
+        }
+        break
+      }
+      case 'barrier_changed': {
+        const nextState = payload.state || 'disabled'
+        state.barriers = state.barriers.map((b) => (
+          b.id === payload.id || !payload.id ? { ...b, state: nextState } : b
+        ))
         break
       }
       case 'shield_raised': {
