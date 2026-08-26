@@ -875,7 +875,7 @@ export const ACT_1_MISSIONS = [
     actId: 'act-1-command',
     order: 5,
     difficulty: 'core',
-    title: '실수 고치기 (주석)',
+    title: '위험 명령 잠시 끄기 — 주석',
     eyebrow: 'ACT 1 · 주석과 디버깅',
     objective: '위험한 직진 명령(# lumi.move(4)) 앞에 #을 붙여 끄고, 아래로 우회하여 비콘에 도착하세요.',
     briefing: '앞에 위험한 크레이터 구덩이가 있습니다. 잘못된 명령 앞에 \'#\'을 붙이면 컴퓨터가 실행하지 않습니다. 위험한 줄을 끄고 안전하게 돌아가 봅시다.',
@@ -1015,18 +1015,17 @@ export const ACT_2_MISSIONS = [
     actId: 'act-2-memory',
     order: 1,
     difficulty: 'core',
-    title: '루미 호출부호 HUD',
+    title: '루미 호출부호 등록',
     eyebrow: 'ACT 2 · MEMORY CORE',
-    objective: '호출부호 문자열 변수를 만들고 HUD 화면에 표시하세요.',
-    briefing: '관제 화면이 호출부호를 잊었습니다. 변수는 값을 기억하는 이름표 달린 상자입니다. pilot_name 상자에 문자열 "NOVA"를 저장한 뒤, 그 상자 자체를 HUD 출력 도구에 전달해 보세요.',
+    objective: '호출부호 문자열 "NOVA"를 callsign 변수에 저장하고 lumi.say()로 보고하세요.',
+    briefing: '기억 코어가 복구되기 시작했습니다. 변수는 값을 기억하는 이름표 달린 상자입니다. callsign 상자에 문자열 "NOVA"를 저장한 뒤, lumi.say()로 관제소에 호출부호를 전송하세요.',
     learningSteps: [
-      '문자열 "NOVA"를 기억할 pilot_name 변수를 만듭니다.',
-      'game.text.render의 첫 번째 자리에 문자열을 다시 쓰지 말고 pilot_name 변수를 전달합니다.',
-      'position에는 "top-left"를 전달하여 HUD 왼쪽 위에 표시합니다.',
+      '문자열 "NOVA"를 기억할 callsign 변수를 만듭니다.',
+      'lumi.say()에 문자열을 직접 쓰지 말고 callsign 변수를 전달합니다.',
     ],
     concepts: ['변수', '문자열 대입'],
     restorationLevel: 20,
-    lumiVoice: '호출부호 등록 완료! 관제 링크 정상.',
+    lumiVoice: '호출부호 NOVA 등록 완료! 관제 링크 정상.',
     reward: {
       policyVersion: 'reward-v1',
       tier: 'core',
@@ -1034,13 +1033,13 @@ export const ACT_2_MISSIONS = [
       firstCompletionOnly: true,
     },
     pygameBridge: {
-      lumiCode: 'pilot_name = "NOVA"\ngame.text.render(pilot_name, position="top-left")',
-      pygameCode: 'pilot_name = "NOVA"\nscreen.blit(font.render(pilot_name, True, (0, 240, 255)), (20, 20))',
-      commonIdea: '기억한 호출부호 변수 값을 HUD 텍스트로 화면에 표시한다.',
+      lumiCode: 'callsign = "NOVA"\nlumi.say(callsign)',
+      pygameCode: 'callsign = "NOVA"\nprint(callsign)',
+      commonIdea: '변수에 문자열을 대입하고 출력 함수에 전달한다.',
     },
     memoryFragment: {
-      label: '호출부호 HUD 등록 패턴',
-      code: 'pilot_name = "NOVA"\ngame.text.render(pilot_name, position="top-left")',
+      label: '호출부호 변수 저장 패턴',
+      code: 'from msense import lumi\ncallsign = "NOVA"\nlumi.say(callsign)',
       duration: 3000,
       autoPlay: true,
     },
@@ -1048,10 +1047,7 @@ export const ACT_2_MISSIONS = [
       mode: 'edit',
       visibleTools: ['run', 'reset', 'step', 'timeline', 'inspector'],
     },
-    starterCode: `# 호출부호 "NOVA"를 pilot_name 변수에 저장하세요.
-
-# 다음 줄에서 그 변수를 HUD의 왼쪽 위에 표시하세요.
-`,
+    starterCode: '# [호출부호 등록]\\n# 1. 호출부호 "NOVA"를 callsign 변수에 저장하세요.\\n# 2. 루미가 변수 값을 말하게 하세요.\\n',
     world: {
       scene: 'workbench',
       width: 7,
@@ -1061,16 +1057,16 @@ export const ACT_2_MISSIONS = [
       obstacles: [],
     },
     goals: [
-      { type: 'variableDefined', name: 'pilot_name' },
-      { type: 'textRendered', position: 'top-left', includes: 'NOVA' },
+      { type: 'variableDefined', name: 'callsign' },
+      { type: 'spokenMessage', includes: 'NOVA' },
     ],
     conceptEvidence: {
       mustUse: ['variable', 'string'],
-      mustCall: ['game.text.render'],
+      mustCall: ['lumi.say'],
     },
     hints: [
-      { level: 1, type: 'concept', text: '=의 왼쪽에는 변수 이름, 오른쪽에는 저장할 문자열을 씁니다. 문자열은 따옴표로 감쌉니다.' },
-      { level: 2, type: 'structure', text: 'HUD 도구의 모양은 `game.text.render(표시할_값, position="위치")`입니다. 표시할_값 자리에 pilot_name을 넣어보세요.' },
+      { level: 1, type: 'concept', text: '=의 왼쪽에는 변수 이름, 오른쪽에는 저장할 문자열을 씁니다. 문자열은 큰따옴표로 감쌉니다.' },
+      { level: 2, type: 'structure', text: 'callsign = "NOVA"로 변수를 만들고 lumi.say(callsign)을 호출하세요.' },
     ],
     hiddenVariants: [],
   },
@@ -1080,18 +1076,17 @@ export const ACT_2_MISSIONS = [
     actId: 'act-2-memory',
     order: 2,
     difficulty: 'core',
-    title: '탐사선 스킨 장착',
+    title: '숫자 변수와 재사용',
     eyebrow: 'ACT 2 · MEMORY CORE',
-    objective: '이미지 이름 변수를 만들어 스킨을 변경하고 하단 HUD에도 표시하세요.',
-    briefing: '같은 이미지 이름을 여러 번 직접 쓰면 나중에 스킨을 바꿀 때 모두 고쳐야 합니다. ship_image 변수에 "lumi_blue"를 한 번만 저장하고 이미지 배치와 이름표 출력에 재사용하세요.',
+    objective: 'power 변수에 숫자 10을 저장하고 lumi.say()로 보고하세요.',
+    briefing: '변수에는 글자뿐만 아니라 숫자도 저장할 수 있습니다. power 상자에 10을 저장하고 lumi.say()로 관제소에 보고하세요.',
     learningSteps: [
-      '이미지 이름 문자열 "lumi_blue"를 ship_image 변수에 저장합니다.',
-      'game.screen.blit에 ship_image와 격자 위치 (2, 2)를 전달합니다.',
-      '같은 ship_image를 game.text.render에도 전달해 화면 아래에 이름을 표시합니다.',
+      '숫자 10을 기억할 power 변수를 만듭니다.',
+      'lumi.say(power)로 변수 값을 보고합니다.',
     ],
-    concepts: ['변수 재사용', '식별자 규칙'],
+    concepts: ['변수', '숫자 대입'],
     restorationLevel: 40,
-    lumiVoice: '블루 스킨 장착 완료! 시각 동기화 양호.',
+    lumiVoice: '동력 수치 10 보고 완료!',
     reward: {
       policyVersion: 'reward-v1',
       tier: 'core',
@@ -1099,13 +1094,13 @@ export const ACT_2_MISSIONS = [
       firstCompletionOnly: true,
     },
     pygameBridge: {
-      lumiCode: 'ship_image = "lumi_blue"\ngame.screen.blit(ship_image, (2, 2))\ngame.text.render(ship_image, "bottom")',
-      pygameCode: 'ship_image = "lumi_blue.png"\nscreen.blit(ship_image, (100, 100))\nscreen.blit(font.render(ship_image, ...))',
-      commonIdea: '하나의 변수에 담긴 이미지 이름을 이미지 배치와 HUD에 두 번 재사용한다.',
+      lumiCode: 'power = 10\nlumi.say(power)',
+      pygameCode: 'power = 10\nprint(power)',
+      commonIdea: '숫자 변수를 정의하고 화면 또는 콘솔에 출력한다.',
     },
     memoryFragment: {
-      label: '스킨 장착 및 HUD 재사용 패턴',
-      code: 'ship_image = "lumi_blue"\ngame.screen.blit(ship_image, position=(2, 2))\ngame.text.render(ship_image, position="bottom")',
+      label: '숫자 변수 대입 패턴',
+      code: 'from msense import lumi\npower = 10\nlumi.say(power)',
       duration: 3000,
       autoPlay: true,
     },
@@ -1113,12 +1108,7 @@ export const ACT_2_MISSIONS = [
       mode: 'edit',
       visibleTools: ['run', 'reset', 'step', 'timeline', 'inspector'],
     },
-    starterCode: `# 이미지 이름 "lumi_blue"를 ship_image 변수에 저장하세요.
-
-# 다음 줄에서 이미지를 격자 (2, 2)에 배치하세요.
-
-# 마지막 줄에서 같은 변수의 값을 화면 아래에 표시하세요.
-`,
+    starterCode: '# [숫자 변수와 재사용]\\n# 1. power 변수에 숫자 10을 저장하세요.\\n# 2. 루미가 변수 값을 말하게 하세요.\\n',
     world: {
       scene: 'workbench',
       width: 7,
@@ -1128,17 +1118,16 @@ export const ACT_2_MISSIONS = [
       obstacles: [],
     },
     goals: [
-      { type: 'variableDefined', name: 'ship_image' },
-      { type: 'screenBlitted', image: 'lumi_blue' },
-      { type: 'textRendered', position: 'bottom', includes: 'lumi_blue' },
+      { type: 'variableDefined', name: 'power' },
+      { type: 'spokenMessage', includes: '10' },
     ],
     conceptEvidence: {
-      mustUse: ['variable', 'string'],
-      mustCall: ['game.screen.blit', 'game.text.render'],
+      mustUse: ['variable'],
+      mustCall: ['lumi.say'],
     },
     hints: [
-      { level: 1, type: 'concept', text: '변수는 한 번 저장한 값을 여러 함수의 인자로 다시 전달할 수 있습니다.' },
-      { level: 2, type: 'structure', text: '이미지 배치는 `game.screen.blit(이미지_이름, position=(x, y))`, 글자 표시는 `game.text.render(표시할_값, position="위치")` 모양입니다.' },
+      { level: 1, type: 'concept', text: '숫자는 따옴표 없이 power = 10 처럼 씁니다.' },
+      { level: 2, type: 'structure', text: 'power = 10 작성 후 lumi.say(power)를 호출하세요.' },
     ],
     hiddenVariants: [],
   },
@@ -1148,18 +1137,18 @@ export const ACT_2_MISSIONS = [
     actId: 'act-2-memory',
     order: 3,
     difficulty: 'core',
-    title: '보호막 에너지 게이지',
+    title: '보호막 변수 갱신',
     eyebrow: 'ACT 2 · MEMORY CORE',
-    objective: '초기 보호막 5에서 2를 소모하여 shield 변수를 갱신하고 게이지 바로 시각화하세요.',
+    objective: '초기 보호막 5에서 2를 소모하여 shield 변수를 갱신하고 lumi.say()로 보고하세요.',
     briefing: '보호막은 처음 5칸 충전되어 있고 피격으로 2칸을 잃었습니다. 오른쪽의 shield를 먼저 읽어 2를 뺀 뒤, 계산 결과를 다시 같은 변수에 저장하면 값이 3으로 갱신됩니다.',
     learningSteps: [
       'shield 변수에 초기 보호막 값 5를 저장합니다.',
       '기존 shield에서 2를 뺀 결과를 다시 shield에 저장합니다.',
-      'game.hud.bar에 이름 "SHIELD", 갱신된 shield, 최댓값 5를 전달합니다.',
+      'lumi.say(shield)로 갱신된 값을 보고합니다.',
     ],
     concepts: ['변수 갱신', '산술 연산', '-'],
     restorationLevel: 60,
-    lumiVoice: '보호막 3 게이지 갱신 완료!',
+    lumiVoice: '보호막 3 갱신 완료!',
     reward: {
       policyVersion: 'reward-v1',
       tier: 'core',
@@ -1167,13 +1156,13 @@ export const ACT_2_MISSIONS = [
       firstCompletionOnly: true,
     },
     pygameBridge: {
-      lumiCode: 'shield = 5\nshield = shield - 2\ngame.hud.bar("SHIELD", shield, maximum=5)',
-      pygameCode: 'shield = 5\nshield -= 2\npygame.draw.rect(screen, (0,150,255), (10, 10, shield * 20, 15))',
-      commonIdea: '연산으로 바뀐 변수 값을 화면 게이지의 길이로 즉시 시각화한다.',
+      lumiCode: 'shield = 5\nshield = shield - 2\nlumi.say(shield)',
+      pygameCode: 'shield = 5\nshield -= 2\nprint(shield)',
+      commonIdea: '연산으로 바뀐 변수 값을 갱신하여 확인한다.',
     },
     memoryFragment: {
-      label: '보호막 게이지 연산 및 갱신 패턴',
-      code: 'shield = 5\nshield = shield - 2\ngame.hud.bar("SHIELD", shield, maximum=5)',
+      label: '보호막 변수 연산 및 갱신 패턴',
+      code: 'from msense import lumi\\nshield = 5\\nshield = shield - 2\\nlumi.say(shield)',
       duration: 3000,
       autoPlay: true,
     },
@@ -1181,12 +1170,7 @@ export const ACT_2_MISSIONS = [
       mode: 'edit',
       visibleTools: ['run', 'reset', 'step', 'timeline', 'inspector'],
     },
-    starterCode: `# shield 변수에 초기 보호막 값 5를 저장하세요.
-
-# 다음 줄에서 기존 값보다 2 작은 값으로 shield를 갱신하세요.
-
-# 마지막 줄에서 갱신된 shield를 최댓값 5인 HUD 바로 표시하세요.
-`,
+    starterCode: '# [보호막 변수 갱신]\\n# 1. shield 변수에 초기 보호막 값 5를 저장하세요.\\n# 2. 기존 값보다 2 작은 값으로 shield를 갱신하세요.\\n# 3. 갱신된 shield를 루미가 보고하게 하세요.\\n',
     world: {
       scene: 'workbench',
       width: 7,
@@ -1197,15 +1181,15 @@ export const ACT_2_MISSIONS = [
     },
     goals: [
       { type: 'variableChanged', name: 'shield', expectedFinal: 3 },
-      { type: 'hudBarSet', label: 'SHIELD', expectedValue: 3, maximum: 5 },
+      { type: 'spokenMessage', includes: '3' },
     ],
     conceptEvidence: {
       mustUse: ['variable', '-'],
-      mustCall: ['game.hud.bar'],
+      mustCall: ['lumi.say'],
     },
     hints: [
       { level: 1, type: 'concept', text: '대입문의 오른쪽이 먼저 계산됩니다. 그래서 같은 변수 이름을 =의 양쪽에 사용해 값을 갱신할 수 있습니다.' },
-      { level: 2, type: 'structure', text: 'HUD 바의 모양은 `game.hud.bar("표시 이름", 현재값, maximum=최댓값)`입니다.' },
+      { level: 2, type: 'structure', text: 'shield = 5 다음 줄에 shield = shield - 2, 그 다음 줄에 lumi.say(shield)를 작성하세요.' },
     ],
     hiddenVariants: [],
   },

@@ -9,7 +9,7 @@ const BASE_WORLD = Object.freeze({
 
 const SENSOR_API = Object.freeze([
   { signature: 'from msense import lumi, world', description: '탐사 로봇(lumi)과 환경 관측 센서(world)를 불러옵니다.' },
-  { signature: 'world.steps_to_target', description: '현재 위치에서 목표까지 필요한 칸 수를 읽습니다.' },
+  { signature: 'world.target_distance', description: '현재 위치에서 목표 비콘까지의 거리를 읽습니다.' },
   { signature: 'world.path_clear', description: '관제소가 확인한 항로의 안전 여부를 Boolean으로 읽습니다.' },
   { signature: 'world.obstacle_ahead_distance', description: '현재 방향에서 가장 가까운 장애물까지의 칸 수를 읽습니다.' },
   { signature: 'lumi.move(distance)', description: '현재 방향으로 지정한 칸만큼 이동합니다.' },
@@ -46,7 +46,7 @@ function sensorMission({
     learningSteps,
     memoryFragment: {
       label: '센서 텔레메트리 스키마',
-      code: 'from msense import lumi, world\ndistance = world.steps_to_target\nlumi.move(distance)',
+      code: 'from msense import lumi, world\ndistance = world.target_distance\nlumi.move(distance)',
       duration: 1800,
       autoPlay: true,
     },
@@ -77,12 +77,12 @@ export const LUMI_SENSOR_CORE_MISSIONS = [
     aliases: ['lumi-act3-01', '3-1'],
     title: '목표 거리 수신',
     objective: 'from msense import lumi, world로 센서를 불러오고, 목표 거리를 읽어 루미를 이동시키세요.',
-    briefing: '비콘의 위치는 매번 달라집니다. 파이썬에서는 from msense import lumi, world로 탐사 로봇 lumi와 환경 관측 센서 world를 불러옵니다. world 객체는 비콘과의 거리(world.steps_to_target), 장애물 거리, 항로 안전 여부 등 외부 환경 데이터를 실시간으로 알려주는 센서 모듈입니다.',
+    briefing: '비콘의 위치는 매번 달라집니다. 파이썬에서는 from msense import lumi, world로 탐사 로봇 lumi와 환경 관측 센서 world를 불러옵니다. world 객체는 비콘과의 거리(world.target_distance), 장애물 거리, 항로 안전 여부 등 외부 환경 데이터를 실시간으로 알려주는 센서 모듈입니다.',
     concepts: ['from', 'import', 'world', '속성', '센서', '변수'],
     pygameBridgeKey: 'sensor-distance',
     learningSteps: [
       'from msense import lumi, world 로 로봇과 환경 센서 모듈을 불러옵니다.',
-      'world.steps_to_target 센서로 목표까지의 거리를 읽어 distance 변수에 저장합니다.',
+      'world.target_distance 센서로 목표까지의 거리를 읽어 distance 변수에 저장합니다.',
       'lumi.move(distance)로 루미를 목표 비콘까지 이동시킵니다.',
     ],
     goals: [
@@ -90,10 +90,10 @@ export const LUMI_SENSOR_CORE_MISSIONS = [
       { type: 'variableValueEquals', name: 'distance', value: 3, label: '센서 거리 3을 변수에 저장' },
     ],
     mustUse: ['sensor', 'variable'],
-    mustCall: ['world.steps_to_target', 'lumi.move'],
+    mustCall: ['world.target_distance', 'lumi.move'],
     hints: [
       { level: 1, type: 'context', text: 'world는 외부 환경 정보를 제공하는 센서입니다. 첫 줄에 `from msense import lumi, world`를 작성하세요.' },
-      { level: 2, type: 'concept', text: '`distance = world.steps_to_target`로 센서값을 저장한 뒤 `lumi.move(distance)`로 이동하세요.' },
+      { level: 2, type: 'concept', text: '`distance = world.target_distance`로 센서값을 저장한 뒤 `lumi.move(distance)`로 이동하세요.' },
     ],
     hiddenVariants: [
       {
@@ -228,7 +228,7 @@ export const LUMI_SENSOR_CORE_MISSIONS = [
     pygameBridgeKey: 'condition-compound',
     learningSteps: [
       'from msense import lumi, world 로 모듈을 불러옵니다.',
-      'world.path_clear 와 (world.obstacle_ahead_distance > world.steps_to_target) 조건을 and로 연결해 can_depart에 저장하세요.',
+      'world.path_clear 와 (world.obstacle_ahead_distance > world.target_distance) 조건을 and로 연결해 can_depart에 저장하세요.',
       'lumi.say(can_depart)로 융합 신호를 관제소에 보고하세요.',
     ],
     world: { obstacles: [{ x: 7, y: 2 }] },
@@ -237,10 +237,10 @@ export const LUMI_SENSOR_CORE_MISSIONS = [
       { type: 'spokenMessage', includes: 'True', label: '통합 출발 신호 보고' },
     ],
     mustUse: ['sensor', 'comparison', 'boolean', 'variable'],
-    mustCall: ['world.path_clear', 'world.obstacle_ahead_distance', 'world.steps_to_target', 'lumi.say'],
+    mustCall: ['world.path_clear', 'world.obstacle_ahead_distance', 'world.target_distance', 'lumi.say'],
     hints: [
       { level: 1, type: 'context', text: '`A and B`는 두 조건이 모두 True일 때만 True입니다.' },
-      { level: 2, type: 'concept', text: '`can_depart = world.path_clear and (world.obstacle_ahead_distance > world.steps_to_target)`로 완성하세요.' },
+      { level: 2, type: 'concept', text: '`can_depart = world.path_clear and (world.obstacle_ahead_distance > world.target_distance)`로 완성하세요.' },
     ],
     hiddenVariants: [
       {

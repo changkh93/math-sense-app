@@ -416,9 +416,9 @@ export function getRelevantMissionApi(mission = {}) {
   if (requiredCalls.has('print') || /\bprint\s*\(/.test(text)) appendReference('print')
   if (requiredCalls.has('type') || /\btype\s*\(/.test(text)) appendReference('type')
   if (requiredCalls.has('len') || /\blen\s*\(/.test(text)) appendReference('len')
-  if (text.includes('world.objects')) {
+  if (text.includes('world.objects') || mission?.id === 'while-collect-03') {
     appendReference('world.objects')
-    if (text.includes('[0]') || mission?.id === 'while-collect-03' || mission?.id === 'while-rescue-06') appendReference('world.objects[0]')
+    if (text.includes('[0]') || mission?.id === 'while-rescue-06') appendReference('world.objects[0]')
   }
   if (mission?.id === 'lumi-act1-05' || mission?.concepts?.some(c => String(c).includes('주석')) || text.includes('주석')) {
     appendReference('#')

@@ -58,20 +58,19 @@ lumi.turn(-90)
 lumi.move(2)`,
 
   // ACT 2 · Memory Core (v2 Game Enrichment)
-  'lumi-act2-01': `from msense import game
+  'lumi-act2-01': `from msense import lumi
 
-pilot_name = "NOVA"
-game.text.render(pilot_name, position="top-left")`,
-  'lumi-act2-02': `from msense import game
+callsign = "NOVA"
+lumi.say(callsign)`,
+  'lumi-act2-02': `from msense import lumi
 
-ship_image = "lumi_blue"
-game.screen.blit(ship_image, position=(2, 2))
-game.text.render(ship_image, position="bottom")`,
-  'lumi-act2-03': `from msense import game
+power = 10
+lumi.say(power)`,
+  'lumi-act2-03': `from msense import lumi
 
 shield = 5
 shield = shield - 2
-game.hud.bar("SHIELD", shield, maximum=5)`,
+lumi.say(shield)`,
 
   // ACT 2 · Memory Core (Legacy)
   'lumi-act2-01-legacy': `from msense import lumi
@@ -100,7 +99,7 @@ lumi.say(msg)
 lumi.move(3)`,
   'lumi-act2-06': `from msense import lumi
 
-steps_text = input("이동 신호")
+steps_text = input("이동할 칸 수를 입력하세요: ")
 steps = int(steps_text)
 lumi.move(steps)`,
 
@@ -141,7 +140,7 @@ game.quit()`,
   // ACT 3 · Sensor Core
   'lumi-sensor-3-01': `from msense import lumi, world
 
-distance = world.steps_to_target
+distance = world.target_distance
 lumi.move(distance)`,
   'lumi-sensor-3-02': `from msense import lumi, world
 
@@ -157,10 +156,7 @@ safe_distance = world.obstacle_ahead_distance >= 3
 lumi.say(safe_distance)`,
   'lumi-sensor-3-05': `from msense import lumi, world
 
-can_depart = (
-    world.path_clear
-    and world.obstacle_ahead_distance > world.steps_to_target
-)
+can_depart = world.path_clear and (world.obstacle_ahead_distance > world.target_distance)
 lumi.say(can_depart)`,
 
   // ACT 4 · Decision Core
@@ -185,7 +181,7 @@ else:
     lumi.move(1)`,
   'if-route-04': `from msense import lumi, world
 
-target_x = world.snapshot()["target"]["x"]
+target_x = world.target_x
 if target_x < lumi.x:
     lumi.turn(180)
 lumi.move(world.target_distance)`,
@@ -198,14 +194,8 @@ if (lumi.energy >= distance and distance <= 6) or world.emergency:
 
 if lumi.energy < 20:
     lumi.charge()
-
 if world.incoming_pulse:
     lumi.shield()
-
-for obj in lumi.scan():
-    if obj.strength >= 5:
-        lumi.collect(obj)
-
 lumi.move(world.target_distance)`,
 
   // ACT 5 · Automation Core
@@ -215,7 +205,7 @@ for step in range(3):
     lumi.move(1)`,
   'lumi-automation-5-02': `from msense import lumi, world
 
-distance = world.steps_to_target
+distance = world.target_distance
 for step in range(distance):
     lumi.move(1)`,
   'lumi-automation-5-03': `from msense import lumi, world
@@ -227,21 +217,17 @@ for step in range(row_count):
 
 signal_count = world.survey_columns
 total = 0
-
 for energy in range(1, signal_count + 1):
     total = total + energy
-
 print(total)`,
   'lumi-automation-5-05': `from msense import lumi
 
 signals = lumi.scan()
-
 for signal in signals:
     lumi.collect(signal)`,
   'lumi-automation-5-06': `from msense import lumi, world
 
-side_length = world.steps_to_target
-
+side_length = world.target_distance
 for side in range(4):
     for step in range(side_length):
         lumi.move(1)
@@ -251,11 +237,9 @@ for side in range(4):
 rows = world.survey_rows
 columns = world.survey_columns
 cells = 0
-
 for row in range(rows):
     for column in range(columns):
         cells = cells + 1
-
 lumi.say(cells)`,
 
   // ACT 6 · Persistence Core
@@ -267,19 +251,15 @@ while world.target_distance > 0:
 
 while lumi.energy < 50:
     lumi.charge()
-
 lumi.move(world.target_distance)`,
   'while-collect-03': `from msense import lumi, world
 
-while world.objects:
-    obj = world.objects[0]
-    lumi.collect(obj)`,
+while world.signal_count > 0:
+    lumi.collect()`,
   'while-countdown-04': `count = 3
-
 while count > 0:
     print(count)
     count = count - 1
-
 print("LAUNCH")`,
   'while-break-05': `from msense import lumi, world
 
@@ -295,7 +275,7 @@ for sig in signals:
     if sig.kind == "noise":
         continue
     lumi.collect(sig)`,
-  'while-rescue-07': `from msense import lumi, world, game
+  'while-rescue-07': `from msense import game, lumi, world
 
 game.init()
 while game.running and world.target_distance > 0:
@@ -355,7 +335,9 @@ raw_packet = world.data_packet
 pairs = raw_packet.split("|")
 telemetry = {}
 for pair in pairs:
-    k, v = pair.split(":")
+    parts = pair.split(":")
+    k = parts[0]
+    v = parts[1]
     telemetry[k] = v
 print(telemetry["STATUS"])`,
 
@@ -491,37 +473,41 @@ for drone in fleet:
 
 def find_urgent(signal_list):
     urgent = signal_list[0]
-    for signal in signal_list:
-        if signal["corruption"] > urgent["corruption"]:
-            urgent = signal
+    for s in signal_list:
+        if s["corruption"] > urgent["corruption"]:
+            urgent = s
     return urgent["name"]
 
 target_name = find_urgent(signals)`,
-  'lumi-lost-light-f-02': `def choose_action(energy, corruption):
-    if energy < 30:
-        return "CHARGE"
-    elif corruption > 0:
-        return "PURIFY"
-    else:
-        return "STANDBY"
+  'lumi-lost-light-f-02': `from msense import lumi, world
 
-act_1 = choose_action(20, 50)
-act_2 = choose_action(80, 40)`,
+while world.target_distance > 0:
+    if world.threat_type == "pulse":
+        lumi.shield()
+    elif world.threat_type == "mine":
+        lumi.dodge()
+    elif lumi.energy < 20:
+        lumi.charge()
+    else:
+        lumi.move(1)`,
   'lumi-lost-light-f-03': `class Drone:
     def __init__(self, name, corruption):
         self.name = name
         self.corruption = corruption
 
     def purify(self, amount):
-        self.corruption = max(0, self.corruption - amount)
+        if self.corruption > amount:
+            self.corruption = self.corruption - amount
+        else:
+            self.corruption = 0
 
-fleet = [Drone("D1", 20), Drone("D2", 30)]
-total_corruption = sum(d.corruption for d in fleet)
+specs = world.entity_specs
+fleet = []
+for s in specs:
+    fleet.append(Drone(s["name"], s["corruption"]))
 
-while total_corruption > 0:
-    for drone in fleet:
-        drone.purify(10)
-    total_corruption = sum(d.corruption for d in fleet)`,
+for d in fleet:
+    d.purify(30)`,
   'lumi-lost-light-f-04': `class RelayBeacon:
     def __init__(self, name, power):
         self.name = name
@@ -529,14 +515,12 @@ while total_corruption > 0:
         self.active = False
 
     def activate(self):
-        self.active = True
+        if self.power >= 50:
+            self.active = True
 
-relays = []
-for spec in world.entity_specs:
-    relays.append(RelayBeacon(spec["name"], spec["power"]))
-
-for relay in relays:
-    relay.activate()`,
+beacons = [RelayBeacon("ALPHA", 60), RelayBeacon("BETA", 80), RelayBeacon("GAMMA", 100)]
+for b in beacons:
+    b.activate()`,
 
   // Student beta / optional object labs
   'pilot-object-9-1': `print(type(lumi))`,

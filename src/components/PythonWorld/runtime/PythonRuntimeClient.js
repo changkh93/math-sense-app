@@ -22,6 +22,16 @@ export default class PythonRuntimeClient {
     this.worker = new Worker(new URL('./pythonWorld.worker.js', import.meta.url), { type: 'module' })
     this.worker.addEventListener('message', this.handleMessage)
     this.worker.addEventListener('error', this.handleWorkerError)
+    this.load().then(() => {
+      if (!this.disposed) {
+        this.onStatus?.({ status: 'ready' })
+      }
+    }).catch((error) => {
+      console.warn('Python runtime preload notice:', error)
+      if (!this.disposed) {
+        this.onStatus?.({ status: 'error', error })
+      }
+    })
   }
 
   handleMessage = (event) => {
@@ -29,6 +39,9 @@ export default class PythonRuntimeClient {
     if (message.type === 'status') {
       this.onStatus?.(message)
       return
+    }
+    if (message.type === 'loaded') {
+      this.onStatus?.({ status: 'ready' })
     }
     const pending = this.pending.get(message.requestId)
     if (!pending) return

@@ -413,6 +413,16 @@ def _run_mission(payload_json, code):
 
             self.incoming_pulse = bool(config.get("incomingPulse", False))
             self.pulse_distance = int(config.get("pulseDistance", 3))
+            threat_cfg = str(config.get("threatType") or config.get("threat") or "")
+            if not threat_cfg:
+                if self.incoming_pulse:
+                    threat_cfg = "pulse"
+                elif config.get("mineAhead") or config.get("hasMine"):
+                    threat_cfg = "mine"
+                else:
+                    threat_cfg = "none"
+            self.threat_type = threat_cfg
+            self.threat_distance = int(config.get("threatDistance", config.get("pulseDistance", 3)))
             self.enemies = [dict(e) for e in (config.get("enemies") or [])]
             self.enemy_detected = bool(config.get("enemyDetected", len(self.enemies) > 0 or self.incoming_pulse))
             self.key_sequence = list(mission.get("keySequence") or mission.get("inputTape") or [])
@@ -671,11 +681,13 @@ def _run_mission(payload_json, code):
             emit("world", action="scan", found=[item.snapshot() for item in found], end=dict(state.rover))
             return found
 
-        def collect(self, obj):
+        def collect(self, obj=None):
             nonlocal command_count
             command_count += 1
             if command_count > max_commands:
                 raise MissionLimitError("월드 명령 수가 안전 한도를 넘었습니다.")
+            if obj is None:
+                return self.collect_nearest()
             object_id = obj.id if isinstance(obj, WorldObject) else str(obj)
             item = next((candidate for candidate in state.objects if candidate["id"] == object_id), None)
             if item is None or item["collected"]:
@@ -724,6 +736,25 @@ def _run_mission(payload_json, code):
             emit("rover_dodged", direction=str(direction), end=dict(state.rover))
             return True
 
+        def collect_nearest(self):
+            nonlocal command_count
+            command_count += 1
+            if command_count > max_commands:
+                raise MissionLimitError("월드 명령 수가 안전 한도를 넘었습니다.")
+            uncollected = [item for item in state.objects if not item["collected"]]
+            if not uncollected:
+                raise ValueError("더 이상 수집할 신호가 없습니다.")
+            uncollected.sort(key=lambda item: abs(item["x"] - state.rover["x"]) + abs(item["y"] - state.rover["y"]))
+            target_item = uncollected[0]
+            target_item["collected"] = True
+            state.inventory.append(dict(target_item))
+            emit("world", action="collect", object=dict(target_item), inventoryCount=len(state.inventory), end=dict(state.rover))
+            return True
+
+        def status(self, label, value):
+            emit("lumi_status", label=str(label), value=str(value), end=dict(state.rover))
+            return True
+
         def jam(self, enemy=None):
             nonlocal command_count
             command_count += 1
@@ -745,7 +776,9 @@ def _run_mission(payload_json, code):
     class World:
         @property
         def target_distance(self):
-            return state.target_distance
+            dist = state.target_distance
+            emit("sensor_read", sensor="target_distance", value=dist)
+            return dist
 
         @property
         def steps_to_target(self):
@@ -757,6 +790,32 @@ def _run_mission(payload_json, code):
         def path_clear(self):
             emit("sensor_read", sensor="path_clear", value=state.path_clear)
             return state.path_clear
+
+        @property
+        def threat_type(self):
+            emit("sensor_read", sensor="threat_type", value=state.threat_type)
+            return state.threat_type
+
+        @property
+        def threat_distance(self):
+            emit("sensor_read", sensor="threat_distance", value=state.threat_distance)
+            return state.threat_distance
+
+        @property
+        def signal_count(self):
+            count = len(state.signals) if state.signals else len([item for item in state.objects if not item["collected"]])
+            emit("sensor_read", sensor="signal_count", value=count)
+            return count
+
+        @property
+        def target_x(self):
+            return state.target["x"]
+
+        @property
+        def beacon_reached(self):
+            reached = (state.rover["x"] == state.target["x"] and state.rover["y"] == state.target["y"])
+            emit("sensor_read", sensor="beacon_reached", value=reached)
+            return reached
 
         @property
         def obstacle_ahead_distance(self):

@@ -10,7 +10,7 @@ const BASE_WORLD = Object.freeze({
 const AUTOMATION_API = Object.freeze([
   { signature: 'from msense import lumi, world', description: '탐사 로봇과 환경 센서를 불러옵니다.' },
   { signature: 'range(count)', description: '0부터 count 직전까지 반복에 사용할 숫자 흐름을 만듭니다.' },
-  { signature: 'world.steps_to_target', description: '목표까지 필요한 현재 이동 칸 수를 읽습니다.' },
+  { signature: 'world.target_distance', description: '목표까지 필요한 현재 이동 칸 수를 읽습니다.' },
   { signature: 'world.survey_rows / world.survey_columns', description: '조사해야 할 격자의 행과 열 수를 읽습니다.' },
   { signature: 'lumi.move(distance)', description: '현재 방향으로 지정한 칸만큼 이동합니다.' },
   { signature: 'lumi.turn(degrees)', description: '90도 단위로 방향을 전환합니다.' },
@@ -113,14 +113,14 @@ export const LUMI_AUTOMATION_CORE_MISSIONS = [
     concepts: ['for', 'range', '센서', '일반화'],
     pygameBridgeKey: 'loop-range',
     learningSteps: [
-      'distance = world.steps_to_target 로 거리를 읽습니다.',
+      'distance = world.target_distance 로 거리를 읽습니다.',
       'for step in range(distance): 반복문을 작성합니다.',
       '들여써서 lumi.move(1)을 실행합니다.',
     ],
     world: { target: { x: 7, y: 2 } },
     goals: [{ type: 'position', x: 7, y: 2, label: '센서 거리만큼 반복해 도달' }],
     mustUse: ['sensor', 'for', 'range'],
-    mustCall: ['world.steps_to_target', 'lumi.move'],
+    mustCall: ['world.target_distance', 'lumi.move'],
     hints: [
       { level: 1, type: 'context', text: '숫자 대신 변수 `distance`를 `range()`에 전달합니다.' },
       { level: 2, type: 'concept', text: '`for step in range(distance):` 아래에서 `lumi.move(1)`을 실행하세요.' },
@@ -264,7 +264,7 @@ export const LUMI_AUTOMATION_CORE_MISSIONS = [
     concepts: ['중첩 for', '안쪽 반복', '바깥 반복', '회전'],
     pygameBridgeKey: 'loop-nested',
     learningSteps: [
-      'side_length = world.steps_to_target 로 한 변의 길이를 읽습니다.',
+      'side_length = world.target_distance 로 한 변의 길이를 읽습니다.',
       'for side in range(4): 로 네 변을 순회합니다.',
       '안쪽에서 for step in range(side_length): 로 한 칸씩 이동합니다.',
       '한 변이 끝날 때 lumi.turn(90)으로 회전합니다.',
@@ -276,7 +276,7 @@ export const LUMI_AUTOMATION_CORE_MISSIONS = [
       { type: 'eventOccurred', eventType: 'rover_turned', label: '각 변에서 방향 전환' },
     ],
     mustUse: ['sensor', 'for', 'range', 'nested_for'],
-    mustCall: ['world.steps_to_target', 'lumi.move', 'lumi.turn'],
+    mustCall: ['world.target_distance', 'lumi.move', 'lumi.turn'],
     hints: [
       { level: 1, type: 'context', text: '바깥쪽은 `range(4)`, 안쪽은 `range(side_length)`입니다.' },
       { level: 2, type: 'concept', text: '안쪽 for가 끝난 후, 바깥 for 안에서 `lumi.turn(90)`을 실행하세요.' },

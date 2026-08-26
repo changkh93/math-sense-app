@@ -46,7 +46,7 @@ assert.equal(ACT_2_MISSIONS.length, 6, 'ACT 2 must have 6 missions')
 assert.equal(ACT_2_MISSIONS[0].id, 'lumi-act2-01')
 assert.equal(ACT_2_MISSIONS[1].id, 'lumi-act2-02')
 assert.equal(ACT_2_MISSIONS[2].id, 'lumi-act2-03')
-assert.equal(getLumiMissionById('lumi-act2-01')?.title, '루미 호출부호 HUD', 'stable ACT 2 ID must resolve to enriched content')
+assert.equal(getLumiMissionById('lumi-act2-01')?.title, '루미 호출부호 등록', 'stable ACT 2 ID must resolve to enriched content')
 assert.equal(getLumiMissionById('lumi-act2-01-legacy')?.title, '첫 기억 슬롯 (Legacy)', 'legacy content must use a non-reward-conflicting ID')
 assert.equal(ACT_1_MISSIONS.length, 6, 'ACT 1 catalog count must match its six missions')
 

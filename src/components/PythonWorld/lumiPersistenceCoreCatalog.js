@@ -148,14 +148,13 @@ export const LUMI_PERSISTENCE_CORE_MISSIONS = [
     order: 3,
     aliases: ['lumi-act6-03', '6-3'],
     title: '잔여 신호 지속 수집',
-    objective: '월드에 신호가 남아 있는 동안(`while world.objects:`) 모두 수집하세요.',
-    briefing: '빈 리스트는 False로 판정됩니다. `while world.objects:` 조건으로 목록에 남은 신호가 0개가 될 때까지 수집을 반복하세요.',
-    concepts: ['while', '리스트 조건', '수집'],
+    objective: '신호가 남아 있는 동안(while world.signal_count > 0) lumi.collect()로 모두 수집하세요.',
+    briefing: '`while world.signal_count > 0:` 조건으로 남은 신호가 0개가 될 때까지 lumi.collect()로 수집을 반복하세요.',
+    concepts: ['while', 'signal_count', '수집'],
     pygameBridgeKey: 'loop-while',
     learningSteps: [
-      'while world.objects: 반복문을 작성합니다.',
-      'obj = world.objects[0] 로 첫 번째 신호를 가져옵니다.',
-      'lumi.collect(obj)로 신호를 수집합니다.',
+      'while world.signal_count > 0: 반복문을 작성합니다.',
+      'lumi.collect()로 신호를 수집합니다.',
     ],
     world: {
       target: { x: 1, y: 2 },
@@ -169,8 +168,8 @@ export const LUMI_PERSISTENCE_CORE_MISSIONS = [
     mustUse: ['while'],
     mustCall: ['lumi.collect'],
     hints: [
-      { level: 1, type: 'context', text: '수집할 때마다 `world.objects`의 길이가 줄어듭니다.' },
-      { level: 2, type: 'concept', text: '`while world.objects:` 아래에서 `obj = world.objects[0]` 후 `lumi.collect(obj)`를 호출하세요.' },
+      { level: 1, type: 'context', text: '수집할 때마다 `world.signal_count`가 줄어듭니다.' },
+      { level: 2, type: 'concept', text: '`while world.signal_count > 0:` 아래에 `lumi.collect()`를 작성하세요.' },
     ],
     hiddenVariants: [
       {

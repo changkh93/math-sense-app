@@ -409,7 +409,7 @@ export default function PythonMissionLab({ unit, missionSet, initialMissionIndex
       onStatus: ({ status }) => setRuntimeStatus(status),
     })
     runtimeRef.current = runtime
-    runtime.load().catch(() => setRuntimeStatus('error'))
+    runtime.load().then(() => setRuntimeStatus('ready')).catch(() => setRuntimeStatus('error'))
     return () => {
       clearInterval(autoplayRef.current)
       runtime.dispose()
@@ -1204,7 +1204,15 @@ export default function PythonMissionLab({ unit, missionSet, initialMissionIndex
               )}
               {running
                 ? <button type="button" className="is-stop" onClick={stopMission}>■ STOP</button>
-                : <button type="button" className="is-run" onClick={runMission} disabled={runtimeStatus !== 'ready'}>▶ RUN</button>}
+                : <button
+                    type="button"
+                    className="is-run"
+                    onClick={runMission}
+                    disabled={running}
+                    title={runtimeStatus === 'loading' ? 'Python 엔진을 준비 중입니다. 클릭하면 즉시 로드 후 실행됩니다.' : '작성한 파이썬 코드를 실행합니다.'}
+                  >
+                    {runtimeStatus === 'loading' ? '⏳ RUN' : '▶ RUN'}
+                  </button>}
             </div>
           </div>
           {scaffold.allowQuickInsert === true && suggestedTokens.length > 0 && !isViewOnly && (

@@ -301,14 +301,13 @@ export const LUMI_DECISION_CORE_MISSIONS = [
     order: 6,
     aliases: ['lumi-act4-06', '4-F'],
     title: '자율 구조 판단 시스템',
-    objective: '에너지가 부족하면 충전하고, 적 펄스가 오면 방어막을 켜고, 강한 신호만 수집한 뒤 비콘에 도착하세요.',
+    objective: '에너지가 부족하면 충전하고, 적 펄스가 오면 방어막을 켠 뒤 비콘에 도착하세요.',
     briefing: 'FINAL DECISION TEST입니다. 지금까지 배운 if/elif/else와 센서 판단을 종합하여 스스로 상황을 극복하는 자율 루미를 완성하세요.',
     concepts: ['if', 'elif', 'else', '센서 판단', '종합'],
     pygameBridgeKey: 'condition-field',
     learningSteps: [
       'if lumi.energy < 20: 조건으로 필요 시 충전합니다.',
       'if world.incoming_pulse: 조건이면 lumi.shield()로 방어합니다.',
-      '주변 신호 중 strength >= 5인 우선 신호를 수집합니다.',
       'lumi.move(world.target_distance)로 비콘에 도착합니다.',
     ],
     world: {
@@ -318,21 +317,19 @@ export const LUMI_DECISION_CORE_MISSIONS = [
       stations: [{ id: 'station_dock', x: 1, y: 2, label: '급속 충전소' }],
       objects: [
         { id: 'station', kind: 'charge', x: 1, y: 2 },
-        { id: 'priority', kind: 'signal', x: 1, y: 2, strength: 8 },
       ],
       target: { x: 6, y: 2, kind: 'sos', label: '비상 탈출 비콘' },
     },
     goals: [
       { type: 'shieldActive', label: '적 펄스 방어막 가동' },
-      { type: 'collectedIncludes', id: 'priority', label: '우선 구조 신호 수집' },
       { type: 'position', x: 6, y: 2, label: '비콘 최종 도착' },
     ],
     mustUse: ['if', 'comparison'],
     mustCall: ['lumi.charge', 'lumi.shield', 'lumi.move'],
     hints: [
-      { level: 1, type: 'context', text: '에너지 충전(20 미만), 적 펄스 방어, 강한 신호 수집을 순서대로 판단해야 합니다.' },
+      { level: 1, type: 'context', text: '에너지 충전(20 미만)과 적 펄스 방어를 순서대로 판단해야 합니다.' },
       { level: 2, type: 'concept', text: '각 단계마다 독립된 if 조건문을 작성해 필요한 행동만 순차 실행되도록 합니다.' },
-      { level: 3, type: 'code', text: 'if lumi.energy < 20:\n    lumi.charge()\nif world.incoming_pulse:\n    lumi.shield()\nfor item in lumi.scan():\n    if item.strength >= 5:\n        lumi.collect(item)\nlumi.move(world.target_distance)' },
+      { level: 3, type: 'code', text: 'if lumi.energy < 20:\n    lumi.charge()\nif world.incoming_pulse:\n    lumi.shield()\nlumi.move(world.target_distance)' },
     ],
     hiddenVariants: [
       {
@@ -343,7 +340,6 @@ export const LUMI_DECISION_CORE_MISSIONS = [
           incomingPulse: true,
           objects: [
             { id: 'station', kind: 'charge', x: 1, y: 2 },
-            { id: 'priority', kind: 'signal', x: 1, y: 2, strength: 9 },
           ],
         },
         goals: [
