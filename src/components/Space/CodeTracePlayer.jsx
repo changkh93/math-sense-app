@@ -1791,7 +1791,14 @@ export default function CodeTracePlayer({
 
   const answerCode = getModeCode({ ...exercise, answerCode: requiredAnswerCode }, mode, visibleLines);
   const totalLines = normalizeNewlines(requiredAnswerCode || '').split('\n').length;
-  const visibleAnswerLineCount = Math.max(1, normalizeNewlines(answerCode || '').split('\n').length);
+  const answerLines = useMemo(() => {
+    return normalizeNewlines(answerCode || '').split('\n');
+  }, [answerCode]);
+  const visibleAnswerLineCount = Math.max(1, answerLines.length);
+  const currentStudentLineNumber = useMemo(() => {
+    const codeBeforeCursor = studentCode.slice(0, studentSelection.start);
+    return normalizeNewlines(codeBeforeCursor).split('\n').length;
+  }, [studentCode, studentSelection.start]);
   const codePanelHeight = Math.min(
     CODE_PANEL_MAX_HEIGHT,
     Math.max(
@@ -1987,6 +1994,16 @@ export default function CodeTracePlayer({
           background: linear-gradient(135deg, #86efac, #22c55e);
           animation: codeTraceCheckPop 0.28s ease-out both;
           box-shadow: 0 0 14px rgba(34,197,94,0.34);
+        }
+        .code-trace-answer-line-marker {
+          border-color: rgba(34,197,94,0.28);
+          color: rgba(187,247,208,0.85);
+          background: rgba(15,23,42,0.82);
+        }
+        .code-trace-answer-line-marker.is-current {
+          border-color: rgba(34,197,94,0.85);
+          color: #86efac;
+          box-shadow: 0 0 10px rgba(34,197,94,0.3), inset 0 0 8px rgba(2,6,23,0.55);
         }
         .code-trace-cm-char {
           border-radius: 4px;
@@ -2268,7 +2285,7 @@ export default function CodeTracePlayer({
                 )}
               </div>
             </div>
-            <pre
+            <div
               tabIndex={0}
               onCopy={preventAnswerCopy}
               onCut={preventAnswerCopy}
@@ -2276,10 +2293,95 @@ export default function CodeTracePlayer({
               onContextMenu={preventAnswerCopy}
               onSelect={preventAnswerCopy}
               onKeyDown={preventAnswerCopyShortcut}
-              style={{ boxSizing: 'border-box', width: '100%', maxWidth: '100%', height: codePanelHeight, minHeight: CODE_PANEL_MIN_HEIGHT, maxHeight: CODE_PANEL_MAX_HEIGHT, margin: 0, padding: '1rem', borderRadius: 10, background: '#020617', color: '#e5e7eb', overflow: 'auto', whiteSpace: 'pre', filter: answerVisible ? 'none' : 'blur(5px)', userSelect: 'none', WebkitUserSelect: 'none', MozUserSelect: 'none', fontSize: '0.92rem', lineHeight: 1.55 }}
+              style={{
+                boxSizing: 'border-box',
+                width: '100%',
+                maxWidth: '100%',
+                height: codePanelHeight,
+                minHeight: CODE_PANEL_MIN_HEIGHT,
+                maxHeight: CODE_PANEL_MAX_HEIGHT,
+                margin: 0,
+                borderRadius: 10,
+                background: '#020617',
+                border: '1px solid rgba(255,255,255,0.12)',
+                color: '#f8fafc',
+                overflow: 'auto',
+                filter: answerVisible ? 'none' : 'blur(5px)',
+                userSelect: 'none',
+                WebkitUserSelect: 'none',
+                MozUserSelect: 'none',
+                fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
+                fontSize: '0.92rem',
+                lineHeight: '1.55',
+              }}
             >
-              {answerCode}
-            </pre>
+              <div style={{ display: 'flex', minWidth: 'max-content', padding: '1rem 0' }}>
+                <div
+                  aria-hidden="true"
+                  style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    userSelect: 'none',
+                    backgroundColor: '#020617',
+                    borderRight: '1px solid rgba(148,163,184,0.08)',
+                    paddingLeft: '0.65rem',
+                    paddingRight: '0.4rem',
+                    flexShrink: 0,
+                  }}
+                >
+                  {answerLines.map((_, idx) => {
+                    const lineNumber = idx + 1;
+                    const isCurrent = lineNumber === currentStudentLineNumber;
+                    return (
+                      <div
+                        key={idx}
+                        style={{
+                          height: `${CODE_PANEL_LINE_HEIGHT_PX}px`,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                        }}
+                      >
+                        <span
+                          className={`code-trace-cm-line-marker code-trace-answer-line-marker ${isCurrent ? 'is-current' : ''}`}
+                        >
+                          {lineNumber}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                <div
+                  style={{
+                    flex: 1,
+                    paddingLeft: '1rem',
+                    paddingRight: '1rem',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    whiteSpace: 'pre',
+                  }}
+                >
+                  {answerLines.map((lineText, idx) => {
+                    const isCurrent = (idx + 1) === currentStudentLineNumber;
+                    return (
+                      <div
+                        key={idx}
+                        style={{
+                          height: `${CODE_PANEL_LINE_HEIGHT_PX}px`,
+                          lineHeight: `${CODE_PANEL_LINE_HEIGHT_PX}px`,
+                          whiteSpace: 'pre',
+                          backgroundColor: isCurrent ? 'rgba(34, 197, 94, 0.06)' : 'transparent',
+                          borderRadius: 3,
+                        }}
+                      >
+                        {lineText || '\u00A0'}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
           </section>
 
           <section className={`glass-card code-trace-student-panel ${currentPassed ? 'is-complete' : ''}`} style={{ padding: '1rem', minWidth: 0, position: 'relative' }}>
