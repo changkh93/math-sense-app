@@ -123,9 +123,12 @@ function hasReachedSingleGoal(goal, ctx) {
   if (goal.type === 'collectedIncludes') {
     return (finalState?.inventory || []).some((item) => item.id === goal.id)
   }
+  if (goal.type === 'collectedExcludesKind') {
+    return !(finalState?.inventory || []).some((item) => item.kind === goal.kind)
+  }
   if (goal.type === 'allSignalsCollected') {
     const remaining = (finalState?.objects || []).filter((item) => item.kind === 'signal' && !item.collected)
-    return remaining.length === 0 && Number(finalState?.collectedCount || 0) > 0
+    return remaining.length === 0 && Number(finalState?.collectedCount || finalState?.inventory?.length || 0) > 0
   }
   if (goal.type === 'minimumEnergy') return Number(rover.energy || 0) >= Number(goal.value || 0)
   if (goal.type === 'stdoutIncludes') {
@@ -136,6 +139,85 @@ function hasReachedSingleGoal(goal, ctx) {
     const normStdout = cleanStdout.toLowerCase().replace(/\s+/g, ' ')
     const normExpected = expected.toLowerCase().replace(/\s+/g, ' ')
     return normStdout.includes(normExpected)
+  }
+
+  // Game API & Combat Goals
+  if (goal.type === 'gameInited') {
+    return events.some((e) => e.type === 'game_inited')
+  }
+  if (goal.type === 'gameQuitted') {
+    return events.some((e) => e.type === 'game_quitted')
+  }
+  if (goal.type === 'screenBlitted') {
+    return events.some((e) => {
+      if (e.type !== 'screen_blitted') return false
+      if (goal.image && String(e.payload?.image).toLowerCase() !== String(goal.image).toLowerCase()) return false
+      return true
+    })
+  }
+  if (goal.type === 'shapeDrawn') {
+    return events.some((e) => {
+      if (e.type !== 'shape_drawn') return false
+      if (goal.shape && e.payload?.shape !== goal.shape) return false
+      return true
+    })
+  }
+  if (goal.type === 'textRendered') {
+    return events.some((e) => {
+      if (e.type !== 'text_rendered') return false
+      if (goal.position && String(e.payload?.position).toLowerCase() !== String(goal.position).toLowerCase()) return false
+      if (goal.includes) {
+        const text = String(e.payload?.text || '').toLowerCase()
+        return text.includes(String(goal.includes).toLowerCase())
+      }
+      return true
+    })
+  }
+  if (goal.type === 'hudBarSet' || goal.type === 'hudBarUpdated') {
+    return events.some((e) => {
+      if (e.type !== 'hud_bar_updated') return false
+      if (goal.label && String(e.payload?.label).toUpperCase() !== String(goal.label).toUpperCase()) return false
+      if (goal.expectedValue !== undefined && Number(e.payload?.value) !== Number(goal.expectedValue)) return false
+      if (goal.maximum !== undefined && Number(e.payload?.maximum) !== Number(goal.maximum)) return false
+      return true
+    })
+  }
+  if (goal.type === 'soundPlayed') {
+    return events.some((e) => {
+      if (e.type !== 'sound_played') return false
+      if (goal.name && String(e.payload?.name).toLowerCase() !== String(goal.name).toLowerCase()) return false
+      return true
+    })
+  }
+  if (goal.type === 'musicPlayed') {
+    return events.some((e) => {
+      if (e.type !== 'music_played') return false
+      if (goal.name && String(e.payload?.name).toLowerCase() !== String(goal.name).toLowerCase()) return false
+      return true
+    })
+  }
+  if (goal.type === 'keyPressedChecked' || goal.type === 'keyChecked') {
+    return events.some((e) => {
+      if (e.type !== 'key_checked') return false
+      if (goal.key && String(e.payload?.key).toUpperCase() !== String(goal.key).toUpperCase()) return false
+      if (goal.type === 'keyPressedChecked' && e.payload?.pressed !== true) return false
+      return true
+    })
+  }
+  if (goal.type === 'clockTicked') {
+    const ticks = events.filter((e) => e.type === 'clock_ticked')
+    const min = Number(goal.minFrames || goal.count || 1)
+    return ticks.length >= min
+  }
+  if (goal.type === 'shieldActive' || goal.type === 'shieldRaised') {
+    return events.some((e) => e.type === 'shield_raised')
+  }
+  if (goal.type === 'collisionChecked') {
+    return events.some((e) => {
+      if (e.type !== 'collision_detected') return false
+      if (goal.collided !== undefined && Boolean(e.payload?.collided) !== Boolean(goal.collided)) return false
+      return true
+    })
   }
 
   // Variables & Memory Goals
@@ -180,6 +262,83 @@ function hasReachedSingleGoal(goal, ctx) {
       return userVars.some(([, val]) => val === goal.expectedFinal)
     }
     return true
+  }
+  if (goal.type === 'variableListEquals') {
+    const target = goal.name ? execTrace.variables[goal.name] : Object.values(execTrace.variables).find(Array.isArray)
+    if (!Array.isArray(target)) return false
+    return JSON.stringify(target) === JSON.stringify(goal.value)
+  }
+  if (goal.type === 'variableListLength') {
+    const target = goal.name ? execTrace.variables[goal.name] : Object.values(execTrace.variables).find(Array.isArray)
+    if (!Array.isArray(target)) return false
+    return goal.exact ? target.length === Number(goal.length) : target.length >= Number(goal.length)
+  }
+  if (goal.type === 'variableTupleEquals') {
+    const target = goal.name ? execTrace.variables[goal.name] : Object.values(execTrace.variables).find((v) => Array.isArray(v) || typeof v === 'object')
+    if (!target) return false
+    return JSON.stringify(target) === JSON.stringify(goal.value)
+  }
+  if (goal.type === 'variableDictContains') {
+    const target = goal.name ? execTrace.variables[goal.name] : Object.values(execTrace.variables).find((v) => typeof v === 'object' && !Array.isArray(v))
+    if (!target || typeof target !== 'object') return false
+    if (!(goal.key in target)) return false
+    if (goal.value !== undefined) return String(target[goal.key]) === String(goal.value)
+    return true
+  }
+  if (goal.type === 'variableDictEquals') {
+    const target = goal.name ? execTrace.variables[goal.name] : Object.values(execTrace.variables).find((v) => typeof v === 'object' && !Array.isArray(v))
+    if (!target || typeof target !== 'object' || Array.isArray(target)) return false
+    const expected = goal.value || {}
+    const targetKeys = Object.keys(target).sort()
+    const expectedKeys = Object.keys(expected).sort()
+    if (JSON.stringify(targetKeys) !== JSON.stringify(expectedKeys)) return false
+    return targetKeys.every((k) => String(target[k]) === String(expected[k]))
+  }
+  if (goal.type === 'printedSequence') {
+    const expectedLines = Array.isArray(goal.sequence || goal.lines || goal.value) ? (goal.sequence || goal.lines || goal.value) : []
+    const stdoutLines = stdout.split(/\r?\n/).map((l) => l.trim()).filter(Boolean)
+    if (expectedLines.length === 0) return true
+    let expectedIdx = 0
+    for (const line of stdoutLines) {
+      if (line === String(expectedLines[expectedIdx]).trim()) {
+        expectedIdx += 1
+        if (expectedIdx === expectedLines.length) return true
+      }
+    }
+    return false
+  }
+  if (goal.type === 'globalVariableAbsent') {
+    const lastMainLine = [...events].reverse().find((e) => e.type === 'line_entered' && (!e.payload?.activeFrameId || e.payload?.activeFrameId === 'main'))
+    if (lastMainLine?.payload?.variables) {
+      return lastMainLine.payload.variables[goal.name] === undefined
+    }
+    return execTrace.variables[goal.name] === undefined
+  }
+  if (goal.type === 'localVariableObserved') {
+    const matchingFunctionFrames = new Set(events
+      .filter((event) => (
+        event.type === 'frame_entered' &&
+        (!goal.functionName || event.payload?.functionName === goal.functionName)
+      ))
+      .map((event) => event.payload?.frameId || event.frameId)
+      .filter(Boolean))
+
+    return events.some((event) => (
+      event.type === 'memory_changed' &&
+      event.payload?.name === goal.name &&
+      matchingFunctionFrames.has(event.payload?.frameId || event.frameId)
+    ))
+  }
+  if (goal.type === 'functionCalled') {
+    const fnName = String(goal.name || '')
+    return events.some((event) => (
+      event.type === 'frame_entered' &&
+      event.payload?.callableKind === 'function' &&
+      event.payload?.functionName === fnName
+    ))
+  }
+  if (goal.type === 'eventDidNotOccur') {
+    return !events.some((e) => e.type === goal.eventType || (goal.name && e.payload?.name === goal.name))
   }
 
   // Object Core & Execution Trace Goals (Runtime Evidence)

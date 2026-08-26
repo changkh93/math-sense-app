@@ -179,14 +179,30 @@ def _analyze(tree, code=""):
             concepts.add("dict")
         elif isinstance(node, ast.Tuple):
             concepts.add("tuple")
+        elif isinstance(node, ast.Subscript):
+            concepts.add("subscript")
+            concepts.add("indexing")
         elif isinstance(node, ast.While):
             concepts.add("while")
+        elif isinstance(node, ast.Break):
+            concepts.add("break")
+        elif isinstance(node, ast.Continue):
+            concepts.add("continue")
         elif isinstance(node, ast.If):
             concepts.add("if")
+            if node.orelse:
+                if len(node.orelse) == 1 and isinstance(node.orelse[0], ast.If):
+                    concepts.add("elif")
+                else:
+                    concepts.add("else")
         elif isinstance(node, ast.Compare):
             concepts.add("comparison")
         elif isinstance(node, ast.BoolOp):
             concepts.add("boolean")
+            if isinstance(node.op, ast.And):
+                concepts.add("and")
+            elif isinstance(node.op, ast.Or):
+                concepts.add("or")
         elif isinstance(node, ast.Return):
             concepts.add("return")
         elif isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
@@ -211,6 +227,10 @@ def _analyze(tree, code=""):
                 concepts.add("sensor")
                 calls.add(node.attr)
                 calls.add("world." + node.attr)
+            if isinstance(node.value, ast.Name) and node.value.id == "game":
+                concepts.add("game")
+                calls.add(node.attr)
+                calls.add("game." + node.attr)
             if node.attr.startswith("__") and node.attr.endswith("__"):
                 violations.append(f"내부 특성 '{node.attr}' 접근은 보안상 허용되지 않습니다.")
         elif isinstance(node, ast.Call) and isinstance(node.func, ast.Name):
@@ -240,7 +260,30 @@ def _analyze(tree, code=""):
                 current = current.value
             if isinstance(current, ast.Name):
                 parts.append(current.id)
-                calls.add(".".join(reversed(parts)))
+                full_call = ".".join(reversed(parts))
+                calls.add(full_call)
+                if full_call.startswith("game."):
+                    concepts.add("game")
+                if "blit" in full_call:
+                    concepts.add("blit")
+                if "draw" in full_call:
+                    concepts.add("draw")
+                if "render" in full_call:
+                    concepts.add("render")
+                if "sound" in full_call:
+                    concepts.add("sound")
+                if "music" in full_call:
+                    concepts.add("music")
+                if "key" in full_call or "pressed" in full_call:
+                    concepts.add("key")
+                if "collides" in full_call:
+                    concepts.add("collision")
+                if "clock" in full_call or "tick" in full_call:
+                    concepts.add("clock")
+                if "hud" in full_call:
+                    concepts.add("hud")
+                if "shield" in full_call:
+                    concepts.add("shield")
         elif isinstance(node, ast.Import):
             violations.append("Mission Lab에서는 지정된 msense 모듈만 불러올 수 있습니다.")
         elif isinstance(node, ast.ImportFrom):
@@ -327,6 +370,37 @@ def _run_mission(payload_json, code):
                         clean_spec[key] = raw_value if not isinstance(raw_value, str) else raw_value[:120]
                 self.entity_specs.append(clean_spec)
             self.inventory = []
+            data_spec = config.get("data") if isinstance(config.get("data"), dict) else {}
+            raw_signals = data_spec.get("signals") if "signals" in data_spec else config.get("signals", ["ALPHA", "BETA", "GAMMA"])
+            self.signals = [str(s)[:120] for s in list(raw_signals or [])[:32]]
+
+            raw_inv = data_spec.get("inventoryItems") if "inventoryItems" in data_spec else config.get("inventoryItems", ["crystal", "shield", "laser"])
+            self.inventory_items = [str(s)[:120] for s in list(raw_inv or [])[:32]]
+
+            raw_cells = data_spec.get("batteryCells") if "batteryCells" in data_spec else config.get("batteryCells", ["cell1", "cell2", "cell3"])
+            self.battery_cells = [str(s)[:120] for s in list(raw_cells or [])[:32]]
+
+            raw_packet = data_spec.get("dataPacket") if "dataPacket" in data_spec else config.get("dataPacket", "ENERGY:90|SHIELD:5|STATUS:SAFE")
+            self.data_packet = str(raw_packet)[:300]
+
+            raw_status = data_spec.get("statusData") if "statusData" in data_spec else config.get("statusData", {"name": "LUMI", "energy": 80, "shield": 5})
+            clean_status = {}
+            if isinstance(raw_status, dict):
+                for k, v in list(raw_status.items())[:20]:
+                    clean_status[str(k)[:40]] = v if not isinstance(v, str) else v[:120]
+            self.status_data = clean_status
+
+            self.incoming_pulse = bool(config.get("incomingPulse", False))
+            self.pulse_distance = int(config.get("pulseDistance", 3))
+            self.enemies = [dict(e) for e in (config.get("enemies") or [])]
+            self.enemy_detected = bool(config.get("enemyDetected", len(self.enemies) > 0 or self.incoming_pulse))
+            self.key_sequence = list(mission.get("keySequence") or mission.get("inputTape") or [])
+            self.game_state = {
+                "inited": False,
+                "running": False,
+                "frame": 0,
+                "skin": "default",
+            }
 
         @property
         def target_distance(self):
@@ -370,6 +444,10 @@ def _run_mission(payload_json, code):
                 "objects": [dict(item) for item in self.objects],
                 "inventory": [dict(item) for item in self.inventory],
                 "collectedCount": len(self.inventory),
+                "incomingPulse": self.incoming_pulse,
+                "pulseDistance": self.pulse_distance,
+                "enemies": [dict(e) for e in self.enemies],
+                "gameState": dict(self.game_state),
             }
 
     state = WorldState(world_config)
@@ -605,6 +683,40 @@ def _run_mission(payload_json, code):
             emit("world", action="charge", before=before, end=dict(state.rover))
             return state.rover["energy"]
 
+        def shield(self):
+            nonlocal command_count
+            command_count += 1
+            if command_count > max_commands:
+                raise MissionLimitError("월드 명령 수가 안전 한도를 넘었습니다.")
+            state.rover["shield"] = True
+            state.incoming_pulse = False
+            emit("shield_raised", energy=state.rover["energy"], incomingPulse=False, end=dict(state.rover))
+            return True
+
+        def dodge(self, direction="left"):
+            nonlocal command_count
+            command_count += 1
+            if command_count > max_commands:
+                raise MissionLimitError("월드 명령 수가 안전 한도를 넘었습니다.")
+            emit("rover_dodged", direction=str(direction), end=dict(state.rover))
+            return True
+
+        def jam(self, enemy=None):
+            nonlocal command_count
+            command_count += 1
+            if command_count > max_commands:
+                raise MissionLimitError("월드 명령 수가 안전 한도를 넘었습니다.")
+            emit("enemy_jammed", enemy=str(enemy) if enemy is not None else "drone", end=dict(state.rover))
+            return True
+
+        def pulse(self, enemy=None):
+            nonlocal command_count
+            command_count += 1
+            if command_count > max_commands:
+                raise MissionLimitError("월드 명령 수가 안전 한도를 넘었습니다.")
+            emit("enemy_purified", enemy=str(enemy) if enemy is not None else "drone", end=dict(state.rover))
+            return True
+
     lumi = Rover()
 
     class World:
@@ -639,6 +751,32 @@ def _run_mission(payload_json, code):
             emit("sensor_read", sensor="survey_columns", value=state.survey_columns)
             return state.survey_columns
 
+        @property
+        def incoming_pulse(self):
+            emit("sensor_read", sensor="incoming_pulse", value=state.incoming_pulse)
+            return state.incoming_pulse
+
+        @property
+        def pulse_distance(self):
+            emit("sensor_read", sensor="pulse_distance", value=state.pulse_distance)
+            return state.pulse_distance
+
+        @property
+        def enemy_detected(self):
+            emit("sensor_read", sensor="enemy_detected", value=state.enemy_detected)
+            return state.enemy_detected
+
+        @property
+        def emergency(self):
+            is_emer = bool(state.incoming_pulse or not state.path_clear)
+            emit("sensor_read", sensor="emergency", value=is_emer)
+            return is_emer
+
+        @property
+        def enemies(self):
+            emit("sensor_read", sensor="enemies", value=len(state.enemies))
+            return [dict(item) for item in state.enemies]
+
         def snapshot(self):
             return state.snapshot()
 
@@ -651,12 +789,243 @@ def _run_mission(payload_json, code):
             emit("sensor_read", sensor="entity_specs", value=len(state.entity_specs))
             return [dict(item) for item in state.entity_specs]
 
+        @property
+        def signals(self):
+            emit("sensor_read", sensor="signals", value={"kind": "list", "length": len(state.signals)})
+            return list(state.signals)
+
+        @property
+        def inventory_items(self):
+            emit("sensor_read", sensor="inventory_items", value={"kind": "list", "length": len(state.inventory_items)})
+            return list(state.inventory_items)
+
+        @property
+        def battery_cells(self):
+            emit("sensor_read", sensor="battery_cells", value={"kind": "list", "length": len(state.battery_cells)})
+            return list(state.battery_cells)
+
+        @property
+        def data_packet(self):
+            emit("sensor_read", sensor="data_packet", value={"kind": "str", "length": len(state.data_packet)})
+            return str(state.data_packet)
+
+        @property
+        def status_data(self):
+            emit("sensor_read", sensor="status_data", value={"kind": "dict", "keys": list(state.status_data.keys())})
+            return dict(state.status_data)
+
+        @property
+        def target_pos(self):
+            pos = (int(state.target["x"]), int(state.target["y"]))
+            emit("sensor_read", sensor="target_pos", value={"kind": "tuple", "x": pos[0], "y": pos[1]})
+            return pos
+
     world = World()
+
+    def consume_game_command(limit_message="게임 명령 수가 안전 한도를 넘었습니다."):
+        nonlocal command_count
+        command_count += 1
+        if command_count > max_commands:
+            raise MissionLimitError(limit_message)
+
+    def finite_number(value, label):
+        if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(float(value)):
+            raise TypeError(f"{label}에는 유한한 숫자를 사용해 주세요.")
+        return float(value)
+
+    def fixed_numeric_sequence(value, length, label):
+        if not isinstance(value, (list, tuple)) or len(value) != length:
+            raise TypeError(f"{label}에는 숫자 {length}개가 든 tuple 또는 list를 사용해 주세요.")
+        return [finite_number(item, label) for item in value]
+
+    def collision_box(value):
+        if isinstance(value, WorldObject):
+            return (float(value.x), float(value.y), 1.0, 1.0)
+        if isinstance(value, str):
+            match = next((item for item in state.objects + state.enemies if str(item.get("id")) == value), None)
+            if match is None:
+                raise ValueError(f"{value!r} 이름의 월드 객체를 찾을 수 없습니다.")
+            value = match
+        if isinstance(value, dict):
+            position = value.get("position")
+            x = value.get("x", position[0] if isinstance(position, (list, tuple)) and len(position) >= 2 else None)
+            y = value.get("y", position[1] if isinstance(position, (list, tuple)) and len(position) >= 2 else None)
+            if x is None or y is None:
+                raise TypeError("충돌 대상 dictionary에는 x, y 좌표가 필요합니다.")
+            width = value.get("width", value.get("w", 1))
+            height = value.get("height", value.get("h", 1))
+            return (finite_number(x, "x"), finite_number(y, "y"), finite_number(width, "width"), finite_number(height, "height"))
+        if isinstance(value, (list, tuple)):
+            if len(value) == 2:
+                x, y = fixed_numeric_sequence(value, 2, "위치")
+                return (x, y, 1.0, 1.0)
+            if len(value) == 4:
+                x, y, width, height = fixed_numeric_sequence(value, 4, "충돌 사각형")
+                return (x, y, width, height)
+        if hasattr(value, "x") and hasattr(value, "y"):
+            return (
+                finite_number(getattr(value, "x"), "x"),
+                finite_number(getattr(value, "y"), "y"),
+                finite_number(getattr(value, "width", 1), "width"),
+                finite_number(getattr(value, "height", 1), "height"),
+            )
+        raise TypeError("충돌 대상은 (x, y), (x, y, width, height), 월드 객체 또는 좌표 dictionary여야 합니다.")
+
+    class GameScreen:
+        def blit(self, image, position=(0, 0)):
+            consume_game_command()
+            img_name = str(image)
+            if not img_name or len(img_name) > 80:
+                raise ValueError("이미지 이름은 1~80글자로 작성해 주세요.")
+            if img_name.startswith("lumi_"):
+                state.game_state["skin"] = img_name
+            pos = tuple(fixed_numeric_sequence(position, 2, "이미지 위치")) if isinstance(position, (list, tuple)) else str(position)[:40]
+            emit("screen_blitted", image=img_name, position=pos)
+            return True
+
+    class GameDraw:
+        def rect(self, color, rect, width=0):
+            consume_game_command()
+            clean_rect = fixed_numeric_sequence(rect, 4, "사각형 영역")
+            clean_width = int(finite_number(width, "테두리 두께"))
+            if clean_rect[2] <= 0 or clean_rect[3] <= 0 or clean_width < 0:
+                raise ValueError("사각형의 너비·높이는 0보다 크고 테두리 두께는 0 이상이어야 합니다.")
+            emit("shape_drawn", shape="rect", color=str(color)[:40], rect=clean_rect, width=clean_width)
+            return True
+
+        def circle(self, color, center, radius, width=0):
+            consume_game_command()
+            clean_center = fixed_numeric_sequence(center, 2, "원의 중심")
+            clean_radius = finite_number(radius, "반지름")
+            clean_width = int(finite_number(width, "테두리 두께"))
+            if clean_radius <= 0 or clean_width < 0:
+                raise ValueError("원의 반지름은 0보다 크고 테두리 두께는 0 이상이어야 합니다.")
+            emit("shape_drawn", shape="circle", color=str(color)[:40], center=clean_center, radius=clean_radius, width=clean_width)
+            return True
+
+    class GameText:
+        def render(self, text, position="top-left", color=None):
+            consume_game_command()
+            pos = str(position)[:40] if isinstance(position, str) else fixed_numeric_sequence(position, 2, "텍스트 위치")
+            emit("text_rendered", text=str(text)[:240], position=pos, color=str(color)[:40] if color else None)
+            return True
+
+    class GameHud:
+        def bar(self, label, value, maximum=100, color=None):
+            consume_game_command()
+            clean_value = finite_number(value, "게이지 값")
+            clean_maximum = finite_number(maximum, "게이지 최댓값")
+            if clean_maximum <= 0:
+                raise ValueError("게이지 최댓값은 0보다 커야 합니다.")
+            emit("hud_bar_updated", label=str(label)[:40], value=clean_value, maximum=clean_maximum, color=str(color)[:40] if color else None)
+            return True
+
+    class GameSound:
+        def play(self, name):
+            consume_game_command()
+            clean_name = str(name).strip()[:40]
+            if not clean_name:
+                raise ValueError("재생할 효과음 이름을 입력해 주세요.")
+            emit("sound_played", name=clean_name)
+            return True
+
+    class GameMusic:
+        def play(self, name):
+            consume_game_command()
+            clean_name = str(name).strip()[:40]
+            if not clean_name:
+                raise ValueError("재생할 배경음 이름을 입력해 주세요.")
+            emit("music_played", name=clean_name)
+            return True
+
+    class GameKey:
+        def pressed(self, key_name):
+            consume_game_command()
+            k = str(key_name).upper().strip()
+            if k not in ("RIGHT", "LEFT", "UP", "DOWN", "SPACE", "ARROW_RIGHT", "ARROW_LEFT", "ARROW_UP", "ARROW_DOWN"):
+                raise ValueError("키 이름은 RIGHT, LEFT, UP, DOWN, SPACE 중 하나를 사용해 주세요.")
+            frame = state.game_state["frame"]
+            is_pressed = False
+            if state.key_sequence:
+                if frame < len(state.key_sequence):
+                    frame_keys = state.key_sequence[frame]
+                    if isinstance(frame_keys, (list, set, tuple)):
+                        is_pressed = k in [str(x).upper() for x in frame_keys]
+                    elif isinstance(frame_keys, dict):
+                        is_pressed = bool(frame_keys.get(k) or frame_keys.get(key_name))
+                    elif isinstance(frame_keys, str):
+                        is_pressed = (k == frame_keys.upper().strip())
+                else:
+                    is_pressed = False
+            emit("key_checked", key=k, pressed=is_pressed, frame=frame)
+            return is_pressed
+
+    class GameClock:
+        def tick(self, fps=10):
+            consume_game_command("게임 루프 실행 한도를 넘었습니다.")
+            if not state.game_state["inited"]:
+                raise RuntimeError("game.clock.tick() 전에 game.init()으로 장면을 시작해 주세요.")
+            clean_fps = int(finite_number(fps, "FPS"))
+            if clean_fps < 1 or clean_fps > 60:
+                raise ValueError("FPS는 1부터 60 사이의 정수를 사용해 주세요.")
+            state.game_state["frame"] += 1
+            max_frames = max(1, min(120, int(limits.get("maxFrames", 30))))
+            if state.game_state["frame"] >= max_frames:
+                state.game_state["running"] = False
+            emit("clock_ticked", frame=state.game_state["frame"], fps=clean_fps)
+            return state.game_state["frame"]
+
+    class Game:
+        def __init__(self):
+            self.screen = GameScreen()
+            self.draw = GameDraw()
+            self.text = GameText()
+            self.hud = GameHud()
+            self.sound = GameSound()
+            self.music = GameMusic()
+            self.key = GameKey()
+            self.clock = GameClock()
+
+        def init(self):
+            consume_game_command()
+            state.game_state["inited"] = True
+            state.game_state["running"] = True
+            state.game_state["frame"] = 0
+            emit("game_inited", width=state.width, height=state.height)
+            return True
+
+        def quit(self):
+            consume_game_command()
+            state.game_state["running"] = False
+            emit("game_quitted", frame=state.game_state["frame"])
+            return True
+
+        @property
+        def running(self):
+            return state.game_state["running"]
+
+        @property
+        def frame(self):
+            return state.game_state["frame"]
+
+        def collides(self, a, b):
+            consume_game_command()
+            ax, ay, aw, ah = collision_box(a)
+            bx, by, bw, bh = collision_box(b)
+            if aw <= 0 or ah <= 0 or bw <= 0 or bh <= 0:
+                raise ValueError("충돌 사각형의 너비와 높이는 0보다 커야 합니다.")
+            is_col = ax < bx + bw and ax + aw > bx and ay < by + bh and ay + ah > by
+            emit("collision_detected", a=str(a)[:120], b=str(b)[:120], collided=is_col)
+            return is_col
+
+    game = Game()
 
     msense = types.ModuleType("msense")
     msense.lumi = lumi
     msense.world = world
+    msense.game = game
     msense.Rover = Rover
+    msense.Game = Game
     sys.modules["msense"] = msense
     sys.modules["metasense"] = msense
 
@@ -671,6 +1040,8 @@ def _run_mission(payload_json, code):
             if isinstance(other, str):
                 return self.__name__ == other
             if isinstance(other, SafeType):
+                return self.__name__ == other.__name__
+            if isinstance(other, type):
                 return self.__name__ == other.__name__
             return False
 
@@ -737,6 +1108,7 @@ def _run_mission(payload_json, code):
         student_globals = {
             "__builtins__": allowed_builtins,
             "__name__": "__main__",
+            "game": game,
         }
         if auto_import:
             student_globals["lumi"] = lumi

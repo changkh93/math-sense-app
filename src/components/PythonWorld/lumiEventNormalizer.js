@@ -127,6 +127,51 @@ export function normalizeRuntimeEvents(rawEvents = []) {
         sensor: raw.sensor ?? raw.payload?.sensor,
         value: raw.value ?? raw.payload?.value,
       }
+    } else if (raw.type === 'game_inited') {
+      type = 'game_inited'
+      payload = { width: raw.width, height: raw.height }
+    } else if (raw.type === 'game_quitted') {
+      type = 'game_quitted'
+      payload = { frame: raw.frame }
+    } else if (raw.type === 'screen_blitted') {
+      type = 'screen_blitted'
+      payload = { image: raw.image, position: raw.position }
+    } else if (raw.type === 'shape_drawn') {
+      type = 'shape_drawn'
+      payload = { shape: raw.shape, color: raw.color, rect: raw.rect, center: raw.center, radius: raw.radius, width: raw.width }
+    } else if (raw.type === 'text_rendered') {
+      type = 'text_rendered'
+      payload = { text: raw.text, position: raw.position, color: raw.color }
+    } else if (raw.type === 'hud_bar_updated') {
+      type = 'hud_bar_updated'
+      payload = { label: raw.label, value: raw.value, maximum: raw.maximum, color: raw.color }
+    } else if (raw.type === 'sound_played') {
+      type = 'sound_played'
+      payload = { name: raw.name }
+    } else if (raw.type === 'music_played') {
+      type = 'music_played'
+      payload = { name: raw.name }
+    } else if (raw.type === 'key_checked') {
+      type = 'key_checked'
+      payload = { key: raw.key, pressed: raw.pressed, frame: raw.frame }
+    } else if (raw.type === 'clock_ticked') {
+      type = 'clock_ticked'
+      payload = { frame: raw.frame, fps: raw.fps }
+    } else if (raw.type === 'collision_detected') {
+      type = 'collision_detected'
+      payload = { a: raw.a, b: raw.b, collided: raw.collided }
+    } else if (raw.type === 'shield_raised') {
+      type = 'shield_raised'
+      payload = { energy: raw.energy, incomingPulse: raw.incomingPulse, rover: raw.end }
+    } else if (raw.type === 'rover_dodged') {
+      type = 'rover_dodged'
+      payload = { direction: raw.direction, rover: raw.end }
+    } else if (raw.type === 'enemy_jammed') {
+      type = 'enemy_jammed'
+      payload = { enemy: raw.enemy, rover: raw.end }
+    } else if (raw.type === 'enemy_purified') {
+      type = 'enemy_purified'
+      payload = { enemy: raw.enemy, rover: raw.end }
     } else if (raw.payload && typeof raw.payload === 'object') {
       type = raw.type
       payload = { ...raw.payload }

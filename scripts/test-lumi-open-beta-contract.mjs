@@ -44,20 +44,16 @@ print(_run_mission(mission_payload_json, student_code))
 const legacyImportMission = getLumiMissionSet('act-4-decision').missions[0]
 assert.equal(runPython(legacyImportMission, legacyImportMission.starterCode).error, null, 'Safe metasense import must work')
 
-const dataSet = getLumiMissionSet('act-7-data')
-const solutions = [
-  'signals = ["ALPHA", "BETA", "GAMMA"]\nprint(len(signals))',
-  'packet = "ALPHA|BETA|GAMMA"\nsignals = packet.split("|")\nprint(len(signals))',
-  'signals = ["ALPHA", "BETA", "GAMMA"]\nmessage = "-".join(signals)\nprint(message)',
-  'target = (4, 2)\nprint(target)',
-  'status = {"name": "LUMI", "energy": 80}\nprint(status.get("energy", 0))',
-]
+import { getLumiSolutionBody } from '../src/components/PythonWorld/lumiSolutionCatalog.js'
 
-dataSet.missions.forEach((mission, index) => {
+const dataSet = getLumiMissionSet('act-7-data')
+dataSet.missions.forEach((mission) => {
   const starterEvaluation = evaluateMissionRun(mission, runPython(mission, mission.starterCode))
   assert.equal(starterEvaluation.basePassed, false, `${mission.codeName} starter must not clear`)
-  const solutionEvaluation = evaluateMissionRun(mission, runPython(mission, solutions[index]))
-  assert.equal(solutionEvaluation.basePassed, true, `${mission.codeName} solution must clear`)
+  const solution = getLumiSolutionBody(mission)
+  assert.ok(solution, `${mission.codeName} solution must exist`)
+  const solutionEvaluation = evaluateMissionRun(mission, runPython(mission, solution))
+  assert.equal(solutionEvaluation.basePassed, true, `${mission.codeName} solution must clear: ${solutionEvaluation.failureReason}`)
 })
 console.log('  -> Safe imports and ACT 7 data missions execute correctly')
 

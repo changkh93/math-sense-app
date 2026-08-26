@@ -17,6 +17,11 @@ const API_REFERENCE = Object.freeze([
     detail: 'LUMI에게 명령을 내리기 전에 항상 맨 첫 줄에 작성합니다.',
   },
   {
+    signature: 'from msense import game', token: 'from msense import game',
+    description: 'LUMI의 학습용 게임 도구를 현재 Python 파일에서 사용할 수 있게 준비합니다.',
+    detail: '실제 pygame을 불러오는 import pygame과는 다른 교육용 API입니다. 게임 제작의 개념과 실행 순서를 먼저 안전하게 연습합니다.',
+  },
+  {
     signature: '# 주석 (실행 끄기 / 설명)', token: '#',
     description: '줄 맨 앞에 #을 붙이면 Python이 해당 코드를 실행하지 않고 건너뜁니다.',
     detail: '예: # lumi.move(4)처럼 위험한 명령을 비활성화하거나 메모를 남길 때 사용합니다.',
@@ -92,6 +97,36 @@ const API_REFERENCE = Object.freeze([
     detail: '각 항목은 name, integrity 같은 이름표가 붙은 값을 가진 dictionary입니다. for로 항목을 하나씩 읽어 객체를 만들 수 있습니다.',
   },
   {
+    signature: 'world.signals', token: 'world.signals',
+    description: '관제소가 이번 미션에 보낸 신호 목록(list)입니다.',
+    detail: '미션마다 항목과 개수가 달라질 수 있습니다. 변수에 저장한 뒤 len(), 인덱싱, for 반복에 사용할 수 있습니다.',
+  },
+  {
+    signature: 'world.inventory_items', token: 'world.inventory_items',
+    description: '탐사선에 적재된 기본 자원 목록(list)입니다.',
+    detail: '인덱스 조회, append(), for 순회로 목록을 다룰 수 있습니다.',
+  },
+  {
+    signature: 'world.battery_cells', token: 'world.battery_cells',
+    description: '장착된 에너지 셀 목록(list)입니다.',
+    detail: 'pop()으로 마지막 셀을 꺼내어 소모할 수 있습니다.',
+  },
+  {
+    signature: 'world.data_packet', token: 'world.data_packet',
+    description: '원격 통신으로 수신된 압축 텔레메트리 패킷 문자열(str)입니다.',
+    detail: 'split("|") 메서드로 분리하여 리스트나 사전으로 해독합니다.',
+  },
+  {
+    signature: 'world.status_data', token: 'world.status_data',
+    description: '탐사선 상태 정보가 담긴 사전(dict)입니다.',
+    detail: '["energy"], ["shield"] 등의 키 이름표로 개별 수치를 조회합니다.',
+  },
+  {
+    signature: 'world.target_pos', token: 'world.target_pos',
+    description: '목표 지점의 불변 (x, y) 좌표 튜플(tuple)입니다.',
+    detail: '수정할 수 없는 (x, y) 쌍으로 목표 위치를 안전하게 참조합니다.',
+  },
+  {
     signature: 'input(prompt)', token: 'input',
     description: '관제 입력 패널에서 받은 값을 문자열로 반환합니다.',
     detail: '숫자처럼 보여도 결과는 str입니다. 이동 거리로 쓰려면 int(input(...))처럼 정수로 변환해야 합니다.',
@@ -125,6 +160,86 @@ const API_REFERENCE = Object.freeze([
     signature: 'separator.join(items)', token: 'join',
     description: '문자열 리스트의 항목 사이에 separator를 넣어 하나의 문자열로 만듭니다.',
     detail: 'split과 반대 방향의 작업입니다. items의 항목은 문자열이어야 하며 원본 리스트는 바뀌지 않습니다.',
+  },
+  {
+    signature: 'game.init()', token: 'game.init',
+    description: 'LUMI의 학습용 게임 장면을 시작하고 game.running을 True로 바꿉니다.',
+    detail: '실제 pygame.init()과 똑같은 함수는 아니지만, 게임 기능을 먼저 준비한다는 순서를 연습합니다.',
+  },
+  {
+    signature: 'game.quit()', token: 'game.quit',
+    description: 'LUMI의 학습용 게임 장면을 끝내고 game.running을 False로 바꿉니다.',
+    detail: '실제 pygame에서도 종료 처리가 필요합니다. 이 연습에서는 실행 기록에 종료 이벤트를 남깁니다.',
+  },
+  {
+    signature: 'game.screen.blit(image, position)', token: 'game.screen.blit',
+    description: '이름으로 고른 이미지나 스킨을 LUMI 월드의 격자 좌표에 배치합니다.',
+    detail: 'position=(2, 2)는 LUMI 격자의 2열 2행입니다. 실제 pygame의 blit은 Surface 이미지와 픽셀 좌표를 사용합니다.',
+  },
+  {
+    signature: 'game.draw.circle(color, center, radius)', token: 'game.draw.circle',
+    description: '지정한 중심 좌표에 레이더 원 등의 도형을 그립니다.',
+    detail: 'center=(x, y)는 격자 중심, radius는 격자 기준 반지름입니다. 실제 pygame에서는 픽셀 좌표를 사용합니다.',
+  },
+  {
+    signature: 'game.draw.rect(color, rect)', token: 'game.draw.rect',
+    description: '지정한 영역에 사각형을 그립니다.',
+    detail: 'rect=(x, y, width, height) 순서입니다. 실제 pygame에서도 같은 네 값의 사각형 개념을 사용하지만 단위는 픽셀입니다.',
+  },
+  {
+    signature: 'game.text.render(text, position="top-left")', token: 'game.text.render',
+    description: '문자열을 LUMI의 HUD 위치에 표시합니다.',
+    detail: '실제 pygame에서는 font.render()로 글자 이미지를 만든 뒤 blit()으로 배치합니다. LUMI에서는 두 단계를 하나로 단순화했습니다.',
+  },
+  {
+    signature: 'game.hud.bar(label, value, maximum=100)', token: 'game.hud.bar',
+    description: 'HUD에 에너지 또는 보호막 상태 게이지 바를 표시합니다.',
+    detail: '변수의 수치 변화를 시각적인 바 게이지로 나타냅니다.',
+  },
+  {
+    signature: 'game.sound.play(name)', token: 'game.sound.play',
+    description: 'LUMI에 준비된 이름의 효과음(SFX)을 재생합니다.',
+    detail: '예: "shield", "alert", "engine". 실제 pygame에서는 먼저 사운드 파일을 불러온 뒤 Sound.play()를 호출합니다.',
+  },
+  {
+    signature: 'game.music.play(name)', token: 'game.music.play',
+    description: 'LUMI에 준비된 이름의 배경 테마를 시작합니다.',
+    detail: '실제 pygame에서는 음악 파일을 load한 다음 mixer.music.play()를 호출합니다. LUMI는 파일 준비 단계를 생략합니다.',
+  },
+  {
+    signature: 'game.key.pressed(key_name)', token: 'game.key.pressed',
+    description: '미션에 기록된 현재 논리 프레임의 키 입력을 True 또는 False로 읽습니다.',
+    detail: '재생 결과가 항상 같도록 미션이 입력 테이프를 제공합니다. 실제 pygame에서는 pygame.key.get_pressed()로 사용자가 지금 누른 키를 읽습니다.',
+  },
+  {
+    signature: 'game.collides(a, b)', token: 'game.collides',
+    description: '두 위치나 사각형이 실제로 겹치는지 True 또는 False로 확인합니다.',
+    detail: '(x, y)는 한 칸, (x, y, width, height)는 사각형입니다. 실제 pygame의 Rect.colliderect()와 같은 겹침 판단을 연습합니다.',
+  },
+  {
+    signature: 'game.clock.tick(fps=10)', token: 'game.clock.tick',
+    description: 'LUMI 실행 기록을 다음 논리 프레임으로 한 칸 진행하고 표시할 FPS 값을 저장합니다.',
+    detail: '학습 실행을 빠르고 똑같이 재생하기 위해 실제 시간을 기다리지는 않습니다. 실제 pygame의 Clock.tick()은 루프 속도를 시간 기준으로 제한합니다.',
+  },
+  {
+    signature: 'game.running', token: 'game.running',
+    description: '학습용 게임 장면이 실행 중인지 나타내는 Boolean 속성입니다.',
+    detail: 'game.init() 뒤 True가 되고, 미션의 마지막 논리 프레임이나 game.quit() 뒤 False가 됩니다. 괄호를 붙이지 않습니다.',
+  },
+  {
+    signature: 'game.frame', token: 'game.frame',
+    description: '현재 몇 번째 논리 프레임인지 나타내는 정수 속성입니다.',
+    detail: 'game.clock.tick()을 한 번 호출할 때마다 1씩 증가합니다. 실제 시간이 아니라 재생 가능한 실행 순서 번호입니다.',
+  },
+  {
+    signature: 'lumi.shield()', token: 'lumi.shield',
+    description: '루미의 에너지 보호막을 가동합니다.',
+    detail: '접근하는 적의 에너지 펄스를 방어하여 피해를 막습니다.',
+  },
+  {
+    signature: 'world.incoming_pulse', token: 'world.incoming_pulse',
+    description: '적의 에너지 펄스가 접근 중이면 True인 Boolean 센서입니다.',
+    detail: 'if world.incoming_pulse: 조건문과 함께 사용하여 방어 또는 회피를 결정합니다.',
   },
 ])
 
@@ -212,10 +327,13 @@ export function getLumiLearningSteps(mission = {}) {
 }
 
 export function getLumiInitialCode(mission = {}) {
+  if (isSolvedStarterAllowed(mission)) return String(mission?.starterCode || '')
   if (typeof mission?.starterCode === 'string' && mission.starterCode.trim().length > 0) {
     return mission.starterCode
   }
-  if (isSolvedStarterAllowed(mission)) return String(mission?.starterCode || '')
+  if (Array.isArray(mission?.starterCode)) {
+    return `${mission.starterCode.join('\n')}\n`
+  }
   if (mission?.scaffold?.exposure === 'minimal-skeleton' && typeof mission?.scaffold?.initialCode === 'string') return mission.scaffold.initialCode
   return `${['# 아래 순서대로 코드를 작성하세요.', ...getLumiLearningSteps(mission).map((step, index) => `# ${index + 1}. ${step}`)].join('\n')}\n\n`
 }
@@ -295,6 +413,9 @@ export function getRelevantMissionApi(mission = {}) {
     appendReference('#')
   }
   if (requiredCalls.has('lumi.move') && text.includes('world.target_distance')) appendReference('world.target_distance')
+  if (text.includes('game.')) appendReference('from msense import game')
+  if (text.includes('game.running')) appendReference('game.running')
+  if (text.includes('game.frame')) appendReference('game.frame')
   return selected.length > 0 ? selected : catalogItems.slice(0, 3)
 }
 
@@ -317,10 +438,36 @@ export function getLumiGoalLabel(goal = {}) {
     allSignalsCollected: '월드에 남은 구조 신호를 모두 수집합니다.',
     collectedCount: `수집 대상을 ${goal.count || 1}개 이상 회수합니다.`,
     collectedIncludes: `${goal.id || '지정된'} 신호를 수집합니다.`,
+    collectedExcludesKind: `${goal.kind || '지정된'} 종류의 대상은 수집하지 않습니다.`,
     minimumEnergy: `루미의 에너지를 ${goal.value} 이상으로 만듭니다.`,
     variableDefined: `${goal.name} 변수를 만들고 값을 저장합니다.`,
     variableValueEquals: `${goal.name} 변수의 최종 값을 ${String(goal.value)}로 만듭니다.`,
     variableChanged: `${goal.name} 변수의 값을 계산으로 갱신합니다.`,
+    variableListEquals: `${goal.name || '리스트'}에 올바른 항목들을 순서대로 저장합니다.`,
+    variableListLength: `${goal.name || '리스트'}의 길이를 ${goal.length}개로 만듭니다.`,
+    variableTupleEquals: `${goal.name || '튜플'}에 올바른 좌표를 튜플로 저장합니다.`,
+    variableDictContains: `${goal.name || '사전'}에 ${goal.key} 키와 상태 값을 올바르게 설정합니다.`,
+    variableDictEquals: `${goal.name || '사전'}에 정확한 상태 사전 데이터를 구성합니다.`,
+    printedSequence: '출력 창에 각 항목을 순서대로 한 줄씩 출력합니다.',
+    globalVariableAbsent: `${goal.name} 변수가 함수 밖 전역에 남지 않고 안전하게 소멸합니다.`,
+    localVariableObserved: `${goal.functionName || '함수'} 안에서 ${goal.name || '지역 변수'}를 만들고 사용합니다.`,
+    functionCalled: `${goal.name || '함수'}를 정의한 후 실제로 호출합니다.`,
+    eventDidNotOccur: '위험 이벤트가 발생하지 않도록 안전하게 제어합니다.',
+    gameInited: '정비창 화면의 전원을 켭니다 (game.init).',
+    gameQuitted: '장면을 안전하게 종료합니다 (game.quit).',
+    screenBlitted: goal.image ? `${goal.image} 이미지를 화면에 배치합니다.` : '이미지를 화면에 배치합니다.',
+    shapeDrawn: '화면에 지정된 도형을 그립니다.',
+    textRendered: goal.includes ? `HUD에 “${goal.includes}” 문구를 표시합니다.` : 'HUD에 텍스트를 표시합니다.',
+    hudBarSet: `${goal.label || '상태'} 게이지 바를 설정합니다.`,
+    hudBarUpdated: `${goal.label || '상태'} 게이지 바를 갱신합니다.`,
+    soundPlayed: `${goal.name || '효과음'}을 재생합니다.`,
+    musicPlayed: `${goal.name || '배경음'}을 시작합니다.`,
+    keyPressedChecked: `${goal.key || '키보드'} 입력 상태를 확인합니다.`,
+    keyChecked: `${goal.key || '키보드'} 입력 상태를 확인합니다.`,
+    clockTicked: '게임 루프 프레임을 진행합니다 (game.clock.tick).',
+    shieldActive: '에너지 보호막을 가동합니다 (lumi.shield).',
+    shieldRaised: '에너지 보호막을 가동합니다 (lumi.shield).',
+    collisionChecked: '충돌 여부를 확인합니다.',
     classDefined: `${goal.className || '지정된'} 클래스를 정의합니다.`,
     classCountAtLeast: `클래스 설계도를 ${goal.count || 1}개 이상 정의합니다.`,
     instanceCountEquals: `객체 인스턴스를 정확히 ${goal.count}개 생성합니다.`,

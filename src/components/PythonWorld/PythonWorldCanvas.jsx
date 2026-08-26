@@ -44,6 +44,10 @@ export default function PythonWorldCanvas({
   const isAwake = Boolean(rover.awake)
   const lastSpeech = rover.lastMessage || (result?.cleared ? mission?.lumiVoice : null)
   const activeSensor = showSensor ? worldState.sensorReadings?.steps_to_target : undefined
+  const configuredEnemies = worldState.gameState?.enemies || []
+  const visibleEnemies = configuredEnemies.length > 0
+    ? configuredEnemies
+    : (mission?.world?.incomingPulse ? [{ id: 'turret_1', x: width - 1, y: 1 }] : [])
 
   const cellStyle = (x, y) => ({
     left: `${((x + 0.5) / width) * 100}%`,
@@ -266,6 +270,67 @@ export default function PythonWorldCanvas({
           <LumiTacticalWorldLayer tacticalState={tacticalState} width={width} height={height} />
         )}
 
+        {/* Drawn Shapes Layer */}
+        {(worldState.gameState?.shapes || []).map((s, idx) => {
+          if (s.shape === 'circle' && Array.isArray(s.center)) {
+            const cx = s.center[0] ?? 0
+            const cy = s.center[1] ?? 0
+            const r = Math.max(1, Number(s.radius) || 2)
+            const style = {
+              ...cellStyle(cx, cy),
+              position: 'absolute',
+              width: `${(r / width) * 200}%`,
+              height: `${(r / height) * 200}%`,
+              transform: 'translate(-50%, -50%)',
+              borderRadius: '50%',
+              border: `2px dashed ${s.color || '#38bdf8'}`,
+              boxShadow: `0 0 16px ${s.color || 'rgba(56, 189, 248, 0.4)'}`,
+              pointerEvents: 'none',
+              zIndex: 3,
+            }
+            return <div key={`shape-${idx}`} style={style} />
+          }
+          if (s.shape === 'rect' && Array.isArray(s.rect) && s.rect.length === 4) {
+            const [x, y, rectWidth, rectHeight] = s.rect.map(Number)
+            const style = {
+              left: `${(x / width) * 100}%`,
+              top: `${(y / height) * 100}%`,
+              width: `${(rectWidth / width) * 100}%`,
+              height: `${(rectHeight / height) * 100}%`,
+              position: 'absolute',
+              border: `${Math.max(1, Number(s.width) || 2)}px solid ${s.color || '#38bdf8'}`,
+              background: Number(s.width) === 0 ? `${s.color || '#38bdf8'}33` : 'transparent',
+              boxShadow: `0 0 12px ${s.color || 'rgba(56, 189, 248, 0.35)'}`,
+              pointerEvents: 'none',
+              zIndex: 3,
+            }
+            return <div key={`shape-${idx}`} style={style} />
+          }
+          return null
+        })}
+
+        {/* Enemy Drone / Turret Layer */}
+        {visibleEnemies.map((enemy, idx) => (
+          <div
+            key={enemy.id || `enemy-${idx}`}
+            className="python-world__enemy-turret"
+            style={cellStyle(enemy.x ?? width - 1, enemy.y ?? 1)}
+          >
+            <div className="python-world__enemy-turret-body">
+              <span>👾</span>
+            </div>
+            {worldState.gameState?.incomingPulse && (
+              <div
+                className="python-world__enemy-pulse-beam"
+                style={{
+                  width: '120px',
+                  transform: 'rotate(180deg) translateY(-50%)',
+                }}
+              />
+            )}
+          </div>
+        ))}
+
         {/* 1.8x Scaled LUMI Rover with Alive Character Presence */}
         <div
           className={`python-world__rover ${!isAwake ? 'python-world__rover--sleeping' : 'python-world__rover--awake'}`}
@@ -274,6 +339,11 @@ export default function PythonWorldCanvas({
           {/* Faint broken circular gauge for sleeping state */}
           {!isAwake && (
             <div className="python-world__broken-gauge" aria-hidden="true" />
+          )}
+
+          {/* Active Forcefield Shield */}
+          {worldState.gameState?.shieldActive && (
+            <div className="python-world__shield-bubble" aria-label="보호막 가동 중" />
           )}
 
           {/* Glowing orbital rings for awake state */}
@@ -294,10 +364,25 @@ export default function PythonWorldCanvas({
               aria-label="루미 탐사선"
             >
               <defs>
-                <linearGradient id="lumiHullGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+                <linearGradient id="lumiHullGradDefault" x1="0%" y1="0%" x2="100%" y2="0%">
                   <stop offset="0%" stopColor="#1e3a5f" />
                   <stop offset="55%" stopColor="#2563eb" />
                   <stop offset="100%" stopColor="#38bdf8" />
+                </linearGradient>
+                <linearGradient id="lumiHullGradGold" x1="0%" y1="0%" x2="100%" y2="0%">
+                  <stop offset="0%" stopColor="#78350f" />
+                  <stop offset="55%" stopColor="#d97706" />
+                  <stop offset="100%" stopColor="#fbbf24" />
+                </linearGradient>
+                <linearGradient id="lumiHullGradStealth" x1="0%" y1="0%" x2="100%" y2="0%">
+                  <stop offset="0%" stopColor="#0f172a" />
+                  <stop offset="55%" stopColor="#334155" />
+                  <stop offset="100%" stopColor="#64748b" />
+                </linearGradient>
+                <linearGradient id="lumiHullGradNeon" x1="0%" y1="0%" x2="100%" y2="0%">
+                  <stop offset="0%" stopColor="#581c87" />
+                  <stop offset="55%" stopColor="#9333ea" />
+                  <stop offset="100%" stopColor="#c084fc" />
                 </linearGradient>
                 <linearGradient id="lumiVisorGrad" x1="0%" y1="0%" x2="100%" y2="0%">
                   <stop offset="0%" stopColor="#fef08a" />
@@ -320,14 +405,23 @@ export default function PythonWorldCanvas({
               )}
 
               {/* Spaceship Main Hull (Points East / Right) */}
-              <path
-                d="M 44 20 L 14 6 L 16 15 L 10 15 L 12 20 L 10 25 L 16 25 L 14 34 Z"
-                fill={isAwake ? 'url(#lumiHullGrad)' : '#334155'}
-                stroke={isAwake ? '#7dd3fc' : '#64748b'}
-                strokeWidth="1.5"
-                strokeLinejoin="round"
-                filter={isAwake ? 'url(#lumiGlow)' : undefined}
-              />
+              {(() => {
+                const skin = worldState.gameState?.skin
+                let hullFill = 'url(#lumiHullGradDefault)'
+                if (skin === 'lumi_gold') hullFill = 'url(#lumiHullGradGold)'
+                else if (skin === 'lumi_stealth') hullFill = 'url(#lumiHullGradStealth)'
+                else if (skin === 'lumi_neon' || skin === 'lumi_purple') hullFill = 'url(#lumiHullGradNeon)'
+                return (
+                  <path
+                    d="M 44 20 L 14 6 L 16 15 L 10 15 L 12 20 L 10 25 L 16 25 L 14 34 Z"
+                    fill={isAwake ? hullFill : '#334155'}
+                    stroke={isAwake ? '#7dd3fc' : '#64748b'}
+                    strokeWidth="1.5"
+                    strokeLinejoin="round"
+                    filter={isAwake ? 'url(#lumiGlow)' : undefined}
+                  />
+                )
+              })()}
 
               {/* Wing Accent Panels */}
               <polygon points="28,15 16,10 18,17" fill={isAwake ? '#67e8f9' : '#475569'} opacity="0.7" />
@@ -353,7 +447,11 @@ export default function PythonWorldCanvas({
               )}
             </svg>
           </div>
-          <span className="python-world__rover-label">{isAwake ? 'LUMI' : 'OFFLINE'}</span>
+          <span className="python-world__rover-label">
+            {worldState.gameState?.skin && worldState.gameState.skin !== 'default'
+              ? worldState.gameState.skin.toUpperCase()
+              : (isAwake ? 'LUMI' : 'OFFLINE')}
+          </span>
 
           {lastSpeech && (
             <div className="python-world__speech-bubble" role="status">
@@ -362,6 +460,74 @@ export default function PythonWorldCanvas({
           )}
         </div>
       </div>
+
+      {/* Rendered Text HUD Overlays */}
+      {(worldState.gameState?.texts || []).map((item, idx) => {
+        const posClass = typeof item.position === 'string'
+          ? `python-world__hud-text-overlay--${item.position.replace('_', '-')}`
+          : ''
+        const customStyle = Array.isArray(item.position)
+          ? cellStyle(item.position[0], item.position[1])
+          : {}
+        return (
+          <div
+            key={`hud-text-${idx}`}
+            className={`python-world__hud-text-overlay ${posClass}`}
+            style={{ ...customStyle, color: item.color || undefined }}
+          >
+            {item.text}
+          </div>
+        )
+      })}
+
+      {/* Rendered HUD Bars (e.g. Shield gauge) */}
+      {Object.keys(worldState.gameState?.hudBars || {}).length > 0 && (
+        <div className="python-world__hud-bars">
+          {Object.values(worldState.gameState.hudBars).map((bar, idx) => {
+            const pct = Math.max(0, Math.min(100, (Number(bar.value) / Number(bar.maximum || 100)) * 100))
+            const isShield = String(bar.label).toUpperCase().includes('SHIELD')
+            return (
+              <div key={`hud-bar-${idx}`} className="python-world__hud-bar-item">
+                <div className="python-world__hud-bar-header">
+                  <span>{bar.label}</span>
+                  <span>{bar.value}/{bar.maximum}</span>
+                </div>
+                <div className="python-world__hud-bar-track">
+                  <div
+                    className={`python-world__hud-bar-fill ${isShield ? 'python-world__hud-bar-fill--shield' : ''}`}
+                    style={{ width: `${pct}%`, background: bar.color || undefined }}
+                  />
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
+
+      {/* Key State Monitor (When keys are evaluated in trace/game loop) */}
+      {(worldState.gameState?.pressedKeys?.length > 0 || mission?.concepts?.includes('key') || mission?.concepts?.includes('게임 루프')) && (
+        <div className="python-world__key-monitor" title="키보드 입력 센서 모니터">
+          {['LEFT', 'UP', 'DOWN', 'RIGHT', 'SPACE'].map((k) => {
+            const isPressed = (worldState.gameState?.pressedKeys || []).includes(k)
+            const iconMap = { LEFT: '←', UP: '↑', DOWN: '↓', RIGHT: '→', SPACE: '␣' }
+            return (
+              <div
+                key={k}
+                className={`python-world__key-cap ${isPressed ? 'python-world__key-cap--active' : ''}`}
+              >
+                {iconMap[k] || k}
+              </div>
+            )
+          })}
+        </div>
+      )}
+
+      {/* Frame Ticker in Game Loop */}
+      {worldState.gameState?.frame > 0 && (
+        <div className="python-world__frame-ticker">
+          FRAME #{worldState.gameState.frame} · {worldState.gameState.fps || 10} FPS
+        </div>
+      )}
 
       {showHud && (
         <div className="python-world__hud">

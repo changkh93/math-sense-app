@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { VERTICAL_SLICE_MISSIONS, ACT_1_MISSIONS, getLumiMissionById } from '../src/components/PythonWorld/lumiCourseCatalog.js';
+import { VERTICAL_SLICE_MISSIONS, ALL_VERTICAL_SLICE_MISSIONS, ACT_1_MISSIONS, getLumiMissionById } from '../src/components/PythonWorld/lumiCourseCatalog.js';
 import {
   LUMI_REWARD_FLAGS,
   getCanonicalLumiMission,
@@ -9,11 +9,12 @@ import {
 
 console.log('=== Running Phase 8: LUMI Rewards, Canonical ID, & Idempotent Ledger Tests ===');
 
-// 1. Check Vertical Slice Catalog Rewards
+// 1. Check Vertical Slice Catalog Rewards (ACT 0: 6 missions + Legacy: 4 missions)
 console.log('[Test 1] Vertical Slice Mission Catalog Reward configuration...');
-assert.equal(VERTICAL_SLICE_MISSIONS.length, 10, 'Must have 10 vertical slice missions');
+assert.equal(VERTICAL_SLICE_MISSIONS.length, 6, 'ACT 0 must have 6 core vertical slice missions');
+assert.equal(ALL_VERTICAL_SLICE_MISSIONS.length, 10, 'Must have 10 total vertical slice missions including legacy');
 
-let totalBaseCrystals = 0;
+let totalCoreBaseCrystals = 0;
 VERTICAL_SLICE_MISSIONS.forEach((m) => {
   assert.ok(m.reward, `Mission ${m.id} must have reward metadata`);
   assert.equal(m.reward.policyVersion, 'reward-v1');
@@ -24,11 +25,16 @@ VERTICAL_SLICE_MISSIONS.forEach((m) => {
     assert.equal(m.reward.tier, 'core');
     assert.equal(m.reward.baseCrystals, 4, `Core mission ${m.id} must have 4 base crystals`);
   }
-  totalBaseCrystals += m.reward.baseCrystals;
+  totalCoreBaseCrystals += m.reward.baseCrystals;
 });
+assert.equal(totalCoreBaseCrystals, 28, 'Total base crystals for 6 ACT 0 missions must be exactly 28 (5 core * 4 + 1 field-test * 8 = 28)');
 
-assert.equal(totalBaseCrystals, 48, 'Total base crystals for 10 vertical slice missions must be exactly 48 (8 core * 4 + 2 field-test * 8 = 48)');
-console.log('  -> Total base crystals verified: 48');
+let totalAllBaseCrystals = 0;
+ALL_VERTICAL_SLICE_MISSIONS.forEach((m) => {
+  totalAllBaseCrystals += m.reward.baseCrystals;
+});
+assert.equal(totalAllBaseCrystals, 48, 'Total base crystals for all 10 vertical slice missions must be exactly 48');
+console.log('  -> Total base crystals verified: 28 core / 48 total');
 
 // 2. Check ACT 1 Catalog Rewards
 console.log('[Test 2] ACT 1 Missions Catalog Reward configuration...');
@@ -60,7 +66,7 @@ assert.equal(canonicalFromLowercase.id, 'lumi-vs-01');
 assert.equal(canonicalFromAlias.codeName, 'VS-01');
 assert.equal(canonicalFromAlias.unitId, 'lumi_protocol_vertical_slice');
 assert.equal(canonicalFromAlias.lumiCourseId, 'lumi-season-1');
-assert.equal(canonicalFromAlias.totalMissionCount, 10);
+assert.equal(canonicalFromAlias.totalMissionCount, 6);
 assert.equal(canonicalFromAlias.reward.baseCrystals, 4);
 
 const vs06Canonical = getCanonicalLumiMission('VS-06');

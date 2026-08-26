@@ -1518,3 +1518,270 @@
   font-family: monospace;
   color: #ffd77f;
 }
+
+/* ==========================================
+   LUMI Game Engine & HUD Extensions
+   ========================================== */
+.python-world__hud-text-overlay {
+  position: absolute;
+  z-index: 12;
+  font-family: 'JetBrains Mono', monospace, sans-serif;
+  font-weight: 800;
+  text-shadow: 0 0 10px rgba(73, 233, 255, 0.6);
+  pointer-events: none;
+  transition: all 0.2s ease;
+}
+.python-world__hud-text-overlay--top-left {
+  top: 14px;
+  left: 18px;
+  font-size: 1rem;
+  color: var(--lab-cyan);
+  background: rgba(4, 14, 28, 0.75);
+  padding: 4px 12px;
+  border-radius: 6px;
+  border: 1px solid rgba(73, 233, 255, 0.4);
+}
+.python-world__hud-text-overlay--bottom {
+  bottom: 40px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 0.9rem;
+  color: var(--lab-mint);
+  background: rgba(4, 14, 28, 0.85);
+  padding: 4px 14px;
+  border-radius: 20px;
+  border: 1px solid rgba(85, 241, 200, 0.4);
+}
+.python-world__hud-text-overlay--center {
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 1.1rem;
+  color: #ffd77f;
+  background: rgba(4, 14, 28, 0.9);
+  padding: 8px 18px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 215, 127, 0.5);
+}
+
+.python-world__hud-bars {
+  position: absolute;
+  top: 14px;
+  right: 18px;
+  z-index: 12;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  pointer-events: none;
+}
+.python-world__hud-bar-item {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  background: rgba(4, 14, 28, 0.85);
+  padding: 6px 12px;
+  border-radius: 8px;
+  border: 1px solid rgba(73, 233, 255, 0.3);
+  min-width: 140px;
+}
+.python-world__hud-bar-header {
+  display: flex;
+  justify-content: space-between;
+  font-family: monospace;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--lab-cyan);
+}
+.python-world__hud-bar-track {
+  height: 8px;
+  background: rgba(15, 23, 42, 0.9);
+  border-radius: 4px;
+  overflow: hidden;
+  border: 1px solid rgba(73, 233, 255, 0.2);
+}
+.python-world__hud-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #0ea5e9, #38bdf8);
+  border-radius: 4px;
+  transition: width 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+  box-shadow: 0 0 8px rgba(56, 189, 248, 0.6);
+}
+.python-world__hud-bar-fill--shield {
+  background: linear-gradient(90deg, #3b82f6, #60a5fa, #93c5fd);
+  box-shadow: 0 0 10px rgba(96, 165, 250, 0.8);
+}
+
+.python-world__key-monitor {
+  position: absolute;
+  bottom: 40px;
+  left: 18px;
+  z-index: 12;
+  display: flex;
+  gap: 6px;
+  background: rgba(4, 14, 28, 0.85);
+  padding: 6px 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(73, 233, 255, 0.3);
+  pointer-events: none;
+}
+.python-world__key-cap {
+  width: 26px;
+  height: 26px;
+  display: grid;
+  place-items: center;
+  background: rgba(30, 41, 59, 0.8);
+  border: 1px solid #475569;
+  border-radius: 4px;
+  color: #94a3b8;
+  font-family: monospace;
+  font-size: 0.72rem;
+  font-weight: 700;
+  transition: all 0.15s ease;
+}
+.python-world__key-cap--active {
+  background: rgba(56, 189, 248, 0.3);
+  border-color: #38bdf8;
+  color: #38bdf8;
+  box-shadow: 0 0 10px #38bdf8;
+  transform: translateY(-2px);
+}
+
+.python-world__shield-bubble {
+  position: absolute;
+  inset: -14px;
+  border-radius: 50%;
+  border: 2px solid rgba(96, 165, 250, 0.9);
+  background: radial-gradient(circle, rgba(147, 197, 253, 0.25) 0%, rgba(59, 130, 246, 0.1) 70%, transparent 100%);
+  box-shadow: 0 0 24px rgba(96, 165, 250, 0.8), inset 0 0 14px rgba(147, 197, 253, 0.4);
+  animation: python-shield-hum 1.5s ease-in-out infinite alternate;
+  pointer-events: none;
+  z-index: 8;
+}
+@keyframes python-shield-hum {
+  from { transform: scale(0.98); opacity: 0.85; }
+  to { transform: scale(1.06); opacity: 1; }
+}
+
+.python-world__enemy-turret {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  z-index: 7;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  pointer-events: none;
+}
+.python-world__enemy-turret-body {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: #1e1b4b;
+  border: 2px solid #ef4444;
+  box-shadow: 0 0 14px rgba(239, 68, 68, 0.6);
+  display: grid;
+  place-items: center;
+  font-size: 1.1rem;
+}
+.python-world__enemy-pulse-beam {
+  position: absolute;
+  height: 3px;
+  background: linear-gradient(90deg, rgba(239, 68, 68, 0.8), rgba(239, 68, 68, 0.2));
+  transform-origin: left center;
+  pointer-events: none;
+  animation: python-laser-pulse 0.8s infinite ease-in-out;
+}
+@keyframes python-laser-pulse {
+  50% { opacity: 0.4; }
+}
+
+.python-world__frame-ticker {
+  position: absolute;
+  bottom: 12px;
+  right: 18px;
+  z-index: 12;
+  font-family: monospace;
+  font-size: 0.72rem;
+  color: #7dd3fc;
+  background: rgba(4, 14, 28, 0.8);
+  padding: 3px 8px;
+  border-radius: 4px;
+  border: 1px solid rgba(56, 189, 248, 0.3);
+  pointer-events: none;
+}
+
+/* ==========================================
+   Pygame Bridge Comparison Card
+   ========================================== */
+.python-lab__pygame-bridge-card {
+  margin-top: 14px;
+  padding: 14px 18px;
+  border-radius: 10px;
+  background: linear-gradient(135deg, rgba(15, 23, 42, 0.95) 0%, rgba(30, 27, 75, 0.9) 100%);
+  border: 1px solid #818cf8;
+  box-shadow: 0 6px 20px rgba(99, 102, 241, 0.25);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.python-lab__pygame-bridge-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.88rem;
+  font-weight: 800;
+  color: #c7d2fe;
+  letter-spacing: 0.04em;
+}
+.python-lab__pygame-bridge-title span {
+  font-size: 1.1rem;
+}
+.python-lab__pygame-bridge-note {
+  margin: 0;
+  color: #b9cbe1;
+  font-size: 0.82rem;
+  line-height: 1.55;
+}
+.python-lab__pygame-bridge-note code {
+  color: #67e8f9;
+}
+.python-lab__pygame-bridge-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.python-lab__pygame-bridge-col {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  background: rgba(3, 7, 18, 0.6);
+  padding: 8px 12px;
+  border-radius: 6px;
+  border: 1px solid rgba(129, 140, 248, 0.25);
+}
+.python-lab__pygame-bridge-col-header {
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: #94a3b8;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+.python-lab__pygame-bridge-col code {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.76rem;
+  color: #a5f3fc;
+  background: transparent;
+  padding: 0;
+  word-break: break-all;
+}
+.python-lab__pygame-bridge-col--pygame code {
+  color: #fbcfe8;
+}
+.python-lab__pygame-bridge-common {
+  font-size: 0.78rem;
+  color: #e0e7ff;
+  line-height: 1.4;
+  background: rgba(99, 102, 241, 0.12);
+  padding: 6px 10px;
+  border-radius: 6px;
+  border-left: 3px solid #818cf8;
+}

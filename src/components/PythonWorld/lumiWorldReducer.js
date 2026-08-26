@@ -44,6 +44,26 @@ export function createInitialWorldState(worldConfig = {}) {
       : [],
     variables: {},
     sensorReadings: {},
+    gameState: {
+      inited: false,
+      running: false,
+      quitted: false,
+      frame: 0,
+      fps: 10,
+      skin: String(worldConfig.skin || 'default'),
+      blits: [],
+      shapes: [],
+      texts: [],
+      hudBars: {},
+      shieldActive: false,
+      lastSound: null,
+      lastMusic: null,
+      pressedKeys: [],
+      incomingPulse: Boolean(worldConfig.incomingPulse),
+      pulseDistance: Number(worldConfig.pulseDistance || 3),
+      enemies: Array.isArray(worldConfig.enemies) ? worldConfig.enemies.map((e) => ({ ...e })) : [],
+      collisions: [],
+    },
   }
 }
 
@@ -90,6 +110,7 @@ export function reduceLumiWorldState(initialWorld = {}, normalizedEvents = [], t
           const targetObj = state.objects.find((item) => item.id === payload.object.id)
           if (targetObj) targetObj.collected = true
           state.inventory.push({ ...payload.object, collected: true })
+          state.collectedCount = (state.collectedCount || 0) + 1
         }
         break
       }
@@ -97,6 +118,107 @@ export function reduceLumiWorldState(initialWorld = {}, normalizedEvents = [], t
         if (payload.end) {
           state.rover = { ...state.rover, ...payload.end }
         }
+        break
+      }
+      case 'shield_raised': {
+        state.gameState.shieldActive = true
+        if (payload.incomingPulse !== undefined) {
+          state.gameState.incomingPulse = Boolean(payload.incomingPulse)
+        }
+        if (payload.rover) {
+          state.rover = { ...state.rover, ...payload.rover }
+        }
+        break
+      }
+      case 'rover_dodged': {
+        if (payload.rover) {
+          state.rover = { ...state.rover, ...payload.rover }
+        }
+        break
+      }
+      case 'enemy_jammed':
+      case 'enemy_purified': {
+        if (payload.rover) {
+          state.rover = { ...state.rover, ...payload.rover }
+        }
+        break
+      }
+      case 'game_inited': {
+        state.gameState.inited = true
+        state.gameState.running = true
+        state.gameState.quitted = false
+        break
+      }
+      case 'game_quitted': {
+        state.gameState.running = false
+        state.gameState.quitted = true
+        break
+      }
+      case 'screen_blitted': {
+        if (payload.image) {
+          if (String(payload.image).startsWith('lumi_')) {
+            state.gameState.skin = String(payload.image)
+          }
+          state.gameState.blits.push({ image: payload.image, position: payload.position })
+          if (state.gameState.blits.length > 60) state.gameState.blits.shift()
+        }
+        break
+      }
+      case 'shape_drawn': {
+        state.gameState.shapes.push({
+          shape: payload.shape,
+          color: payload.color,
+          rect: payload.rect,
+          center: payload.center,
+          radius: payload.radius,
+          width: payload.width,
+        })
+        if (state.gameState.shapes.length > 80) state.gameState.shapes.shift()
+        break
+      }
+      case 'text_rendered': {
+        state.gameState.texts.push({
+          text: payload.text,
+          position: payload.position,
+          color: payload.color,
+        })
+        if (state.gameState.texts.length > 40) state.gameState.texts.shift()
+        break
+      }
+      case 'hud_bar_updated': {
+        if (payload.label) {
+          state.gameState.hudBars[payload.label] = {
+            label: payload.label,
+            value: payload.value,
+            maximum: payload.maximum,
+            color: payload.color,
+          }
+        }
+        break
+      }
+      case 'sound_played': {
+        state.gameState.lastSound = payload.name
+        break
+      }
+      case 'music_played': {
+        state.gameState.lastMusic = payload.name
+        break
+      }
+      case 'key_checked': {
+        if (payload.key) {
+          state.gameState.pressedKeys = state.gameState.pressedKeys.filter((key) => key !== payload.key)
+          if (payload.pressed) state.gameState.pressedKeys.push(payload.key)
+        }
+        break
+      }
+      case 'clock_ticked': {
+        state.gameState.frame = Number(payload.frame ?? state.gameState.frame + 1)
+        if (payload.fps !== undefined) state.gameState.fps = Number(payload.fps)
+        break
+      }
+      case 'collision_detected': {
+        state.gameState.collisions.push({ a: payload.a, b: payload.b, collided: payload.collided })
+        if (state.gameState.collisions.length > 60) state.gameState.collisions.shift()
         break
       }
       case 'line_entered': {
@@ -122,6 +244,12 @@ export function reduceLumiWorldState(initialWorld = {}, normalizedEvents = [], t
           state.sensorReadings = {
             ...state.sensorReadings,
             [payload.sensor]: payload.value,
+          }
+          if (payload.sensor === 'incoming_pulse') {
+            state.gameState.incomingPulse = Boolean(payload.value)
+          }
+          if (payload.sensor === 'pulse_distance') {
+            state.gameState.pulseDistance = Number(payload.value)
           }
         }
         break

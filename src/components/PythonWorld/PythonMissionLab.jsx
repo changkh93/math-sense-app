@@ -11,12 +11,14 @@ import { mergeMissionCompletion, normalizeMissionLabProgress } from '../../utils
 import PythonRuntimeClient from './runtime/PythonRuntimeClient'
 import PythonEditor from './PythonEditor'
 import PythonWorldCanvas from './PythonWorldCanvas'
-import { playLumiSound, isLumiMuted, setLumiMuted, startWorldAmbience, stopWorldAmbience } from './lumiAudio'
+import { playLumiSound, isLumiMuted, setLumiMuted, stopWorldAmbience } from './lumiAudio'
 import { claimLumiMissionReward } from '../../services/lumiRewardService'
 import { deriveExecutionModel, selectSystemObjectInspectorItems } from './executionTraceSelectors'
 import { projectTacticalEvents } from './lumiTacticalEventProjector'
 import { reduceTacticalState } from './lumiTacticalReducer'
 import LumiTacticalInspector from './LumiTacticalInspector'
+import LumiPygameBridgeCard from './LumiPygameBridgeCard'
+import { getLumiPygameBridge } from './lumiPygameBridgeRegistry'
 import {
   LUMI_DRAFT_SCHEMA_VERSION,
   getLumiConceptLessons,
@@ -187,6 +189,7 @@ export default function PythonMissionLab({ unit, missionSet, initialMissionIndex
   const runIdRef = useRef(0)
   const celebratedRunIdsRef = useRef(new Set())
   const pendingResultRef = useRef(null)
+  const lastServerDraftRef = useRef('')
 
   const handleStartResize = useCallback((e) => {
     e.preventDefault()
@@ -264,7 +267,7 @@ export default function PythonMissionLab({ unit, missionSet, initialMissionIndex
     } else {
       setInspectorTab('trace')
     }
-  }, [mission?.id])
+  }, [mission])
 
   const toggleSound = useCallback(() => {
     setSoundMuted((prev) => {
@@ -301,7 +304,6 @@ export default function PythonMissionLab({ unit, missionSet, initialMissionIndex
         case 'rover_woke': {
           if (mission.id === 'lumi-vs-01') {
             playLumiSound('first_awaken')
-            startWorldAmbience('online')
           } else {
             playLumiSound('boot')
           }
@@ -335,6 +337,30 @@ export default function PythonMissionLab({ unit, missionSet, initialMissionIndex
         case 'memory_changed':
           playLumiSound('memory')
           break
+        case 'game_inited':
+          playLumiSound('boot')
+          break
+        case 'shield_raised':
+          playLumiSound('shield')
+          break
+        case 'sound_played': {
+          const soundName = String(event.payload?.name || '').toLowerCase()
+          const supportedSound = {
+            alert: 'alert', warning: 'warning', engine: 'engine', thrust: 'thrust',
+            hud: 'hud', radar: 'radar', blip: 'blip', damage: 'damage', hit: 'hit',
+            pulse: 'pulse', laser: 'laser', shield: 'shield',
+          }[soundName]
+          // lumi.shield() already emits shield_raised. Avoid playing the same
+          // effect twice when a mission also records game.sound.play("shield").
+          const recentShieldAction = soundName === 'shield'
+            && events.slice(Math.max(0, playhead - 4), playhead)
+              .some((previousEvent) => previousEvent.type === 'shield_raised')
+          if (supportedSound && !recentShieldAction) playLumiSound(supportedSound)
+          break
+        }
+        case 'music_played': {
+          break
+        }
         default:
           break
       }
@@ -382,9 +408,6 @@ export default function PythonMissionLab({ unit, missionSet, initialMissionIndex
       const preview = getLumiSolutionPreview(mission)
       if (preview) setSolutionSession({ sessionId: Date.now(), ...preview, automatic: true })
     }, 500)
-
-    const isMission1Offline = mission.id === 'lumi-vs-01' && !(progress.completedMissionIds || []).includes('lumi-vs-01')
-    startWorldAmbience(isMission1Offline ? 'offline' : 'online')
 
     if (!isPreviewOnly && user?.uid && missionSet?.kind !== 'prototype' && !hasLocalDraft(unit?.id, mission.id)) {
       getDoc(doc(db, 'users', user.uid, 'pythonMissionProgress', mission.id))
@@ -467,6 +490,14 @@ export default function PythonMissionLab({ unit, missionSet, initialMissionIndex
   const persistCompletion = useCallback(async (evaluation) => {
     if (!mission) return
     const isFirstMissionClear = !progress.completedMissionIds?.includes(mission.id)
+    const previousStars = Number(progress.bestStarsByMission?.[mission.id] || 0)
+    const previousAssistance = progress.bestAssistanceByMission?.[mission.id]
+    const completionEvidenceImproved = (
+      isFirstMissionClear ||
+      Number(evaluation.stars || 0) > previousStars ||
+      previousAssistance === undefined ||
+      assistanceLevel < Number(previousAssistance)
+    )
     const assistanceInfo = {
       maxLevel: assistanceLevel,
       hintsViewed: [
@@ -511,7 +542,7 @@ export default function PythonMissionLab({ unit, missionSet, initialMissionIndex
       }, 600)
     }
 
-    if (!isPreviewOnly && user?.uid && unit?.id) {
+    if (!isPreviewOnly && completionEvidenceImproved && user?.uid && unit?.id) {
       try {
         const rewardResult = await claimLumiMissionReward({
           userId: user.uid,
@@ -565,6 +596,36 @@ export default function PythonMissionLab({ unit, missionSet, initialMissionIndex
       ...(evaluation.completed ? { representativeSuccessCode: persistedCode, lastCompletedAt: serverTimestamp() } : {}),
     }
     const missionProgressRef = doc(db, 'users', user.uid, 'pythonMissionProgress', mission.id)
+    const serverDraftKey = `${mission.id}:${persistedCode}`
+    const completed = evaluation.completed === true || evaluation.cleared === true
+    const previousStars = Number(progress.bestStarsByMission?.[mission.id] || 0)
+    const previousAssistance = progress.bestAssistanceByMission?.[mission.id]
+    const wasCompleted = progress.completedMissionIds?.includes(mission.id)
+    const evidenceImproved = (
+      !wasCompleted ||
+      Number(evaluation.stars || 0) > previousStars ||
+      previousAssistance === undefined ||
+      assistanceLevel < Number(previousAssistance)
+    )
+
+    if (!completed) {
+      if (lastServerDraftRef.current === serverDraftKey) return
+      await setDoc(missionProgressRef, {
+        unitId: unit.id,
+        unitTitle: unit.title || '',
+        missionSetId: missionSet.id,
+        missionSetVersion: Number(missionSet.version || 1),
+        missionId: mission.id,
+        missionTitle: mission.title,
+        draftCode: persistedCode,
+        draftSchemaVersion: LUMI_DRAFT_SCHEMA_VERSION,
+        updatedAt: serverTimestamp(),
+      }, { merge: true })
+      lastServerDraftRef.current = serverDraftKey
+      return
+    }
+
+    if (!evidenceImproved) return
     const runsRef = collection(missionProgressRef, 'runs')
     const runRef = doc(runsRef, getNextRunSlot(unit.id, mission.id))
     await Promise.all([
@@ -587,7 +648,8 @@ export default function PythonMissionLab({ unit, missionSet, initialMissionIndex
         timestamp: serverTimestamp(),
       }),
     ])
-  }, [assistanceLevel, code, isPreviewOnly, mission, missionSet.id, missionSet.version, unit, user?.uid])
+    lastServerDraftRef.current = serverDraftKey
+  }, [assistanceLevel, code, isPreviewOnly, mission, missionSet.id, missionSet.version, progress.bestAssistanceByMission, progress.bestStarsByMission, progress.completedMissionIds, unit, user?.uid])
 
   const runMission = useCallback(async () => {
     if (!mission || !runtimeRef.current || running) return
@@ -1069,6 +1131,9 @@ export default function PythonMissionLab({ unit, missionSet, initialMissionIndex
                     🎉 코어 복원 완료 축하창 보기
                   </button>
                 )
+              )}
+              {(result.cleared || result.completed) && getLumiPygameBridge(mission) && (
+                <LumiPygameBridgeCard bridge={getLumiPygameBridge(mission)} />
               )}
               {(result.cleared || result.completed) && mission.reflectionQuestions?.length > 0 && (
                 <div className="python-lab__reflection">

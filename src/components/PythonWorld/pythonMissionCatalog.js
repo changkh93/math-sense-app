@@ -393,6 +393,10 @@ export function getMissionVariant(mission, variant) {
       rover: { ...mission.world?.rover, ...worldOverrides.rover },
       target: { ...mission.world?.target, ...(target || {}) },
       objects: worldOverrides.objects || mission.world?.objects,
+      data: {
+        ...(mission.world?.data || {}),
+        ...(worldOverrides.data || {}),
+      },
     },
     goal: nextGoal,
     goals: nextGoals,

@@ -57,16 +57,32 @@ lumi.move(2)
 lumi.turn(-90)
 lumi.move(2)`,
 
-  // ACT 2 · Memory Core
-  'lumi-act2-01': `from msense import lumi
+  // ACT 2 · Memory Core (v2 Game Enrichment)
+  'lumi-act2-01': `from msense import game
+
+pilot_name = "NOVA"
+game.text.render(pilot_name, position="top-left")`,
+  'lumi-act2-02': `from msense import game
+
+ship_image = "lumi_blue"
+game.screen.blit(ship_image, position=(2, 2))
+game.text.render(ship_image, position="bottom")`,
+  'lumi-act2-03': `from msense import game
+
+shield = 5
+shield = shield - 2
+game.hud.bar("SHIELD", shield, maximum=5)`,
+
+  // ACT 2 · Memory Core (Legacy)
+  'lumi-act2-01-legacy': `from msense import lumi
 
 steps = 3
 lumi.move(steps)`,
-  'lumi-act2-02': `from msense import lumi
+  'lumi-act2-02-legacy': `from msense import lumi
 
 target_steps = 4
 lumi.move(target_steps)`,
-  'lumi-act2-03': `from msense import lumi
+  'lumi-act2-03-legacy': `from msense import lumi
 
 energy = 5
 energy = energy - 2
@@ -87,6 +103,40 @@ lumi.move(3)`,
 steps_text = input("이동 신호")
 steps = int(steps_text)
 lumi.move(steps)`,
+
+  // Vertical Slice Gameplay Enrichment Set (5 Slices)
+  'lumi-vs-game-01': `from msense import game
+
+game.init()
+game.screen.blit("lumi_blue", position=(2, 2))
+game.draw.circle("#38bdf8", (2, 2), 2)
+game.quit()`,
+  'lumi-vs-game-02': `from msense import game
+
+shield = 5
+shield = shield - 2
+game.hud.bar("SHIELD", shield, maximum=5)
+game.sound.play("shield")`,
+  'lumi-vs-game-03': `from msense import game
+
+right_pressed = game.key.pressed("RIGHT")
+if right_pressed:
+    game.text.render("KEY: RIGHT", position="bottom")`,
+  'lumi-vs-game-04': `from msense import lumi, world, game
+
+if world.incoming_pulse:
+    lumi.shield()
+    game.sound.play("shield")`,
+  'lumi-vs-game-05': `from msense import lumi, world, game
+
+game.init()
+while game.running:
+    if world.incoming_pulse:
+        lumi.shield()
+    if game.key.pressed("RIGHT"):
+        lumi.move(1)
+    game.clock.tick(10)
+game.quit()`,
 
   // ACT 3 · Sensor Core
   'lumi-sensor-3-01': `distance = world.steps_to_target
@@ -110,33 +160,40 @@ if lumi.energy < 30:
     lumi.charge()`,
   'if-launch-02': `from msense import lumi, world
 
-distance = world.target_distance
-if lumi.energy >= distance:
-    lumi.move(distance)`,
-  'if-signal-03': `from msense import lumi
+if world.path_clear:
+    lumi.move(world.target_distance)
+else:
+    lumi.say("대기")`,
+  'if-signal-03': `from msense import lumi, world
 
-objects = lumi.scan()
-for obj in objects:
-    if obj.strength >= 5:
-        lumi.collect(obj)`,
+dist = world.obstacle_ahead_distance
+if dist <= 2:
+    lumi.shield()
+elif dist <= 4:
+    lumi.dodge()
+else:
+    lumi.move(1)`,
   'if-route-04': `from msense import lumi, world
 
-if world.snapshot()["target"]["x"] < lumi.x:
+target_x = world.snapshot()["target"]["x"]
+if target_x < lumi.x:
     lumi.turn(180)
-
 lumi.move(world.target_distance)`,
   'if-dual-05': `from msense import lumi, world
 
 distance = world.target_distance
-if lumi.energy >= distance and distance <= 6:
+if (lumi.energy >= distance and distance <= 6) or world.emergency:
     lumi.move(distance)`,
   'if-rescue-06': `from msense import lumi, world
 
-if lumi.energy < world.target_distance:
+if lumi.energy < 20:
     lumi.charge()
 
+if world.incoming_pulse:
+    lumi.shield()
+
 for obj in lumi.scan():
-    if obj.kind == "signal" and obj.priority >= 3:
+    if obj.strength >= 5:
         lumi.collect(obj)
 
 lumi.move(world.target_distance)`,
@@ -180,7 +237,6 @@ lumi.say(cells)`,
   // ACT 6 · Persistence Core
   'while-approach-01': `from msense import lumi, world
 
-# target_distance는 이동할 때마다 다시 계산되는 현재 거리입니다.
 while world.target_distance > 0:
     lumi.move(1)`,
   'while-charge-02': `from msense import lumi, world
@@ -191,7 +247,6 @@ while lumi.energy < 50:
 lumi.move(world.target_distance)`,
   'while-collect-03': `from msense import lumi, world
 
-# 수집할 때마다 world.objects에서 해당 신호가 사라집니다.
 while world.objects:
     obj = world.objects[0]
     lumi.collect(obj)`,
@@ -202,36 +257,85 @@ while count > 0:
     count = count - 1
 
 print("LAUNCH")`,
-  'while-energy-05': `from msense import lumi, world
+  'while-break-05': `from msense import lumi, world
 
-while lumi.energy > 0 and world.target_distance > 0:
+while True:
+    obstacle_dist = world.obstacle_ahead_distance
+    if obstacle_dist <= 1:
+        break
     lumi.move(1)`,
-  'while-rescue-06': `from msense import lumi, world
+  'while-continue-06': `from msense import lumi
 
-# 첫 번째 반복: 남은 신호를 모두 회수합니다.
-while world.objects:
-    signal = world.objects[0]
-    lumi.collect(signal)
+signals = lumi.scan()
+for sig in signals:
+    if sig.kind == "noise":
+        continue
+    lumi.collect(sig)`,
+  'while-rescue-07': `from msense import lumi, world, game
 
-# 두 번째 반복: 현재 거리를 매번 다시 확인하며 이동합니다.
-while world.target_distance > 0:
-    lumi.move(1)`,
+game.init()
+while game.running and world.target_distance > 0:
+    lumi.move(1)
+    game.clock.tick(10)
+game.quit()`,
 
-  // ACT 7 · Data Core
-  'lumi-data-7-01': `signals = ["ALPHA", "BETA", "GAMMA"]
+  // ACT 7 · Data Core (10 Missions)
+  'lumi-data-7-01': `from msense import world
+
+signals = world.signals
 print(len(signals))`,
-  'lumi-data-7-02': `packet = "ALPHA|BETA|GAMMA"
+  'lumi-data-7-02': `from msense import world
+
+items = world.inventory_items
+first_item = items[0]
+last_item = items[-1]
+print(first_item)
+print(last_item)`,
+  'lumi-data-7-03': `from msense import world
+
+items = world.inventory_items
+items.append("radar")
+print(len(items))`,
+  'lumi-data-7-04': `from msense import world
+
+cells = world.battery_cells
+used = cells.pop()
+print(used)`,
+  'lumi-data-7-05': `from msense import world
+
+items = world.inventory_items
+for item in items:
+    print(item)`,
+  'lumi-data-7-06': `from msense import world
+
+packet = world.data_packet
 signals = packet.split("|")
 print(len(signals))`,
-  'lumi-data-7-03': `signals = ["ALPHA", "BETA", "GAMMA"]
+  'lumi-data-7-07': `from msense import world
+
+signals = world.signals
 message = "-".join(signals)
 print(message)`,
-  'lumi-data-7-04': `target = (4, 2)
-print(target)`,
-  'lumi-data-7-05': `status = {"name": "LUMI", "energy": 80}
-print(status.get("energy", 0))`,
+  'lumi-data-7-08': `from msense import world
 
-  // ACT 8 · Ability Core
+target_pos = world.target_pos
+print(target_pos)`,
+  'lumi-data-7-09': `from msense import world
+
+stats = world.status_data
+energy_val = stats["energy"]
+print(energy_val)`,
+  'lumi-data-7-10': `from msense import world
+
+raw_packet = world.data_packet
+pairs = raw_packet.split("|")
+telemetry = {}
+for pair in pairs:
+    k, v = pair.split(":")
+    telemetry[k] = v
+print(telemetry["STATUS"])`,
+
+  // ACT 8 · Ability Core (7 Missions)
   'function-move-01': `from msense import lumi, world
 
 def move_to_beacon():
@@ -257,34 +361,39 @@ def rescue(signal):
     if signal.priority >= 3:
         lumi.collect(signal)
 
-for signal in lumi.scan():
-    rescue(signal)`,
-  'function-charge-05': `from msense import lumi, world
+for sig in lumi.scan():
+    rescue(sig)`,
+  'function-scope-05': `def calc_shield():
+    local_bonus = 10
+    return local_bonus
 
-def ensure_energy(required):
-    if lumi.energy < required:
-        lumi.charge()
+total_power = calc_shield()
+print(total_power)`,
+  'function-multi-06': `from msense import lumi
 
-distance = world.target_distance
-ensure_energy(distance)
-lumi.move(distance)`,
-  'function-expedition-06': `from msense import lumi, world
+def check_energy():
+    return lumi.energy < 30
 
-def prepare():
-    if lumi.energy < world.target_distance:
-        lumi.charge()
+def handle_charge():
+    lumi.charge()
 
-def rescue():
-    for signal in lumi.scan():
-        if signal.kind == "signal":
-            lumi.collect(signal)
+if check_energy():
+    handle_charge()`,
+  'function-field-07': `from msense import lumi, world
 
-def navigate():
-    lumi.move(world.target_distance)
+def detect_threat():
+    return world.incoming_pulse
 
-prepare()
-rescue()
-navigate()`,
+def choose_action(threat):
+    if threat:
+        lumi.shield()
+
+def navigate(distance):
+    lumi.move(distance)
+
+threat = detect_threat()
+choose_action(threat)
+navigate(world.target_distance)`,
 
   // ACT 9 · Object Core
   'lumi-object-9-01': `print(type(lumi))`,
@@ -504,6 +613,14 @@ function looksIncomplete(code = '') {
 }
 
 export function getLumiSolutionBody(mission = {}) {
+  if (mission?.solutionCode) return String(mission.solutionCode).trim()
+  if (SOLUTIONS[mission?.id]) return SOLUTIONS[mission.id].trim()
+  if (mission?.codeName && SOLUTIONS[mission.codeName]) return SOLUTIONS[mission.codeName].trim()
+  if (Array.isArray(mission?.aliases)) {
+    for (const alias of mission.aliases) {
+      if (SOLUTIONS[alias]) return SOLUTIONS[alias].trim()
+    }
+  }
   const explicit = String(mission?.solutionCode || SOLUTIONS[mission?.id] || '').trim()
   if (explicit) return explicit
 
@@ -520,4 +637,3 @@ export function getLumiSolutionDuration(code = '') {
 export function hasLumiSolution(mission = {}) {
   return Boolean(getLumiSolutionBody(mission))
 }
-

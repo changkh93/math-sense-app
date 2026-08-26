@@ -83,79 +83,20 @@ export function isLumiMuted() {
 }
 
 /**
- * Duck ambient sound during important action or voice
+ * Duck ambient sound during important action or voice (no-op when background drone is disabled)
  */
-function duckAmbient(durationSec = 0.8, duckLevel = 0.2) {
-  if (!ambientBus || !audioCtx) return
-  const now = audioCtx.currentTime
-  ambientBus.gain.cancelScheduledValues(now)
-  ambientBus.gain.setValueAtTime(ambientBus.gain.value, now)
-  ambientBus.gain.linearRampToValueAtTime(0.4 * duckLevel, now + 0.05)
-  ambientBus.gain.exponentialRampToValueAtTime(0.4, now + durationSec)
+function duckAmbient() {
+  // Continuous background drone is disabled.
 }
 
 /**
  * Continuous World Ambience Generator
- * @param {'offline' | 'online'} mode
+ * Note: Continuous background drone hum is permanently disabled across all courses
+ * to provide a clean, distraction-free environment while keeping interactive SFX crisp.
+ * @param {'offline' | 'online'} _mode
  */
-export function startWorldAmbience(mode = 'offline') {
-  if (isMuted) return
-  const ctx = initAudioSystem()
-  if (!ctx) return
-
-  if (currentAmbientMode === mode && currentAmbientNodes) return
+export function startWorldAmbience(_mode = 'offline') {
   stopWorldAmbience()
-  currentAmbientMode = mode
-
-  const now = ctx.currentTime
-  const nodes = []
-
-  if (mode === 'offline') {
-    // Dark deep-space hum (55Hz drone with lowpass resonance)
-    const osc = ctx.createOscillator()
-    const filter = ctx.createBiquadFilter()
-    const gain = ctx.createGain()
-
-    osc.type = 'sawtooth'
-    osc.frequency.setValueAtTime(55, now)
-
-    filter.type = 'lowpass'
-    filter.frequency.setValueAtTime(110, now)
-
-    gain.gain.setValueAtTime(0.001, now)
-    gain.gain.linearRampToValueAtTime(0.04, now + 2.0)
-
-    osc.connect(filter)
-    filter.connect(gain)
-    gain.connect(ambientBus)
-
-    osc.start(now)
-    nodes.push(osc, gain)
-  } else {
-    // Online core harmonic hum (330Hz warm sine drone + gentle electrical rhythm)
-    const osc1 = ctx.createOscillator()
-    const osc2 = ctx.createOscillator()
-    const gain = ctx.createGain()
-
-    osc1.type = 'sine'
-    osc1.frequency.setValueAtTime(165, now) // Low A
-
-    osc2.type = 'sine'
-    osc2.frequency.setValueAtTime(330, now) // Harmonic E
-
-    gain.gain.setValueAtTime(0.001, now)
-    gain.gain.linearRampToValueAtTime(0.05, now + 1.5)
-
-    osc1.connect(gain)
-    osc2.connect(gain)
-    gain.connect(ambientBus)
-
-    osc1.start(now)
-    osc2.start(now)
-    nodes.push(osc1, osc2, gain)
-  }
-
-  currentAmbientNodes = nodes
 }
 
 export function stopWorldAmbience() {
@@ -170,6 +111,7 @@ export function stopWorldAmbience() {
     }
     currentAmbientNodes = null
   }
+  currentAmbientMode = null
 }
 
 /**
@@ -616,6 +558,126 @@ export function playLumiSound(soundType, options = {}) {
       gain.connect(sfxBus)
       osc.start(now)
       osc.stop(now + 0.11)
+      break
+    }
+
+    // ==========================================
+    // 8. Game API & Combat SFX
+    // ==========================================
+    case 'shield': {
+      // Forcefield harmonic resonance sweep up
+      const osc = ctx.createOscillator()
+      const gain = ctx.createGain()
+      osc.type = 'sine'
+      osc.frequency.setValueAtTime(320, now)
+      osc.frequency.exponentialRampToValueAtTime(1200, now + 0.35)
+      gain.gain.setValueAtTime(0.01, now)
+      gain.gain.linearRampToValueAtTime(0.25, now + 0.05)
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.45)
+      osc.connect(gain)
+      gain.connect(sfxBus)
+      osc.start(now)
+      osc.stop(now + 0.5)
+      break
+    }
+
+    case 'pulse':
+    case 'laser': {
+      // Rapid downward laser chirp
+      const osc = ctx.createOscillator()
+      const gain = ctx.createGain()
+      osc.type = 'sawtooth'
+      osc.frequency.setValueAtTime(1400, now)
+      osc.frequency.exponentialRampToValueAtTime(220, now + 0.18)
+      gain.gain.setValueAtTime(0.2, now)
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.22)
+      osc.connect(gain)
+      gain.connect(sfxBus)
+      osc.start(now)
+      osc.stop(now + 0.24)
+      break
+    }
+
+    case 'alert':
+    case 'warning': {
+      // Tactical warning double-blip
+      const osc = ctx.createOscillator()
+      const gain = ctx.createGain()
+      osc.type = 'sine'
+      osc.frequency.setValueAtTime(880, now)
+      osc.frequency.setValueAtTime(660, now + 0.08)
+      gain.gain.setValueAtTime(0.2, now)
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.2)
+      osc.connect(gain)
+      gain.connect(sfxBus)
+      osc.start(now)
+      osc.stop(now + 0.22)
+      break
+    }
+
+    case 'engine':
+    case 'thrust': {
+      // Low engine boost hiss
+      const osc = ctx.createOscillator()
+      const gain = ctx.createGain()
+      osc.type = 'triangle'
+      osc.frequency.setValueAtTime(120, now)
+      osc.frequency.linearRampToValueAtTime(80, now + 0.25)
+      gain.gain.setValueAtTime(0.2, now)
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.3)
+      osc.connect(gain)
+      gain.connect(sfxBus)
+      osc.start(now)
+      osc.stop(now + 0.32)
+      break
+    }
+
+    case 'hud':
+    case 'click': {
+      // Crisp neon UI click
+      const osc = ctx.createOscillator()
+      const gain = ctx.createGain()
+      osc.type = 'sine'
+      osc.frequency.setValueAtTime(1760, now)
+      gain.gain.setValueAtTime(0.15, now)
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.05)
+      osc.connect(gain)
+      gain.connect(sfxBus)
+      osc.start(now)
+      osc.stop(now + 0.06)
+      break
+    }
+
+    case 'radar':
+    case 'blip': {
+      // Radar blip
+      const osc = ctx.createOscillator()
+      const gain = ctx.createGain()
+      osc.type = 'sine'
+      osc.frequency.setValueAtTime(1046.5, now)
+      gain.gain.setValueAtTime(0.16, now)
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.25)
+      osc.connect(gain)
+      gain.connect(sfxBus)
+      osc.start(now)
+      osc.stop(now + 0.27)
+      break
+    }
+
+    case 'damage':
+    case 'hit': {
+      // Low impact crunch
+      const osc = ctx.createOscillator()
+      const gain = ctx.createGain()
+      osc.type = 'sawtooth'
+      osc.frequency.setValueAtTime(150, now)
+      osc.frequency.exponentialRampToValueAtTime(40, now + 0.18)
+      gain.gain.setValueAtTime(0.25, now)
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.22)
+      osc.connect(gain)
+      gain.connect(sfxBus)
+      osc.start(now)
+      osc.stop(now + 0.24)
       break
     }
 

@@ -31,5 +31,42 @@ export default defineConfig(({ mode }) => {
         '/glm-api': zcodeProxy,
       },
     },
+    build: {
+      rollupOptions: {
+        output: {
+          manualChunks(id) {
+            if (id.includes('node_modules')) {
+              if (id.includes('@react-three')) {
+                return 'vendor-react-three'
+              }
+              if (id.includes('three')) {
+                return 'vendor-three'
+              }
+              if (id.includes('@codemirror') || id.includes('codemirror')) {
+                return 'vendor-codemirror'
+              }
+              if (id.includes('katex') || id.includes('react-katex')) {
+                return 'vendor-katex'
+              }
+              if (id.includes('firebase/firestore') || id.includes('@firebase/firestore')) {
+                return 'vendor-firebase-firestore'
+              }
+              if (id.includes('firebase') || id.includes('@firebase')) {
+                return 'vendor-firebase'
+              }
+              if (id.includes('recharts') || id.includes('d3-')) {
+                return 'vendor-charts'
+              }
+              if (id.includes('fabric')) {
+                return 'vendor-fabric'
+              }
+              if (id.includes('framer-motion')) {
+                return 'vendor-motion'
+              }
+            }
+          },
+        },
+      },
+    },
   }
 })
