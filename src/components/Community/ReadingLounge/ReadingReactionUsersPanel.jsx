@@ -62,19 +62,18 @@ export default function ReadingReactionUsersPanel({
   return (
     <AnimatePresence>
       <MotionDiv
-        initial={{ opacity: 0, height: 0, y: -6 }}
-        animate={{ opacity: 1, height: 'auto', y: 0 }}
-        exit={{ opacity: 0, height: 0, y: -6 }}
+        initial={{ opacity: 0, y: -8 }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0, y: -8 }}
         transition={{ duration: 0.2 }}
         className="reaction-users-inline-panel glass hud-border"
         style={{
-          marginTop: '0.6rem',
-          padding: '1rem',
+          marginTop: '0.65rem',
+          padding: '0.9rem 1rem',
           borderRadius: '14px',
-          background: 'rgba(15, 23, 42, 0.75)',
+          background: 'rgba(15, 23, 42, 0.88)',
           border: '1px solid rgba(255, 255, 255, 0.12)',
-          boxShadow: '0 8px 24px rgba(0, 0, 0, 0.4)',
-          overflow: 'hidden',
+          boxShadow: '0 8px 24px rgba(0, 0, 0, 0.45)',
         }}
       >
         {/* Header */}
@@ -104,7 +103,18 @@ export default function ReadingReactionUsersPanel({
         </div>
 
         {/* User List */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', maxHeight: '240px', overflowY: 'auto', paddingRight: '0.2rem' }}>
+        <div
+          className="reaction-users-list-scroll"
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '0.45rem',
+            maxHeight: '260px',
+            minHeight: '40px',
+            overflowY: 'auto',
+            paddingRight: '0.2rem',
+          }}
+        >
           {isLoading ? (
             <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '1.5rem', color: 'rgba(255,255,255,0.5)' }}>
               <Loader size={18} className="animate-spin" />

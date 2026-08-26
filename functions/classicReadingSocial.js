@@ -1740,6 +1740,11 @@ module.exports = function ({
         .where("type", "in", ["want", "want_to_read"])
         .limit(pageSize + 1);
       if (cursor) legacyQuery = legacyQuery.startAfter(cursor);
+    } else if (targetType === "read") {
+      legacyQuery = shareRef.collection("reactions")
+        .where("type", "in", ["read", "already_read", "completed"])
+        .limit(pageSize + 1);
+      if (cursor) legacyQuery = legacyQuery.startAfter(cursor);
     }
 
     const [reactionsSnap, legacySnap] = await Promise.all([
