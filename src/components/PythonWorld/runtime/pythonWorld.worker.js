@@ -1108,7 +1108,6 @@ def _run_mission(payload_json, code):
         student_globals = {
             "__builtins__": allowed_builtins,
             "__name__": "__main__",
-            "game": game,
         }
         if auto_import:
             student_globals["lumi"] = lumi
@@ -1212,8 +1211,9 @@ def _run_mission(payload_json, code):
 
                 f_snap = frame_snapshots[cur_frame_id]
                 current_snapshots = {}
+                system_names = {"lumi", "world", "msense", "metasense", "Rover", "Game", "game"}
                 for k, v in frame.f_locals.items():
-                    if not k.startswith("__") and k not in {"lumi", "world"}:
+                    if not k.startswith("__") and k not in system_names:
                         current_snapshots[k] = _json_value(v, depth=0, seen=None, instance_registry=instance_registry)
 
                 if f_snap["last_line"] is not None:
@@ -1263,8 +1263,9 @@ def _run_mission(payload_json, code):
         main_snap = frame_snapshots.get("main", {})
         prev_line = main_snap.get("last_line")
         prev_locals = main_snap.get("locals", {})
+        system_names = {"lumi", "world", "msense", "metasense", "Rover", "Game", "game"}
         for k, v in student_globals.items():
-            if not k.startswith("__") and k not in {"lumi", "world"}:
+            if not k.startswith("__") and k not in system_names:
                 cur_snap = _json_value(v, depth=0, seen=None, instance_registry=instance_registry)
                 old_snap = prev_locals.get(k)
                 if k not in prev_locals or old_snap != cur_snap:
@@ -1301,24 +1302,36 @@ def _run_mission(payload_json, code):
         sys.modules.pop("msense", None)
         sys.modules.pop("metasense", None)
 
+    sys_objs = {
+        "lumi": {
+            "kind": "python_instance",
+            "id": "system-lumi",
+            "className": "Rover",
+            "publicAttributes": {
+                "energy": state.rover["energy"],
+                "direction": state.rover["direction"],
+            },
+            "methods": ["wake", "move", "turn", "say", "scan", "collect", "charge"],
+        }
+    }
+    if student_globals.get("game") is game:
+        sys_objs["game"] = {
+            "kind": "python_instance",
+            "id": "system-game",
+            "className": "Game",
+            "publicAttributes": {
+                "frame": state.game_state.get("frame", 0),
+            },
+            "methods": ["init", "quit", "draw_rect", "draw_circle", "render_text", "collides"],
+        }
+
     return json.dumps({
         "events": events,
         "stdout": stdout.getvalue()[:max_output_chars],
         "conceptsUsed": concepts,
         "callsUsed": calls,
         "classesMetadata": classes_metadata,
-        "systemObjects": {
-            "lumi": {
-                "kind": "python_instance",
-                "id": "system-lumi",
-                "className": "Rover",
-                "publicAttributes": {
-                    "energy": state.rover["energy"],
-                    "direction": state.rover["direction"],
-                },
-                "methods": ["wake", "move", "turn", "say", "scan", "collect", "charge"],
-            }
-        },
+        "systemObjects": sys_objs,
         "finalState": state.snapshot(),
         "commandCount": command_count,
         "error": result_error,

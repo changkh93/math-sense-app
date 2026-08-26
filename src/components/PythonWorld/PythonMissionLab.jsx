@@ -54,6 +54,30 @@ function getNextRunSlot(unitId, missionId) {
   }
 }
 
+export function formatPythonMemoryValue(val) {
+  if (val === null || val === undefined) return 'None'
+  if (typeof val === 'boolean') return val ? 'True' : 'False'
+  if (typeof val === 'number') return String(val)
+  if (typeof val === 'string') return `"${val}"`
+  if (typeof val === 'object') {
+    if (val.kind === 'python_instance') {
+      return `<${val.className || 'Object'} (${val.id || 'instance'})>`
+    }
+    if (val.kind === 'python_class') {
+      return `<class '${val.className || 'Class'}'>`
+    }
+    if (val.kind === 'circular_ref') {
+      return `<circular ${val.className || 'instance'}>`
+    }
+    if (Array.isArray(val)) {
+      return `[${val.map((item) => formatPythonMemoryValue(item)).join(', ')}]`
+    }
+    const entries = Object.entries(val).filter(([k]) => !k.startsWith('__'))
+    return `{${entries.map(([k, v]) => `"${k}": ${formatPythonMemoryValue(v)}`).join(', ')}}`
+  }
+  return String(val)
+}
+
 function readDraft(unitId, mission) {
   try {
     const currentDraft = localStorage.getItem(`${DRAFT_PREFIX}${unitId}:${mission.id}`)
@@ -1291,7 +1315,7 @@ export default function PythonMissionLab({ unit, missionSet, initialMissionIndex
                                   <div className="python-lab__instance-attrs">
                                     {Object.entries(val.publicAttributes || {}).map(([attr, attrVal]) => (
                                       <span key={attr} className="python-lab__attr-chip">
-                                        .{attr} = {typeof attrVal === 'object' ? JSON.stringify(attrVal) : String(attrVal)}
+                                        .{attr} = {formatPythonMemoryValue(attrVal)}
                                       </span>
                                     ))}
                                   </div>
@@ -1317,7 +1341,7 @@ export default function PythonMissionLab({ unit, missionSet, initialMissionIndex
                             return (
                               <div className="python-lab__memory-item" key={name}>
                                 <span className="python-lab__memory-name">{name}</span>
-                                <span className="python-lab__memory-val">{typeof val === 'object' ? JSON.stringify(val) : String(val)}</span>
+                                <span className="python-lab__memory-val">{formatPythonMemoryValue(val)}</span>
                               </div>
                             )
                           })}
@@ -1384,7 +1408,7 @@ export default function PythonMissionLab({ unit, missionSet, initialMissionIndex
                             {Object.entries(inst.publicAttributes || {}).map(([k, v]) => (
                               <div key={k} className="python-lab__instance-attr-row">
                                 <span className="python-lab__attr-name">.{k}</span>
-                                <span className="python-lab__attr-val">{typeof v === 'object' ? JSON.stringify(v) : String(v)}</span>
+                                <span className="python-lab__attr-val">{formatPythonMemoryValue(v)}</span>
                               </div>
                             ))}
                           </div>
@@ -1395,7 +1419,7 @@ export default function PythonMissionLab({ unit, missionSet, initialMissionIndex
                                 <div key={dIdx} className="python-lab__diff-entry">
                                   <span>Line {d.sourceLine}:</span>
                                   {Object.entries(d.changes).map(([k, c]) => (
-                                    <code key={k}>{k}: {String(c.before)} ➔ {String(c.after)}</code>
+                                    <code key={k}>{k}: {formatPythonMemoryValue(c.before)} ➔ {formatPythonMemoryValue(c.after)}</code>
                                   ))}
                                 </div>
                               ))}
@@ -1417,7 +1441,7 @@ export default function PythonMissionLab({ unit, missionSet, initialMissionIndex
                           {Object.entries(item.publicAttributes).map(([name, value]) => (
                             <div key={name} className="python-lab__instance-attr-row">
                               <span className="python-lab__attr-name">.{name}</span>
-                              <span className="python-lab__attr-val">{typeof value === 'object' ? JSON.stringify(value) : String(value)}</span>
+                              <span className="python-lab__attr-val">{formatPythonMemoryValue(value)}</span>
                             </div>
                           ))}
                         </div>
