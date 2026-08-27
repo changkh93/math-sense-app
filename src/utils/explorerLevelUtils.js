@@ -11,6 +11,14 @@ export const EXPLORER_LEVELS = [
   { level: 10, threshold: 24000, title: '우주의 아인슈타인' },
   { level: 11, threshold: 38000, title: '아고라의 아르키메데스' },
   { level: 12, threshold: 60000, title: '스텔라의 전설' },
+  { level: 13, threshold: 100000, title: '진리의 피타고라스' },
+  { level: 14, threshold: 160000, title: '초공간의 페르마' },
+  { level: 15, threshold: 250000, title: '무한연산의 튜링' },
+  { level: 16, threshold: 400000, title: '초시공의 푸앵카레' },
+  { level: 17, threshold: 600000, title: '다차원의 리만' },
+  { level: 18, threshold: 850000, title: '신의 직관 라마누잔' },
+  { level: 19, threshold: 1200000, title: '무한공간의 힐베르트' },
+  { level: 20, threshold: 2000000, title: '코스모스의 초월자' },
 ];
 
 function readNonNegativeNumber(value) {

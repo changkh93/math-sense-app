@@ -108,7 +108,13 @@ export function getTodayStudyCrewMissionKey() {
 }
 
 export function getStudyCrewMissionForDate(dateKey) {
-  const seed = String(dateKey || '').replaceAll('-', '');
-  const numericSeed = Number(seed) || 0;
-  return STUDY_CREW_DAILY_MISSIONS[numericSeed % STUDY_CREW_DAILY_MISSIONS.length];
+  const parts = String(dateKey || '').split('-').map(Number);
+  if (parts.length < 3 || !parts[0] || !parts[1] || !parts[2]) {
+    return STUDY_CREW_DAILY_MISSIONS[0];
+  }
+  const [year, month, day] = parts;
+  const daysSinceEpoch = Math.floor(Date.UTC(year, month - 1, day) / 86400000);
+  const total = STUDY_CREW_DAILY_MISSIONS.length;
+  const index = ((daysSinceEpoch % total) + total) % total;
+  return STUDY_CREW_DAILY_MISSIONS[index];
 }

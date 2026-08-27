@@ -32,8 +32,16 @@ assert.equal(level10.title, '우주의 아인슈타인');
 assert.equal(level10.remaining, 6089);
 assert.equal(level10.progress, 57);
 
-const maxLevel = calculateExplorerLevel(991063);
-assert.equal(maxLevel.level, 12);
+const level18 = calculateExplorerLevel(987230);
+assert.equal(level18.level, 18);
+assert.equal(level18.title, '신의 직관 라마누잔');
+assert.equal(level18.nextTitle, '무한공간의 힐베르트');
+assert.equal(level18.isMaxLevel, false);
+assert.equal(level18.remaining, 212770);
+
+const maxLevel = calculateExplorerLevel(2500000);
+assert.equal(maxLevel.level, 20);
+assert.equal(maxLevel.title, '코스모스의 초월자');
 assert.equal(maxLevel.isMaxLevel, true);
 assert.equal(maxLevel.progress, 100);
 assert.equal(maxLevel.remaining, 0);

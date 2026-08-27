@@ -1308,14 +1308,14 @@ module.exports = function ({ functions, admin, costOptimizedDataFunctions, requi
     const bonusCrystals = status === "reviewed" ? parsedBonus : 0;
 
     if (!assignmentId) throw new functions.https.HttpsError("invalid-argument", "과제 ID가 필요합니다.");
-    if (!["reviewed", "needs_revision"].includes(status)) {
+    if (!["reviewed", "needs_revision", "missing"].includes(status)) {
       throw new functions.https.HttpsError("invalid-argument", "올바른 검토 상태를 지정해 주세요.");
     }
     if (!Number.isInteger(bonusCrystals) || bonusCrystals < 0 || bonusCrystals > 10000) {
       throw new functions.https.HttpsError("invalid-argument", "보너스 광석은 0~10,000 범위의 정수여야 합니다.");
     }
-    if (status === "needs_revision" && !feedback) {
-      throw new functions.https.HttpsError("invalid-argument", "보완 요청에는 피드백이 필요합니다.");
+    if ((status === "needs_revision" || status === "missing") && !feedback) {
+      throw new functions.https.HttpsError("invalid-argument", "보완 요청 및 누락 처리에는 피드백(사유)이 필요합니다.");
     }
 
     const assignmentRef = db.collection("assignments").doc(assignmentId);
@@ -1329,7 +1329,7 @@ module.exports = function ({ functions, admin, costOptimizedDataFunctions, requi
         throw new functions.https.HttpsError("not-found", "과제를 찾을 수 없습니다.");
       }
       const assignment = assignmentSnap.data() || {};
-      if (!isWesternClassicCluster(assignment.clusterId) || !assignment.reading?.bookId) {
+      if (!isWesternClassicCluster(assignment.clusterId)) {
         throw new functions.https.HttpsError("failed-precondition", "서양고전 독서 과제만 이 경로로 검토할 수 있습니다.");
       }
       const targetUserId = String(assignment.userId || "").trim();
@@ -1359,7 +1359,7 @@ module.exports = function ({ functions, admin, costOptimizedDataFunctions, requi
       if (!userSnap?.exists) {
         throw new functions.https.HttpsError("failed-precondition", "과제 소유자 계정을 찾을 수 없습니다.");
       }
-      if (status === "reviewed" && (!bookSnap?.exists || bookSnap.data()?.archivedAt)) {
+      if (status === "reviewed" && bookId && (!bookSnap?.exists || bookSnap.data()?.archivedAt)) {
         throw new functions.https.HttpsError("failed-precondition", "활성 독서 도서가 연결된 과제만 검토 완료할 수 있습니다.");
       }
 
@@ -1438,7 +1438,7 @@ module.exports = function ({ functions, admin, costOptimizedDataFunctions, requi
           tx.update(bookRef, { achievementStats: nextAch });
           bookData = { ...bookData, achievementStats: nextAch };
         }
-      } else if (status === "needs_revision" && hadAssignCredit) {
+      } else if ((status === "needs_revision" || status === "missing") && hadAssignCredit) {
         tx.delete(assignmentCreditRef);
 
         const curReadingStats = projectedReadingStats;
