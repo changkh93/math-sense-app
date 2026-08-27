@@ -77,17 +77,15 @@ async function fetchStudentReport(userId, days) {
     .filter(([, status]) => status === 'active')
     .map(([id]) => id);
 
-  // ── Parallel fetch all data ──
-  const [attendance, history, allHistory, assignments, assignmentWarnings, progress, regionsSnap, chaptersSnap, unitsSnap] = await Promise.all([
+  // ── Parallel fetch all initial data ──
+  const [attendance, history, allHistory, assignments, assignmentWarnings, progress, regionsSnap] = await Promise.all([
     fetchAttendance(userId),
     fetchHistory(userId, startTs, endTs),
     fetchAllHistory(userId),
     fetchAssignments(userId),
     fetchAssignmentWarnings(userId),
     fetchProgress(userId),
-    getDocs(collection(db, 'regions')),
-    getDocs(collection(db, 'chapters')),
-    getDocs(collection(db, 'units'))
+    getDocs(collection(db, 'regions'))
   ]);
 
   // Construct region names map and region-to-cluster mapping
@@ -99,24 +97,7 @@ async function fetchStudentReport(userId, days) {
     REGION_TO_CLUSTER[doc.id] = data.clusterId;
   });
 
-  // also map chapters to region to fix progress
-  const chapToRegion = {};
-  chaptersSnap.docs.forEach(doc => {
-    chapToRegion[doc.id] = doc.data().regionId;
-  });
-
-  const regionUnitCount = {};
-  const unitToRegion = {};
-  unitsSnap.docs.forEach(doc => {
-     const data = doc.data();
-     const rId = chapToRegion[data.chapterId];
-     if (rId) {
-       regionUnitCount[rId] = (regionUnitCount[rId] || 0) + 1;
-       unitToRegion[doc.id] = rId;
-     }
-  });
-
-  // Calculate active regions from history
+  // Calculate active regions from history, assignments, and student profile
   const regionSet = new Set();
   
   history.forEach(h => {
@@ -130,6 +111,14 @@ async function fetchStudentReport(userId, days) {
       regionSet.add(regionId);
     }
   });
+  if (activeClusters.length > 0) {
+    regionsSnap.docs.forEach(doc => {
+      const data = doc.data();
+      if (data.clusterId && activeClusters.includes(data.clusterId)) {
+        regionSet.add(doc.id);
+      }
+    });
+  }
   const activeRegions = Array.from(regionSet);
   
   if (activeRegions.length === 0 && history.length > 0) {
@@ -137,17 +126,40 @@ async function fetchStudentReport(userId, days) {
     REGION_NAMES['unknown_region'] = '수반 과정';
   }
 
+  // Scoped fetch of chapters and units for authorized regions
+  const chaptersList = await fetchChaptersForRegions(activeRegions);
+  const chapterIds = chaptersList.map(c => c.id);
+  const unitsList = await fetchUnitsForChapters(chapterIds);
+
+  // Map chapters to region to fix progress
+  const chapToRegion = {};
+  chaptersList.forEach(docData => {
+    chapToRegion[docData.id] = docData.regionId;
+  });
+
+  const regionUnitCount = {};
+  const unitToRegion = {};
+  unitsList.forEach(docData => {
+     const rId = chapToRegion[docData.chapterId];
+     if (rId) {
+       regionUnitCount[rId] = (regionUnitCount[rId] || 0) + 1;
+       unitToRegion[docData.id] = rId;
+     }
+  });
+
   // --- Build Ordered Region Structure ---
   const regionStructure = {};
   activeRegions.forEach(id => {
     regionStructure[id] = { chapters: [], orderedUnits: [], total: 0 };
   });
   regionsSnap.docs.forEach(r => {
-    if (!regionStructure[r.id]) regionStructure[r.id] = { chapters: [], orderedUnits: [], total: 0 };
+    if (!regionStructure[r.id] && activeRegions.includes(r.id)) {
+      regionStructure[r.id] = { chapters: [], orderedUnits: [], total: 0 };
+    }
   });
 
-  chaptersSnap.docs.forEach(c => {
-    const data = c.data();
+  chaptersList.forEach(c => {
+    const data = c;
     const chapId = c.id;
     const rId = data.regionId;
     const rTitle = data.regionTitle;
@@ -171,9 +183,8 @@ async function fetchStudentReport(userId, days) {
     reg.chapters.sort((a,b) => (a.order || 0) - (b.order || 0));
   });
 
-  const unitsRaw = unitsSnap.docs.map(u => ({ ...u.data(), id: u.id }));
   const unitsByChapter = {};
-  unitsRaw.forEach(u => {
+  unitsList.forEach(u => {
     if (!unitsByChapter[u.chapterId]) unitsByChapter[u.chapterId] = [];
     unitsByChapter[u.chapterId].push(u);
   });
@@ -317,6 +328,59 @@ async function fetchAssignmentWarnings(userId) {
 async function fetchProgress(userId) {
   const snap = await getDocs(collection(db, 'users', userId, 'learning_progress'));
   return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+}
+
+async function fetchChaptersForRegions(regionIds) {
+  if (!regionIds || regionIds.length === 0) return [];
+  const validRegionIds = regionIds.filter(id => id && id !== 'unknown_region');
+  if (validRegionIds.length === 0) return [];
+
+  const chapters = [];
+  for (let i = 0; i < validRegionIds.length; i += 30) {
+    const chunk = validRegionIds.slice(i, i + 30);
+    try {
+      const q = query(collection(db, 'chapters'), where('regionId', 'in', chunk));
+      const snap = await getDocs(q);
+      snap.docs.forEach(d => chapters.push({ id: d.id, ...d.data() }));
+    } catch (err) {
+      console.warn(`Failed to batch fetch chapters for regions [${chunk.join(', ')}]:`, err);
+      for (const rId of chunk) {
+        try {
+          const singleQ = query(collection(db, 'chapters'), where('regionId', '==', rId));
+          const singleSnap = await getDocs(singleQ);
+          singleSnap.docs.forEach(d => chapters.push({ id: d.id, ...d.data() }));
+        } catch (singleErr) {
+          console.warn(`Failed to fetch chapters for single region ${rId}:`, singleErr);
+        }
+      }
+    }
+  }
+  return chapters;
+}
+
+async function fetchUnitsForChapters(chapterIds) {
+  if (!chapterIds || chapterIds.length === 0) return [];
+  const units = [];
+  for (let i = 0; i < chapterIds.length; i += 30) {
+    const chunk = chapterIds.slice(i, i + 30);
+    try {
+      const q = query(collection(db, 'units'), where('chapterId', 'in', chunk));
+      const snap = await getDocs(q);
+      snap.docs.forEach(d => units.push({ id: d.id, ...d.data() }));
+    } catch (err) {
+      console.warn(`Failed to batch fetch units for chapters [${chunk.join(', ')}]:`, err);
+      for (const cId of chunk) {
+        try {
+          const singleQ = query(collection(db, 'units'), where('chapterId', '==', cId));
+          const singleSnap = await getDocs(singleQ);
+          singleSnap.docs.forEach(d => units.push({ id: d.id, ...d.data() }));
+        } catch (singleErr) {
+          console.warn(`Failed to fetch units for single chapter ${cId}:`, singleErr);
+        }
+      }
+    }
+  }
+  return units;
 }
 
 async function fetchPeerComparison(activeRegions, startTs, endTs, myUserId) {
