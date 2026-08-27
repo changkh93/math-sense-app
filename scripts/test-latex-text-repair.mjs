@@ -7,6 +7,8 @@ import {
   restoreLostLatexCommandSlashes,
   sanitizeLaTeX,
   repairLaTeXForEditing,
+  URL_MATCH_PATTERN,
+  trimUrlToken,
 } from '../src/utils/latexFormatCore.js';
 import {
   isWorkbookMathDisplayValue,
@@ -66,5 +68,11 @@ assert.equal(sanitizeLaTeX(koreanInMacro), koreanInMacro);
 
 const rawKorean = String.raw`\frac{사과}{바나나}`;
 assert.equal(sanitizeLaTeX(rawKorean), String.raw`\frac{\text{사과}}{\text{바나나}}`);
+
+// 7. Shared URL helpers must remain exported for the JSX formatter.
+assert.deepEqual(
+  [...'문서: https://example.com/path?q=1.'.matchAll(new RegExp(URL_MATCH_PATTERN))].map((match) => trimUrlToken(match[0])),
+  ['https://example.com/path?q=1']
+);
 
 console.log('LaTeX text repair & math format core tests passed.');

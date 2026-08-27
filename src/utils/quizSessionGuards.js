@@ -12,3 +12,10 @@ export const canSubmitQuizSession = ({ questions = [], answers = {}, expectedTot
   hasCompleteQuizQuestionSet(questions, expectedTotal) &&
   getUnansweredQuizQuestions(questions, answers).length === 0
 )
+
+export const getEverWrongQuizQuestions = (questions = [], answers = {}, everWrongIds = []) => {
+  const everWrong = everWrongIds instanceof Set ? everWrongIds : new Set(everWrongIds)
+  return questions.filter(question => (
+    question?.id && (everWrong.has(question.id) || answers?.[question.id]?.isCorrect === false)
+  ))
+}

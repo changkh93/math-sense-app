@@ -12,6 +12,8 @@ import {
   repairControlCharsToLatex,
   sanitizeLaTeX,
   repairLaTeXForEditing,
+  URL_MATCH_PATTERN,
+  trimUrlToken,
   extractPlainUrls,
   getYouTubeVideoId,
   getUrlPreviewData,
@@ -301,5 +303,3 @@ export const parseInlineFormatting = (text, options = {}) => {
     });
   });
 };
-
-

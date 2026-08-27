@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import {
   canSubmitQuizSession,
+  getEverWrongQuizQuestions,
   getUnansweredQuizQuestions,
   hasCompleteQuizQuestionSet,
 } from '../src/utils/quizSessionGuards.js'
@@ -67,6 +68,16 @@ assert.equal(
   }),
   false,
   '문항 데이터가 누락되면 모든 현재 문항에 답했더라도 제출할 수 없어야 합니다.'
+)
+
+assert.deepEqual(
+  getEverWrongQuizQuestions(
+    questions,
+    { q1: { isCorrect: true }, q2: { isCorrect: true }, q3: { isCorrect: false } },
+    new Set(['q2'])
+  ).map(question => question.id),
+  ['q2', 'q3'],
+  '나중에 정답으로 고쳤더라도 세션 중 한 번 틀린 문항은 다크매터 대상으로 유지해야 합니다.'
 )
 
 console.log('quiz session guard tests passed')

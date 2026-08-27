@@ -13,11 +13,12 @@ import { useAuth } from '../../hooks/useAuth'
 import MissionMarkdownViewer from './MissionMarkdownViewer'
 import QuizScratchPad from './QuizScratchPad'
 import { db, functions } from '../../firebase'
-import { doc, getDoc, setDoc, deleteField, serverTimestamp } from 'firebase/firestore'
+import { doc, getDoc, setDoc, deleteField, serverTimestamp, runTransaction, increment } from 'firebase/firestore'
 import { httpsCallable } from 'firebase/functions'
 import { useCreateMistakeCardFromQuiz } from '../../hooks/useMistakeNotebook'
 import {
   canSubmitQuizSession,
+  getEverWrongQuizQuestions,
   getUnansweredQuizQuestions,
   hasCompleteQuizQuestionSet,
 } from '../../utils/quizSessionGuards'
@@ -31,6 +32,13 @@ const shuffleArray = (array) => {
     [newArr[i], newArr[j]] = [newArr[j], newArr[i]];
   }
   return newArr;
+}
+
+const createQuizSessionId = () => {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID()
+  }
+  return `quiz_${Date.now()}_${Math.random().toString(36).slice(2, 12)}`
 }
 
 const QUIZ_REACTION_CHOICES = [
@@ -214,6 +222,7 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
   // Anti-Guessing State
   const [retryCount, setRetryCount] = useState(0)
   const [everWrongSet, setEverWrongSet] = useState(new Set())
+  const [quizSessionId, setQuizSessionId] = useState('')
   const [isMobile, setIsMobile] = useState(() => window.innerWidth <= 768)
   const isDarkMatter = quizData?.unitId === 'dark_matter_zone'
   const [isAiExplanationOpen, setIsAiExplanationOpen] = useState(false)
@@ -247,6 +256,8 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
   const fullscreenCleanupTimerRef = useRef(null)
   const latestQuizSessionRef = useRef(null)
   const integritySaveSucceededRef = useRef(false)
+  const darkMatterSyncPromiseRef = useRef(null)
+  const darkMatterSyncedSessionRef = useRef('')
   const currentQuestion = currentQuestions[currentIdx]
 
   // Keep the latest resumable state available to focus-violation callbacks without
@@ -263,6 +274,7 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
       originalTotal,
       firstPassScore: firstPassScore !== null ? firstPassScore : null,
       everWrong: pendingResult?.everWrongIds || Array.from(everWrongSet),
+      sessionId: quizSessionId,
       reviewMarks: Array.from(reviewMarks),
       deferredQuestionIds: Array.from(deferredQuestionIds),
       isDeferredRound,
@@ -307,6 +319,8 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
           let targetIsResultMode = false
 
           let targetEverWrong = []
+          let targetSessionId = createQuizSessionId()
+          let persistedQuizSession = null
 
           if (user?.uid && quizData.unitId) {
             const progressRef = doc(db, 'users', user.uid, 'learning_progress', quizData.unitId)
@@ -315,6 +329,8 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
               const data = snap.data()
               if (data.quizSession) {
                 const session = data.quizSession
+                persistedQuizSession = session
+                targetSessionId = session.sessionId || targetSessionId
                 // 문항 수가 달라졌더라도 최대한 기존 진행도를 살려서 로드합니다.
                 targetCurrentIdx = session.currentIdx || 0
                 targetUserAnswers = session.userAnswers || {}
@@ -383,6 +399,7 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
               ? pendingCheckpoint.deferredQuestionIds.filter(questionId => selectedIds.has(questionId))
               : targetDeferredQuestionIds
             targetIsDeferredRound = pendingCheckpoint.isDeferredRound === true
+            targetSessionId = pendingCheckpoint.sessionId || targetSessionId
 
             const checkpointQuestionIds = Array.isArray(pendingCheckpoint.currentQuestionIds)
               ? pendingCheckpoint.currentQuestionIds
@@ -410,10 +427,18 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
           setShieldsUsed(targetShieldsUsed)
           setFirstPassScore(targetFirstPassScore)
           setEverWrongSet(new Set(targetEverWrong))
+          setQuizSessionId(targetSessionId)
           setReviewMarks(new Set(targetReviewMarks))
           setDeferredQuestionIds(new Set(targetDeferredQuestionIds))
           setIsDeferredRound(targetIsDeferredRound)
           setIsResultMode(targetIsResultMode)
+
+          if (user?.uid && quizData.unitId && persistedQuizSession && !persistedQuizSession.sessionId) {
+            const progressRef = doc(db, 'users', user.uid, 'learning_progress', quizData.unitId)
+            await setDoc(progressRef, {
+              quizSession: { ...persistedQuizSession, sessionId: targetSessionId }
+            }, { merge: true })
+          }
           
           initializedRef.current = guardKey;
 
@@ -579,6 +604,7 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
           originalTotal: originalTotal,
           firstPassScore: computedFirstPass !== null ? computedFirstPass : firstPassScore,
           everWrong: Array.from(nextEverWrongSet),
+          sessionId: quizSessionId,
           reviewMarks: nextReviewMarkIds || Array.from(reviewMarks),
           deferredQuestionIds: nextDeferredQuestionIds || Array.from(deferredQuestionIds),
           isDeferredRound: nextIsDeferredRound ?? isDeferredRound,
@@ -611,6 +637,7 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
       sessionCrystals: pending.sessionCrystals,
       shieldsUsed: pending.shieldsUsed,
       everWrong: pending.everWrongIds,
+      sessionId: quizSessionId,
       reviewMarks: Array.from(reviewMarks),
       deferredQuestionIds: Array.from(deferredQuestionIds),
       isDeferredRound,
@@ -1493,6 +1520,82 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
     })
   }
 
+  const buildDarkMatterWrongQuestions = useCallback(() => (
+    getEverWrongQuizQuestions(allSessionQuestions, userAnswers, everWrongSet)
+      .map(q => {
+        const answerMeta = userAnswers[q.id] || {}
+        return {
+          ...q,
+          unitId: q.unitId || quizData?.unitId || '',
+          unitTitle: q.unitTitle || quizData?.title || '',
+          chapterId: q.chapterId || quizData?.chapterId || '',
+          regionId: q.regionId || region?.id || '',
+          reactionId: answerMeta.reactionId || '',
+          reactionLabel: answerMeta.reactionLabel || '',
+          darkMatterCause: answerMeta.darkMatterCause || '',
+        }
+      })
+  ), [allSessionQuestions, everWrongSet, quizData?.chapterId, quizData?.title, quizData?.unitId, region?.id, userAnswers])
+
+  const syncDarkMatterForCompletedAnswers = useCallback(async () => {
+    if (!user?.uid || !quizData?.unitId || !quizSessionId) return false
+    if (darkMatterSyncedSessionRef.current === quizSessionId) return true
+
+    const inFlight = darkMatterSyncPromiseRef.current
+    if (inFlight?.sessionId === quizSessionId) return inFlight.promise
+
+    const wrongQuestions = buildDarkMatterWrongQuestions()
+    if (wrongQuestions.length === 0) {
+      darkMatterSyncedSessionRef.current = quizSessionId
+      return true
+    }
+
+    const promise = runTransaction(db, async (transaction) => {
+      const receiptRef = doc(db, 'users', user.uid, 'quiz_dark_matter_syncs', quizSessionId)
+      const receiptSnap = await transaction.get(receiptRef)
+      if (receiptSnap.exists()) return
+
+      wrongQuestions.forEach((question) => {
+        const questionRef = doc(db, 'users', user.uid, 'incorrect_questions', question.id)
+        const safeQuestion = JSON.parse(JSON.stringify(question))
+        transaction.set(questionRef, {
+          ...safeQuestion,
+          lastFailedAt: serverTimestamp(),
+          failCount: increment(1),
+          lastFailureSessionId: quizSessionId,
+        }, { merge: true })
+      })
+      transaction.set(receiptRef, {
+        unitId: quizData.unitId,
+        questionIds: wrongQuestions.map(question => question.id),
+        syncedAt: serverTimestamp(),
+      })
+    }).then(() => {
+      darkMatterSyncedSessionRef.current = quizSessionId
+      return true
+    }).catch((error) => {
+      console.error('Failed to sync completed quiz mistakes:', error)
+      return false
+    }).finally(() => {
+      if (darkMatterSyncPromiseRef.current?.sessionId === quizSessionId) {
+        darkMatterSyncPromiseRef.current = null
+      }
+    })
+
+    darkMatterSyncPromiseRef.current = { sessionId: quizSessionId, promise }
+    return promise
+  }, [buildDarkMatterWrongQuestions, quizData?.unitId, quizSessionId, user?.uid])
+
+  useEffect(() => {
+    if (
+      !isResultMode ||
+      isLoadingSession ||
+      !canSubmitQuizSession({ questions: allSessionQuestions, answers: userAnswers, expectedTotal: originalTotal })
+    ) return
+
+    void syncDarkMatterForCompletedAnswers()
+  }, [allSessionQuestions, isLoadingSession, isResultMode, originalTotal, syncDarkMatterForCompletedAnswers, userAnswers])
+
   const handleFinish = async () => {
     if (isSubmitting) return
 
@@ -1555,6 +1658,8 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
     const crystalsEarned = isDarkMatter 
       ? Math.min(5, solvedAndReleasedCount) 
       : sessionCrystals + (canGetPerfectBonus ? 10 : 0)
+    const wrongQuestions = buildDarkMatterWrongQuestions()
+    const wrongQuestionsPreSynced = await syncDarkMatterForCompletedAnswers()
     
     try {
       try {
@@ -1563,17 +1668,7 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
         console.error("Failed to submit quiz session reactions", reactionError)
       }
 
-      // Clear localStorage on successful finish
-      if (user?.uid && quizData?.unitId) {
-        clearPendingAnswerCheckpoint(user.uid, quizData.unitId)
-        localStorage.removeItem(`metasense_retry_${user.uid}_${quizData.unitId}`)
-        try {
-          const progressRef = doc(db, 'users', user.uid, 'learning_progress', quizData.unitId)
-          await setDoc(progressRef, { quizSession: deleteField() }, { merge: true })
-        } catch(e) { console.error("Failed to clear quiz session", e) }
-      }
-
-      await onComplete({ 
+      const completion = await onComplete({
         unitId: quizData?.unitId || quizData?.id || "",
         unitTitle: quizData?.title || "탐사 퀴즈",
         chapterId: quizData?.chapterId || "",
@@ -1589,19 +1684,8 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
         crystalsEarned,
         isPerfect: canGetPerfectBonus,
         shieldsUsed,
-        wrongQuestions: allSessionQuestions.filter(q => everWrongSet.has(q.id) || (userAnswers[q.id] && userAnswers[q.id].isCorrect === false)).map(q => {
-          const answerMeta = userAnswers[q.id] || {}
-          return {
-            ...q,
-            unitId: q.unitId || quizData?.unitId || "",
-            unitTitle: q.unitTitle || quizData?.title || "",
-            chapterId: q.chapterId || quizData?.chapterId || "",
-            regionId: q.regionId || region?.id || "",
-            reactionId: answerMeta.reactionId || "",
-            reactionLabel: answerMeta.reactionLabel || "",
-            darkMatterCause: answerMeta.darkMatterCause || ""
-          }
-        }),
+        wrongQuestions,
+        wrongQuestionsPreSynced,
         correctQuestions: allSessionQuestions.filter(q => userAnswers[q.id]?.isCorrect && !everWrongSet.has(q.id)).map(q => {
           const answerMeta = userAnswers[q.id] || {}
           return {
@@ -1627,10 +1711,30 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
           }
         })
       })
+      if (completion?.ok === false) throw completion.error || new Error('퀴즈 결과 저장에 실패했습니다.')
+
+      // Clear resumable state only after the completion transaction and Dark
+      // Matter synchronization both had a chance to finish successfully.
+      if (user?.uid && quizData?.unitId) {
+        clearPendingAnswerCheckpoint(user.uid, quizData.unitId)
+        localStorage.removeItem(`metasense_retry_${user.uid}_${quizData.unitId}`)
+        const progressRef = doc(db, 'users', user.uid, 'learning_progress', quizData.unitId)
+        await setDoc(progressRef, { quizSession: deleteField() }, { merge: true })
+      }
     } catch (err) {
       console.error("Finish failed:", err)
       setIsSubmitting(false)
     }
+  }
+
+  const handleResultExit = async () => {
+    const synced = await syncDarkMatterForCompletedAnswers()
+    if (!synced) {
+      setSessionGuardMessage('오답 저장이 지연되고 있습니다. 네트워크를 확인한 뒤 다시 시도해 주세요.')
+      return
+    }
+    soundManager.playClick()
+    onExit()
   }
 
   if (isLoadingSession) {
@@ -1732,7 +1836,7 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
         <div className="space-quiz-container fade-in">
           <div className="glass-card space-quiz-card" style={{ textAlign: 'center' }}>
               <button 
-                onClick={() => { soundManager.playClick(); onExit() }}
+                onClick={handleResultExit}
                 style={{
                   position: 'absolute',
                   top: '1rem',
@@ -1842,6 +1946,12 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
                 )
               })}
             </div>
+
+            {sessionGuardMessage && (
+              <p style={{ color: '#fbbf24', marginBottom: '1rem', fontWeight: 700 }}>
+                {sessionGuardMessage}
+              </p>
+            )}
 
             {/* 버튼들 */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>

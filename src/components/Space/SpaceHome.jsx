@@ -2411,7 +2411,7 @@ function SpaceHome() {
       const reviewMarkedIds = new Set((result.reviewMarkedQuestions || []).map(q => q.id))
 
       // 1. Handle wrongly answered questions (incorrect_questions)
-      if (result.wrongQuestions && result.wrongQuestions.length > 0) {
+      if (!result.wrongQuestionsPreSynced && result.wrongQuestions && result.wrongQuestions.length > 0) {
         result.wrongQuestions.forEach(q => {
           const qRef = doc(db, 'users', user.uid, 'incorrect_questions', q.id)
           finalBatch.set(qRef, {
@@ -4154,10 +4154,13 @@ function SpaceHome() {
         }}
         onExit={() => setActiveDarkMatterQuizQs(null)}
         onComplete={async (result) => {
-          await handleComplete(result)
-          // If we finished the current batch, go back to dashboard to see remaining
-          setActiveDarkMatterQuizQs(null)
+          const outcome = await handleComplete(result)
+          if (outcome?.ok !== false) {
+            // If we finished the current batch, go back to dashboard to see remaining
+            setActiveDarkMatterQuizQs(null)
+          }
           // We don't exit entirely so they can see the progress in the meter
+          return outcome
         }}
         hasShield={userData?.shieldCharges || 0}
         hasRadar={false}

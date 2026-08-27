@@ -147,9 +147,9 @@ export const repairLaTeXForEditing = (text) => {
   return restoreLostLatexCommandSlashes(repairControlCharsToLatex(text)).trim();
 };
 
-const URL_MATCH_PATTERN = /(https?:\/\/[^\s<>"']+)/gi;
+export const URL_MATCH_PATTERN = /(https?:\/\/[^\s<>"']+)/gi;
 
-const trimUrlToken = (rawUrl) => {
+export const trimUrlToken = (rawUrl) => {
   if (!rawUrl || typeof rawUrl !== 'string') return '';
   return rawUrl.replace(/[.,!?;:)\]}]+$/g, '');
 };
