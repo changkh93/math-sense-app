@@ -13,7 +13,10 @@
         <span class="icon">🌌</span>
         <span class="title">Stellar Agora</span>
       </div>
-      <div class="status-indicator online"></div>
+      <div class="header-right">
+        <span class="version-tag">v1.0.4</span>
+        <div class="status-indicator online" title="연결 상태"></div>
+      </div>
     </div>
 
     <div class="main-action">
@@ -21,20 +24,18 @@
         <div class="btn-icon">📸</div>
         <div class="btn-text">
           <span class="main-text">화면 캡쳐 후 질문하기</span>
-          <span class="sub-text">현재 보고 있는 화면을 바로 공유합니다</span>
+          <span class="sub-text">현재 보고 있는 웹페이지를 바로 캡처하여 질문합니다</span>
         </div>
       </button>
     </div>
 
-    <div class="recent-activity">
-      <div class="section-title">💬 내 질문 알림</div>
-      <div id="activity-list" class="activity-list">
-        <div class="empty-state">로그인이 필요합니다.</div>
+    <div class="content-section">
+      <div id="activity-container" class="activity-container">
+        <!-- Dynamic: Login prompt or User Card + Pathway to My Questions -->
       </div>
     </div>
 
     <div class="footer">
-      <button id="open-app-btn" class="text-link">스텔라 아고라 열기</button>
       <div class="powered-by">Powered by <strong>Meta Sense</strong></div>
     </div>
   </div>

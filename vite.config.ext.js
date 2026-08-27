@@ -17,6 +17,7 @@ const target = process.env.EXT_TARGET;
 const configs = {
   // --- Background Service Worker ---
   bg: defineConfig({
+    publicDir: false,
     build: {
       outDir: 'dist-ext',
       emptyOutDir: true,
@@ -36,6 +37,7 @@ const configs = {
 
   // --- Popup Script ---
   popup: defineConfig({
+    publicDir: false,
     build: {
       outDir: 'dist-ext',
       emptyOutDir: false,   // background 결과 보존!
@@ -54,6 +56,7 @@ const configs = {
   }),
   // --- Content Script ---
   content: defineConfig({
+    publicDir: false,
     plugins: [
       // react() 플러그인을 명시적으로 추가하여 JSX 처리 및 최적화 보장
       import('@vitejs/plugin-react').then(m => m.default())

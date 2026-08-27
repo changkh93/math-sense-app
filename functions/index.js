@@ -5546,6 +5546,9 @@ exports.createAgoraQuestion = regionalFunctions.https.onCall(async (data, contex
     ? Math.max(0, Math.floor(rawBountyAmount))
     : 0;
   const drawingUrl = typeof data?.drawingUrl === "string" ? data.drawingUrl.slice(0, 2048) : null;
+  const source = typeof data?.source === "string" ? data.source.trim().slice(0, 50) : "agora";
+  const sourceUrl = typeof data?.sourceUrl === "string" ? data.sourceUrl.slice(0, 2048) : null;
+  const sourceTitle = typeof data?.sourceTitle === "string" ? data.sourceTitle.slice(0, 200) : null;
   const quizId = typeof data?.quizId === "string" ? data.quizId.slice(0, 200) : null;
   const quizContext = sanitizeAgoraQuizContext(data?.quizContext);
 
@@ -5590,6 +5593,9 @@ exports.createAgoraQuestion = regionalFunctions.https.onCall(async (data, contex
       isAnonymous: isPublic,
       anonymousLabel,
       anonymousLabelVersion: 2,
+      source: source || "agora",
+      sourceUrl: sourceUrl || null,
+      sourceTitle: sourceTitle || null,
       quizId,
       quizContext: quizContext || {
         chapterId: "",

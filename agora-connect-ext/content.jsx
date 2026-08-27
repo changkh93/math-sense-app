@@ -42,7 +42,7 @@ window.addEventListener('message', (event) => {
   // 1. 상태 확인 (Ping)
   if (type === 'AGORA_PING') {
     console.log('🌌 [Content] Received AGORA_PING');
-    window.postMessage({ type: 'AGORA_PONG', version: '1.0.3' }, window.location.origin);
+    window.postMessage({ type: 'AGORA_PONG', version: '1.0.4' }, window.location.origin);
   }
 
   // 2. 캡처 요청

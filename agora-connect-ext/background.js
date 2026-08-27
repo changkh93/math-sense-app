@@ -19,14 +19,13 @@ import {
 import { 
   getFirestore, 
   collection, 
-  addDoc, 
-  serverTimestamp, 
   query, 
   where, 
   getDocs,
   onSnapshot
 } from "firebase/firestore";
 import { getStorage, ref, uploadString, getDownloadURL } from "firebase/storage";
+import { getFunctions, httpsCallable } from "firebase/functions";
 
 // --- Firebase 설정 ---
 const firebaseConfig = {
@@ -43,6 +42,7 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 const storage = getStorage(app);
+const functions = getFunctions(app, "asia-northeast3");
 const GOOGLE_WEB_CLIENT_ID = "1075562222654-c7a2853oroa1ngv0s50uhjjonc6sg4cb.apps.googleusercontent.com";
 
 let unsubscribeAnswers = null;
@@ -234,7 +234,7 @@ async function updateStorageAndBadge(snapshot) {
 }
 
 // ============================================================
-// 질문 제출
+// 질문 제출 (Cloud Functions createAgoraQuestion 호출)
 // ============================================================
 async function handleSubmission(payload) {
   const user = auth.currentUser;
@@ -247,28 +247,22 @@ async function handleSubmission(payload) {
   await uploadString(storageRef, payload.image, 'data_url');
   const downloadURL = await getDownloadURL(storageRef);
 
-  await addDoc(collection(db, 'questions'), {
-    userId: userId,
-    userName: user.displayName || "확장 프로그램 사용자",
-    content: payload.text,
+  const createAgoraQuestion = httpsCallable(functions, 'createAgoraQuestion');
+  const contentText = (payload.text && payload.text.trim()) ? payload.text.trim() : "(캡처 이미지 질문)";
+
+  const result = await createAgoraQuestion({
+    content: contentText,
     type: 'concept',
     category: 'general',
     isPublic: true,
-    status: 'open',
-    upvotes: 0,
-    upvotedBy: [],
-    answerCount: 0,
     drawingUrl: downloadURL,
-    quizId: null,
-    quizContext: { chapterId: '', unitId: '', questionId: '', wrongAnswer: null, quizTitle: '' },
-    createdAt: serverTimestamp(),
-    updatedAt: serverTimestamp(),
+    anonymousLabel: user.displayName ? `${user.displayName} (확장 프로그램)` : '별빛을 따라온 익명의 탐험가',
     source: 'agora-connect',
     sourceUrl: payload.url || '',
     sourceTitle: payload.title || ''
   });
 
-  return { success: true };
+  return { success: true, questionId: result?.data?.id };
 }
 
 // ============================================================

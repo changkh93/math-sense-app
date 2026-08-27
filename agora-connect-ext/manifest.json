@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "아고라 커넥트 (Agora Connect)",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description": "어떤 웹페이지에서든 화면을 캡처하고 판서하여 스텔라 아고라에 바로 질문하세요.",
   "permissions": [
     "activeTab",
