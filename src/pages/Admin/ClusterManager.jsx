@@ -1,5 +1,7 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
+import { httpsCallable } from 'firebase/functions';
 import { useClusters, useAdminMutations } from '../../hooks/useContent';
+import { functions } from '../../firebase';
 import { Plus, Edit, Trash2, RefreshCw, Copy, Check } from 'lucide-react';
 import './Admin.css';
 
@@ -8,6 +10,15 @@ function ClusterManager() {
   const { saveCluster, deleteCluster } = useAdminMutations();
   const [editingCluster, setEditingCluster] = useState(null);
   const [copied, setCopied] = useState(false);
+  const [inviteCodes, setInviteCodes] = useState({});
+
+  useEffect(() => {
+    if (!clusters.length) return;
+    const loadSecrets = httpsCallable(functions, 'adminGetAccessSecrets');
+    loadSecrets({ keys: clusters.map((cluster) => `cluster_${cluster.docId || cluster.id}`) })
+      .then((result) => setInviteCodes(result.data?.secrets || {}))
+      .catch((error) => console.error('Failed to load cluster invite codes:', error));
+  }, [clusters]);
 
   // Form State
   const [formData, setFormData] = useState({
@@ -20,12 +31,13 @@ function ClusterManager() {
   });
 
   const handleEdit = (cluster) => {
+    const clusterId = cluster.id || cluster.docId || '';
     setEditingCluster(cluster);
     setFormData({
-      id: cluster.id || cluster.docId || '',
+      id: clusterId,
       name: cluster.name || '',
       isPrivate: !!cluster.isPrivate,
-      inviteCode: cluster.inviteCode || '',
+      inviteCode: inviteCodes[`cluster_${clusterId}`] || '',
       expiresAt: cluster.expiresAt ? new Date(cluster.expiresAt.toDate ? cluster.expiresAt.toDate() : cluster.expiresAt).toISOString().split('T')[0] : '',
       classSchedule: (cluster.classSchedule || []).map(s => ({
         ...s,
@@ -77,6 +89,9 @@ function ClusterManager() {
     try {
       console.log('Saving cluster with payload:', payload);
       await saveCluster.mutateAsync(payload);
+      if (payload.id && payload.inviteCode) {
+        setInviteCodes((current) => ({ ...current, [`cluster_${payload.id}`]: payload.inviteCode }));
+      }
       setEditingCluster(null);
       alert('성공적으로 저장되었습니다.');
     } catch (err) {
@@ -89,7 +104,7 @@ function ClusterManager() {
     if (window.confirm(`'${cluster.name}' 군집을 삭제하시겠습니까? (이 군집에 연결된 은하/단원이 있다면 문제가 발생할 수 있습니다)`)) {
       try {
         await deleteCluster.mutateAsync(cluster.docId || cluster.id);
-      } catch (err) {
+      } catch {
         alert('삭제 실패');
       }
     }
@@ -109,20 +124,23 @@ function ClusterManager() {
       <div className="content-grid">
         <div className="list-section">
           <ul className="item-list">
-            {clusters.map((cluster) => (
+            {clusters.map((cluster) => {
+              const clusterId = cluster.docId || cluster.id;
+              const inviteCode = inviteCodes[`cluster_${clusterId}`] || '';
+              return (
               <li key={cluster.docId || cluster.id} className="list-item">
                 <div className="item-info">
                   <span className="item-title">{cluster.name}</span>
                   <span className="item-meta">
-                    {cluster.isPrivate ? `비공개 (초대: ${cluster.inviteCode})` : '공개'} 
+                    {cluster.isPrivate ? `비공개 (초대: ${inviteCode || '서버 보관'})` : '공개'}
                     {cluster.usageCount ? ` | 사용: ${cluster.usageCount}회` : ''}
                   </span>
                 </div>
                 <div className="item-actions">
-                  {cluster.isPrivate && cluster.inviteCode && (
+                  {cluster.isPrivate && inviteCode && (
                     <button 
                       className="icon-btn" 
-                      onClick={() => copyToClipboard(cluster.inviteCode)}
+                      onClick={() => copyToClipboard(inviteCode)}
                       title="초대 URL 복사"
                     >
                       {copied ? <Check size={16} color="green" /> : <Copy size={16} />}
@@ -136,7 +154,8 @@ function ClusterManager() {
                   </button>
                 </div>
               </li>
-            ))}
+              );
+            })}
             {clusters.length === 0 && <p className="empty-state">생성된 군집이 없습니다.</p>}
           </ul>
         </div>

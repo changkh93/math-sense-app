@@ -18,6 +18,8 @@
     "test:streak": "node scripts/test-streak-utils.mjs",
     "test:pdf-url": "node scripts/test-pdf-url-utils.mjs",
     "test:google-auth": "node scripts/test-google-auth-flow.mjs",
+    "test:access-control": "node --test functions/accessControl.test.cjs",
+    "migrate:access-control": "node scripts/migrate-access-control.mjs",
     "test:referral": "node scripts/test-referral-billing-core.cjs",
     "test:learning-summary": "node scripts/test-learning-summary-utils.mjs",
     "test:weekly-growth-loop": "node --test functions/weeklyGrowthLoopPolicy.test.cjs && node scripts/test-weekly-growth-loop-domain.mjs",

@@ -638,7 +638,7 @@ function buildRefineryCauseStats(records = []) {
 function SpaceHome() {
   const navigate = useNavigate()
   const location = useLocation()
-  const { user, userData, loading: authLoading } = useAuth()
+  const { user, userData, accessClaims, loading: authLoading } = useAuth()
   const [learningSummary, setLearningSummary] = useState(null)
   const [recentCompletionHistory, setRecentCompletionHistory] = useState([])
   const [loadingHistory, setLoadingHistory] = useState(true)
@@ -1045,7 +1045,15 @@ function SpaceHome() {
   }, [currentView])
 
   // Data Hooks
-  const { data: clusters, isLoading: loadingClusters } = useClusters()
+  const canLoadCourseCatalog = Boolean(
+    !authLoading && user && userData && !userData.dataLoadError && !userData.recoveryRequired
+  )
+  const {
+    data: clusters,
+    isLoading: loadingClusters,
+    isError: errorClusters,
+    refetch: refetchClusters
+  } = useClusters({ enabled: canLoadCourseCatalog })
   
   const activeClusters = useMemo(() => {
     if (loadingClusters) return [];
@@ -1057,6 +1065,8 @@ function SpaceHome() {
       list = [{ id: 'cluster_elementary', docId: 'cluster_elementary', name: '초등수학', isPrivate: false, order: 0 }];
     }
     const access = userData?.clusterAccess || { cluster_elementary: 'active' };
+    const claimsAreAuthoritative = accessClaims?.version >= 1;
+    const claimedCourses = new Set(accessClaims?.courses || []);
     
     // Admin can see all clusters
     if (userData?.role === 'admin') return list;
@@ -1066,9 +1076,12 @@ function SpaceHome() {
     // 2. Show private clusters if user has 'active' access in clusterAccess
     return list.filter(c => {
       if (!c.isPrivate) return true;
-      return access[c.docId] === 'active' || access[c.id] === 'active';
+      const clusterId = c.docId || c.id;
+      return claimsAreAuthoritative
+        ? claimedCourses.has(clusterId)
+        : access[clusterId] === 'active';
     });
-  }, [clusters, loadingClusters, user, userData]);
+  }, [accessClaims, clusters, loadingClusters, user, userData]);
 
   const activeClusterData = useMemo(() => {
     if (!selectedClusterId) return null;
@@ -1216,7 +1229,12 @@ function SpaceHome() {
   ]);
 
   const canLoadLearningMap = Boolean(userData && !userData.dataLoadError && !userData.recoveryRequired && selectedClusterId)
-  const { data: regions, isLoading: loadingRegions, isError: errorRegions } = useRegions(selectedClusterId, {
+  const {
+    data: regions,
+    isLoading: loadingRegions,
+    isError: errorRegions,
+    refetch: refetchRegions
+  } = useRegions(selectedClusterId, {
     enabled: canLoadLearningMap
   })
   const { data: chapters, isLoading: loadingChapters } = useChapters(selectedRegionId)
@@ -2040,10 +2058,9 @@ function SpaceHome() {
     const allFinished = chapters.every((ch) => chapterProgress[ch.docId]?.isFinished);
     if (allFinished) {
       console.log(`[Auto-Promote] All chapters completed in region ${selectedRegionId}. Updating regionAccess to completed...`);
-      const userRef = doc(db, 'users', user.uid);
-      updateDoc(userRef, {
-        [`regionAccess.${selectedRegionId}`]: 'completed'
-      }).catch((err) => console.error("Failed to auto-promote region access:", err));
+      const completeAccess = httpsCallable(functions, 'completeRegionAccess');
+      completeAccess({ regionId: selectedRegionId })
+        .catch((err) => console.error("Failed to auto-promote region access:", err));
     }
   }, [user?.uid, selectedRegionId, chapters, chapterProgress, userData?.regionAccess]);
 
@@ -3150,7 +3167,10 @@ function SpaceHome() {
   // Loading State with Timeout & Error handling
   const hasAccountDataIssue = Boolean(userData?.dataLoadError || userData?.recoveryRequired)
   const isUserDataPending = Boolean(user && !userData && !hasAccountDataIssue)
-  const isLoading = (authLoading || isUserDataPending || loadingClusters || (canLoadLearningMap && loadingRegions)) && !errorRegions
+  // Only identity is allowed to gate the whole application. Course/map reads
+  // render inside the shell with their own loading/error states, so one slow
+  // Firestore request cannot strand the page on a full-screen loader.
+  const isLoading = authLoading || isUserDataPending
 
   if (isLoading) {
     return (
@@ -4254,26 +4274,16 @@ function SpaceHome() {
           setVerifyingCode(true);
           setAccessError(null);
           try {
-            if (region.accessCode === code) {
-              const batch = writeBatch(db);
-              batch.set(doc(db, 'users', user.uid), {
-                regionAccess: { [region.id]: 'active' }
-              }, { merge: true });
-              batch.set(doc(db, 'regions', region.id, 'students', user.uid), {
-                email: user.email,
-                status: 'active',
-                joinedAt: serverTimestamp()
-              });
-              await batch.commit();
-              setPendingRegion(null);
-              selectRegion(region.id);
-              soundManager.playWarp();
-            } else {
-              setAccessError('접근 코드가 올바르지 않습니다.');
-            }
+            const redeem = httpsCallable(functions, 'redeemRegionAccessCode');
+            await redeem({ regionId: region.id, accessCode: code });
+            setPendingRegion(null);
+            selectRegion(region.id);
+            soundManager.playWarp();
           } catch (err) {
             console.error('[Region Access Error]', err);
-            setAccessError('오류가 발생했습니다. 다시 시도해주세요.');
+            setAccessError(err?.code === 'functions/permission-denied'
+              ? '접근 코드가 올바르지 않거나 군집 권한이 없습니다.'
+              : '오류가 발생했습니다. 다시 시도해주세요.');
           } finally {
             setVerifyingCode(false);
           }
@@ -4383,6 +4393,9 @@ function SpaceHome() {
           <div style={{ pointerEvents: 'auto', width: '100%' }}>
             <ClusterSelector 
               clusters={activeClusters}
+              loading={loadingClusters}
+              error={errorClusters}
+              onRetry={() => refetchClusters()}
               onEnterFrontier={requestGalaxyEntry}
               onSelect={(id) => {
                 selectCluster(id);
@@ -4510,6 +4523,18 @@ function SpaceHome() {
                     <span className="font-tech" style={{ color: 'var(--text-muted)', fontSize: '1.2rem' }}>
                       행성 맵 스캔 중...
                     </span>
+                  ) : errorRegions ? (
+                    <div className="font-tech" role="alert" style={{ color: '#ff9b9b', fontSize: '1rem', lineHeight: 1.6 }}>
+                      <div>⚠ 행성 맵을 불러오지 못했습니다.</div>
+                      <button
+                        type="button"
+                        className="space-btn font-tech"
+                        onClick={() => refetchRegions()}
+                        style={{ marginTop: '.75rem', padding: '.65rem .9rem', color: 'var(--crystal-cyan)' }}
+                      >
+                        다시 시도
+                      </button>
+                    </div>
                   ) : (!regions || regions.length === 0) ? (
                     <span className="font-tech" style={{ color: '#ff6b6b', fontSize: '1.2rem' }}>
                       ⚠ 탐사가능한 행성이 없습니다

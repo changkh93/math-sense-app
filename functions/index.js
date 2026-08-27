@@ -5045,6 +5045,8 @@ exports.createChildAccountForParent = regionalFunctions.https.onCall(async (data
   if (birthDate) userData.birthDate = birthDate;
 
   await userRef.set(userData, { merge: true });
+  await accessControl.internal.syncClaims(createdUser.uid, userData.clusterAccess, userData.regionAccess);
+  await userRef.set({ accessClaimsSyncedAt: FieldValue.serverTimestamp() }, { merge: true });
   await parentRef.set({
     childrenUids: FieldValue.arrayUnion(createdUser.uid),
     updatedAt: FieldValue.serverTimestamp(),
@@ -6725,6 +6727,15 @@ async function requireAdminUid(context) {
   }
   return uid;
 }
+
+const accessControl = require("./accessControl.cjs")({
+  functions,
+  admin,
+  regionalFunctions,
+  requireAuthUid,
+  requireAdminUid,
+});
+Object.assign(exports, accessControl.functions);
 
 const classicReading = require("./classicReading")({
   functions,

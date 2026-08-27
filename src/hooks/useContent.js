@@ -13,19 +13,43 @@ import {
   serverTimestamp
 } from 'firebase/firestore';
 import { ref, deleteObject } from 'firebase/storage';
-import { db, storage } from '../firebase';
+import { httpsCallable } from 'firebase/functions';
+import { db, functions, storage } from '../firebase';
 import { sanitizeCodeTraceExercise } from '../utils/codeTraceSanitizer';
 
+const CONTENT_QUERY_TIMEOUT_MS = 10000;
+
+const withContentQueryTimeout = (promise, label) => new Promise((resolve, reject) => {
+  const timeout = setTimeout(() => {
+    const error = new Error(`${label} timed out`);
+    error.code = 'content/deadline-exceeded';
+    reject(error);
+  }, CONTENT_QUERY_TIMEOUT_MS);
+
+  promise.then(resolve, reject).finally(() => clearTimeout(timeout));
+});
+
+// The Firebase SDK already performs its own network recovery. Retrying a timed
+// out read starts another billable request while the original may still finish,
+// so only retry one immediate, non-timeout failure.
+const retryContentQuery = (failureCount, error) => (
+  error?.code !== 'content/deadline-exceeded' && failureCount < 1
+);
+
 // --- Clusters ---
-export function useClusters() {
+export function useClusters(options = {}) {
   return useQuery({
     queryKey: ['clusters'],
     queryFn: async () => {
       const q = query(collection(db, 'clusters'), orderBy('order', 'asc'));
-      const snap = await getDocs(q);
+      const snap = await withContentQueryTimeout(getDocs(q), 'clusters');
       return snap.docs.map(doc => ({ ...doc.data(), docId: doc.id }));
     },
     staleTime: 1000 * 60 * 30, // 30 mins
+    gcTime: 1000 * 60 * 60,
+    enabled: options.enabled ?? true,
+    retry: retryContentQuery,
+    refetchOnWindowFocus: false,
   });
 }
 
@@ -36,12 +60,14 @@ export function useRegion(regionId) {
     queryFn: async () => {
       if (!regionId) return null;
       const docRef = doc(db, 'regions', regionId);
-      const snap = await getDoc(docRef);
+      const snap = await withContentQueryTimeout(getDoc(docRef), `region:${regionId}`);
       if (snap.exists()) return { ...snap.data(), id: snap.id, docId: snap.id };
       return null;
     },
     enabled: !!regionId,
     staleTime: 1000 * 60 * 60,
+    retry: retryContentQuery,
+    refetchOnWindowFocus: false,
   });
 }
 
@@ -56,13 +82,13 @@ export function useRegions(clusterId = 'cluster_elementary', options = {}) {
         collection(db, 'regions'), 
         where('clusterId', '==', cid)
       );
-      const snap = await getDocs(q);
+      const snap = await withContentQueryTimeout(getDocs(q), `regions:${cid}`);
       let data = snap.docs.map(doc => ({ ...doc.data(), id: doc.id, docId: doc.id }));
 
       // 2. Legacy Fallback: If elementary and no regions found, try fetching all
       if (cid === 'cluster_elementary' && data.length === 0) {
         try {
-          const allSnap = await getDocs(collection(db, 'regions'));
+          const allSnap = await withContentQueryTimeout(getDocs(collection(db, 'regions')), 'regions:legacy');
           const legacy = allSnap.docs
             .map(doc => ({ ...doc.data(), id: doc.id, docId: doc.id }))
             .filter(r => !r.clusterId);
@@ -76,7 +102,8 @@ export function useRegions(clusterId = 'cluster_elementary', options = {}) {
     },
     enabled,
     staleTime: 1000 * 60 * 5,
-    retry: 2
+    retry: retryContentQuery,
+    refetchOnWindowFocus: false,
   });
 }
 
@@ -87,12 +114,14 @@ export function useChapter(chapterId) {
     queryFn: async () => {
       if (!chapterId) return null;
       const docRef = doc(db, 'chapters', chapterId);
-      const snap = await getDoc(docRef);
+      const snap = await withContentQueryTimeout(getDoc(docRef), `chapter:${chapterId}`);
       if (snap.exists()) return { ...snap.data(), docId: snap.id };
       return null;
     },
     enabled: !!chapterId,
     staleTime: 1000 * 60 * 60,
+    retry: retryContentQuery,
+    refetchOnWindowFocus: false,
   });
 }
 
@@ -107,7 +136,7 @@ export function useChapters(regionId) {
           collection(db, 'chapters'), 
           where('regionId', '==', regionId)
         );
-        const snap = await getDocs(q);
+        const snap = await withContentQueryTimeout(getDocs(q), `chapters:${regionId}`);
         console.log(`[DEBUG] Found ${snap.size} chapters for ${regionId}`);
         const data = snap.docs.map(doc => ({ ...doc.data(), docId: doc.id }));
         return data.sort((a, b) => (a.order || 0) - (b.order || 0));
@@ -119,6 +148,8 @@ export function useChapters(regionId) {
     enabled: !!regionId,
     staleTime: 1000 * 60 * 5,  // 5 minutes - prevents unnecessary refetches
     gcTime: 1000 * 60 * 10,    // 10 minutes garbage collection
+    retry: retryContentQuery,
+    refetchOnWindowFocus: false,
   });
 }
 
@@ -134,7 +165,7 @@ export function useUnits(chapterId) {
           collection(db, 'units'), 
           where('chapterId', '==', chapterId)
         );
-        const snap = await getDocs(q);
+        const snap = await withContentQueryTimeout(getDocs(q), `units:${chapterId}`);
         console.log(`[DEBUG] Found ${snap.size} units for ${chapterId}`);
         const data = snap.docs.map(doc => ({ ...doc.data(), docId: doc.id }));
         return data.sort((a, b) => (a.order || 0) - (b.order || 0));
@@ -146,6 +177,8 @@ export function useUnits(chapterId) {
     enabled: !!chapterId,
     staleTime: 1000 * 60 * 5,  // 5 minutes - prevents unnecessary refetches
     gcTime: 1000 * 60 * 10,    // 10 minutes garbage collection
+    retry: retryContentQuery,
+    refetchOnWindowFocus: false,
   });
 }
 
@@ -158,7 +191,7 @@ export function useUnit(unitId) {
       console.log(`[DEBUG] Fetching single unit: ${unitId}`);
       try {
         const docRef = doc(db, 'units', unitId);
-        const snap = await getDoc(docRef);
+        const snap = await withContentQueryTimeout(getDoc(docRef), `unit:${unitId}`);
         if (snap.exists()) {
           return { ...snap.data(), docId: snap.id };
         }
@@ -171,6 +204,8 @@ export function useUnit(unitId) {
     enabled: !!unitId,
     staleTime: 1000 * 60 * 5,
     gcTime: 1000 * 60 * 10,
+    retry: retryContentQuery,
+    refetchOnWindowFocus: false,
   });
 }
 
@@ -186,7 +221,7 @@ export function useQuizzes(unitId) {
           collection(db, 'quizzes'), 
           where('unitId', '==', unitId)
         );
-        const snap = await getDocs(q);
+        const snap = await withContentQueryTimeout(getDocs(q), `quizzes:${unitId}`);
         console.log(`[DEBUG] Found ${snap.size} quizzes for unit: ${unitId}`);
         const data = snap.docs.map(doc => ({ ...doc.data(), docId: doc.id }));
         return data.sort((a, b) => (a.order || 0) - (b.order || 0));
@@ -198,6 +233,8 @@ export function useQuizzes(unitId) {
     enabled: !!unitId,
     staleTime: 1000 * 60 * 30, // 30 minutes of strong caching
     gcTime: 1000 * 60 * 60, // 1 hour garbage collection
+    retry: retryContentQuery,
+    refetchOnWindowFocus: false,
   });
 }
 
@@ -211,13 +248,15 @@ export function useCodeExercises(unitId) {
         collection(db, 'codeExercises'),
         where('unitId', '==', unitId)
       );
-      const snap = await getDocs(q);
+      const snap = await withContentQueryTimeout(getDocs(q), `codeExercises:${unitId}`);
       const data = snap.docs.map(doc => sanitizeCodeTraceExercise({ ...doc.data(), docId: doc.id }));
       return data.sort((a, b) => (a.order || 0) - (b.order || 0));
     },
     enabled: !!unitId,
     staleTime: 1000 * 60 * 30,
     gcTime: 1000 * 60 * 60,
+    retry: retryContentQuery,
+    refetchOnWindowFocus: false,
   });
 }
 
@@ -242,12 +281,11 @@ export function useAdminMutations() {
 
         const finalData = { 
           ...cleanData, 
-          id: clusterId,
-          updatedAt: serverTimestamp()
+          id: clusterId
         };
 
-        console.log('Final clean data to Firestore:', finalData);
-        await setDoc(doc(db, 'clusters', clusterId), finalData, { merge: true });
+        const saveAccessResource = httpsCallable(functions, 'adminSaveAccessResource');
+        await saveAccessResource({ type: 'cluster', resource: finalData });
       },
       onSuccess: () => queryClient.invalidateQueries({ queryKey: ['clusters'] })
     }),
@@ -288,7 +326,8 @@ export function useAdminMutations() {
     saveRegion: useMutation({
       mutationFn: async (data) => {
         const id = data.id || `reg_${Date.now()}`;
-        await setDoc(doc(db, 'regions', id), { ...data, id }, { merge: true });
+        const saveAccessResource = httpsCallable(functions, 'adminSaveAccessResource');
+        await saveAccessResource({ type: 'region', resource: { ...data, id } });
       },
       onSuccess: () => queryClient.invalidateQueries({ queryKey: ['regions'] })
     }),

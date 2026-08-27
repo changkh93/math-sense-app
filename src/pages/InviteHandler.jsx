@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { collection, query, where, getDocs, getDoc, doc, setDoc, increment } from 'firebase/firestore';
-import { db, auth, googleProvider } from '../firebase';
-import { signInWithEmailAndPassword, signInWithPopup, signOut } from 'firebase/auth';
+import { httpsCallable } from 'firebase/functions';
+import { auth, functions, googleProvider } from '../firebase';
+import { signInWithEmailAndPassword, signInWithPopup } from 'firebase/auth';
 import { useAuth } from '../hooks/useAuth';
 import StarField from '../components/Space/StarField';
 import '../styles/space-theme.css';
@@ -12,12 +12,6 @@ const navItems = [
   ['전화상담', '/consultation'],
   ['회원가입', '/signup']
 ];
-
-const isActiveMemberData = (data = {}) => (
-  data?.isDeleted !== true &&
-  data?.accountStatus !== 'deleted' &&
-  !data?.deletedAt
-);
 
 function InviteHandler() {
   const { inviteCode } = useParams();
@@ -41,57 +35,15 @@ function InviteHandler() {
     const processInvite = async () => {
       try {
         setStatus('loading');
-        const q = query(collection(db, 'clusters'), where('inviteCode', '==', inviteCode));
-        const snap = await getDocs(q);
-
-        if (snap.empty) {
-          setStatus('invalid');
-          return;
-        }
-
-        const clusterDoc = snap.docs[0];
-        const clusterData = clusterDoc.data();
-
-        // Check expiration
-        if (clusterData.expiresAt && new Date(clusterData.expiresAt.toDate()) < new Date()) {
-          setStatus('invalid');
-          return;
-        }
-
-        setClusterInfo(clusterData);
-
-        const userDocRef = doc(db, 'users', user.uid);
-        const userSnap = await getDoc(userDocRef);
-        if (!userSnap.exists() || !isActiveMemberData(userSnap.data())) {
-          await signOut(auth);
-          setStatus('wrongAccount');
-          return;
-        }
-
-        // Unlock cluster access safely using updateDoc for nested fields
-        try {
-          // Use updateDoc for reliable nested field updates
-          await setDoc(userDocRef, {
-            clusterAccess: { [clusterDoc.id]: 'active' }
-          }, { merge: true });
-        } catch (err) {
-          console.warn("User doc update failed, trying setDoc without merge fallback", err);
-          await setDoc(userDocRef, { clusterAccess: { [clusterDoc.id]: 'active' } }, { merge: true });
-        }
-
-        // Increment usage count (optional - don't fail if this fails)
-        try {
-          await setDoc(doc(db, 'clusters', clusterDoc.id), {
-            usageCount: increment(1)
-          }, { merge: true });
-        } catch (err) {
-          console.warn("Usage count increment failed (permission?), continuing...", err);
-        }
+        const redeem = httpsCallable(functions, 'redeemClusterInvite');
+        const result = await redeem({ inviteCode });
+        setClusterInfo(result.data?.cluster || null);
+        await auth.currentUser?.getIdToken(true);
 
         setStatus('success');
       } catch (err) {
         console.error("Invite processing error:", err);
-        setStatus('invalid');
+        setStatus(err?.code === 'functions/failed-precondition' ? 'wrongAccount' : 'invalid');
       }
     };
 

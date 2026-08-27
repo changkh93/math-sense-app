@@ -1,7 +1,10 @@
-import { useState, useEffect } from 'react';
-import { onAuthStateChanged, signOut } from 'firebase/auth';
+import { useState, useEffect, useRef } from 'react';
+import { onAuthStateChanged, onIdTokenChanged, signOut } from 'firebase/auth';
 import { collection, doc, getDoc, getDocs, onSnapshot, query, where } from 'firebase/firestore';
 import { auth, db } from '../firebase';
+
+const AUTH_BOOTSTRAP_TIMEOUT_MS = 8000;
+const USER_DOCUMENT_TIMEOUT_MS = 10000;
 
 const buildDefaultUserData = (firebaseUser, extra = {}) => ({
   crystals: 0,
@@ -72,13 +75,69 @@ const setSignupRequiredNotice = (firebaseUser, reason = 'missing-membership') =>
 export function useAuth() {
   const [user, setUser] = useState(null);
   const [userData, setUserData] = useState(null);
+  const [accessClaims, setAccessClaims] = useState(null);
   const [loading, setLoading] = useState(true);
+  const accessRevisionRef = useRef({ initialized: false, value: null });
 
   useEffect(() => {
     let unsubscribeSnapshot = null;
     let cleanupTimeout = null;
+    let authBootstrapTimeout = null;
+    let userDocumentTimeout = null;
+
+    const clearAuthBootstrapTimeout = () => {
+      if (!authBootstrapTimeout) return;
+      clearTimeout(authBootstrapTimeout);
+      authBootstrapTimeout = null;
+    };
+
+    const clearUserDocumentTimeout = () => {
+      if (!userDocumentTimeout) return;
+      clearTimeout(userDocumentTimeout);
+      userDocumentTimeout = null;
+    };
+
+    // Firebase Auth normally resolves from local persistence almost instantly.
+    // IndexedDB/browser-extension failures can prevent the first callback forever,
+    // so never let the public landing page depend on an unbounded SDK wait.
+    authBootstrapTimeout = setTimeout(() => {
+      console.warn('useAuth: Auth bootstrap timed out; showing the public landing page.');
+      setUser(null);
+      setUserData(null);
+      setLoading(false);
+    }, AUTH_BOOTSTRAP_TIMEOUT_MS);
+
+    // Claims ride on Firebase's cached ID token, so reading course access here
+    // adds no Firestore read. This listener only refreshes the compact access
+    // state and does not resubscribe to the user document on hourly token renewals.
+    const unsubscribeToken = onIdTokenChanged(auth, async (firebaseUser) => {
+      if (!firebaseUser) {
+        setAccessClaims(null);
+        return;
+      }
+      try {
+        const token = await firebaseUser.getIdTokenResult();
+        const courses = Array.isArray(token.claims?.courses)
+          ? token.claims.courses.filter((id) => typeof id === 'string')
+          : [];
+        const regions = Array.isArray(token.claims?.regions)
+          ? token.claims.regions.filter((id) => typeof id === 'string')
+          : [];
+        setAccessClaims({
+          version: Number(token.claims?.accessVersion || 0),
+          courses,
+          regions
+        });
+      } catch (error) {
+        console.warn('useAuth: Failed to read access claims:', error);
+        setAccessClaims(null);
+      }
+    });
 
     const unsubscribeAuth = onAuthStateChanged(auth, (firebaseUser) => {
+      clearAuthBootstrapTimeout();
+      clearUserDocumentTimeout();
+
       if (cleanupTimeout) {
         clearTimeout(cleanupTimeout);
         cleanupTimeout = null;
@@ -88,6 +147,7 @@ export function useAuth() {
         unsubscribeSnapshot();
         unsubscribeSnapshot = null;
       }
+      accessRevisionRef.current = { initialized: false, value: null };
 
       if (firebaseUser?.isAnonymous) {
         // Anonymous Firebase Auth = crew guest. The guest entry screen
@@ -134,6 +194,7 @@ export function useAuth() {
       if (firebaseUser) {
         const userDocRef = doc(db, 'users', firebaseUser.uid);
         const applyUserDocumentData = (data) => {
+          clearUserDocumentTimeout();
           if (isDeletedAccountData(data)) {
             console.warn('삭제된 회원 계정의 앱 접근을 차단했습니다.', {
               uid: firebaseUser.uid,
@@ -145,6 +206,21 @@ export function useAuth() {
             signOut(auth);
             return;
           }
+
+          const nextAccessRevision = data?.accessUpdatedAt?.toMillis?.()
+            ?? data?.accessUpdatedAt?.seconds
+            ?? data?.accessUpdatedAt
+            ?? null;
+          const previousRevision = accessRevisionRef.current;
+          if (previousRevision.initialized && previousRevision.value !== nextAccessRevision) {
+            // The profile listener already exists for normal user data, so this
+            // makes rare admin access changes take effect immediately without
+            // adding another Firestore subscription or polling loop.
+            firebaseUser.getIdToken(true).catch((error) => {
+              console.warn('useAuth: Failed to refresh token after access change:', error);
+            });
+          }
+          accessRevisionRef.current = { initialized: true, value: nextAccessRevision };
 
           setUserData({
             crystals: 0,
@@ -194,11 +270,25 @@ export function useAuth() {
           setLoading(false);
         };
 
+        // A listener may remain pending while the browser is offline or its
+        // persistence layer is locked. Fail visibly and recoverably instead of
+        // keeping the entire application behind an infinite loading screen.
+        userDocumentTimeout = setTimeout(() => {
+          console.warn('useAuth: User document bootstrap timed out.', { uid: firebaseUser.uid });
+          setUserData(buildDefaultUserData(firebaseUser, {
+            dataLoadError: true,
+            dataLoadTimedOut: true,
+            adjustmentReason: '사용자 데이터 동기화 시간 초과'
+          }));
+          setLoading(false);
+        }, USER_DOCUMENT_TIMEOUT_MS);
+
         unsubscribeSnapshot = onSnapshot(userDocRef, (docSnap) => {
           if (docSnap.exists()) {
             applyUserDocumentData(docSnap.data());
           } else {
             if (window.sessionStorage.getItem('accountDeletionInProgress') === firebaseUser.uid) {
+              clearUserDocumentTimeout();
               setUserData(null);
               setLoading(false);
               return;
@@ -280,6 +370,7 @@ export function useAuth() {
                 setUserData(null);
                 await signOut(auth);
               } finally {
+                clearUserDocumentTimeout();
                 setLoading(false);
               }
             });
@@ -306,15 +397,28 @@ export function useAuth() {
                 adjustmentReason: fallbackErr?.message || '사용자 데이터 동기화 실패'
               }));
             })
-            .finally(() => setLoading(false));
+            .finally(() => {
+              clearUserDocumentTimeout();
+              setLoading(false);
+            });
         });
       } else {
+        clearUserDocumentTimeout();
         setUserData(null);
         setLoading(false);
       }
+    }, (err) => {
+      clearAuthBootstrapTimeout();
+      clearUserDocumentTimeout();
+      console.error('useAuth: Auth state bootstrap failed:', err);
+      setUser(null);
+      setUserData(null);
+      setLoading(false);
     });
 
     return () => {
+      clearAuthBootstrapTimeout();
+      clearUserDocumentTimeout();
       if (cleanupTimeout) {
         clearTimeout(cleanupTimeout);
       }
@@ -327,9 +431,10 @@ export function useAuth() {
           }
         }, 100);
       }
+      unsubscribeToken();
       unsubscribeAuth();
     };
   }, []);
 
-  return { user, userData, loading };
+  return { user, userData, accessClaims, loading };
 }

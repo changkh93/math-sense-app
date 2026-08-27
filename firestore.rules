@@ -16,6 +16,65 @@ service cloud.firestore {
       return request.auth != null;
     }
 
+    function hasCourseClaim(clusterId) {
+      return isAuth() && (
+        isAdmin() ||
+        (
+          'accessVersion' in request.auth.token &&
+          request.auth.token.accessVersion == 1 &&
+          request.auth.token.courses is list &&
+          clusterId in request.auth.token.courses
+        ) ||
+        (
+          !('courses' in request.auth.token) &&
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.clusterAccess is map &&
+          clusterId in get(/databases/$(database)/documents/users/$(request.auth.uid)).data.clusterAccess &&
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.clusterAccess[clusterId] == 'active'
+        )
+      );
+    }
+
+    function hasRegionClaim(regionId) {
+      return isAuth() && (
+        isAdmin() ||
+        (
+          'accessVersion' in request.auth.token &&
+          request.auth.token.accessVersion == 1 &&
+          request.auth.token.regions is list &&
+          regionId in request.auth.token.regions
+        ) ||
+        (
+          !('regions' in request.auth.token) &&
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.regionAccess is map &&
+          regionId in get(/databases/$(database)/documents/users/$(request.auth.uid)).data.regionAccess &&
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.regionAccess[regionId] in ['active', 'completed']
+        )
+      );
+    }
+
+    function canReadRegionContent(regionId) {
+      let region = get(/databases/$(database)/documents/regions/$(regionId));
+      // Older elementary regions predate clusterId; keep them mapped to the
+      // original public elementary cluster during the metadata migration.
+      let clusterId = ('clusterId' in region.data)
+        ? region.data.clusterId
+        : 'cluster_elementary';
+      let cluster = get(/databases/$(database)/documents/clusters/$(clusterId));
+      return isAuth() &&
+             (cluster.data.isPrivate != true || hasCourseClaim(clusterId)) &&
+             (region.data.isPrivate != true || hasRegionClaim(regionId));
+    }
+
+    function canReadChapterContent(chapterId) {
+      let chapter = get(/databases/$(database)/documents/chapters/$(chapterId));
+      return canReadRegionContent(chapter.data.regionId);
+    }
+
+    function canReadUnitContent(unitId) {
+      let unit = get(/databases/$(database)/documents/units/$(unitId));
+      return canReadChapterContent(unit.data.chapterId);
+    }
+
     function isAgoraBanned(userId) {
       return exists(/databases/$(database)/documents/agoraBannedUsers/$(userId));
     }
@@ -70,6 +129,11 @@ service cloud.firestore {
     function protectedUserKeys() {
       return [
         'role',
+        'clusterAccess',
+        'regionAccess',
+        'accessUpdatedAt',
+        'accessUpdatedBy',
+        'accessClaimsSyncedAt',
         'isGuest',
         'isDeleted',
         'accountStatus',
@@ -99,6 +163,11 @@ service cloud.firestore {
              (!('isGuest' in request.resource.data) || request.resource.data.isGuest == false) &&
              (!('isDeleted' in request.resource.data) || request.resource.data.isDeleted == false) &&
              (!('accountStatus' in request.resource.data) || request.resource.data.accountStatus == 'active') &&
+             (!('regionAccess' in request.resource.data) || request.resource.data.regionAccess.size() == 0) &&
+             (!('clusterAccess' in request.resource.data) || (
+               request.resource.data.clusterAccess.keys().hasOnly(['cluster_elementary']) &&
+               request.resource.data.clusterAccess.cluster_elementary == 'active'
+             )) &&
              !request.resource.data.keys().hasAny([
                'agoraStats',
                'crewStats',
@@ -197,29 +266,39 @@ service cloud.firestore {
       // Allow students to add themselves when they verify the code
       match /students/{studentId} {
         allow read: if isAdmin() || request.auth.uid == studentId;
-        allow write: if isAdmin() || request.auth.uid == studentId;
+        allow write: if isAdmin();
       }
+    }
+
+    // Enrollment codes and hashed invite lookups are server-only. Callable
+    // functions perform both validation and writes using the Admin SDK.
+    match /accessSecrets/{secretId} {
+      allow read, write: if false;
+    }
+
+    match /clusterInviteLookup/{codeHash} {
+      allow read, write: if false;
     }
     
     match /chapters/{document=**} {
-      allow read: if true;
+      allow read: if canReadRegionContent(resource.data.regionId);
       allow write: if isAdmin();
     }
     
     match /units/{document=**} {
-      allow read: if true;
+      allow read: if canReadChapterContent(resource.data.chapterId);
       allow write: if isAdmin();
     }
     
     // Quizzes: Authenticated Read, Admin Write
     match /quizzes/{document=**} {
-      allow read: if isAuth();
+      allow read: if canReadUnitContent(resource.data.unitId);
       allow write: if isAdmin();
     }
 
     // Code trace exercises: students read, admins import/edit.
     match /codeExercises/{document=**} {
-      allow read: if isAuth();
+      allow read: if canReadUnitContent(resource.data.unitId);
       allow write: if isAdmin();
     }
 

@@ -1,16 +1,17 @@
 import React, { useState, useEffect } from 'react';
+import { httpsCallable } from 'firebase/functions';
 import { useClusters, useRegions, useChapters, useUnits, useAdminMutations } from '../../hooks/useContent';
 import { ChevronRight, ChevronDown, Plus, Trash2, Edit3, BookOpen, Layers, Library, Settings, Sparkles, ArrowUp, ArrowDown, Rocket, Bot, RefreshCw, Users, Code2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import AiQuizImportModal from '../../components/Admin/AiQuizImportModal';
 import AiCodeTraceImportModal from '../../components/Admin/AiCodeTraceImportModal';
-import { db } from '../../firebase';
-import { collection, getDocs, doc, updateDoc, writeBatch } from 'firebase/firestore';
+import { db, functions } from '../../firebase';
+import { collection, getDocs, doc, writeBatch } from 'firebase/firestore';
 import RegionEditModal from '../../components/Admin/RegionEditModal';
 import RegionStudentManagerModal from '../../components/Admin/RegionStudentManagerModal';
 
 const ContentManager = () => {
-  const { data: clusters, isLoading: loadingClusters } = useClusters();
+  const { data: clusters } = useClusters();
   
   // Use sessionStorage to persist UI state across navigations
   const [selectedClusterId, setSelectedClusterId] = useState(() => {
@@ -21,7 +22,7 @@ const ContentManager = () => {
     const saved = sessionStorage.getItem('admin_expandedRegions');
     try {
       return saved ? JSON.parse(saved) : {};
-    } catch (e) {
+    } catch {
       return {};
     }
   });
@@ -30,7 +31,7 @@ const ContentManager = () => {
     const saved = sessionStorage.getItem('admin_expandedChapters');
     try {
       return saved ? JSON.parse(saved) : {};
-    } catch (e) {
+    } catch {
       return {};
     }
   });
@@ -48,7 +49,7 @@ const ContentManager = () => {
     sessionStorage.setItem('admin_expandedChapters', JSON.stringify(expandedChapters));
   }, [expandedChapters]);
 
-  const { data: regions, isLoading: loadingRegions, refetch: refetchRegions } = useRegions(selectedClusterId);
+  const { data: regions, isLoading: loadingRegions } = useRegions(selectedClusterId);
   const { saveRegion } = useAdminMutations();
   const [aiImportUnitId, setAiImportUnitId] = useState(null);
   const [codeTraceImportUnitId, setCodeTraceImportUnitId] = useState(null);
@@ -56,6 +57,20 @@ const ContentManager = () => {
   // Modals state
   const [editingRegion, setEditingRegion] = useState(null);
   const [managingRegionStudents, setManagingRegionStudents] = useState(null);
+  const [regionCodes, setRegionCodes] = useState({});
+
+  useEffect(() => {
+    if (!regions?.length) return;
+    const loadSecrets = httpsCallable(functions, 'adminGetAccessSecrets');
+    loadSecrets({ keys: regions.map((region) => `region_${region.id || region.docId}`) })
+      .then((result) => setRegionCodes(result.data?.secrets || {}))
+      .catch((error) => console.error('Failed to load region access codes:', error));
+  }, [regions]);
+
+  const withRegionCode = (region) => {
+    const regionId = region?.id || region?.docId;
+    return region ? { ...region, accessCode: regionCodes[`region_${regionId}`] || '' } : region;
+  };
 
   const toggleRegion = (id) => setExpandedRegions(prev => ({ ...prev, [id]: !prev[id] }));
   const toggleChapter = (id) => setExpandedChapters(prev => ({ ...prev, [id]: !prev[id] }));
@@ -66,6 +81,10 @@ const ContentManager = () => {
 
   const handleSaveRegion = (regionData) => {
     saveRegion.mutate(regionData);
+    const regionId = regionData.id || regionData.docId;
+    if (regionId && regionData.accessCode) {
+      setRegionCodes((current) => ({ ...current, [`region_${regionId}`]: regionData.accessCode }));
+    }
   };
 
   const handleRecountAnswers = async () => {
@@ -164,8 +183,8 @@ const ContentManager = () => {
             onToggleChapter={toggleChapter}
             onOpenAiImport={setAiImportUnitId}
             onOpenCodeTraceImport={setCodeTraceImportUnitId}
-            onEditRegion={(region) => setEditingRegion(region)}
-            onManageStudents={(region) => setManagingRegionStudents(region)}
+            onEditRegion={(region) => setEditingRegion(withRegionCode(region))}
+            onManageStudents={(region) => setManagingRegionStudents(withRegionCode(region))}
           />
         ))}
       </div>
@@ -200,7 +219,7 @@ const ContentManager = () => {
 
 const RegionNode = ({ region, isExpanded, onToggle, expandedChapters, onToggleChapter, onOpenAiImport, onOpenCodeTraceImport, onEditRegion, onManageStudents }) => {
   const { data: chapters, isLoading: loadingChapters } = useChapters(isExpanded ? region.id : null);
-  const { saveRegion, deleteRegion, saveChapter } = useAdminMutations();
+  const { deleteRegion, saveChapter } = useAdminMutations();
 
   const handleRename = (e) => {
     e.stopPropagation();

@@ -9,7 +9,7 @@ const CLUSTER_IMAGES = {
   '초등수학': '/images/clusters/elementary_math.png'
 };
 
-function ClusterSelector({ clusters, onSelect, onEnterFrontier }) {
+function ClusterSelector({ clusters, loading = false, error = false, onRetry, onSelect, onEnterFrontier }) {
   return (
     <div className="space-bg" style={{ minHeight: '100vh', position: 'relative', padding: '20px' }}>
       <StarField count={200} />
@@ -42,6 +42,39 @@ function ClusterSelector({ clusters, onSelect, onEnterFrontier }) {
           gap: '30px',
           padding: '20px'
         }}>
+          {(loading || error) && (
+            <div
+              role={error ? 'alert' : 'status'}
+              className="font-tech"
+              style={{
+                width: '100%',
+                padding: '0.9rem 1rem',
+                border: `1px solid ${error ? 'rgba(255,107,107,.45)' : 'rgba(0,243,255,.28)'}`,
+                borderRadius: 14,
+                color: error ? '#ff9b9b' : 'var(--crystal-cyan, #00f3ff)',
+                background: 'rgba(5,15,30,.78)'
+              }}
+            >
+              {error ? '학습 코스 정보를 불러오지 못했습니다.' : '학습 코스를 동기화하는 중입니다…'}
+              {error && (
+                <button
+                  type="button"
+                  onClick={onRetry}
+                  style={{
+                    marginLeft: 12,
+                    padding: '.45rem .7rem',
+                    border: '1px solid currentColor',
+                    borderRadius: 8,
+                    color: 'inherit',
+                    background: 'transparent',
+                    cursor: 'pointer'
+                  }}
+                >
+                  다시 시도
+                </button>
+              )}
+            </div>
+          )}
           <Motion.button
             type="button"
             initial={{ opacity: 0, scale: 0.9 }}

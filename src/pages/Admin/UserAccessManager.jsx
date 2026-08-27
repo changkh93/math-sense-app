@@ -168,7 +168,6 @@ function UserAccessManager() {
 
   const handleAccessChange = async (userId, clusterId, newStatus) => {
     try {
-      const userRef = doc(db, 'users', userId);
       const targetUser = users.find(u => u.uid === userId);
       const currentAccess = targetUser.clusterAccess || {};
       const currentParticipation = targetUser.participation || {};
@@ -185,15 +184,14 @@ function UserAccessManager() {
         newAccess[clusterId] = newStatus; // 'active' or 'suspended'
       }
 
-      await updateDoc(userRef, {
-        clusterAccess: newAccess,
-        participation: nextParticipation
-      });
+      const setAccess = httpsCallable(functions, 'adminSetUserAccess');
+      const result = await setAccess({ targetUid: userId, scope: 'cluster', resourceId: clusterId, status: newStatus });
+      const serverAccess = result.data?.access || newAccess;
       
       // Update local state
       setUsers(prev => prev.map(u => {
         if (u.uid === userId) {
-          return { ...u, clusterAccess: newAccess, participation: nextParticipation };
+          return { ...u, clusterAccess: serverAccess, participation: nextParticipation };
         }
         return u;
       }));
@@ -207,7 +205,6 @@ function UserAccessManager() {
 
   const handleRegionAccessChange = async (userId, regionId, newStatus) => {
     try {
-      const userRef = doc(db, 'users', userId);
       const targetUser = users.find(u => u.uid === userId);
       const currentRegionAccess = targetUser?.regionAccess || {};
       const nextRegionAccess = { ...currentRegionAccess };
@@ -218,11 +215,13 @@ function UserAccessManager() {
         nextRegionAccess[regionId] = newStatus; // active | completed | suspended
       }
 
-      await updateDoc(userRef, { regionAccess: nextRegionAccess });
+      const setAccess = httpsCallable(functions, 'adminSetUserAccess');
+      const result = await setAccess({ targetUid: userId, scope: 'region', resourceId: regionId, status: newStatus });
+      const serverAccess = result.data?.access || nextRegionAccess;
 
       setUsers(prev => prev.map(u => {
         if (u.uid === userId) {
-          return { ...u, regionAccess: nextRegionAccess };
+          return { ...u, regionAccess: serverAccess };
         }
         return u;
       }));
