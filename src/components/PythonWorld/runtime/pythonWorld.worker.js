@@ -581,11 +581,19 @@ def _run_mission(payload_json, code):
 
         @property
         def strength(self):
-            return self._data()["strength"] if self._data() else None
+            data = self._data()
+            if not data:
+                return 0
+            val = data.get("strength")
+            return int(val) if val is not None else 0
 
         @property
         def priority(self):
-            return self._data()["priority"] if self._data() else None
+            data = self._data()
+            if not data:
+                return 0
+            val = data.get("priority")
+            return int(val) if val is not None else 0
 
         @property
         def position(self):

@@ -1,5 +1,7 @@
+import PythonWorker from './pythonWorld.worker.js?worker'
+
 const LOAD_TIMEOUT_MS = 60_000
-const RUN_TIMEOUT_MS = 6_000
+const RUN_TIMEOUT_MS = 10_000
 
 function createAbortError(message = 'Python 실행이 중지되었습니다.') {
   const error = new Error(message)
@@ -19,19 +21,28 @@ export default class PythonRuntimeClient {
 
   createWorker() {
     if (this.disposed) return
-    this.worker = new Worker(new URL('./pythonWorld.worker.js', import.meta.url), { type: 'module' })
-    this.worker.addEventListener('message', this.handleMessage)
-    this.worker.addEventListener('error', this.handleWorkerError)
-    this.load().then(() => {
-      if (!this.disposed) {
-        this.onStatus?.({ status: 'ready' })
+    try {
+      if (typeof PythonWorker === 'function') {
+        this.worker = new PythonWorker()
+      } else {
+        this.worker = new Worker(new URL('./pythonWorld.worker.js', import.meta.url), { type: 'module' })
       }
-    }).catch((error) => {
-      console.warn('Python runtime preload notice:', error)
-      if (!this.disposed) {
-        this.onStatus?.({ status: 'error', error })
-      }
-    })
+      this.worker.addEventListener('message', this.handleMessage)
+      this.worker.addEventListener('error', this.handleWorkerError)
+      this.load().then(() => {
+        if (!this.disposed) {
+          this.onStatus?.({ status: 'ready' })
+        }
+      }).catch((error) => {
+        console.warn('Python runtime preload notice:', error)
+        if (!this.disposed) {
+          this.onStatus?.({ status: 'error', error })
+        }
+      })
+    } catch (err) {
+      console.error('Worker initialization failed:', err)
+      this.handleWorkerError(err)
+    }
   }
 
   handleMessage = (event) => {

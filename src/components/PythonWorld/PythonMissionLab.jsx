@@ -689,7 +689,12 @@ export default function PythonMissionLab({ unit, missionSet, initialMissionIndex
   }, [assistanceLevel, code, isPreviewOnly, mission, missionSet.id, missionSet.version, progress.bestAssistanceByMission, progress.bestStarsByMission, progress.completedMissionIds, unit, user?.uid])
 
   const runMission = useCallback(async () => {
-    if (!mission || !runtimeRef.current || running) return
+    if (!mission || running) return
+    if (!runtimeRef.current) {
+      runtimeRef.current = new PythonRuntimeClient({
+        onStatus: ({ status }) => setRuntimeStatus(status),
+      })
+    }
     const runId = ++runIdRef.current
     clearInterval(autoplayRef.current)
     setPlaying(false)
@@ -926,8 +931,19 @@ export default function PythonMissionLab({ unit, missionSet, initialMissionIndex
           >
             {soundMuted ? '🔇' : '🔊'}
           </button>
-          <div className={`python-lab__runtime python-lab__runtime--${runtimeStatus}`}>
-            <span /> {runtimeStatus === 'ready' ? 'PYTHON READY' : runtimeStatus === 'error' ? 'RUNTIME ERROR' : 'PYTHON LOADING'}
+          <div
+            className={`python-lab__runtime python-lab__runtime--${runtimeStatus}`}
+            onClick={() => {
+              if (runtimeStatus === 'error') {
+                setRuntimeStatus('loading')
+                runtimeRef.current?.stop('재연결')
+                runtimeRef.current?.load().then(() => setRuntimeStatus('ready')).catch(() => setRuntimeStatus('error'))
+              }
+            }}
+            style={{ cursor: runtimeStatus === 'error' ? 'pointer' : 'default' }}
+            title={runtimeStatus === 'error' ? '엔진을 다시 연결하려면 클릭하세요.' : ''}
+          >
+            <span /> {runtimeStatus === 'ready' ? 'PYTHON READY' : runtimeStatus === 'error' ? '⚠️ RUNTIME ERROR (클릭하여 재연결)' : 'PYTHON LOADING'}
           </div>
         </div>
       </header>
