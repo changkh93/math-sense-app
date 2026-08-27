@@ -4,6 +4,7 @@ import { storage } from '../../firebase';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { compressImage } from '../../utils/storageUtils';
 import { parseInlineFormatting } from '../../utils/formatUtils';
+import WorkbookChoiceContent from '../../components/Space/WorkbookChoiceContent';
 import {
   buildWorkbookChapterDraftPrompt,
   buildWorkbookDraftPrompt,
@@ -715,7 +716,7 @@ const WorkbookVisualEditor = ({
                            style={{ flex: 1, padding: '0.6rem', background: 'rgba(5, 10, 25, 0.8)', border: '1px solid var(--planet-purple)', color: 'white', borderRadius: '4px' }}
                          />
                          <div style={{ fontSize: '0.9rem', color: 'var(--crystal-cyan)', minWidth: '40px', textAlign: 'center' }}>
-                           {parseInlineFormatting(opt)}
+                           <WorkbookChoiceContent value={opt} keyPrefix={`editor-mc-opt-${selectedElement.id}-${idx}`} />
                          </div>
                          <button 
                            onClick={() => {

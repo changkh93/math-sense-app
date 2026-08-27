@@ -18,7 +18,9 @@ assert.equal(unwrapWorkbookMathDelimiters(`$$${longDivision}$$`), longDivision);
 assert.equal(unwrapWorkbookMathDelimiters(String.raw`\[\frac{1}{2}\]`), String.raw`\frac{1}{2}`);
 assert.equal(unwrapWorkbookMathDelimiters(String.raw`\(\frac{1}{2}\)`), String.raw`\frac{1}{2}`);
 assert.match(normalizeWorkbookMathForKatex(longDivision), /\\begin\{array\}\{rc\}/);
-assert.doesNotThrow(() => katex.renderToString(normalizeWorkbookMathForKatex(longDivision), { displayMode: true, throwOnError: true }));
+const fractionWithEnglishText = String.raw`\frac{2}{4} \text{ of a triangle}`;
+assert.equal(isWorkbookMathDisplayValue(fractionWithEnglishText), true);
+assert.doesNotThrow(() => katex.renderToString(normalizeWorkbookMathForKatex(fractionWithEnglishText), { displayMode: true, throwOnError: true }));
 
 console.log('Workbook math display tests passed.');
 
