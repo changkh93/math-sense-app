@@ -10,33 +10,49 @@ export function createInitialWorldState(worldConfig = {}) {
   const target = hasExplicitTarget && targetConfig ? {
     x: Number(targetConfig.x ?? (Number(worldConfig.width || 8) - 1)),
     y: Number(targetConfig.y ?? Math.floor((Number(worldConfig.height || 5)) / 2)),
+    radius: Number(targetConfig.radius ?? 0.8),
     kind: String(targetConfig.kind || 'beacon'),
     label: targetConfig.label || null,
     visible: targetConfig.visible !== false,
   } : (hasExplicitTarget && targetConfig === undefined ? {
     x: Number(worldConfig.width || 8) - 1,
     y: Math.floor((Number(worldConfig.height || 5)) / 2),
+    radius: 0.8,
     kind: 'beacon',
     label: null,
     visible: true,
   } : null)
+
+  const initialRoverX = Number(rover.x || 0)
+  const initialRoverY = Number(rover.y || 0)
 
   return {
     width: Number(worldConfig.width || 8),
     height: Number(worldConfig.height || 5),
     scene: String(worldConfig.scene || 'nav'),
     rover: {
-      x: Number(rover.x || 0),
-      y: Number(rover.y || 0),
+      x: initialRoverX,
+      y: initialRoverY,
       direction: Number(rover.direction || 0) % 360,
       energy: Number(rover.energy ?? 100),
       awake: Boolean(rover.awake ?? true),
+      collisionRadius: Number(rover.collisionRadius ?? 0.2),
+      hitMine: false,
+      blocked: false,
       lastMessage: null,
     },
     target,
     pathClear: Boolean(worldConfig.pathClear ?? true),
+    pathTrail: [{ x: initialRoverX, y: initialRoverY }],
+    hitMinePoint: null,
     obstacles: Array.isArray(worldConfig.obstacles)
-      ? worldConfig.obstacles.map((obs) => ({ x: Number(obs.x), y: Number(obs.y) }))
+      ? worldConfig.obstacles.map((obs, idx) => ({
+        id: obs.id || `obs_${idx + 1}`,
+        x: Number(obs.x),
+        y: Number(obs.y),
+        radius: obs.radius !== undefined ? Number(obs.radius) : undefined,
+        collisionRadius: obs.collisionRadius !== undefined ? Number(obs.collisionRadius) : undefined,
+      }))
       : [],
     barriers: Array.isArray(worldConfig.barriers)
       ? worldConfig.barriers.map((b, idx) => ({
@@ -116,6 +132,27 @@ export function reduceLumiWorldState(initialWorld = {}, normalizedEvents = [], t
       case 'rover_moved': {
         if (payload.end) {
           state.rover = { ...state.rover, ...payload.end }
+          state.pathTrail.push({
+            x: Number(payload.end.x ?? state.rover.x),
+            y: Number(payload.end.y ?? state.rover.y),
+            hitMine: Boolean(payload.hitMine),
+            blocked: Boolean(payload.blocked),
+          })
+        }
+        if (payload.hitMine) {
+          state.rover.hitMine = true
+          state.rover.blocked = true
+        }
+        break
+      }
+      case 'rover_hit_mine': {
+        state.rover.hitMine = true
+        state.rover.blocked = true
+        if (payload.point) {
+          state.hitMinePoint = { x: Number(payload.point.x), y: Number(payload.point.y) }
+        }
+        if (payload.end) {
+          state.rover = { ...state.rover, ...payload.end, hitMine: true, blocked: true }
         }
         break
       }

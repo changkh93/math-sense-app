@@ -1955,3 +1955,83 @@
   box-shadow: 0 0 18px #10b981;
 }
 
+/* ==========================================
+   Free Route & Field Analysis Styles
+   ========================================== */
+.python-lab__field-analysis {
+  background: rgba(15, 23, 42, 0.85);
+  border: 1px solid rgba(56, 189, 248, 0.4);
+  border-radius: 8px;
+  padding: 10px 14px;
+  margin: 10px 0 6px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+}
+
+.python-lab__field-analysis-title {
+  font-size: 0.75rem;
+  font-weight: 800;
+  color: #38bdf8;
+  letter-spacing: 0.06em;
+  margin-bottom: 8px;
+  text-transform: uppercase;
+}
+
+.python-lab__field-analysis-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+  gap: 8px;
+}
+
+.python-lab__field-analysis-item {
+  background: rgba(30, 41, 59, 0.7);
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  border-radius: 6px;
+  padding: 6px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.python-lab__field-analysis-item span {
+  font-size: 0.68rem;
+  color: #94a3b8;
+}
+
+.python-lab__field-analysis-item strong {
+  font-size: 0.85rem;
+  color: #f1f5f9;
+  font-weight: 700;
+}
+
+.python-world__mine-contact-marker {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.python-world__mine-contact-flash {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: radial-gradient(circle, #ff2d55 0%, rgba(255, 45, 85, 0) 70%);
+  animation: minePulse 1.2s infinite alternate ease-in-out;
+}
+
+.python-world__mine-contact-badge {
+  font-size: 0.65rem;
+  font-weight: 900;
+  color: #fff;
+  background: #ff2d55;
+  padding: 2px 6px;
+  border-radius: 4px;
+  box-shadow: 0 0 10px #ff2d55;
+  white-space: nowrap;
+}
+
+@keyframes minePulse {
+  0% { transform: scale(0.8); opacity: 0.6; }
+  100% { transform: scale(1.4); opacity: 1; }
+}
+
+

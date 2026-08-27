@@ -1160,6 +1160,33 @@ export default function PythonMissionLab({ unit, missionSet, initialMissionIndex
                   💡 {result.failureReason}
                 </p>
               )}
+              {result.fieldAnalysis && (
+                <div className="python-lab__field-analysis">
+                  <div className="python-lab__field-analysis-title">📊 FIELD ANALYSIS</div>
+                  <div className="python-lab__field-analysis-grid">
+                    <div className="python-lab__field-analysis-item">
+                      <span>지뢰 충돌</span>
+                      <strong style={{ color: result.fieldAnalysis.noMineHit ? '#5eead4' : '#ff4d6d' }}>
+                        {result.fieldAnalysis.noMineHit ? '✓ 안전 통과' : '💥 지뢰 충돌'}
+                      </strong>
+                    </div>
+                    <div className="python-lab__field-analysis-item">
+                      <span>이동 거리</span>
+                      <strong>{result.fieldAnalysis.totalDistance}u</strong>
+                    </div>
+                    <div className="python-lab__field-analysis-item">
+                      <span>회전 횟수</span>
+                      <strong>{result.fieldAnalysis.turnCount}회</strong>
+                    </div>
+                    {result.fieldAnalysis.minClearance && (
+                      <div className="python-lab__field-analysis-item">
+                        <span>최소 안전 여유</span>
+                        <strong style={{ color: '#5eead4' }}>{result.fieldAnalysis.minClearance}</strong>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
               {(result.nextUnlocked || result.cleared || result.completed) && (
                 missionIndex < missions.length - 1 ? (
                   <button type="button" onClick={() => setMissionIndex((index) => index + 1)}>다음 미션 →</button>

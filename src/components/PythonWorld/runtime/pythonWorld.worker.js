@@ -340,32 +340,97 @@ def _run_mission(payload_json, code):
         "active_self_ref": None,
     }
 
+    def get_segment_circle_hit(p1, p2, circle_center, hit_radius):
+        dx = p2[0] - p1[0]
+        dy = p2[1] - p1[1]
+        fx = p1[0] - circle_center[0]
+        fy = p1[1] - circle_center[1]
+
+        if fx * fx + fy * fy <= hit_radius * hit_radius:
+            return {"hit": True, "t": 0.0, "point": (round(p1[0], 4), round(p1[1], 4))}
+
+        a = dx * dx + dy * dy
+        if a < 1e-12:
+            return {"hit": False, "t": None, "point": None}
+
+        b = 2.0 * (fx * dx + fy * dy)
+        c = (fx * fx + fy * fy) - hit_radius * hit_radius
+
+        discriminant = b * b - 4.0 * a * c
+        if discriminant < 0.0:
+            return {"hit": False, "t": None, "point": None}
+
+        sqrt_d = math.sqrt(discriminant)
+        t1 = (-b - sqrt_d) / (2.0 * a)
+        t2 = (-b + sqrt_d) / (2.0 * a)
+
+        valid_ts = [t for t in (t1, t2) if 0.0 <= t <= 1.0]
+        if not valid_ts:
+            return {"hit": False, "t": None, "point": None}
+
+        t_hit = min(valid_ts)
+        hit_x = round(p1[0] + t_hit * dx, 4)
+        hit_y = round(p1[1] + t_hit * dy, 4)
+        return {"hit": True, "t": t_hit, "point": (hit_x, hit_y)}
+
+    def get_segment_point_distance(p1, p2, point):
+        dx = p2[0] - p1[0]
+        dy = p2[1] - p1[1]
+        a = dx * dx + dy * dy
+        if a < 1e-12:
+            return math.hypot(p1[0] - point[0], p1[1] - point[1])
+        t = max(0.0, min(1.0, ((point[0] - p1[0]) * dx + (point[1] - p1[1]) * dy) / a))
+        proj_x = p1[0] + t * dx
+        proj_y = p1[1] + t * dy
+        return math.hypot(proj_x - point[0], proj_y - point[1])
+
     class WorldState:
         def __init__(self, config):
             rover = config.get("rover") or {}
             target = config.get("target") or {}
             self.width = int(config.get("width", 8))
             self.height = int(config.get("height", 5))
+            self.capabilities = dict(config.get("capabilities") or {})
+            raw_rx = float(rover.get("x", 0))
+            raw_ry = float(rover.get("y", 0))
+            raw_rdir = float(rover.get("direction", 0)) % 360.0
             self.rover = {
-                "x": int(rover.get("x", 0)),
-                "y": int(rover.get("y", 0)),
-                "direction": int(rover.get("direction", 0)) % 360,
+                "x": int(raw_rx) if abs(raw_rx - round(raw_rx)) < 1e-6 else raw_rx,
+                "y": int(raw_ry) if abs(raw_ry - round(raw_ry)) < 1e-6 else raw_ry,
+                "direction": int(round(raw_rdir)) if abs(raw_rdir - round(raw_rdir)) < 1e-6 else raw_rdir,
                 "energy": int(rover.get("energy", 100)),
                 "awake": bool(rover.get("awake", True)),
+                "collisionRadius": float(rover.get("collisionRadius", 0.2)),
             }
             self.max_energy = int(rover.get("maxEnergy", config.get("maxEnergy", 100)))
+            raw_tx = float(target.get("x", 0))
+            raw_ty = float(target.get("y", 0))
             self.target = {
-                "x": int(target.get("x", 0)),
-                "y": int(target.get("y", 0)),
+                "x": int(raw_tx) if abs(raw_tx - round(raw_tx)) < 1e-6 else raw_tx,
+                "y": int(raw_ty) if abs(raw_ty - round(raw_ty)) < 1e-6 else raw_ty,
+                "radius": float(target.get("radius", 0.8)),
                 "kind": str(target.get("kind", "beacon")),
+                "label": target.get("label"),
             }
             self.path_clear = bool(config.get("pathClear", True))
             self.survey_rows = max(1, min(10, int(config.get("surveyRows", 2))))
             self.survey_columns = max(1, min(10, int(config.get("surveyColumns", 3))))
             self.obstacles = {
-                (int(item.get("x", -1)), int(item.get("y", -1)))
+                (int(round(float(item.get("x", -1)))), int(round(float(item.get("y", -1)))))
                 for item in (config.get("obstacles") or [])
             }
+            self.mines = [
+                {
+                    "x": float(item.get("x", 0)),
+                    "y": float(item.get("y", 0)),
+                    "radius": float(item.get("radius", 0.35)),
+                    "collisionRadius": float(item.get("collisionRadius", item.get("radius", 0.32))),
+                }
+                for item in (config.get("mines") or config.get("obstacles") or [])
+            ]
+            self.min_clearance = None
+            self.target_reached_at = None
+            self.hit_mine = False
             self.objects = []
             for index, item in enumerate(config.get("objects") or []):
                 self.objects.append({
@@ -435,7 +500,7 @@ def _run_mission(payload_json, code):
 
         @property
         def target_distance(self):
-            return abs(self.target["x"] - self.rover["x"]) + abs(self.target["y"] - self.rover["y"])
+            return round(abs(self.target["x"] - self.rover["x"]) + abs(self.target["y"] - self.rover["y"]), 2)
 
         @property
         def steps_to_target(self):
@@ -455,8 +520,8 @@ def _run_mission(payload_json, code):
                 return -1
             max_distance = max(self.width, self.height)
             for distance in range(1, max_distance + 1):
-                x = self.rover["x"] + delta[0] * distance
-                y = self.rover["y"] + delta[1] * distance
+                x = int(round(self.rover["x"])) + delta[0] * distance
+                y = int(round(self.rover["y"])) + delta[1] * distance
                 if x < 0 or y < 0 or x >= self.width or y >= self.height:
                     return -1
                 if (x, y) in self.obstacles:
@@ -479,6 +544,10 @@ def _run_mission(payload_json, code):
                 "pulseDistance": self.pulse_distance,
                 "enemies": [dict(e) for e in self.enemies],
                 "gameState": dict(self.game_state),
+                "capabilities": dict(self.capabilities),
+                "minClearance": self.min_clearance,
+                "hitMine": self.hit_mine,
+                "targetReachedAt": self.target_reached_at,
             }
 
     state = WorldState(world_config)
@@ -572,59 +641,105 @@ def _run_mission(payload_json, code):
             if command_count > max_commands:
                 raise MissionLimitError("월드 명령 수가 안전 한도를 넘었습니다.")
             state.rover["awake"] = True
+            emit("rover_woke", rover=dict(state.rover), end=dict(state.rover))
             emit("world", action="wake", end=dict(state.rover))
             return True
 
         def move(self, distance=1):
             nonlocal command_count
-            if isinstance(distance, bool) or not isinstance(distance, int):
-                raise TypeError("move()의 거리는 정수여야 합니다. (예: lumi.move(3))")
-            if distance < 0 or distance > 50:
-                raise ValueError("한 번에 이동할 수 있는 거리는 0~50칸 사이의 정수입니다.")
+            if isinstance(distance, bool) or not isinstance(distance, (int, float)) or not math.isfinite(distance):
+                raise TypeError("move()의 거리는 숫자여야 합니다. (예: lumi.move(3), lumi.move(4.2), lumi.move(-2))")
+
+            if abs(distance) > 100:
+                raise ValueError("한 번에 이동할 수 있는 거리는 최대 100입니다.")
+
             command_count += 1
             if command_count > max_commands:
                 raise MissionLimitError("월드 명령 수가 안전 한도를 넘었습니다.")
 
+            if state.rover.get("blocked"):
+                return False
+
             start = dict(state.rover)
-            path = []
-            blocked = False
-            direction = int(round(state.rover["direction"])) % 360
+            direction_deg = float(state.rover["direction"])
+            move_val = float(distance)
 
-            cardinal_map = {
-                0: (1, 0),
-                90: (0, 1),
-                180: (-1, 0),
-                270: (0, -1),
-            }
-            if direction not in cardinal_map:
-                raise ValueError(f"방향 각도는 90도 단위(0, 90, 180, 270)여야 합니다. (현재: {direction}도)")
+            if move_val < 0:
+                rad = math.radians((direction_deg + 180.0) % 360.0)
+                actual_dist = abs(move_val)
+            else:
+                rad = math.radians(direction_deg)
+                actual_dist = move_val
 
-            delta = cardinal_map[direction]
-            for _ in range(distance):
-                nx = state.rover["x"] + delta[0]
-                ny = state.rover["y"] + delta[1]
-                if nx < 0 or ny < 0 or nx >= state.width or ny >= state.height or (nx, ny) in state.obstacles:
-                    blocked = True
-                    break
-                if state.rover["energy"] <= 0:
-                    blocked = True
-                    break
-                state.rover["x"] = nx
-                state.rover["y"] = ny
-                state.rover["energy"] = max(0, state.rover["energy"] - 1)
-                path.append({"x": nx, "y": ny})
+            dx = math.cos(rad) * actual_dist
+            dy = math.sin(rad) * actual_dist
+            nx = state.rover["x"] + dx
+            ny = state.rover["y"] + dy
 
-            reached = (state.rover["x"] == state.target["x"] and state.rover["y"] == state.target["y"])
-            emit(
-                "world",
-                action="move",
-                start=start,
-                end=dict(state.rover),
-                path=path,
-                blocked=blocked,
-                reachedTarget=reached,
-            )
-            return not blocked
+            # Snap very close integer calculations (e.g. 1.999999999 -> 2)
+            if abs(nx - round(nx)) < 1e-5:
+                nx = int(round(nx))
+            else:
+                nx = round(nx, 4)
+
+            if abs(ny - round(ny)) < 1e-5:
+                ny = int(round(ny))
+            else:
+                ny = round(ny, 4)
+
+            p1 = (float(state.rover["x"]), float(state.rover["y"]))
+            p2 = (float(nx), float(ny))
+            rover_r = float(state.rover.get("collisionRadius", 0.2))
+
+            earliest_hit = None
+            for mine in state.mines:
+                mine_pos = (float(mine.get("x", 0)), float(mine.get("y", 0)))
+                mine_r = float(mine.get("collisionRadius", mine.get("radius", 0.32)))
+                hit_r = mine_r + rover_r
+                hit_res = get_segment_circle_hit(p1, p2, mine_pos, hit_r)
+                if hit_res["hit"]:
+                    if earliest_hit is None or hit_res["t"] < earliest_hit["t"]:
+                        earliest_hit = {
+                            "t": hit_res["t"],
+                            "point": hit_res["point"],
+                            "mine": mine,
+                            "hit_r": hit_r,
+                        }
+                dist_to_mine = get_segment_point_distance(p1, p2, mine_pos)
+                clearance = dist_to_mine - hit_r
+                if state.min_clearance is None or clearance < state.min_clearance:
+                    state.min_clearance = clearance
+
+            if earliest_hit:
+                hit_p = earliest_hit["point"]
+                hit_x = round(hit_p[0], 4)
+                hit_y = round(hit_p[1], 4)
+                if abs(hit_x - round(hit_x)) < 1e-5:
+                    hit_x = int(round(hit_x))
+                if abs(hit_y - round(hit_y)) < 1e-5:
+                    hit_y = int(round(hit_y))
+                state.rover["x"] = hit_x
+                state.rover["y"] = hit_y
+                state.rover["blocked"] = True
+                state.rover["hitMine"] = True
+                state.hit_mine = True
+                emit("rover_hit_mine", point={"x": state.rover["x"], "y": state.rover["y"]}, obstacle=earliest_hit["mine"], end=dict(state.rover))
+                emit("rover_moved", start=start, end=dict(state.rover), distance=distance, path=[{"x": state.rover["x"], "y": state.rover["y"]}], blocked=True, hitMine=True, reachedTarget=False)
+                emit("world", action="move", start=start, end=dict(state.rover), path=[{"x": state.rover["x"], "y": state.rover["y"]}], blocked=True, hitMine=True, reachedTarget=False)
+                return False
+
+            state.rover["x"] = nx
+            state.rover["y"] = ny
+            state.rover["energy"] = max(0, state.rover["energy"] - int(math.ceil(actual_dist)))
+            target_dist = math.hypot(state.rover["x"] - state.target["x"], state.rover["y"] - state.target["y"])
+            target_radius = float(state.target.get("radius", 0.8))
+            reached = target_dist <= target_radius
+            if reached and state.target_reached_at is None:
+                state.target_reached_at = len(events)
+
+            emit("rover_moved", start=start, end=dict(state.rover), distance=distance, path=[{"x": state.rover["x"], "y": state.rover["y"]}], blocked=False, reachedTarget=reached)
+            emit("world", action="move", start=start, end=dict(state.rover), path=[{"x": state.rover["x"], "y": state.rover["y"]}], blocked=False, reachedTarget=reached)
+            return True
 
         def turn(self, degrees=90):
             nonlocal command_count
@@ -641,20 +756,23 @@ def _run_mission(payload_json, code):
                     degrees = alias_map[deg_lower]
                 else:
                     raise ValueError(f"알 수 없는 회전 방향입니다: '{degrees}'. 90, -90 또는 'left', 'right'를 입력해 주세요.")
-            elif isinstance(degrees, bool) or not isinstance(degrees, int):
-                raise TypeError("turn()의 각도는 90도 단위의 정수(예: 90, -90, 180) 또는 방향 별칭('left', 'right')이어야 합니다.")
+            elif isinstance(degrees, bool) or not isinstance(degrees, (int, float)) or not math.isfinite(degrees):
+                raise TypeError("turn()의 각도는 숫자여야 합니다. (예: lumi.turn(90), lumi.turn(35.5), lumi.turn(-45))")
 
-            if degrees % 90 != 0:
-                raise ValueError("turn()의 각도는 90도의 배수(-270, -180, -90, 90, 180, 270)여야 합니다.")
+            if abs(degrees) > 36000:
+                raise ValueError("회전 각도가 너무 큽니다.")
 
             command_count += 1
             if command_count > max_commands:
                 raise MissionLimitError("월드 명령 수가 안전 한도를 넘었습니다.")
 
-            new_dir = (int(round(state.rover["direction"])) + degrees) % 360
+            new_dir = round((float(state.rover["direction"]) + float(degrees)) % 360.0, 4)
             if new_dir < 0:
-                new_dir += 360
+                new_dir += 360.0
+            if abs(new_dir - round(new_dir)) < 1e-5:
+                new_dir = int(round(new_dir))
             state.rover["direction"] = new_dir
+            emit("rover_turned", degrees=degrees, end=dict(state.rover))
             emit("world", action="turn", degrees=degrees, end=dict(state.rover))
             return True
 
@@ -663,7 +781,12 @@ def _run_mission(payload_json, code):
             command_count += 1
             if command_count > max_commands:
                 raise MissionLimitError("월드 명령 수가 안전 한도를 넘었습니다.")
-            emit("world", action="say", message=str(message)[:120], end=dict(state.rover))
+            target_dist = math.hypot(state.rover["x"] - state.target["x"], state.rover["y"] - state.target["y"])
+            target_radius = float(state.target.get("radius", 0.8))
+            inside_target = (target_dist <= target_radius)
+            is_after_arrival = inside_target or (state.target_reached_at is not None)
+            emit("rover_spoke", message=str(message)[:120], roverPosition={"x": state.rover["x"], "y": state.rover["y"]}, insideTarget=inside_target, targetReachedAtSayTime=is_after_arrival, end=dict(state.rover))
+            emit("world", action="say", message=str(message)[:120], insideTarget=inside_target, end=dict(state.rover))
 
         def scan(self, radius=99):
             nonlocal command_count

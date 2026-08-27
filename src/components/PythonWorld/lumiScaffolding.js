@@ -337,15 +337,22 @@ export function getLumiLearningSteps(mission = {}) {
   return objective ? [objective] : ['왼쪽의 성공 조건을 만족하도록 코드를 작성하세요.']
 }
 
+function normalizeStarterCode(code) {
+  if (typeof code !== 'string') return ''
+  return code.replace(/\\n/g, '\n')
+}
+
 export function getLumiInitialCode(mission = {}) {
-  if (isSolvedStarterAllowed(mission)) return String(mission?.starterCode || '')
+  if (isSolvedStarterAllowed(mission)) return normalizeStarterCode(String(mission?.starterCode || ''))
   if (typeof mission?.starterCode === 'string' && mission.starterCode.trim().length > 0) {
-    return mission.starterCode
+    return normalizeStarterCode(mission.starterCode)
   }
   if (Array.isArray(mission?.starterCode)) {
     return `${mission.starterCode.join('\n')}\n`
   }
-  if (mission?.scaffold?.exposure === 'minimal-skeleton' && typeof mission?.scaffold?.initialCode === 'string') return mission.scaffold.initialCode
+  if (mission?.scaffold?.exposure === 'minimal-skeleton' && typeof mission?.scaffold?.initialCode === 'string') {
+    return normalizeStarterCode(mission.scaffold.initialCode)
+  }
   return `${['# 아래 순서대로 코드를 작성하세요.', ...getLumiLearningSteps(mission).map((step, index) => `# ${index + 1}. ${step}`)].join('\n')}\n\n`
 }
 
@@ -443,6 +450,9 @@ export function getLumiGoalLabel(goal = {}) {
     position: `루미가 목표 좌표 (${goal.x}, ${goal.y})에 도착합니다.`,
     positionUnchanged: `항로를 완주하고 출발 좌표 (${goal.x}, ${goal.y})로 돌아옵니다.`,
     noCollision: '장애물과 충돌하지 않습니다.',
+    noMineCollision: '지뢰와 충돌하지 않고 안전하게 이동합니다.',
+    reachedTargetArea: '구조 비콘 도착 영역에 도달합니다.',
+    sayAfterArrival: '도착 후 say()로 구조 완료 신호를 보냅니다.',
     eventOccurred: goal.eventType === 'rover_spoke' ? '루미가 지정된 메시지를 전송합니다.' : '요구된 행동을 실행합니다.',
     spokenMessage: goal.includes ? `루미가 “${goal.includes}”가 포함된 메시지를 말합니다.` : '루미가 메시지를 전송합니다.',
     stdoutIncludes: `출력 창에 “${goal.value}”가 나타납니다.`,

@@ -98,6 +98,32 @@ export default function PythonWorldCanvas({
         </div>
       )}
 
+      {/* Free Route Header Banner */}
+      {mission?.isFreeRoute && (
+        <div style={{
+          position: 'absolute',
+          top: '12px',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          background: 'rgba(15, 23, 42, 0.92)',
+          border: '1px solid #38bdf8',
+          borderRadius: '20px',
+          padding: '5px 18px',
+          color: '#bae6fd',
+          fontSize: '0.8rem',
+          fontWeight: 600,
+          zIndex: 10,
+          boxShadow: '0 4px 14px rgba(0, 0, 0, 0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px',
+          pointerEvents: 'none',
+        }}>
+          <span style={{ color: '#38bdf8' }}>🧭</span>
+          <span>자유 항로 미션 · 정해진 정답 코드는 없습니다.</span>
+        </div>
+      )}
+
       {/* Signal Transmission Beam when RUN is pressed */}
       {isTransmitting && (
         <div className="lumi-transmission-beam">
@@ -118,6 +144,62 @@ export default function PythonWorldCanvas({
         className="python-world__grid"
         style={{ '--grid-columns': width, '--grid-rows': height }}
       >
+        {/* Continuous Path Trail (Breadcrumbs) Layer */}
+        {worldState.pathTrail && worldState.pathTrail.length > 1 && (
+          <svg
+            className="python-world__path-trail-svg"
+            style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              width: '100%',
+              height: '100%',
+              pointerEvents: 'none',
+              zIndex: 2,
+            }}
+          >
+            <polyline
+              points={worldState.pathTrail
+                .map((pt) => `${((pt.x + 0.5) / width) * 100}%,${((pt.y + 0.5) / height) * 100}%`)
+                .join(' ')}
+              fill="none"
+              stroke="#38bdf8"
+              strokeWidth="3"
+              strokeDasharray="4 4"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              opacity="0.8"
+            />
+            {worldState.pathTrail.map((pt, idx) => (
+              <circle
+                key={`trail-dot-${idx}`}
+                cx={`${((pt.x + 0.5) / width) * 100}%`}
+                cy={`${((pt.y + 0.5) / height) * 100}%`}
+                r={idx === 0 ? 4.5 : 3}
+                fill={idx === 0 ? '#38bdf8' : (pt.hitMine ? '#ff2d55' : '#a5f3fc')}
+                opacity="0.9"
+              />
+            ))}
+          </svg>
+        )}
+
+        {/* Mine Contact / Collision Explosion Marker */}
+        {worldState.rover?.hitMine && (
+          <div
+            className="python-world__mine-contact-marker"
+            style={{
+              ...cellStyle(worldState.rover.x, worldState.rover.y),
+              position: 'absolute',
+              transform: 'translate(-50%, -50%)',
+              zIndex: 8,
+              pointerEvents: 'none',
+            }}
+          >
+            <div className="python-world__mine-contact-flash" />
+            <span className="python-world__mine-contact-badge">💥 MINE CONTACT</span>
+          </div>
+        )}
+
         {/* Charging Stations Layer */}
         {stations.map((st, sIdx) => {
           const isLumiOnStation = rover.x === st.x && rover.y === st.y
@@ -152,26 +234,47 @@ export default function PythonWorldCanvas({
           )
         })}
 
-        {obstacles.map((obstacle, index) => (
-          <div
-            className="python-world__obstacle"
-            key={`${obstacle.x}-${obstacle.y}-${index}`}
-            style={cellStyle(obstacle.x, obstacle.y)}
-            title={`위험 지뢰 장애물 (${obstacle.x}, ${obstacle.y})`}
-          >
-            <div className="python-world__mine-hazard">
-              <span className="python-world__mine-pulse" />
-              <svg className="python-world__mine-icon" viewBox="0 0 36 36" fill="none">
-                <circle cx="18" cy="18" r="15" stroke="#ff2d55" strokeWidth="1.5" strokeDasharray="3 2.5" opacity="0.85" />
-                <path d="M18 2 L18 6 M18 30 L18 34 M2 18 L6 18 M30 18 L34 18 M6.7 6.7 L9.5 9.5 M26.5 26.5 L29.3 29.3 M6.7 29.3 L9.5 26.5 M26.5 9.5 L29.3 6.7" stroke="#ff4d6d" strokeWidth="2.2" strokeLinecap="round" />
-                <circle cx="18" cy="18" r="9.5" fill="#240710" stroke="#ff3355" strokeWidth="2" />
-                <circle cx="18" cy="18" r="4" fill="#ff1744" className="python-world__mine-core-glow" />
-                <path d="M14 14 L22 22 M22 14 L14 22" stroke="#ffffff" strokeWidth="1.8" strokeLinecap="round" />
-              </svg>
+        {obstacles.map((obstacle, index) => {
+          const hasRadius = obstacle.radius !== undefined || obstacle.collisionRadius !== undefined
+          const effRadius = obstacle.collisionRadius || obstacle.radius || 0.45
+          return (
+            <div
+              className="python-world__obstacle"
+              key={obstacle.id || `${obstacle.x}-${obstacle.y}-${index}`}
+              style={cellStyle(obstacle.x, obstacle.y)}
+              title={`위험 지뢰 장애물 (${obstacle.x}, ${obstacle.y})`}
+            >
+              {hasRadius && (
+                <div
+                  className="python-world__mine-hazard-radius"
+                  style={{
+                    position: 'absolute',
+                    top: '50%',
+                    left: '50%',
+                    width: `${((effRadius * 2) / width) * 500}%`,
+                    height: `${((effRadius * 2) / height) * 500}%`,
+                    transform: 'translate(-50%, -50%)',
+                    borderRadius: '50%',
+                    border: '1.5px dashed rgba(255, 45, 85, 0.45)',
+                    background: 'radial-gradient(circle, rgba(255, 45, 85, 0.15) 0%, rgba(255, 45, 85, 0) 70%)',
+                    pointerEvents: 'none',
+                  }}
+                />
+              )}
+              <div className="python-world__mine-hazard">
+                <span className="python-world__mine-pulse" />
+                <svg className="python-world__mine-icon" viewBox="0 0 36 36" fill="none">
+                  <circle cx="18" cy="18" r="15" stroke="#ff2d55" strokeWidth="1.5" strokeDasharray="3 2.5" opacity="0.85" />
+                  <path d="M18 2 L18 6 M18 30 L18 34 M2 18 L6 18 M30 18 L34 18 M6.7 6.7 L9.5 9.5 M26.5 26.5 L29.3 29.3 M6.7 29.3 L9.5 26.5 M26.5 9.5 L29.3 6.7" stroke="#ff4d6d" strokeWidth="2.2" strokeLinecap="round" />
+                  <circle cx="18" cy="18" r="9.5" fill="#240710" stroke="#ff3355" strokeWidth="2" />
+                  <circle cx="18" cy="18" r="4" fill="#ff1744" className="python-world__mine-core-glow" />
+                  <path d="M14 14 L22 22 M22 14 L14 22" stroke="#ffffff" strokeWidth="1.8" strokeLinecap="round" />
+                </svg>
+              </div>
+              <span className="python-world__obstacle-label">DANGER</span>
             </div>
-            <span className="python-world__obstacle-label">DANGER</span>
-          </div>
-        ))}
+          )
+        })}
         {objects.map((item, index) => (
           <div
             className={`python-world__object python-world__object--${item.kind || 'signal'}`}
@@ -186,6 +289,25 @@ export default function PythonWorldCanvas({
         {/* Semantic Contextual Target (Only if defined and visible) */}
         {!isObjectMission && target && target.visible !== false && (
           <div className={`python-world__beacon python-world__beacon--${target.kind || 'beacon'}`} style={cellStyle(target.x, target.y)}>
+            {target.radius && (
+              <div
+                className="python-world__target-arrival-zone"
+                style={{
+                  position: 'absolute',
+                  top: '50%',
+                  left: '50%',
+                  width: `${((target.radius * 2) / width) * 500}%`,
+                  height: `${((target.radius * 2) / height) * 500}%`,
+                  transform: 'translate(-50%, -50%)',
+                  borderRadius: '50%',
+                  border: '2px solid rgba(56, 189, 248, 0.6)',
+                  background: 'radial-gradient(circle, rgba(56, 189, 248, 0.2) 0%, rgba(56, 189, 248, 0.02) 75%)',
+                  boxShadow: '0 0 16px rgba(56, 189, 248, 0.35)',
+                  pointerEvents: 'none',
+                  zIndex: -1,
+                }}
+              />
+            )}
             <span className="python-world__beacon-core">
               {target.kind === 'sos' ? '📡' : target.kind === 'station' ? '⚡' : target.kind === 'gate' ? '🚪' : target.kind === 'crystal' ? '💎' : ''}
             </span>

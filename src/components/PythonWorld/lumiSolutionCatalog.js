@@ -7,10 +7,12 @@ const SOLUTIONS = Object.freeze({
 lumi.turn(90)
 lumi.move(1)`,
   'lumi-vs-05': `lumi.say("신호 수신")`,
-  'lumi-vs-06': `lumi.move(2)
-lumi.turn(90)
-lumi.move(2)
-lumi.say("비콘 도착")`,
+  'lumi-vs-06': `lumi.wake()
+lumi.turn(-50)
+lumi.move(4.2)
+lumi.turn(40)
+lumi.move(3.0)
+lumi.say("비콘 도착!")`,
   'lumi-vs-07': `steps = 3
 lumi.move(steps)`,
   'lumi-vs-08': `energy = 5

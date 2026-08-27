@@ -75,16 +75,37 @@ function hasReachedSingleGoal(goal, ctx) {
     return Boolean(rover.awake)
   }
   if (goal.type === 'position') {
-    return Number(rover.x) === Number(goal.x)
-      && Number(rover.y) === Number(goal.y)
+    return Math.abs(Number(rover.x) - Number(goal.x)) < 0.1
+      && Math.abs(Number(rover.y) - Number(goal.y)) < 0.1
   }
   if (goal.type === 'positionUnchanged') {
     const initialX = Number(goal.x ?? mission?.world?.rover?.x ?? 0)
     const initialY = Number(goal.y ?? mission?.world?.rover?.y ?? 0)
-    return Number(rover.x) === initialX && Number(rover.y) === initialY
+    return Math.abs(Number(rover.x) - initialX) < 0.1 && Math.abs(Number(rover.y) - initialY) < 0.1
   }
   if (goal.type === 'noCollision') {
     return !events.some((event) => event.type === 'collision' || event.payload?.blocked)
+  }
+  if (goal.type === 'noMineCollision') {
+    const hitMineEvent = events.some((event) => event.type === 'rover_hit_mine' || event.payload?.hitMine || (event.type === 'collision' && event.payload?.threat !== 'pulse'))
+    return !hitMineEvent && finalState?.hitMine !== true && !events.some((event) => event.payload?.blocked && event.payload?.hitMine)
+  }
+  if (goal.type === 'reachedTargetArea') {
+    const targetX = Number(goal.x ?? mission?.world?.target?.x ?? 0)
+    const targetY = Number(goal.y ?? mission?.world?.target?.y ?? 0)
+    const radius = Number(goal.radius ?? mission?.world?.target?.radius ?? 0.9)
+    const roverX = Number(rover.x ?? 0)
+    const roverY = Number(rover.y ?? 0)
+    const dist = Math.hypot(roverX - targetX, roverY - targetY)
+    return dist <= radius
+  }
+  if (goal.type === 'sayAfterArrival') {
+    return events.some((event) => {
+      if (event.type !== 'rover_spoke') return false
+      const msg = String(event.payload?.message ?? event.message ?? '').trim()
+      if (msg === '' || msg === 'ellipsis' || msg === '...' || msg === 'none') return false
+      return Boolean(event.payload?.insideTarget || event.payload?.targetReachedAtSayTime || event.insideTarget || event.targetReachedAtSayTime)
+    })
   }
   if (goal.type === 'commandNotCalled') {
     const executedEventType = EXECUTED_CALL_EVENT[goal.call]
@@ -649,6 +670,28 @@ export function evaluateMissionAttempt({
     ? '축하합니다! 미션의 모든 조건을 성공적으로 달성했습니다.'
     : (failureReason ? `${failureReason}` : '미션 완료 조건을 다시 확인해 보세요.')
 
+  const events = runtimeResult?.events || []
+  let totalDistance = 0
+  let turnCount = 0
+  events.forEach((ev) => {
+    if (ev.type === 'rover_moved') {
+      const d = Math.abs(Number(ev.payload?.distance ?? ev.distance ?? 0))
+      totalDistance += Number.isFinite(d) ? d : 0
+    } else if (ev.type === 'rover_turned') {
+      turnCount += 1
+    }
+  })
+  const minClearance = typeof runtimeResult?.finalState?.minClearance === 'number'
+    ? Math.max(0, Math.round(runtimeResult.finalState.minClearance * 100) / 100)
+    : null
+
+  const fieldAnalysis = {
+    totalDistance: Math.round(totalDistance * 10) / 10,
+    turnCount,
+    minClearance: minClearance !== null ? `${minClearance}u` : undefined,
+    noMineHit: !events.some((e) => e.type === 'rover_hit_mine' || e.payload?.hitMine),
+  }
+
   return {
     passed,
     basePassed,
@@ -664,6 +707,7 @@ export function evaluateMissionAttempt({
     goalDetails: goalEvaluation.goals,
     failureReason,
     message,
+    fieldAnalysis,
   }
 }
 
@@ -727,6 +771,15 @@ export function getDetailedGoalEvaluation(mission, runtimeResult) {
     } else if (goal.type === 'noCollision') {
       label = label || '충돌 없이 안전 운행'
       if (!passed) hint = '이동 중 장애물이나 벽에 충돌했습니다. 회전과 이동 순서를 다시 확인해주세요.'
+    } else if (goal.type === 'noMineCollision') {
+      label = label || '지뢰 충돌 없이 안전 이동'
+      if (!passed) hint = '⚠ 지뢰 위험 구역에 진입하여 LUMI가 정지했습니다. 회전 각도나 이동 거리를 변경해 새 항로를 만들어 보세요.'
+    } else if (goal.type === 'reachedTargetArea') {
+      label = label || '구조 비콘 영역 도달'
+      if (!passed) hint = '구조 비콘 영역 안에 도달하지 못했습니다. 이동 거리나 회전 각도를 조절해 보세요.'
+    } else if (goal.type === 'sayAfterArrival') {
+      label = label || '도착 후 say() 구조 신호 전송'
+      if (!passed) hint = '구조 비콘에 도착한 뒤 lumi.say(...)를 호출하여 구조 완료 신호를 보내야 합니다.'
     } else if (goal.type === 'stdoutIncludes') {
       label = label || `'${goal.value}' 콘솔 출력`
       if (!passed) hint = `print("${goal.value}") 함수로 지정된 문구를 출력해야 합니다.`
