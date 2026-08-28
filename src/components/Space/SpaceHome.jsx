@@ -79,6 +79,7 @@ const CrystalLedger = lazy(() => import('./CrystalLedger'))
 const loadMetaGalaxy = () => import('../GalaxySocial/MetaGalaxy')
 const MetaGalaxy = lazy(loadMetaGalaxy)
 const PythonProtocolHub = lazy(() => import('../PythonWorld/PythonProtocolHub'))
+const AlgorithmConstellationHub = lazy(() => import('../AlgorithmConstellation/client/hub/AlgorithmConstellationHub'))
 const ReadingLibraryView = lazy(() => import('./ReadingLibrary/ReadingLibraryView'))
 import { isWesternClassicCluster, filterWesternClassicRegions } from '../../constants/westernClassicNavigation'
 
@@ -596,7 +597,7 @@ function RegionPlanetVisual({ imageSrc, title, icon, isMobile, isLocked }) {
 
 const REFINERY_CAUSE_IDS = ['concept_gap', 'equation_setup', 'missed_condition', 'calculation_error', 'no_checking']
 const LOGIN_NOTICE_KEY = 'metasenseLoginNotice'
-const ROOT_VIEWS = new Set(['planet', 'galaxy', 'battle', 'dashboard', 'ranking', 'store', 'crew', 'journey', 'ledger', 'profile', 'assignment_hub', 'mistake_notebook', 'lumi_protocol', 'reading_library'])
+const ROOT_VIEWS = new Set(['planet', 'galaxy', 'battle', 'dashboard', 'ranking', 'store', 'crew', 'journey', 'ledger', 'profile', 'assignment_hub', 'mistake_notebook', 'lumi_protocol', 'algorithm_constellation', 'reading_library'])
 
 function getRequestedRootView(location) {
   const requestedView = location.state?.view || new URLSearchParams(location.search).get('view')
@@ -3955,6 +3956,22 @@ function SpaceHome() {
     )
   }
 
+  if (currentView === 'algorithm_constellation') {
+    return (
+      <div className="space-bg" style={{ minHeight: '100dvh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        <SpaceNavbar currentView={currentView} onViewChange={switchRootView} />
+        <Suspense fallback={<SpaceViewFallback />}>
+          <AlgorithmConstellationHub
+            onBack={() => {
+              switchRootView('planet')
+              soundManager.playWarp()
+            }}
+          />
+        </Suspense>
+      </div>
+    )
+  }
+
   if (currentView === 'journey') {
     return (
       <div className="space-bg space-hud" style={{ minHeight: '100dvh', overflowY: 'auto', background: '#03050c' }}>
@@ -4239,6 +4256,10 @@ function SpaceHome() {
               showLumiProtocol={selectedClusterId === 'python'}
               onSelectLumiProtocol={() => {
                 switchRootView('lumi_protocol')
+                soundManager.playWarp()
+              }}
+              onSelectAlgorithmConstellation={() => {
+                switchRootView('algorithm_constellation')
                 soundManager.playWarp()
               }}
               darkMatterCount={darkMatterCount}
@@ -4547,38 +4568,83 @@ function SpaceHome() {
                     {is2DMode && (
                       <>
                         {selectedClusterId === 'python' && (
-                          <Motion.button
-                            type="button"
-                            initial={{ opacity: 0, scale: 0.8 }}
-                            animate={{ opacity: 1, scale: 1, transition: { delay: 0.04 } }}
-                            whileHover={isMobile ? undefined : { scale: 1.05, filter: 'brightness(1.18)' }}
-                            whileTap={{ scale: 0.95 }}
-                            onClick={() => {
-                              switchRootView('lumi_protocol')
-                              soundManager.playWarp()
-                            }}
-                            style={{
-                              width: isMobile ? 'calc(50% - 0.45rem)' : '250px',
-                              minHeight: isMobile ? '148px' : '250px',
-                              padding: isMobile ? '0.85rem 0.65rem' : '1.5rem',
-                              border: '1px solid rgba(85, 241, 200, 0.58)',
-                              borderRadius: isMobile ? '14px' : '20px',
-                              color: 'white',
-                              cursor: 'pointer',
-                              background: 'radial-gradient(circle at 50% 20%, rgba(73,233,255,.3), transparent 35%), linear-gradient(145deg, rgba(8,48,74,.96), rgba(12,18,48,.97))',
-                              boxShadow: '0 8px 34px rgba(73, 233, 255, .2)',
-                              display: 'flex',
-                              flexDirection: 'column',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              gap: isMobile ? '.45rem' : '.8rem',
-                              font: 'inherit',
-                            }}
-                          >
-                            <span aria-hidden="true" style={{ fontSize: isMobile ? '2.2rem' : '4rem', filter: 'drop-shadow(0 0 12px #49e9ff)' }}>▲</span>
-                            <strong className="font-tech" style={{ color: '#55f1c8', fontSize: isMobile ? '.92rem' : '1.3rem' }}>루미 프로토콜</strong>
-                            <small style={{ color: '#b8f8ff', fontSize: isMobile ? '.68rem' : '.8rem', lineHeight: 1.35 }}>Python Mission World · 20 Missions</small>
-                          </Motion.button>
+                          <>
+                            <Motion.button
+                              type="button"
+                              initial={{ opacity: 0, scale: 0.8 }}
+                              animate={{ opacity: 1, scale: 1, transition: { delay: 0.04 } }}
+                              whileHover={isMobile ? undefined : { scale: 1.05, filter: 'brightness(1.18)' }}
+                              whileTap={{ scale: 0.95 }}
+                              onClick={() => {
+                                switchRootView('lumi_protocol')
+                                soundManager.playWarp()
+                              }}
+                              style={{
+                                width: isMobile ? 'calc(50% - 0.45rem)' : '250px',
+                                minHeight: isMobile ? '148px' : '250px',
+                                padding: isMobile ? '0.85rem 0.65rem' : '1.5rem',
+                                border: '1px solid rgba(85, 241, 200, 0.58)',
+                                borderRadius: isMobile ? '14px' : '20px',
+                                color: 'white',
+                                cursor: 'pointer',
+                                background: 'radial-gradient(circle at 50% 20%, rgba(73,233,255,.3), transparent 35%), linear-gradient(145deg, rgba(8,48,74,.96), rgba(12,18,48,.97))',
+                                boxShadow: '0 8px 34px rgba(73, 233, 255, .2)',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                gap: isMobile ? '.45rem' : '.8rem',
+                                font: 'inherit',
+                              }}
+                            >
+                              <span aria-hidden="true" style={{ fontSize: isMobile ? '2.2rem' : '4rem', filter: 'drop-shadow(0 0 12px #49e9ff)' }}>▲</span>
+                              <strong className="font-tech" style={{ color: '#55f1c8', fontSize: isMobile ? '.92rem' : '1.3rem' }}>루미 프로토콜</strong>
+                              <small style={{ color: '#b8f8ff', fontSize: isMobile ? '.68rem' : '.8rem', lineHeight: 1.35 }}>Python Mission World · 20 Missions</small>
+                            </Motion.button>
+
+                            <Motion.button
+                              type="button"
+                              initial={{ opacity: 0, scale: 0.8 }}
+                              animate={{ opacity: 1, scale: 1, transition: { delay: 0.05 } }}
+                              whileHover={isMobile ? undefined : { scale: 1.05, filter: 'brightness(1.18)' }}
+                              whileTap={{ scale: 0.95 }}
+                              onClick={() => {
+                                switchRootView('algorithm_constellation')
+                                soundManager.playWarp()
+                              }}
+                              style={{
+                                width: isMobile ? 'calc(50% - 0.45rem)' : '250px',
+                                minHeight: isMobile ? '148px' : '250px',
+                                padding: isMobile ? '0.85rem 0.65rem' : '1.5rem',
+                                border: '1px solid rgba(129, 140, 248, 0.58)',
+                                borderRadius: isMobile ? '14px' : '20px',
+                                color: 'white',
+                                cursor: 'pointer',
+                                background: 'radial-gradient(circle at 50% 20%, rgba(129, 140, 248, .3), transparent 35%), linear-gradient(145deg, rgba(15,23,42,.96), rgba(30,27,75,.97))',
+                                boxShadow: '0 8px 34px rgba(129, 140, 248, .2)',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                gap: isMobile ? '.45rem' : '.8rem',
+                                font: 'inherit',
+                              }}
+                            >
+                              <img
+                                src="/assets/planets/algorithm-constellation.png"
+                                alt="생각의 항로"
+                                style={{
+                                  width: isMobile ? '46px' : '72px',
+                                  height: isMobile ? '46px' : '72px',
+                                  borderRadius: '50%',
+                                  objectFit: 'cover',
+                                  filter: 'drop-shadow(0 0 14px rgba(0, 240, 255, 0.65))',
+                                }}
+                              />
+                              <strong className="font-tech" style={{ color: '#c7d2fe', fontSize: isMobile ? '.92rem' : '1.3rem' }}>생각의 항로</strong>
+                              <small style={{ color: '#e0e7ff', fontSize: isMobile ? '.68rem' : '.8rem', lineHeight: 1.35 }}>알고리즘 성단 · 사고력 훈련</small>
+                            </Motion.button>
+                          </>
                         )}
 
                         {/* Mobile-safe route into the 3D Astra Frontier world. */}

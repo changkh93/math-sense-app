@@ -126,6 +126,7 @@ function SceneContent({
   onSelectDarkMatterRefinery,
   onSelectMistakeNotebook,
   onSelectLumiProtocol,
+  onSelectAlgorithmConstellation,
   showLumiProtocol = false,
   darkMatterCount = 0
 }) {
@@ -548,6 +549,47 @@ function SceneContent({
             >
               루미 프로토콜<br />
               <span style={{ fontSize: '.72rem', color: '#d8fbff', fontWeight: '600' }}>LUMI Protocol · 20 Missions</span>
+            </Html>
+          </Float>
+        </group>
+      )}
+
+      {/* Algorithm Constellation — dedicated Python World Thinking Route Planet */}
+      {(!selectedRegionId && showLumiProtocol) && (
+        <group position={[-3.2, -1.8, 2.2]}>
+          <Float speed={2.0} rotationIntensity={0.65} floatIntensity={1.1} floatingRange={[-0.3, 0.3]}>
+            <PlanetMesh
+              color="#00f0ff"
+              size={0.92}
+              planetType="algorithm_constellation"
+              showSpaceship={false}
+              showFormulas={true}
+              onClick={(event) => {
+                event.stopPropagation()
+                onSelectAlgorithmConstellation?.()
+              }}
+              onPointerOver={() => { document.body.style.cursor = 'pointer' }}
+              onPointerOut={() => { document.body.style.cursor = 'auto' }}
+            />
+            <pointLight position={[0, 0, 1.2]} intensity={2.0} color="#00f0ff" distance={7} />
+            <Html
+              position={[0, 1.5, 0]}
+              center
+              zIndexRange={[100, 0]}
+              style={{
+                color: '#c7d2fe',
+                fontSize: '1.08rem',
+                fontWeight: '900',
+                fontFamily: 'var(--font-title, sans-serif)',
+                whiteSpace: 'nowrap',
+                textShadow: '0 2px 6px rgba(0,0,0,.95), 0 0 16px rgba(129,140,248,.7)',
+                pointerEvents: 'none',
+                textAlign: 'center',
+                lineHeight: '1.3',
+              }}
+            >
+              🌌 생각의 항로<br />
+              <span style={{ fontSize: '.72rem', color: '#e0e7ff', fontWeight: '600' }}>Algorithm Constellation · 알고리즘 성단</span>
             </Html>
           </Float>
         </group>

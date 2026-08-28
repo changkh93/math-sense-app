@@ -48,9 +48,14 @@ const Signup = lazy(() => import('./pages/Signup'))
 const Terms = lazy(() => import('./pages/Terms'))
 const ReferralPolicy = lazy(() => import('./pages/ReferralPolicy'))
 const CrewGuestInvite = lazy(() => import('./pages/CrewGuestInvite'))
+const AlgorithmConstellationHub = lazy(() => import('./components/AlgorithmConstellation/client/hub/AlgorithmConstellationHub'))
 
 const AstraBuilderQa = import.meta.env.DEV
   ? lazy(() => import('./components/GalaxySocial/builder/AstraBuilderQa'))
+  : null
+
+const AlgorithmConstellationDevHub = import.meta.env.DEV
+  ? lazy(() => import('./components/AlgorithmConstellation/client/hub/AlgorithmConstellationDevHub'))
   : null
 
 function RouteFallback() {
@@ -96,6 +101,17 @@ function App() {
           element={<AstraBuilderQa />}
         />
       )}
+      {AlgorithmConstellationDevHub && (
+        <Route
+          path="/dev/algorithm-constellation"
+          element={<AlgorithmConstellationDevHub />}
+        />
+      )}
+      <Route path="/algorithm-constellation" element={
+        <PrivateRoute>
+          <AlgorithmConstellationHub />
+        </PrivateRoute>
+      } />
       
       <Route path="/admin" element={
         <AdminRoute>

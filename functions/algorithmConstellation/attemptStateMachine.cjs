@@ -1,0 +1,85 @@
+/**
+ * Server-Authoritative Attempt State Machine
+ * Enforces strict linear lifecycle transitions for algorithm constellation attempts.
+ */
+
+const ATTEMPT_STATES = Object.freeze({
+  STARTED: 'STARTED',
+  BASE_SUBMITTED: 'BASE_SUBMITTED',
+  BASE_PASSED: 'BASE_PASSED',
+  UNDERSTANDING_PASSED: 'UNDERSTANDING_PASSED',
+  TRANSFER_ISSUED: 'TRANSFER_ISSUED',
+  TRANSFER_SUBMITTED: 'TRANSFER_SUBMITTED',
+  FINALIZED: 'FINALIZED',
+  EXPIRED: 'EXPIRED',
+  ABANDONED: 'ABANDONED',
+  INTEGRITY_TERMINATED: 'INTEGRITY_TERMINATED',
+})
+
+const ALLOWED_TRANSITIONS = {
+  [ATTEMPT_STATES.STARTED]: [
+    ATTEMPT_STATES.BASE_SUBMITTED,
+    ATTEMPT_STATES.BASE_PASSED,
+    ATTEMPT_STATES.ABANDONED,
+    ATTEMPT_STATES.EXPIRED,
+    ATTEMPT_STATES.INTEGRITY_TERMINATED,
+  ],
+  [ATTEMPT_STATES.BASE_SUBMITTED]: [
+    ATTEMPT_STATES.BASE_PASSED,
+    ATTEMPT_STATES.BASE_SUBMITTED, // Retry base code
+    ATTEMPT_STATES.ABANDONED,
+    ATTEMPT_STATES.EXPIRED,
+    ATTEMPT_STATES.INTEGRITY_TERMINATED,
+  ],
+  [ATTEMPT_STATES.BASE_PASSED]: [
+    ATTEMPT_STATES.UNDERSTANDING_PASSED,
+    ATTEMPT_STATES.BASE_SUBMITTED, // Student re-edits base
+    ATTEMPT_STATES.ABANDONED,
+    ATTEMPT_STATES.EXPIRED,
+    ATTEMPT_STATES.INTEGRITY_TERMINATED,
+  ],
+  [ATTEMPT_STATES.UNDERSTANDING_PASSED]: [
+    ATTEMPT_STATES.TRANSFER_ISSUED,
+    ATTEMPT_STATES.FINALIZED, // Early finalize without transfer (e.g. 2-star partial complete)
+    ATTEMPT_STATES.ABANDONED,
+    ATTEMPT_STATES.EXPIRED,
+  ],
+  [ATTEMPT_STATES.TRANSFER_ISSUED]: [
+    ATTEMPT_STATES.TRANSFER_SUBMITTED,
+    ATTEMPT_STATES.ABANDONED,
+    ATTEMPT_STATES.EXPIRED,
+    ATTEMPT_STATES.INTEGRITY_TERMINATED,
+  ],
+  [ATTEMPT_STATES.TRANSFER_SUBMITTED]: [
+    ATTEMPT_STATES.FINALIZED,
+    ATTEMPT_STATES.TRANSFER_SUBMITTED, // Retry transfer code
+    ATTEMPT_STATES.ABANDONED,
+    ATTEMPT_STATES.EXPIRED,
+  ],
+  [ATTEMPT_STATES.FINALIZED]: [],
+  [ATTEMPT_STATES.EXPIRED]: [],
+  [ATTEMPT_STATES.ABANDONED]: [],
+  [ATTEMPT_STATES.INTEGRITY_TERMINATED]: [],
+}
+
+function validateAttemptTransition(currentState, nextState) {
+  if (!ATTEMPT_STATES[currentState]) {
+    throw new Error(`Invalid current attempt state: ${currentState}`)
+  }
+  if (!ATTEMPT_STATES[nextState]) {
+    throw new Error(`Invalid next attempt state: ${nextState}`)
+  }
+
+  const allowed = ALLOWED_TRANSITIONS[currentState] || []
+  if (!allowed.includes(nextState)) {
+    const error = new Error(`Illegal attempt state transition: from ${currentState} to ${nextState}`)
+    error.code = 'FAILED_PRECONDITION'
+    throw error
+  }
+  return true
+}
+
+module.exports = {
+  ATTEMPT_STATES,
+  validateAttemptTransition,
+}

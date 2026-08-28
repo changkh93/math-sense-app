@@ -196,7 +196,9 @@ service cloud.firestore {
              collectionId == 'readingDayCredits' ||
              collectionId == 'readingBookCredits' ||
              collectionId == 'readingAssignmentCredits' ||
-             collectionId == 'readingBookDayCredits';
+             collectionId == 'readingBookDayCredits' ||
+             collectionId == 'algorithmAttempts' ||
+             collectionId == 'algorithmProgress';
     }
 
     function isValidAgoraUpvoteToggle() {
@@ -638,6 +640,19 @@ service cloud.firestore {
     }
 
     match /galaxyPlaySessions/{sessionId} {
+      allow read, write: if false;
+    }
+
+    // LUMI Algorithm Constellation: Attempt sessions, reward idempotency, and return queue are strictly server-managed.
+    match /algorithmAttemptSessions/{attemptId} {
+      allow read, write: if false;
+    }
+
+    match /algorithmRewardLedger/{idempotencyKey} {
+      allow read, write: if false;
+    }
+
+    match /algorithmReturnQueue/{returnId} {
       allow read, write: if false;
     }
 

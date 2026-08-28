@@ -67,6 +67,13 @@ const weeklyGrowthLoop = require("./weeklyGrowthLoop")({
   costOptimizedDataFunctions,
 });
 Object.assign(exports, weeklyGrowthLoop.functions);
+
+const algorithmConstellation = require("./algorithmConstellation/index.cjs")({
+  functions,
+  admin,
+  regionalFunctions,
+});
+Object.assign(exports, algorithmConstellation);
 const DIRECT_MEMO_MAX_LENGTH = 2000;
 const CRYSTAL_GIFT_DAILY_LIMIT = 100;
 const QUIZ_BATTLE_TIE_TOLERANCE_MS = 3000;
