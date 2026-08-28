@@ -140,7 +140,7 @@ function publicTransferChallenge(challenge) {
 
 function createCallableOrchestrator({
   store,
-  secretProvider = () => process.env.ALGORITHM_CONSTELLATION_SECRET,
+  secretProvider = () => process.env.ALGORITHM_CONSTELLATION_SECRET || process.env.GUEST_ABUSE_HASH_SECRET,
   now = Date.now,
   judge = defaultJudge,
 } = {}) {

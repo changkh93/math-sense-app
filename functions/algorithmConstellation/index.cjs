@@ -33,7 +33,7 @@ module.exports = function createAlgorithmConstellationFunctions({ functions, adm
     maxInstances: 3,
     memory: '256MB',
     timeoutSeconds: 30,
-    secrets: ['ALGORITHM_CONSTELLATION_SECRET'],
+    secrets: ['GUEST_ABUSE_HASH_SECRET'],
     enforceAppCheck: true,
   })
 
