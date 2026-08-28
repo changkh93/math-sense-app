@@ -76,13 +76,15 @@ export const AC_PAT_003_PUBLIC_KERNEL = deepFreeze({
         { time: 6, bridgeOpen: true, remainder: 0 },
       ],
       truthTable: [
-        { time: 9, expected: true, prompt: '관측 예측 1: 현재 시간이 9초일 때 신호 다리는?' },
-        { time: 10, expected: false, prompt: '관측 예측 2: 현재 시간이 10초일 때 신호 다리는?' },
-        { time: 12, expected: true, prompt: '관측 예측 3: 현재 시간이 12초일 때 신호 다리는?' },
+        { time: 9, expected: true, prompt: '관측 예측 1: 현재 시간이 9초일 때 신호 다리는?', answer: { type: 'boolean-choice', trueLabel: '열림 (True)', falseLabel: '얼어붙음 (False)' } },
+        { time: 10, expected: false, prompt: '관측 예측 2: 현재 시간이 10초일 때 신호 다리는?', answer: { type: 'boolean-choice', trueLabel: '열림 (True)', falseLabel: '얼어붙음 (False)' } },
+        { time: 12, expected: true, prompt: '관측 예측 3: 현재 시간이 12초일 때 신호 다리는?', answer: { type: 'boolean-choice', trueLabel: '열림 (True)', falseLabel: '얼어붙음 (False)' } },
       ],
       predictionGoal: '시간 9초, 10초, 12초일 때 신호 다리의 상태를 예측하세요.',
     },
     explore: {
+      lensId: 'pattern-timeline',
+      lensConfig: { cycleLength: 3, activeInterval: 1, conditionType: 'modulo_zero' },
       type: 'time_modulo_simulator',
       cycle: 3,
       interactiveInputs: [
@@ -144,7 +146,16 @@ export const AC_PAT_003_PUBLIC_KERNEL = deepFreeze({
       policy: 'deterministic_practice',
     },
   },
+
+  scaffolding: {
+    publicPolicy: {
+      parsonAvailable: true,
+      maxHints: 3,
+    },
+  },
 })
 
 // Validate and freeze kernel
 validateProblemKernelSchema(AC_PAT_003_PUBLIC_KERNEL)
+
+export const AC_PAT_003 = AC_PAT_003_PUBLIC_KERNEL

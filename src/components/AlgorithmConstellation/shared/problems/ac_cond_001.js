@@ -29,17 +29,41 @@ export const AC_COND_001 = deepFreeze({
   shells: {
     explorer: {
       story: '고장 난 우주선 관제 기록에는 스위치 상태만 남아 있습니다. 어떤 경우에 발사 게이트가 열리는지 숨겨진 규칙을 찾아보세요.',
-      terms: { switch1: '빨간 스위치', switch2: '파란 스위치', result: '우주선 게이트' },
+      terms: {
+        switch1: '빨간 스위치',
+        switch2: '파란 스위치',
+        result: '우주선 게이트',
+        resultTrue: '게이트 열림 (PASS)',
+        resultFalse: '게이트 닫힘 (LOCKED)',
+        choiceTrue: '열림 (True)',
+        choiceFalse: '닫힘 (False)',
+      },
       visualTheme: 'space_shuttle_gate',
     },
     navigator: {
       story: '구역 보안 격벽 관제 기록을 분석하여 메인 레버와 보조 레버 조합에 따른 격벽 해제 조건을 발견하세요.',
-      terms: { switch1: '메인 레버', switch2: '보조 레버', result: '보안 격벽' },
+      terms: {
+        switch1: '메인 레버',
+        switch2: '보조 레버',
+        result: '보안 격벽',
+        resultTrue: '격벽 해제 (PASS)',
+        resultFalse: '격벽 차단 (LOCKED)',
+        choiceTrue: '해제 (True)',
+        choiceFalse: '차단 (False)',
+      },
       visualTheme: 'sector_airlock',
     },
     pro: {
       story: '두 센서 입력 s1, s2에 대한 시스템 게이트의 출력을 분석하고 함수 check_gate를 구현하세요.',
-      terms: { switch1: 's1', switch2: 's2', result: 'return value' },
+      terms: {
+        switch1: 's1',
+        switch2: 's2',
+        result: 'return value',
+        resultTrue: 'True (열림)',
+        resultFalse: 'False (닫힘)',
+        choiceTrue: 'True',
+        choiceFalse: 'False',
+      },
       visualTheme: 'code_terminal',
     },
   },
@@ -51,12 +75,14 @@ export const AC_COND_001 = deepFreeze({
         { label: '기록 B', s1: true, s2: false, result: false, text: '🔴 ON   🔵 OFF ➔ 🔒 게이트 닫힘' },
       ],
       truthTable: [
-        { s1: false, s2: true, expected: false, prompt: '기록 C: 🔴 OFF  🔵 ON 일 때 게이트는?' },
-        { s1: false, s2: false, expected: false, prompt: '기록 D: 🔴 OFF  🔵 OFF 일 때 게이트는?' },
+        { s1: true, s2: false, expected: false, prompt: '관측 예측 1: 빨간 스위치 ON, 파란 스위치 OFF일 때 게이트는?', answer: { type: 'boolean-choice', trueLabel: '열림 (True)', falseLabel: '닫힘 (False)' } },
+        { s1: false, s2: true, expected: false, prompt: '관측 예측 2: 빨간 스위치 OFF, 파란 스위치 ON일 때 게이트는?', answer: { type: 'boolean-choice', trueLabel: '열림 (True)', falseLabel: '닫힘 (False)' } },
       ],
     },
     explore: {
-      allowedManipulations: ['toggle_switch_1', 'toggle_switch_2'],
+      lensId: 'condition-table',
+      lensConfig: { s1Label: '빨간 안전 스위치', s2Label: '파란 안전 스위치', logic: 'and' },
+      allowedManipulations: ['toggle_s1', 'toggle_s2'],
     },
     code: {
       entryFunction: 'check_gate',

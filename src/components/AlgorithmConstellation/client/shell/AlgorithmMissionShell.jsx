@@ -475,6 +475,7 @@ export default function AlgorithmMissionShell({
         <div>
           <CodeMode
             kernel={kernel}
+            shell={shell}
             initialCode={currentCode}
             assistanceAllowed={Boolean(attemptSession?.policy?.assistanceAllowed)}
             onCodeChange={(c) => setCurrentCode(c)}

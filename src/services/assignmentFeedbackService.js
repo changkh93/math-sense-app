@@ -849,16 +849,12 @@ async function fetchDarkMatterSummary(userId) {
   const incorrect = incorrectSnap.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data(), source: 'incorrect' }));
   const review = reviewSnap.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data(), source: 'review' }));
   const ids = Array.from(new Set([...incorrect, ...review].map((item) => item.id).filter(Boolean))).slice(0, 10);
-  const quizMap = {};
-
-  for (let i = 0; i < ids.length; i += 30) {
-    const chunk = ids.slice(i, i + 30);
-    if (!chunk.length) continue;
-    const quizSnap = await getDocs(query(collection(db, 'quizzes'), where(documentId(), 'in', chunk)));
-    quizSnap.docs.forEach((docSnap) => {
+  const quizDocSnaps = await Promise.all(ids.map((id) => getDoc(doc(db, 'quizzes', id)).catch(() => null)));
+  quizDocSnaps.forEach((docSnap) => {
+    if (docSnap && docSnap.exists()) {
       quizMap[docSnap.id] = { id: docSnap.id, ...docSnap.data() };
-    });
-  }
+    }
+  });
 
   const items = ids.map((id) => {
     const meta = incorrect.find((item) => item.id === id) || review.find((item) => item.id === id) || {};

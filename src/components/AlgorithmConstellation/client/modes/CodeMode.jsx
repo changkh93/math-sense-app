@@ -24,8 +24,16 @@ function cleanPythonError(errMsg) {
     .replace(/false/g, 'False')
 }
 
+function getDiscoveredRuleHint(kernel) {
+  if (kernel?.learning?.objective) {
+    return kernel.learning.objective
+  }
+  return '1·2단계에서 발견한 규칙과 불변성을 바탕으로 Python 함수를 완성하세요.'
+}
+
 export default function CodeMode({
   kernel,
+  shell = 'explorer',
   initialCode,
   understandingEvidence,
   onSubmitSolution,
@@ -199,6 +207,30 @@ export default function CodeMode({
     <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '20px', color: '#fff' }}>
       {/* Editor Column */}
       <div style={{ background: 'rgba(10, 20, 40, 0.75)', padding: '20px', borderRadius: '16px', border: '1px solid rgba(0, 240, 255, 0.25)' }}>
+        {/* Mission Briefing Card */}
+        <div style={{ background: 'linear-gradient(145deg, rgba(15, 23, 42, 0.9), rgba(8, 14, 30, 0.9))', borderRadius: '14px', padding: '16px 18px', marginBottom: '16px', border: '1px solid rgba(0, 240, 255, 0.25)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+            <div style={{ fontSize: '15px', fontWeight: 'bold', color: '#00f0ff', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span>🎯 [3단계 미션]</span>
+              <span>{kernel.identity?.studentTitle || 'Python 코드 구현'}</span>
+            </div>
+            <span style={{ fontSize: '12px', padding: '3px 8px', borderRadius: '4px', background: 'rgba(0, 240, 255, 0.15)', color: '#a5f3fc', border: '1px solid rgba(0, 240, 255, 0.3)', fontFamily: 'monospace' }}>
+              함수: {kernel.modes?.code?.entryFunction || 'check_gate'}
+            </span>
+          </div>
+          <p style={{ margin: '0 0 10px 0', fontSize: '13px', color: '#cbd5e1', lineHeight: '1.5' }}>
+            {kernel.shells?.[shell]?.story || kernel.shells?.explorer?.story || kernel.learning?.objective}
+          </p>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', fontSize: '12px', color: '#94a3b8', background: 'rgba(0, 0, 0, 0.35)', padding: '8px 12px', borderRadius: '6px', border: '1px solid rgba(255, 255, 255, 0.08)' }}>
+            <div>
+              <strong style={{ color: '#fef08a' }}>💡 학습 목표 및 미션:</strong>{' '}
+              <span style={{ color: '#f8fafc' }}>
+                {getDiscoveredRuleHint(kernel)}
+              </span>
+            </div>
+          </div>
+        </div>
+
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
           <div style={{ fontWeight: 'bold', color: '#00f0ff', fontSize: '15px' }}>
             🐍 Python Editor

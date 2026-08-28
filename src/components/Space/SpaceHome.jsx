@@ -1450,48 +1450,42 @@ function SpaceHome() {
       setDarkMatterStats(nextStats)
       if (allIds.length === 0) return []
 
-      // 2. Fetch fresh quiz data from 'quizzes'
+      // 2. Fetch fresh quiz data from 'quizzes' via getDoc (prevents Firestore security rule get() limit violations)
+      const quizDocSnaps = await Promise.all(allIds.map(id => getDoc(doc(db, 'quizzes', id)).catch(() => null)))
       const freshQuestions = []
-      for (let i = 0; i < allIds.length; i += 30) {
-        const chunk = allIds.slice(i, i + 30)
-        // Use documentId() here too since the IDs are document names
-        const qSnap = await getDocs(query(collection(db, 'quizzes'), where(documentId(), 'in', chunk)))
-        qSnap.docs.forEach(doc => {
-          const id = doc.id
-          const qData = doc.data()
-          const rmItem = rmMeta.find(m => m.id === id)
-          const iqItem = iqMeta.find(m => m.id === id)
-          
-          // Determine the most recent activity timestamp for this particular question
-          const activeAt = iqItem?.lastFailedAt || rmItem?.markedAt || rmItem?.masteredAt || null
+      quizDocSnaps.forEach((docSnap, idx) => {
+        if (!docSnap || !docSnap.exists()) return
+        const id = allIds[idx]
+        const qData = docSnap.data()
+        const rmItem = rmMeta.find(m => m.id === id)
+        const iqItem = iqMeta.find(m => m.id === id)
+        
+        const activeAt = iqItem?.lastFailedAt || rmItem?.markedAt || rmItem?.masteredAt || null
 
-          freshQuestions.push({
-            ...qData,
-            id,
-            _source: iqItem ? 'incorrect' : 'review',
-            _reviewMark: !!rmItem,
-            _reviewStatus: rmItem?.status || null,
-            _activeAt: activeAt, // Add physical timestamp for sorting
-            failCount: iqItem?.failCount || 0,
-            lastFailedAt: iqItem?.lastFailedAt || null,
-            unitId: qData.unitId || iqItem?.unitId || rmItem?.unitId,
-            unitTitle: qData.unitTitle || iqItem?.unitTitle || rmItem?.unitTitle
-          })
+        freshQuestions.push({
+          ...qData,
+          id,
+          _source: iqItem ? 'incorrect' : 'review',
+          _reviewMark: !!rmItem,
+          _reviewStatus: rmItem?.status || null,
+          _activeAt: activeAt,
+          failCount: iqItem?.failCount || 0,
+          lastFailedAt: iqItem?.lastFailedAt || null,
+          unitId: qData.unitId || iqItem?.unitId || rmItem?.unitId,
+          unitTitle: qData.unitTitle || iqItem?.unitTitle || rmItem?.unitTitle
         })
-      }
+      })
 
-      // 3. Resolve unitTitles for all unique unitIds
+      // 3. Resolve unitTitles for all unique unitIds via getDoc
       const uniqueUnitIds = Array.from(new Set(freshQuestions.map(q => q.unitId).filter(Boolean)))
       if (uniqueUnitIds.length > 0) {
+        const unitDocSnaps = await Promise.all(uniqueUnitIds.map(uId => getDoc(doc(db, 'units', uId)).catch(() => null)))
         const unitTitlesMap = {}
-        for (let i = 0; i < uniqueUnitIds.length; i += 30) {
-          const chunk = uniqueUnitIds.slice(i, i + 30)
-          // Use documentId() because unit IDs are document names in the units collection
-          const uSnap = await getDocs(query(collection(db, 'units'), where(documentId(), 'in', chunk)))
-          uSnap.docs.forEach(doc => {
-            unitTitlesMap[doc.id] = doc.data().title
-          })
-        }
+        unitDocSnaps.forEach((uSnap, idx) => {
+          if (uSnap && uSnap.exists()) {
+            unitTitlesMap[uniqueUnitIds[idx]] = uSnap.data().title
+          }
+        })
         
         // Update questions with resolved titles
         freshQuestions.forEach(q => {

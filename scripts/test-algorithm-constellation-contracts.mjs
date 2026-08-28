@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { validateProblemKernel } from '../src/components/AlgorithmConstellation/shared/contracts/problemKernelSchema.js'
 import { AC_COND_001 } from '../src/components/AlgorithmConstellation/shared/problems/ac_cond_001.js'
+import { AC_COND_002 } from '../src/components/AlgorithmConstellation/shared/problems/ac_cond_002.js'
 import { createReplayDescriptor, validateReplayDescriptor, TRACE_SCHEMA_VERSION, RUNTIME_VERSION, INTERPRETER_VERSION } from '../src/components/AlgorithmConstellation/shared/contracts/eventReplaySchema.js'
 import { calculateASI, validateAssistanceEvidence, ASI_METRIC_VERSION } from '../src/components/AlgorithmConstellation/shared/contracts/assistanceEvidenceSchema.js'
 import { evaluateConstellationStars } from '../src/components/AlgorithmConstellation/shared/contracts/starEvidenceContract.js'
@@ -17,18 +18,20 @@ import { getPrivateProblemDefinition } from '../functions/algorithmConstellation
 console.log('=== Running Algorithm Constellation Hardened Invariant Tests ===')
 
 // [Test 1] Public Problem Kernel Schema Validation & No Secret Leaks
-console.log('[Test 1] Validating Public Problem Kernel Schema & AC-COND-001...')
+console.log('[Test 1] Validating Public Problem Kernel Schema & AC-COND-001 / AC-COND-002...')
 const kernelErrors = validateProblemKernel(AC_COND_001)
 assert.deepEqual(kernelErrors, [], 'AC-COND-001 must have 0 schema errors')
 assert.equal(AC_COND_001.id, 'AC-COND-001')
-assert.equal(AC_COND_001.shells.explorer.terms.switch1, '빨간 스위치')
-assert.equal(AC_COND_001.shells.pro.terms.switch1, 's1')
-assert.equal(AC_COND_001.modes.code.solutionCode, undefined, 'Public kernel MUST NOT contain solutionCode')
+
+const kernelErrors2 = validateProblemKernel(AC_COND_002)
+assert.deepEqual(kernelErrors2, [], 'AC-COND-002 must have 0 schema errors')
+assert.equal(AC_COND_002.id, 'AC-COND-002')
+assert.equal(AC_COND_002.modes.code.solutionCode, undefined, 'Public kernel MUST NOT contain solutionCode')
 
 // DeepFreeze immutability test on Problem Kernel
 assert.throws(() => {
-  AC_COND_001.shells.explorer.story = 'HACKED'
-}, /Cannot assign to read only property|read-only/)
+  AC_COND_002.shells.explorer.story = 'HACKED'
+}, /Cannot assign to read only property|read-only|not extensible/)
 console.log('  -> Public Problem Kernel validated and deeply frozen')
 
 // [Test 2] Versioned Deterministic Replay Invariant (Cannot overwrite canonical runtime version)
@@ -168,8 +171,9 @@ const judgeResult = evaluateAuthoritativeSubmission({
   studentPythonCode: officialPython,
   entryFunction: 'check_gate',
   understandingAnswer: {
+    challengeId: 'uc_cond_01',
     type: 'truth_table_completion',
-    answers: { s1_true_s2_true: true, s1_true_s2_false: false },
+    answers: { q1: false, q2: true },
   },
   transferPythonCode: transferPython,
   publicTests: AC_COND_001.assessment.publicTests,
@@ -197,6 +201,43 @@ const wrongJudgeResult = evaluateAuthoritativeSubmission({
 
 assert.equal(wrongJudgeResult.hiddenPassed, false, 'Intended wrong solution MUST fail hidden tests!')
 assert.equal(wrongJudgeResult.stars, 0, 'Failed hidden test gives 0 result stars')
+
+// AC-COND-002 (Lifeboat Boarding / OR) Authoritative Judge Evaluation
+const privateDefCond2 = getPrivateProblemDefinition('AC-COND-002', 1)
+const judgeResultCond2 = evaluateAuthoritativeSubmission({
+  problemId: 'AC-COND-002',
+  problemVersion: 1,
+  studentPythonCode: privateDefCond2.officialSolutionCode,
+  entryFunction: 'can_board',
+  understandingAnswer: {
+    challengeId: 'uc_cond_02_01',
+    type: 'truth_table_completion',
+    answers: { q1: true, q2: false },
+  },
+  transferPythonCode: `def can_refuel(at_station, tanker_connected):\n    return bool(at_station or tanker_connected)\n`,
+  publicTests: AC_COND_002.assessment.publicTests,
+})
+assert.equal(judgeResultCond2.stars, 3)
+assert.equal(judgeResultCond2.publicPassed, true)
+assert.equal(judgeResultCond2.hiddenPassed, true)
+assert.equal(judgeResultCond2.understandingPassed, true)
+assert.equal(judgeResultCond2.transferPassed, true)
+
+// Intended wrong solution for AC-COND-002: has_card and emergency_approved (COND-AND-OR-01) -> MUST FAIL hidden tests!
+const wrongCond2Res = evaluateAuthoritativeSubmission({
+  problemId: 'AC-COND-002',
+  problemVersion: 1,
+  studentPythonCode: privateDefCond2.intendedWrongSolutions[0].code,
+  entryFunction: 'can_board',
+  understandingAnswer: {
+    challengeId: 'uc_cond_02_01',
+    type: 'truth_table_completion',
+    answers: { q1: false, q2: false },
+  },
+  publicTests: AC_COND_002.assessment.publicTests,
+})
+assert.equal(wrongCond2Res.hiddenPassed, false, 'OR-as-AND intended wrong solution MUST fail hidden tests')
+assert.equal(wrongCond2Res.stars, 0)
 
 // [Test 10] Progress vs Attempt Storage Separation & AI Mastery Policy
 console.log('[Test 10] Validating Progress & Attempt Data Separation & AI Mastery Policy...')

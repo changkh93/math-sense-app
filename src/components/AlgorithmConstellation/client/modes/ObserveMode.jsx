@@ -1,5 +1,15 @@
 import { useState } from 'react'
 
+function isAnswerMatch(selected, expected) {
+  if (selected === undefined || selected === null) return false
+  if (typeof expected === 'boolean') return selected === expected
+  if (typeof expected === 'number') return Number(selected) === expected
+  if (typeof selected === 'string' && typeof expected === 'string') {
+    return selected === expected || selected.startsWith(expected) || expected.startsWith(selected)
+  }
+  return JSON.stringify(selected) === JSON.stringify(expected)
+}
+
 export default function ObserveMode({
   kernel,
   shell = 'explorer',
@@ -26,7 +36,7 @@ export default function ObserveMode({
   const allAnswered = truthTable.length > 0 && truthTable.every((_, idx) => answers[idx] !== undefined)
   const isAllCorrect =
     allAnswered &&
-    truthTable.every((item, idx) => answers[idx] === item.expected)
+    truthTable.every((item, idx) => isAnswerMatch(answers[idx], item.expected))
 
   const handleSubmit = () => {
     setSubmitted(true)
@@ -46,7 +56,7 @@ export default function ObserveMode({
         <span style={{ fontSize: '32px' }}>{isSignalBridge ? '⏱️' : '🚪'}</span>
         <div>
           <h3 style={{ margin: 0, fontSize: '20px', color: '#00f0ff', fontFamily: 'monospace' }}>
-            [1단계: 관찰 및 추론] {isSignalBridge ? '신호 다리의 개폐 규칙을 찾아라' : '발사 게이트의 숨겨진 규칙을 찾아라'}
+            [1단계: 관찰 및 추론] {shellInfo.terms?.result ? `${shellInfo.terms.result}의 숨겨진 규칙을 찾아라` : (isSignalBridge ? '신호 다리의 개폐 규칙을 찾아라' : '숨겨진 규칙을 찾아라')}
           </h3>
           <p style={{ margin: '6px 0 0', fontSize: '15px', color: '#cbd5e1', lineHeight: '1.6' }}>
             {shellInfo.story}
@@ -87,7 +97,7 @@ export default function ObserveMode({
                   {scene.bridgeOpen ? '🔓' : '❄️'}
                 </div>
                 <div style={{ fontSize: '12px', fontWeight: 'bold', color: scene.bridgeOpen ? '#38bdf8' : '#64748b' }}>
-                  {scene.bridgeOpen ? '열림' : '닫힘'}
+                  {scene.bridgeOpen ? (shellInfo.terms?.choiceTrue || '열림') : (shellInfo.terms?.choiceFalse || '닫힘')}
                 </div>
               </div>
             ))}
@@ -128,8 +138,9 @@ export default function ObserveMode({
         <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
           {truthTable.map((item, idx) => {
             const selected = answers[idx]
-            const isCorrect = submitted && selected === item.expected
-            const isWrong = submitted && selected !== item.expected
+            const isCorrect = submitted && isAnswerMatch(selected, item.expected)
+            const isWrong = submitted && selected !== undefined && !isAnswerMatch(selected, item.expected)
+            const answerSchema = item.answer || (typeof item.expected === 'boolean' ? { type: 'boolean-choice' } : { type: 'single-choice', options: [item.expected] })
 
             return (
               <div
@@ -138,51 +149,98 @@ export default function ObserveMode({
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'space-between',
+                  flexWrap: 'wrap',
+                  gap: '12px',
                   padding: '16px 20px',
                   background: isCorrect ? 'rgba(16, 185, 129, 0.15)' : isWrong ? 'rgba(239, 68, 68, 0.15)' : 'rgba(255, 255, 255, 0.05)',
                   borderRadius: '10px',
                   border: isCorrect ? '1px solid #10b981' : isWrong ? '1px solid #ef4444' : '1px solid rgba(255, 255, 255, 0.12)',
                 }}
               >
-                <div style={{ fontSize: '15px', color: '#f8fafc', fontWeight: '500' }}>
+                <div style={{ fontSize: '15px', color: '#f8fafc', fontWeight: '500', flex: '1 1 240px' }}>
                   {item.prompt}
                 </div>
 
-                <div style={{ display: 'flex', gap: '10px' }}>
-                  <button
-                    type="button"
-                    onClick={() => handleSelectAnswer(idx, true)}
-                    style={{
-                      padding: '8px 18px',
-                      borderRadius: '8px',
-                      border: selected === true ? '2px solid #00f0ff' : '1px solid rgba(255, 255, 255, 0.2)',
-                      background: selected === true ? 'rgba(0, 240, 255, 0.25)' : 'rgba(0, 0, 0, 0.3)',
-                      color: selected === true ? '#00f0ff' : '#fff',
-                      fontWeight: 'bold',
-                      cursor: 'pointer',
-                      fontSize: '14px',
-                      transition: 'all 0.15s ease',
-                    }}
-                  >
-                    열림 (True)
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleSelectAnswer(idx, false)}
-                    style={{
-                      padding: '8px 18px',
-                      borderRadius: '8px',
-                      border: selected === false ? '2px solid #ef4444' : '1px solid rgba(255, 255, 255, 0.2)',
-                      background: selected === false ? 'rgba(239, 68, 68, 0.25)' : 'rgba(0, 0, 0, 0.3)',
-                      color: selected === false ? '#f87171' : '#fff',
-                      fontWeight: 'bold',
-                      cursor: 'pointer',
-                      fontSize: '14px',
-                      transition: 'all 0.15s ease',
-                    }}
-                  >
-                    닫힘 (False)
-                  </button>
+                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                  {answerSchema.type === 'boolean-choice' ? (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => handleSelectAnswer(idx, true)}
+                        style={{
+                          padding: '8px 18px',
+                          borderRadius: '8px',
+                          border: selected === true ? '2px solid #00f0ff' : '1px solid rgba(255, 255, 255, 0.2)',
+                          background: selected === true ? 'rgba(0, 240, 255, 0.25)' : 'rgba(0, 0, 0, 0.3)',
+                          color: selected === true ? '#00f0ff' : '#fff',
+                          fontWeight: 'bold',
+                          cursor: 'pointer',
+                          fontSize: '14px',
+                          transition: 'all 0.15s ease',
+                        }}
+                      >
+                        {answerSchema.trueLabel || shellInfo.terms?.choiceTrue || 'True'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleSelectAnswer(idx, false)}
+                        style={{
+                          padding: '8px 18px',
+                          borderRadius: '8px',
+                          border: selected === false ? '2px solid #ef4444' : '1px solid rgba(255, 255, 255, 0.2)',
+                          background: selected === false ? 'rgba(239, 68, 68, 0.25)' : 'rgba(0, 0, 0, 0.3)',
+                          color: selected === false ? '#f87171' : '#fff',
+                          fontWeight: 'bold',
+                          cursor: 'pointer',
+                          fontSize: '14px',
+                          transition: 'all 0.15s ease',
+                        }}
+                      >
+                        {answerSchema.falseLabel || shellInfo.terms?.choiceFalse || 'False'}
+                      </button>
+                    </>
+                  ) : answerSchema.options && Array.isArray(answerSchema.options) ? (
+                    answerSchema.options.map((opt, optIdx) => {
+                      const isOptionSelected = selected === opt || (typeof opt === 'string' && opt.startsWith(String(selected)))
+                      return (
+                        <button
+                          key={optIdx}
+                          type="button"
+                          onClick={() => handleSelectAnswer(idx, opt)}
+                          style={{
+                            padding: '8px 16px',
+                            borderRadius: '8px',
+                            border: isOptionSelected ? '2px solid #00f0ff' : '1px solid rgba(255, 255, 255, 0.2)',
+                            background: isOptionSelected ? 'rgba(0, 240, 255, 0.25)' : 'rgba(0, 0, 0, 0.3)',
+                            color: isOptionSelected ? '#00f0ff' : '#cbd5e1',
+                            fontWeight: 'bold',
+                            cursor: 'pointer',
+                            fontSize: '13px',
+                            transition: 'all 0.15s ease',
+                          }}
+                        >
+                          {String(opt)}
+                        </button>
+                      )
+                    })
+                  ) : (
+                    <input
+                      type="number"
+                      value={selected !== undefined ? selected : ''}
+                      onChange={(e) => handleSelectAnswer(idx, e.target.value === '' ? undefined : Number(e.target.value))}
+                      placeholder="답안 입력"
+                      style={{
+                        padding: '8px 14px',
+                        borderRadius: '8px',
+                        border: '1px solid rgba(0, 240, 255, 0.5)',
+                        background: 'rgba(0, 0, 0, 0.5)',
+                        color: '#00f0ff',
+                        fontWeight: 'bold',
+                        fontSize: '14px',
+                        width: '100px',
+                      }}
+                    />
+                  )}
                 </div>
               </div>
             )

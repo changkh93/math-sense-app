@@ -5,13 +5,27 @@ import AlgorithmMissionShell from '../shell/AlgorithmMissionShell.jsx'
 import { createAlgorithmConstellationGateway } from '../services/AlgorithmConstellationGateway.js'
 import { createAlgorithmConstellationMockGateway } from '../services/AlgorithmConstellationMockGateway.js'
 import { AC_COND_001 } from '../../shared/problems/ac_cond_001.js'
+import { AC_COND_002 } from '../../shared/problems/ac_cond_002.js'
 import { AC_PAT_003_PUBLIC_KERNEL } from '../../shared/problems/ac_pat_003.js'
+import { AC_PAT_004 } from '../../shared/problems/ac_pat_004.js'
+import { AC_SEQ_005 } from '../../shared/problems/ac_seq_005.js'
+import { AC_NAV_005 } from '../../shared/problems/ac_nav_005.js'
+import { AC_NAV_006 } from '../../shared/problems/ac_nav_006.js'
 import soundManager from '../../../../utils/SoundManager.js'
+
+const TRACK_TABS = [
+  { id: 'all', label: '전체 탐사', icon: '🌌' },
+  { id: 'condition', label: '🧩 조건 판단하기', icon: '⚡' },
+  { id: 'pattern', label: '🔁 규칙 발견하기', icon: '❄️' },
+  { id: 'sequence', label: '📦 데이터 처리하기', icon: '🪐' },
+  { id: 'navigation', label: '🗺 길 탐색하기', icon: '🚀' },
+]
 
 const MISSIONS = [
   {
     kernel: AC_COND_001,
-    tag: '🎯 두 조건을 함께 판단하기',
+    track: 'condition',
+    tag: '🎯 두 조건을 함께 판단하기 (and)',
     badge: '⚡ 입문 항로',
     badgeStyle: {
       background: 'rgba(234, 179, 8, 0.18)',
@@ -26,8 +40,26 @@ const MISSIONS = [
     chips: ['🎯 두 스위치 판단 (and)', '🔍 4상황 직관 발견', '⏱️ 약 5~8분'],
   },
   {
+    kernel: AC_COND_002,
+    track: 'condition',
+    tag: '🚪 대안 조건을 판단하기 (or)',
+    badge: '⚡ 입문 항로',
+    badgeStyle: {
+      background: 'rgba(56, 189, 248, 0.18)',
+      border: '1px solid rgba(56, 189, 248, 0.5)',
+      color: '#bae6fd',
+    },
+    icon: '🚪',
+    accentColor: '#38bdf8',
+    borderColor: 'rgba(56, 189, 248, 0.3)',
+    glowColor: 'rgba(56, 189, 248, 0.15)',
+    btnGradient: 'linear-gradient(135deg, #38bdf8 0%, #0284c7 100%)',
+    chips: ['🚪 구명정 대안 판단 (or)', '🔍 4상황 직관 발견', '⏱️ 약 6~8분'],
+  },
+  {
     kernel: AC_PAT_003_PUBLIC_KERNEL,
-    tag: '⏳ 반복되는 신호 주기 찾기',
+    track: 'pattern',
+    tag: '⏳ 반복되는 신호 주기 찾기 (%)',
     badge: '❄️ 심화 항로',
     badgeStyle: {
       background: 'rgba(129, 140, 248, 0.18)',
@@ -41,22 +73,87 @@ const MISSIONS = [
     btnGradient: 'linear-gradient(135deg, #818cf8 0%, #4f46e5 100%)',
     chips: ['⏳ 3초 주기 나머지 (%)', '📊 시간 흐름 시뮬레이션', '⏱️ 약 8~10분'],
   },
+  {
+    kernel: AC_PAT_004,
+    track: 'pattern',
+    tag: '💡 회전하는 등대 발광 구간 (<)',
+    badge: '❄️ 심화 항로',
+    badgeStyle: {
+      background: 'rgba(168, 85, 247, 0.18)',
+      border: '1px solid rgba(168, 85, 247, 0.5)',
+      color: '#e9d5ff',
+    },
+    icon: '💡',
+    accentColor: '#a855f7',
+    borderColor: 'rgba(168, 85, 247, 0.3)',
+    glowColor: 'rgba(168, 85, 247, 0.15)',
+    btnGradient: 'linear-gradient(135deg, #a855f7 0%, #7c3aed 100%)',
+    chips: ['💡 주기 구간 판별', '📊 발광 시간대 관찰', '⏱️ 약 8~10분'],
+  },
+  {
+    kernel: AC_SEQ_005,
+    track: 'sequence',
+    tag: '🪐 유효 데이터 선별 누적',
+    badge: '🪐 도약 항로',
+    badgeStyle: {
+      background: 'rgba(52, 211, 153, 0.18)',
+      border: '1px solid rgba(52, 211, 153, 0.5)',
+      color: '#a7f3d0',
+    },
+    icon: '🪐',
+    accentColor: '#34d399',
+    borderColor: 'rgba(52, 211, 153, 0.3)',
+    glowColor: 'rgba(52, 211, 153, 0.15)',
+    btnGradient: 'linear-gradient(135deg, #34d399 0%, #059669 100%)',
+    chips: ['📦 유효 에너지 선별 합산', '🔍 캡슐 순회 및 필터링', '⏱️ 약 10~12분'],
+  },
+  {
+    kernel: AC_NAV_005,
+    track: 'navigation',
+    tag: '📡 선입선출 신호 대기열',
+    badge: '🚀 심우주 항로',
+    badgeStyle: {
+      background: 'rgba(251, 146, 60, 0.18)',
+      border: '1px solid rgba(251, 146, 60, 0.5)',
+      color: '#fed7aa',
+    },
+    icon: '📡',
+    accentColor: '#fb923c',
+    borderColor: 'rgba(251, 146, 60, 0.3)',
+    glowColor: 'rgba(251, 146, 60, 0.15)',
+    btnGradient: 'linear-gradient(135deg, #fb923c 0%, #ea580c 100%)',
+    chips: ['📡 도착 순서대로 처리', '🔍 대기열 구조 관찰', '⏱️ 약 10~12분'],
+  },
+  {
+    kernel: AC_NAV_006,
+    track: 'navigation',
+    tag: '🗺️ 성운 최단 경로 탐색',
+    badge: '🚀 심우주 항로',
+    badgeStyle: {
+      background: 'rgba(244, 63, 94, 0.18)',
+      border: '1px solid rgba(244, 63, 94, 0.5)',
+      color: '#fecdd3',
+    },
+    icon: '🗺️',
+    accentColor: '#f43f5e',
+    borderColor: 'rgba(244, 63, 94, 0.3)',
+    glowColor: 'rgba(244, 63, 94, 0.15)',
+    btnGradient: 'linear-gradient(135deg, #f43f5e 0%, #e11d48 100%)',
+    chips: ['🗺️ 최단 경로 탐색', '🔒 중복 방문 방지', '⏱️ 약 15~20분'],
+  },
 ]
 
 export default function AlgorithmConstellationHub({ onBack }) {
   const navigate = useNavigate()
   const [selectedProblem, setSelectedProblem] = useState(null)
   const [hoveredCard, setHoveredCard] = useState(null)
+  const [activeTab, setActiveTab] = useState('all')
 
   const gateway = useMemo(() => {
     if (import.meta.env.DEV) {
       return createAlgorithmConstellationMockGateway()
     }
-    try {
-      return createAlgorithmConstellationGateway(firebaseApp)
-    } catch {
-      return createAlgorithmConstellationMockGateway()
-    }
+    return createAlgorithmConstellationGateway(firebaseApp)
   }, [])
 
   const handleBack = () => {
@@ -69,6 +166,11 @@ export default function AlgorithmConstellationHub({ onBack }) {
     soundManager.playClick?.()
     setSelectedProblem(kernel)
   }
+
+  const filteredMissions = useMemo(() => {
+    if (activeTab === 'all') return MISSIONS
+    return MISSIONS.filter((m) => m.track === activeTab)
+  }, [activeTab])
 
   if (selectedProblem) {
     return (
@@ -98,275 +200,342 @@ export default function AlgorithmConstellationHub({ onBack }) {
         alignItems: 'center',
       }}
     >
-      <div style={{ width: '100%', maxWidth: '1060px' }}>
-        {/* Top Return Button */}
-        <div style={{ marginBottom: '28px' }}>
-          <button
-            type="button"
-            onClick={handleBack}
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '8px',
-              padding: '10px 18px',
-              border: '1px solid rgba(0, 240, 255, 0.3)',
-              borderRadius: '10px',
-              background: 'rgba(10, 20, 40, 0.75)',
-              color: '#38bdf8',
-              fontSize: '13px',
-              fontWeight: 'bold',
-              cursor: 'pointer',
-              boxShadow: '0 4px 16px rgba(0, 0, 0, 0.4)',
-              transition: 'all 0.2s ease',
-            }}
-            onPointerOver={(e) => {
-              e.currentTarget.style.background = 'rgba(0, 240, 255, 0.15)'
-              e.currentTarget.style.borderColor = '#00f0ff'
-            }}
-            onPointerOut={(e) => {
-              e.currentTarget.style.background = 'rgba(10, 20, 40, 0.75)'
-              e.currentTarget.style.borderColor = 'rgba(0, 240, 255, 0.3)'
-            }}
-          >
-            <span>←</span>
-            <span>파이썬 행성군집으로 복귀</span>
-          </button>
-        </div>
+      {/* Top Navigation Bar */}
+      <header
+        style={{
+          width: '100%',
+          maxWidth: '1040px',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          marginBottom: '28px',
+        }}
+      >
+        <button
+          type="button"
+          onClick={handleBack}
+          style={{
+            background: 'rgba(255, 255, 255, 0.08)',
+            border: '1px solid rgba(255, 255, 255, 0.18)',
+            borderRadius: '12px',
+            color: '#94a3b8',
+            padding: '10px 18px',
+            fontSize: '14px',
+            fontWeight: 600,
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            transition: 'all 0.2s ease',
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background = 'rgba(255, 255, 255, 0.15)'
+            e.currentTarget.style.color = '#ffffff'
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)'
+            e.currentTarget.style.color = '#94a3b8'
+          }}
+        >
+          <span>←</span>
+          <span>우주로 돌아가기</span>
+        </button>
 
-        {/* Hero Header */}
         <div
           style={{
-            background: 'linear-gradient(165deg, rgba(15, 23, 42, 0.85) 0%, rgba(6, 11, 25, 0.9) 100%)',
-            border: '1px solid rgba(255, 255, 255, 0.12)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            background: 'rgba(0, 240, 255, 0.08)',
+            border: '1px solid rgba(0, 240, 255, 0.25)',
             borderRadius: '20px',
-            padding: '32px 36px',
-            marginBottom: '36px',
-            boxShadow: '0 16px 40px -10px rgba(0, 0, 0, 0.7)',
-            position: 'relative',
-            overflow: 'hidden',
+            padding: '6px 14px',
+            fontSize: '13px',
+            color: '#38bdf8',
+            fontWeight: 600,
           }}
         >
-          <div
-            style={{
-              position: 'absolute',
-              top: '-40px',
-              right: '-40px',
-              width: '200px',
-              height: '200px',
-              borderRadius: '50%',
-              background: 'radial-gradient(circle, rgba(0, 240, 255, 0.15) 0%, transparent 70%)',
-              pointerEvents: 'none',
-            }}
-          />
-
-          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '5px 12px', background: 'rgba(56, 189, 248, 0.12)', border: '1px solid rgba(56, 189, 248, 0.3)', borderRadius: '20px', marginBottom: '12px' }}>
-            <span style={{ fontSize: '14px' }}>🌌</span>
-            <span style={{ fontSize: '12px', color: '#38bdf8', fontFamily: 'monospace', fontWeight: 'bold', letterSpacing: '0.8px' }}>
-              LUMI ALGORITHM CONSTELLATION
-            </span>
-          </div>
-
-          <h1 style={{ fontSize: '32px', fontWeight: '900', color: '#ffffff', margin: '0 0 12px', letterSpacing: '-0.5px' }}>
-            생각의 항로 · 알고리즘 성단
-          </h1>
-
-          <p style={{ fontSize: '15px', color: '#cbd5e1', lineHeight: '1.65', margin: 0, maxWidth: '780px' }}>
-            관찰하고, 직관적으로 예측하며, 코드로 증명하는 알고리즘 사고력 탐사입니다.
-            <br />
-            문제를 작은 단위로 분해하고 결정적 Time-Travel 디버거로 나의 사고 과정을 직접 확인해 보세요.
-          </p>
+          <span>✦</span>
+          <span>컴퓨팅 사고력 코어 가동 중</span>
         </div>
+      </header>
 
-        {/* Section Heading */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' }}>
-          <span style={{ fontSize: '18px' }}>🛰️</span>
-          <h2 style={{ fontSize: '18px', fontWeight: 'bold', color: '#f8fafc', margin: 0 }}>
-            탐사 가능한 성단 항로 (Missions)
-          </h2>
-        </div>
-
-        {/* Mission Cards Grid */}
+      {/* Hero Header */}
+      <section
+        style={{
+          textAlign: 'center',
+          maxWidth: '820px',
+          marginBottom: '32px',
+        }}
+      >
         <div
           style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))',
-            gap: '24px',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '8px',
+            background: 'rgba(129, 140, 248, 0.15)',
+            border: '1px solid rgba(129, 140, 248, 0.4)',
+            borderRadius: '999px',
+            padding: '6px 16px',
+            fontSize: '13px',
+            fontWeight: 700,
+            color: '#c7d2fe',
+            marginBottom: '14px',
           }}
         >
-          {MISSIONS.map(
-            ({
-              kernel,
-              tag,
-              badge,
-              badgeStyle,
-              icon,
-              accentColor,
-              borderColor,
-              glowColor,
-              btnGradient,
-              chips,
-            }) => {
-              const isHovered = hoveredCard === kernel.id
+          <span>🌌</span>
+          <span>LUMI ALGORITHM CONSTELLATION</span>
+        </div>
 
-              return (
+        <h1
+          style={{
+            fontSize: '32px',
+            fontWeight: 800,
+            letterSpacing: '-0.5px',
+            margin: '0 0 10px',
+            background: 'linear-gradient(135deg, #ffffff 30%, #38bdf8 70%, #818cf8 100%)',
+            WebkitBackgroundClip: 'text',
+            WebkitTextFillColor: 'transparent',
+          }}
+        >
+          생각의 항로 (알고리즘 성단)
+        </h1>
+
+        <p
+          style={{
+            fontSize: '15px',
+            color: '#cbd5e1',
+            lineHeight: 1.6,
+            margin: '0 auto',
+            maxWidth: '640px',
+          }}
+        >
+          정답 코드를 외워 입력하는 곳이 아닙니다.
+          현상을 관측하고, 규칙을 발견하고, 자신의 생각이 Python 코드로 자라나는 과정을 경험하세요.
+        </p>
+      </section>
+
+      {/* Track Filter Tabs */}
+      <nav
+        style={{
+          width: '100%',
+          maxWidth: '1040px',
+          display: 'flex',
+          gap: '10px',
+          flexWrap: 'wrap',
+          marginBottom: '28px',
+          justifyContent: 'center',
+        }}
+      >
+        {TRACK_TABS.map((tab) => {
+          const isActive = activeTab === tab.id
+          return (
+            <button
+              key={tab.id}
+              type="button"
+              onClick={() => {
+                soundManager.playClick?.()
+                setActiveTab(tab.id)
+              }}
+              style={{
+                padding: '10px 18px',
+                borderRadius: '12px',
+                border: isActive ? '1px solid #38bdf8' : '1px solid rgba(255, 255, 255, 0.12)',
+                background: isActive ? 'rgba(56, 189, 248, 0.18)' : 'rgba(255, 255, 255, 0.04)',
+                color: isActive ? '#38bdf8' : '#94a3b8',
+                fontWeight: isActive ? 700 : 500,
+                fontSize: '14px',
+                cursor: 'pointer',
+                transition: 'all 0.2s ease',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+              }}
+            >
+              <span>{tab.icon}</span>
+              <span>{tab.label}</span>
+            </button>
+          )
+        })}
+      </nav>
+
+      {/* Missions Grid */}
+      <section
+        style={{
+          width: '100%',
+          maxWidth: '1040px',
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))',
+          gap: '24px',
+        }}
+      >
+        {filteredMissions.map((item, index) => {
+          const { kernel, tag, badge, badgeStyle, icon, accentColor, borderColor, glowColor, btnGradient, chips } = item
+          const isHovered = hoveredCard === kernel.id
+          const explorerShell = kernel.shells?.explorer
+
+          return (
+            <article
+              key={kernel.id}
+              onMouseEnter={() => setHoveredCard(kernel.id)}
+              onMouseLeave={() => setHoveredCard(null)}
+              style={{
+                background: 'rgba(10, 20, 42, 0.75)',
+                backdropFilter: 'blur(16px)',
+                WebkitBackdropFilter: 'blur(16px)',
+                borderRadius: '20px',
+                border: `1px solid ${isHovered ? accentColor : borderColor}`,
+                boxShadow: isHovered
+                  ? `0 12px 36px -8px ${glowColor}, 0 0 20px -2px ${glowColor}`
+                  : '0 8px 24px -4px rgba(0, 0, 0, 0.5)',
+                padding: '24px',
+                display: 'flex',
+                flexDirection: 'column',
+                justifyContent: 'space-between',
+                transition: 'all 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
+                transform: isHovered ? 'translateY(-4px)' : 'translateY(0)',
+                cursor: 'pointer',
+              }}
+              onClick={() => handleSelectMission(kernel)}
+            >
+              <div>
+                {/* Header with Badge and ID */}
                 <div
-                  key={kernel.id}
-                  onPointerEnter={() => setHoveredCard(kernel.id)}
-                  onPointerLeave={() => setHoveredCard(null)}
                   style={{
-                    background: 'linear-gradient(165deg, rgba(15, 23, 42, 0.95) 0%, rgba(7, 12, 28, 0.98) 100%)',
-                    border: `1px solid ${isHovered ? accentColor : borderColor}`,
-                    borderRadius: '20px',
-                    padding: '28px',
                     display: 'flex',
-                    flexDirection: 'column',
                     justifyContent: 'space-between',
-                    gap: '20px',
-                    boxShadow: isHovered
-                      ? `0 20px 40px -4px rgba(0, 0, 0, 0.8), 0 0 30px ${glowColor}`
-                      : `0 10px 30px -5px rgba(0, 0, 0, 0.6), 0 0 15px ${glowColor}`,
-                    transform: isHovered ? 'translateY(-4px)' : 'none',
-                    transition: 'all 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
+                    alignItems: 'center',
+                    marginBottom: '16px',
                   }}
                 >
-                  {/* Card Header & Body */}
-                  <div>
-                    {/* Top Row: Icon & Badge */}
-                    <div
-                      style={{
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                        alignItems: 'center',
-                        marginBottom: '16px',
-                      }}
-                    >
-                      <div
-                        style={{
-                          width: '44px',
-                          height: '44px',
-                          borderRadius: '12px',
-                          background: 'rgba(255, 255, 255, 0.05)',
-                          border: `1px solid ${borderColor}`,
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          fontSize: '22px',
-                        }}
-                      >
-                        {icon}
-                      </div>
-
-                      <span
-                        style={{
-                          fontSize: '12px',
-                          fontWeight: '700',
-                          padding: '5px 12px',
-                          borderRadius: '16px',
-                          letterSpacing: '0.4px',
-                          ...badgeStyle,
-                        }}
-                      >
-                        {badge}
-                      </span>
-                    </div>
-
-                    {/* Mission Tag / Domain */}
-                    <div
-                      style={{
-                        fontSize: '13px',
-                        fontWeight: '700',
-                        color: accentColor,
-                        fontFamily: 'monospace',
-                        marginBottom: '6px',
-                      }}
-                    >
-                      {kernel.id} · {tag}
-                    </div>
-
-                    {/* Title */}
-                    <h3
-                      style={{
-                        fontSize: '22px',
-                        fontWeight: '800',
-                        color: '#ffffff',
-                        margin: '0 0 12px',
-                        lineHeight: '1.3',
-                      }}
-                    >
-                      {kernel.identity?.studentTitle || kernel.identity?.systemName}
-                    </h3>
-
-                    {/* Description */}
-                    <p
-                      style={{
-                        fontSize: '14px',
-                        color: '#cbd5e1',
-                        lineHeight: '1.65',
-                        margin: '0 0 20px',
-                      }}
-                    >
-                      {kernel.identity?.shortDescription}
-                    </p>
-
-                    {/* Feature Chips */}
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-                      {chips.map((chip) => (
-                        <span
-                          key={chip}
-                          style={{
-                            fontSize: '12px',
-                            color: '#94a3b8',
-                            background: 'rgba(255, 255, 255, 0.05)',
-                            border: '1px solid rgba(255, 255, 255, 0.1)',
-                            borderRadius: '8px',
-                            padding: '4px 10px',
-                            fontWeight: '500',
-                          }}
-                        >
-                          {chip}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Launch Button */}
-                  <button
-                    type="button"
-                    onClick={() => handleSelectMission(kernel)}
+                  <span
                     style={{
-                      width: '100%',
-                      padding: '14px 20px',
-                      background: btnGradient,
-                      color: kernel.id === 'AC-COND-001' ? '#030712' : '#ffffff',
-                      border: 'none',
-                      borderRadius: '12px',
-                      fontSize: '14px',
-                      fontWeight: '800',
-                      cursor: 'pointer',
-                      display: 'flex',
+                      display: 'inline-flex',
                       alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: '8px',
-                      boxShadow: `0 6px 20px ${glowColor}`,
-                      transition: 'all 0.2s ease',
-                      marginTop: '6px',
-                    }}
-                    onPointerOver={(e) => {
-                      e.currentTarget.style.filter = 'brightness(1.15)'
-                    }}
-                    onPointerOut={(e) => {
-                      e.currentTarget.style.filter = 'none'
+                      gap: '5px',
+                      borderRadius: '8px',
+                      padding: '4px 10px',
+                      fontSize: '12px',
+                      fontWeight: 700,
+                      ...badgeStyle,
                     }}
                   >
-                    <span>🚀 탐사 개시 (Launch Mission)</span>
-                    <span style={{ fontSize: '16px' }}>➔</span>
-                  </button>
+                    {badge}
+                  </span>
+
+                  <span
+                    style={{
+                      fontSize: '12px',
+                      fontFamily: 'monospace',
+                      color: 'rgba(255, 255, 255, 0.45)',
+                      fontWeight: 600,
+                    }}
+                  >
+                    {kernel.id}
+                  </span>
                 </div>
-              )
-            },
-          )}
-        </div>
-      </div>
+
+                {/* Title & Tag */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
+                  <span style={{ fontSize: '24px' }}>{icon}</span>
+                  <h2
+                    style={{
+                      margin: 0,
+                      fontSize: '20px',
+                      fontWeight: 700,
+                      color: '#ffffff',
+                    }}
+                  >
+                    {kernel.identity?.studentTitle || kernel.title}
+                  </h2>
+                </div>
+
+                <div
+                  style={{
+                    fontSize: '13px',
+                    fontWeight: 600,
+                    color: accentColor,
+                    marginBottom: '14px',
+                  }}
+                >
+                  {tag}
+                </div>
+
+                {/* Story preview */}
+                <p
+                  style={{
+                    fontSize: '13px',
+                    color: 'rgba(255, 255, 255, 0.75)',
+                    lineHeight: 1.6,
+                    margin: '0 0 18px',
+                    minHeight: '42px',
+                  }}
+                >
+                  {explorerShell?.story || kernel.description}
+                </p>
+
+                {/* Chips */}
+                <div
+                  style={{
+                    display: 'flex',
+                    flexWrap: 'wrap',
+                    gap: '6px',
+                    marginBottom: '20px',
+                  }}
+                >
+                  {chips.map((chip) => (
+                    <span
+                      key={chip}
+                      style={{
+                        background: 'rgba(255, 255, 255, 0.06)',
+                        border: '1px solid rgba(255, 255, 255, 0.1)',
+                        borderRadius: '6px',
+                        padding: '4px 8px',
+                        fontSize: '11px',
+                        color: 'rgba(255, 255, 255, 0.75)',
+                        fontWeight: 500,
+                      }}
+                    >
+                      {chip}
+                    </span>
+                  ))}
+                </div>
+              </div>
+
+              {/* Action Button */}
+              <button
+                type="button"
+                style={{
+                  width: '100%',
+                  padding: '13px 0',
+                  borderRadius: '12px',
+                  border: 'none',
+                  background: btnGradient,
+                  color: '#ffffff',
+                  fontWeight: 700,
+                  fontSize: '14px',
+                  cursor: 'pointer',
+                  boxShadow: `0 4px 14px 0 ${glowColor}`,
+                  display: 'flex',
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                  gap: '6px',
+                  transition: 'opacity 0.2s',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.opacity = '0.9'
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.opacity = '1'
+                }}
+              >
+                <span>🚀 항로 탐사 시작</span>
+                <span style={{ fontSize: '12px' }}>➔</span>
+              </button>
+            </article>
+          )
+        })}
+      </section>
     </main>
   )
 }
