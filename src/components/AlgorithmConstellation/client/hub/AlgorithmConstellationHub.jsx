@@ -20,13 +20,53 @@ const DEFAULT_CONSTELLATION_ID = CONSTELLATIONS.find((constellation) =>
   PUBLISHED_ENTRIES.some((entry) => entry.constellationId === constellation.id)
 )?.id || 'constellation-0'
 
+function readLocalProgressSnapshot() {
+  const local = {}
+  if (typeof window === 'undefined' || !window.localStorage) return local
+  try {
+    const raw = window.localStorage.getItem('msense_alg_dev_progress_v1')
+    if (raw) {
+      const parsed = JSON.parse(raw)
+      if (Array.isArray(parsed)) {
+        for (const [pid, record] of parsed) {
+          if (pid && record) local[pid] = record
+        }
+      }
+    }
+    for (let i = 0; i < window.localStorage.length; i++) {
+      const k = window.localStorage.key(i)
+      if (k && k.startsWith('msense_alg_draft_v2_')) {
+        try {
+          const draft = JSON.parse(window.localStorage.getItem(k))
+          if (draft?.problemId) {
+            const isCompleted = (draft.stars || 0) >= 1 || draft.fsmState === 'COMPLETE' || Boolean(draft.completionResult?.passed)
+            if (isCompleted) {
+              const existing = local[draft.problemId] || {}
+              const stars = Math.max(existing.bestStars || 0, draft.stars || (draft.fsmState === 'COMPLETE' ? 3 : 1))
+              local[draft.problemId] = {
+                ...existing,
+                problemId: draft.problemId,
+                bestStars: stars,
+                masteryStatus: stars >= 3 ? 'mastered' : (existing.masteryStatus || 'in_progress'),
+              }
+            }
+          }
+        } catch { /* skip */ }
+      }
+    }
+  } catch (e) {
+    console.warn('Failed to read local progress snapshot:', e)
+  }
+  return local
+}
+
 export default function AlgorithmConstellationHub({ onBack }) {
   const navigate = useNavigate()
   const [selectedConstellationId, setSelectedConstellationId] = useState(DEFAULT_CONSTELLATION_ID)
   const [routeFilter, setRouteFilter] = useState('all')
   const [selectedProblem, setSelectedProblem] = useState(null)
   const [hoveredCard, setHoveredCard] = useState(null)
-  const [progressMap, setProgressMap] = useState({})
+  const [progressMap, setProgressMap] = useState(() => readLocalProgressSnapshot())
 
   const gateway = useMemo(() => {
     if (import.meta.env.DEV) {
@@ -35,23 +75,34 @@ export default function AlgorithmConstellationHub({ onBack }) {
     return createAlgorithmConstellationGateway(firebaseApp)
   }, [])
 
-  // Authoritative progress loading
-  useEffect(() => {
-    let isMounted = true
-    async function loadProgress() {
-      try {
-        const res = await gateway.getProgress({ problemId: 'all' })
-        if (isMounted && res) {
-          setProgressMap(res)
+  const syncProgress = async () => {
+    const localSnap = readLocalProgressSnapshot()
+    let serverSnap = {}
+    try {
+      serverSnap = (await gateway.getProgress({ problemId: 'all' })) || {}
+    } catch (err) {
+      console.warn('Server progress load fallback to local:', err)
+    }
+    const merged = { ...localSnap }
+    for (const [pid, record] of Object.entries(serverSnap)) {
+      if (pid && record) {
+        const localRecord = merged[pid]
+        const bestStars = Math.max(localRecord?.bestStars || 0, record.bestStars || 0)
+        merged[pid] = {
+          ...localRecord,
+          ...record,
+          problemId: pid,
+          bestStars,
+          masteryStatus: bestStars >= 3 ? 'mastered' : (record.masteryStatus || localRecord?.masteryStatus || 'unstarted'),
         }
-      } catch (err) {
-        console.warn('Failed to load algorithm progress:', err)
       }
     }
-    loadProgress()
-    return () => {
-      isMounted = false
-    }
+    setProgressMap(merged)
+  }
+
+  // Authoritative & resilient progress loading
+  useEffect(() => {
+    syncProgress()
   }, [gateway])
 
   const completedProblemIds = useMemo(() => {
@@ -113,13 +164,8 @@ export default function AlgorithmConstellationHub({ onBack }) {
         }}
         onExit={async () => {
           soundManager.playWarp?.()
-          try {
-            const fresh = await gateway.getProgress({ problemId: 'all' })
-            if (fresh) setProgressMap(fresh)
-          } catch (e) {
-            console.warn('Failed to refresh progress on exit:', e)
-          }
           setSelectedProblem(null)
+          await syncProgress()
         }}
       />
     )
