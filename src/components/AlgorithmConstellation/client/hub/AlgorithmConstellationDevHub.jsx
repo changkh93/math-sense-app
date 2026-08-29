@@ -34,7 +34,7 @@ export default function AlgorithmConstellationDevHub() {
   }
 
   const handleClearDraft = (problemId, version = 1) => {
-    clearAlgorithmDraft({ problemId, problemVersion: version })
+    clearAlgorithmDraft({ problemId, problemVersion: version, ownerKey: 'algorithm-dev' })
     showToast(`[${problemId}] 저장된 로컬 Draft를 초기화했습니다.`)
   }
 
@@ -51,6 +51,7 @@ export default function AlgorithmConstellationDevHub() {
           initialShell={selectedShell}
           intent={selectedIntent}
           gateway={gatewayInstance}
+          draftOwnerKey="algorithm-dev"
           onExit={() => setSelectedProblem(null)}
         />
       ) : (

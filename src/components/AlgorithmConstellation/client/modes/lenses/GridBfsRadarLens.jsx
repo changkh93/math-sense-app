@@ -1,12 +1,11 @@
 import { useState } from 'react'
 
-export default function GridBfsRadarLens({ kernel, shell = 'explorer', onDiscoveryComplete }) {
+export default function GridBfsRadarLens({ onDiscoveryComplete }) {
   const defaultGrid = [
     [0, 0, 0],
     [1, 1, 0],
     [0, 0, 0],
   ]
-  const rows = 3
   const cols = 3
   const start = [0, 0]
   const target = [2, 2]

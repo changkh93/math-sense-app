@@ -7,7 +7,7 @@ import { closeBrackets, closeBracketsKeymap } from '@codemirror/autocomplete'
 import { EditorView, keymap, lineNumbers, highlightActiveLineGutter } from '@codemirror/view'
 
 const AlgorithmPythonEditor = forwardRef(function AlgorithmPythonEditor(
-  { value, onChange, readOnly = false, minHeight = '240px' },
+  { value, onChange, readOnly = false, minHeight = '240px', activeSourceSpan = null },
   ref,
 ) {
   const hostRef = useRef(null)
@@ -127,6 +127,19 @@ const AlgorithmPythonEditor = forwardRef(function AlgorithmPythonEditor(
       syncingValueRef.current = false
     }
   }, [value])
+
+  useEffect(() => {
+    const view = viewRef.current
+    const startLine = activeSourceSpan?.startLine
+    if (!view || !Number.isInteger(startLine) || startLine < 1 || startLine > view.state.doc.lines) return
+    const endLineNumber = Math.min(activeSourceSpan?.endLine || startLine, view.state.doc.lines)
+    const startLineInfo = view.state.doc.line(startLine)
+    const endLineInfo = view.state.doc.line(endLineNumber)
+    view.dispatch({
+      selection: { anchor: startLineInfo.from, head: endLineInfo.to },
+      effects: EditorView.scrollIntoView(startLineInfo.from, { y: 'center' }),
+    })
+  }, [activeSourceSpan])
 
   return (
     <div

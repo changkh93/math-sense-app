@@ -13,6 +13,8 @@ export const AC_SEQ_005 = deepFreeze({
   version: 1,
   schemaVersion: 1,
   family: 'SEQ',
+  evidenceRecipe: { primitives: ['container-scan', 'scalar-sequence', 'decision'] },
+  pythonConcepts: { introduces: ['builtin:list', 'statement:for', 'statement:if'], requires: [] },
 
   identity: {
     systemTitle: 'Sequence - Filter and Accumulator Pattern',

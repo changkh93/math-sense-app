@@ -43,8 +43,10 @@ console.log('[Test 3] Public test execution emits canonical trace events...')
 const runResult = executeRestrictedPublicTests({ code: validCode, publicTests })
 assert.equal(runResult.ok, true)
 assert.equal(runResult.allPassed, true)
-assert.equal(runResult.rawEvents.length, publicTests.length)
-assert(runResult.rawEvents.every((event) => Number.isInteger(event.stepIndex) && event.stateDiff && event.worldDiff))
+assert.equal(runResult.rawEvents.filter((event) => event.eventType === 'public-test-result').length, publicTests.length)
+assert(runResult.rawEvents.some((event) => event.eventType === 'statement-enter'))
+assert(runResult.rawEvents.some((event) => event.eventType === 'function-return'))
+assert(runResult.rawEvents.every((event) => Number.isInteger(event.stepIndex) && event.stateDiff && event.worldDiff && event.sourceSpan))
 assert.throws(
   () => executeRestrictedPublicTests({ code: validCode, publicTests, limits: { maxSteps: 1 } }),
   /스텝 한도/
@@ -53,9 +55,10 @@ assert.throws(
 console.log('[Test 4] Browser runtime is structurally isolated in a terminable Worker...')
 const workerSource = fs.readFileSync('src/components/AlgorithmConstellation/runtime/algorithmWorld.worker.js', 'utf8')
 const adapterSource = fs.readFileSync('src/components/AlgorithmConstellation/runtime/algorithmRuntimeAdapter.js', 'utf8')
+const adapterCoreSource = fs.readFileSync('src/components/AlgorithmConstellation/runtime/algorithmRuntimeAdapterCore.js', 'utf8')
 assert(workerSource.includes("self.addEventListener('message'"))
 assert(adapterSource.includes("algorithmWorld.worker.js?worker"))
-assert(adapterSource.includes('.terminate()'))
+assert(adapterCoreSource.includes('.terminate()'))
 
 console.log('[Test 5] Replay checkpoints and hashes remain deterministic...')
 const replayEngine = createTraceReplayEngine({
@@ -69,5 +72,57 @@ const traceHash1 = computeTraceHash(replayEngine.getCanonicalEvents())
 const traceHash2 = computeTraceHash(replayEngine.getCanonicalEvents())
 assert.equal(traceHash1, traceHash2)
 assert.equal(computeReplayDescriptorHash({ problemId: 'AC-COND-001', version: 1, seed: 1001 }).length, 8)
+
+console.log('[Test 6] Algorithm runtime adapter recovers gracefully after worker timeout...')
+const { createAlgorithmRuntimeAdapterCore } = await import('../src/components/AlgorithmConstellation/runtime/algorithmRuntimeAdapterCore.js')
+
+class FakeTimeoutWorker {
+  constructor() {
+    this.terminated = false
+    this.listeners = new Map()
+  }
+  addEventListener(event, fn) {
+    if (!this.listeners.has(event)) this.listeners.set(event, [])
+    this.listeners.get(event).push(fn)
+  }
+  postMessage(msg) {
+    // Hang on first run to simulate hard infinite loop
+    if (msg.payload?.code?.includes('hang')) {
+      return
+    }
+    // Normal response for second run
+    setTimeout(() => {
+      const handlers = this.listeners.get('message') || []
+      for (const h of handlers) {
+        h({ data: { requestId: msg.requestId, result: { ok: true, stepCount: 1, testResults: [] } } })
+      }
+    }, 10)
+  }
+  terminate() {
+    this.terminated = true
+  }
+}
+
+let createdWorkers = []
+const adapter = createAlgorithmRuntimeAdapterCore({
+  limits: { maxExecutionMs: 50 },
+  workerFactory: () => {
+    const w = new FakeTimeoutWorker()
+    createdWorkers.push(w)
+    return w
+  },
+})
+
+// Run 1: Hangs and triggers hard timeout + worker termination + recreation
+const result1 = await adapter.runStudentCode({ code: 'hang', publicTests: [] })
+assert.equal(result1.ok, false)
+assert.equal(result1.errorCode, 'TIMEOUT')
+assert.ok(createdWorkers[0].terminated, 'First worker must be terminated')
+
+// Run 2: Immediately ready for normal execution on new worker
+const result2 = await adapter.runStudentCode({ code: 'normal', publicTests: [] })
+assert.equal(result2.ok, true)
+assert.equal(createdWorkers.length >= 2, true, 'Second worker must be spawned')
+adapter.dispose()
 
 console.log('\n=== Student RUN Isolation & Trace Replay Tests Passed ===\n')

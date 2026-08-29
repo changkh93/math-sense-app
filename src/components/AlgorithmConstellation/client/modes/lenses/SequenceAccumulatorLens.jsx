@@ -1,6 +1,6 @@
 import { useState } from 'react'
 
-export default function SequenceAccumulatorLens({ kernel, shell = 'explorer', onDiscoveryComplete }) {
+export default function SequenceAccumulatorLens({ kernel, onDiscoveryComplete }) {
   const sampleStream = kernel.modes?.explore?.lensConfig?.sampleStream || [10, -5, 20, -8, 15, 0, -2, 30]
   const [cursor, setCursor] = useState(0)
   const [discoveredRule, setDiscoveredRule] = useState(null)

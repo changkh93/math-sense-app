@@ -13,6 +13,8 @@ export const AC_PAT_004 = deepFreeze({
   version: 1,
   schemaVersion: 1,
   family: 'PAT',
+  evidenceRecipe: { primitives: ['scalar-sequence', 'decision'] },
+  pythonConcepts: { introduces: [], requires: ['operator:modulo'] },
 
   identity: {
     systemTitle: 'Pattern & Modulo - Interval Periodic Beacon',

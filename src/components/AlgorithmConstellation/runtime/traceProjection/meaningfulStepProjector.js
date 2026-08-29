@@ -22,6 +22,16 @@ export function isMeaningfulEvent(event) {
 
   // Essential cognitive events: variable assignments, condition branches, data structure operations, world actions
   const MEANINGFUL_TYPES = [
+    'function-enter',
+    'statement-enter',
+    'assignment',
+    'branch-decision',
+    'loop-iteration',
+    'container-mutation',
+    'function-return',
+    'runtime-error',
+    'public-test-result',
+    'trace-truncated',
     'line',
     'var_change',
     'condition_eval',
@@ -57,9 +67,9 @@ export function projectRawToMeaningfulTrace(rawEvents = [], maxEvents = 300) {
     if (
       previousEvent &&
       getEventType(previousEvent) === type &&
-      previousEvent.line === raw.line &&
-      previousEvent.varName === raw.varName &&
-      raw.varName !== undefined
+      (previousEvent.sourceLine ?? previousEvent.line) === (raw.sourceLine ?? raw.line) &&
+      previousEvent.statementId === raw.statementId &&
+      ['statement-enter', 'loop-iteration'].includes(type)
     ) {
       repeatCount++
       previousEvent.repeatCount = repeatCount
@@ -72,7 +82,7 @@ export function projectRawToMeaningfulTrace(rawEvents = [], maxEvents = 300) {
       ...raw,
       eventType: type,
       type,
-      stepIndex: meaningful.length,
+      meaningfulIndex: meaningful.length,
     }
     meaningful.push(cloned)
     previousEvent = cloned
@@ -81,7 +91,7 @@ export function projectRawToMeaningfulTrace(rawEvents = [], maxEvents = 300) {
       meaningful.push({
         eventType: 'trace_truncated',
         type: 'trace_truncated',
-        stepIndex: meaningful.length,
+        meaningfulIndex: meaningful.length,
         message: '더 많은 단계가 생략되었습니다.',
       })
       break
@@ -162,7 +172,7 @@ export function distillToLearningTrace(meaningfulEvents = [], target = DEFAULT_L
       eventType: type,
       type,
       sceneIndex: sceneIdx,
-      sourceStepIndex: evt.stepIndex ?? idx,
+      sourceStepIndex: evt.runtimeStepIndex ?? evt.stepIndex ?? idx,
       isScene: true,
     }
   })

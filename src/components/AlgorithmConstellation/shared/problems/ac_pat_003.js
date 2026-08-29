@@ -12,6 +12,8 @@ export const AC_PAT_003_PUBLIC_KERNEL = deepFreeze({
   version: 1,
   schemaVersion: 1,
   family: 'PAT',
+  evidenceRecipe: { primitives: ['scalar-sequence', 'decision'] },
+  pythonConcepts: { introduces: ['operator:modulo'], requires: [] },
 
   identity: {
     systemTitle: 'Pattern and Modulo - Frozen Signal Bridge',

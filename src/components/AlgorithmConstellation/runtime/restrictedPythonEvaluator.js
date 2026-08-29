@@ -60,10 +60,20 @@ export function executeRestrictedPublicTests({ code, entryFunction, publicTests 
         throw evaluatorError('LIMIT_EXCEEDED', `최대 실행 단계(스텝 한도)를 초과했습니다.`)
       }
     }
+    const traceHook = (event) => {
+      rawEvents.push({
+        ...event,
+        runtimeStepIndex: totalSteps,
+        stepIndex: totalSteps,
+        metadata: { ...event.metadata, publicTestId: testCase.id },
+      })
+    }
 
     const interpreter = new SafePythonInterpreter(code, targetFn, testCase.inputs, {
       maxSteps: maxSteps - totalSteps,
       onStep: stepHook,
+      onTrace: traceHook,
+      maxTraceEvents: Math.min(limits.maxRawEvents ?? 1_500, 1_500),
     })
     const execRes = interpreter.execute()
 
@@ -78,16 +88,19 @@ export function executeRestrictedPublicTests({ code, entryFunction, publicTests 
       error: execRes.ok ? null : execRes.error,
     })
 
-    const isSignalBridge = Object.hasOwn(testCase.inputs, 'time')
     rawEvents.push({
+      traceSchemaVersion: 2,
+      eventId: `test_${testCase.id || testResults.length}_${totalSteps}`,
+      runtimeStepIndex: totalSteps,
       stepIndex: totalSteps,
-      eventType: isSignalBridge ? 'signal_eval' : 'condition_eval',
-      sourceLine: 2,
-      stateDiff: isSignalBridge
-        ? { time: testCase.inputs.time, remainder: testCase.inputs.time % 3 }
-        : { ...testCase.inputs },
-      worldDiff: isSignalBridge ? { bridgeOpen: actual } : { gateOpen: actual },
-      metadata: { expected: testCase.expected, actual, passed },
+      eventType: 'public-test-result',
+      statementId: null,
+      sourceSpan: { startLine: null, startColumn: null, endLine: null, endColumn: null },
+      sourceLine: null,
+      frame: { frameId: 'frame_0', functionName: targetFn, callDepth: 0 },
+      stateDiff: [],
+      worldDiff: {},
+      metadata: { publicTestId: testCase.id, expected: testCase.expected, actual, passed },
     })
   }
 

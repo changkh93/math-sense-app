@@ -7,6 +7,8 @@ import {
   saveAlgorithmDraft,
   loadAlgorithmDraft,
   clearAlgorithmDraft,
+  loadCompletedPythonConceptIds,
+  markPythonConceptCompleted,
 } from '../src/components/AlgorithmConstellation/client/services/algorithmDraftStorage.js'
 import { buildPersonalizedParsonsTiles } from '../src/components/AlgorithmConstellation/client/scaffold/PersonalizedParsonsBuilder.js'
 import {
@@ -62,6 +64,15 @@ clearAlgorithmDraft({
   storage: global.localStorage,
 })
 assert.equal(loadAlgorithmDraft({ problemId: 'AC-COND-001', problemVersion: 1, ownerKey: 'student_1', storage: global.localStorage }), null)
+assert.equal(saveAlgorithmDraft({ problemId: 'AC-COND-001', code: 'secret', storage: global.localStorage }), false)
+assert.equal(loadAlgorithmDraft({ problemId: 'AC-COND-001', storage: global.localStorage }), null)
+assert.equal(markPythonConceptCompleted({ ownerKey: 'student_1', conceptId: 'statement:for', storage: global.localStorage }), true)
+assert.equal(markPythonConceptCompleted({ ownerKey: 'student_1', conceptId: 'statement:for', storage: global.localStorage }), true)
+assert.deepEqual(
+  loadCompletedPythonConceptIds({ ownerKey: 'student_1', storage: global.localStorage }),
+  ['statement:for'],
+)
+assert.deepEqual(loadCompletedPythonConceptIds({ ownerKey: 'student_2', storage: global.localStorage }), [])
 console.log('  -> Draft storage auto-save and clean recovery verified')
 
 // [Test 2] Gate G: Personalized Parsons Builder

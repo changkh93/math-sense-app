@@ -12,6 +12,8 @@ export const AC_COND_001 = deepFreeze({
   version: 1,
   schemaVersion: 1,
   family: 'COND',
+  evidenceRecipe: { primitives: ['decision'] },
+  pythonConcepts: { introduces: ['value:boolean', 'operator:and'], requires: [] },
 
   identity: {
     systemTitle: 'Condition Decomposition - Binary Conjunction Gate',

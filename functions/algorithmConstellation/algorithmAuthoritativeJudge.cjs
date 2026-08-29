@@ -3,18 +3,15 @@
  * Execution delegates to the same fail-closed restricted evaluator as production.
  */
 
-const { getPrivateProblemDefinition } = require('./privateProblemCatalog.cjs')
-const { runRestrictedPythonFunction } = require('./isolatedJudgeRuntime.cjs')
+const { getPrivateProblemDefinition, getTransferChallenges } = require('./privateProblemCatalog.cjs')
+const {
+  runRestrictedPythonFunction,
+  runTestSuiteWithBudget,
+  MAX_CUMULATIVE_STEPS,
+} = require('./isolatedJudgeRuntime.cjs')
 
 function executePythonFunction(pythonCode, functionName, args = {}) {
   return runRestrictedPythonFunction(pythonCode, functionName, args)
-}
-
-function matchesExpected(actual, expected) {
-  if (Array.isArray(actual) && Array.isArray(expected)) {
-    return JSON.stringify(actual) === JSON.stringify(expected)
-  }
-  return actual === expected
 }
 
 function evaluateAuthoritativeSubmission({
@@ -27,20 +24,32 @@ function evaluateAuthoritativeSubmission({
   publicTests = [],
 }) {
   const definition = getPrivateProblemDefinition(problemId, problemVersion)
-  const publicPassed = (publicTests || []).every((test) => {
-    const result = executePythonFunction(studentPythonCode, entryFunction, test.inputs)
-    return result.ok && matchesExpected(result.result, test.expected)
+  let cumulativeStepsUsed = 0
+
+  // 1. Evaluate Public Tests with budget
+  const publicRes = runTestSuiteWithBudget(publicTests || [], studentPythonCode, entryFunction, {
+    maxCumulativeSteps: MAX_CUMULATIVE_STEPS,
   })
+  cumulativeStepsUsed += publicRes.cumulativeStepsUsed
+
+  // 2. Evaluate Hidden Tests with remaining budget
+  const remainingBudget = Math.max(0, MAX_CUMULATIVE_STEPS - cumulativeStepsUsed)
+  const hiddenRes = runTestSuiteWithBudget(definition.hiddenTests, studentPythonCode, definition.entryFunction, {
+    maxCumulativeSteps: remainingBudget,
+  })
+  cumulativeStepsUsed += hiddenRes.cumulativeStepsUsed
+
   const groupResults = {}
-  let hiddenPassed = true
-  for (const test of definition.hiddenTests) {
-    groupResults[test.group] ||= { group: test.group, total: 0, passed: 0 }
-    groupResults[test.group].total += 1
-    const result = executePythonFunction(studentPythonCode, entryFunction, test.inputs)
-    if (result.ok && matchesExpected(result.result, test.expected)) groupResults[test.group].passed += 1
-    else hiddenPassed = false
+  for (const item of hiddenRes.results) {
+    const groupName = item.test.group || 'default'
+    groupResults[groupName] ||= { group: groupName, total: 0, passed: 0 }
+    groupResults[groupName].total += 1
+    if (item.passed) {
+      groupResults[groupName].passed += 1
+    }
   }
 
+  // 3. Evaluate Understanding
   let understandingPassed = false
   if (understandingAnswer && definition.understandingChallenges?.length > 0) {
     const matchingChallenge = definition.understandingChallenges.find(
@@ -50,16 +59,34 @@ function evaluateAuthoritativeSubmission({
       understandingPassed = matchingChallenge.questions.every((q) => {
         return understandingAnswer.answers?.[q.id] === q.expected
       })
-    } else {
-      understandingPassed = Boolean(understandingAnswer.answers && Object.keys(understandingAnswer.answers).length > 0)
     }
   }
-  const transferPassed = Boolean(transferPythonCode) && definition.transferMasterSet.every((challenge) =>
-    challenge.testCases.every((test) => {
-      const result = executePythonFunction(transferPythonCode, challenge.entryFunction, test.inputs)
-      return result.ok && matchesExpected(result.result, test.expected)
-    })
-  )
+
+  // 4. Evaluate Transfer with remaining budget
+  let transferPassed = false
+  const transferChallenges = getTransferChallenges(definition)
+  if (transferPythonCode && transferChallenges.length > 0) {
+    let allTransferOk = true
+    for (const challenge of transferChallenges) {
+      const transferBudget = Math.max(0, MAX_CUMULATIVE_STEPS - cumulativeStepsUsed)
+      if (transferBudget === 0) {
+        allTransferOk = false
+        break
+      }
+      const tcRes = runTestSuiteWithBudget(challenge.testCases, transferPythonCode, challenge.entryFunction, {
+        maxCumulativeSteps: transferBudget,
+      })
+      cumulativeStepsUsed += tcRes.cumulativeStepsUsed
+      if (!tcRes.allPassed) {
+        allTransferOk = false
+        break
+      }
+    }
+    transferPassed = allTransferOk
+  }
+
+  const publicPassed = publicRes.allPassed
+  const hiddenPassed = hiddenRes.allPassed
   const star1 = publicPassed && hiddenPassed
   const star2 = star1 && understandingPassed
   const star3 = star2 && transferPassed
@@ -77,6 +104,7 @@ function evaluateAuthoritativeSubmission({
     hiddenPassed,
     understandingPassed,
     transferPassed,
+    cumulativeStepsUsed,
     testGroupSummaries: Object.values(groupResults),
   }
 }

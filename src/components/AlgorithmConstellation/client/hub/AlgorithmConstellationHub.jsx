@@ -1,153 +1,32 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import firebaseApp from '../../../../firebase.js'
+import firebaseApp, { auth } from '../../../../firebase.js'
 import AlgorithmMissionShell from '../shell/AlgorithmMissionShell.jsx'
 import { createAlgorithmConstellationGateway } from '../services/AlgorithmConstellationGateway.js'
 import { createAlgorithmConstellationMockGateway } from '../services/AlgorithmConstellationMockGateway.js'
-import { AC_COND_001 } from '../../shared/problems/ac_cond_001.js'
-import { AC_COND_002 } from '../../shared/problems/ac_cond_002.js'
-import { AC_PAT_003_PUBLIC_KERNEL } from '../../shared/problems/ac_pat_003.js'
-import { AC_PAT_004 } from '../../shared/problems/ac_pat_004.js'
-import { AC_SEQ_005 } from '../../shared/problems/ac_seq_005.js'
-import { AC_NAV_005 } from '../../shared/problems/ac_nav_005.js'
-import { AC_NAV_006 } from '../../shared/problems/ac_nav_006.js'
+import { CONSTELLATIONS, getConstellationAccess, getMissingPrerequisites } from '../../shared/catalog/constellationRegistry.js'
+import { ALGORITHM_EDITORIAL_CATALOG } from '../../shared/catalog/algorithmEditorialCatalog.js'
+import { PUBLIC_KERNELS } from '../../shared/problems/index.js'
 import soundManager from '../../../../utils/SoundManager.js'
 
-const TRACK_TABS = [
-  { id: 'all', label: '전체 탐사', icon: '🌌' },
-  { id: 'condition', label: '🧩 조건 판단하기', icon: '⚡' },
-  { id: 'pattern', label: '🔁 규칙 발견하기', icon: '❄️' },
-  { id: 'sequence', label: '📦 데이터 처리하기', icon: '🪐' },
-  { id: 'navigation', label: '🗺 길 탐색하기', icon: '🚀' },
+const ROUTE_FILTERS = [
+  { id: 'all', label: '전체 항로', icon: '🌌' },
+  { id: 'core', label: '🌟 본 항로 (Core)', icon: '🌟' },
+  { id: 'branch', label: '🌿 선택 항로 (Branch)', icon: '🌿' },
 ]
 
-const MISSIONS = [
-  {
-    kernel: AC_COND_001,
-    track: 'condition',
-    tag: '🎯 두 조건을 함께 판단하기 (and)',
-    badge: '⚡ 입문 항로',
-    badgeStyle: {
-      background: 'rgba(234, 179, 8, 0.18)',
-      border: '1px solid rgba(234, 179, 8, 0.5)',
-      color: '#fef08a',
-    },
-    icon: '⚡',
-    accentColor: '#00f0ff',
-    borderColor: 'rgba(0, 240, 255, 0.3)',
-    glowColor: 'rgba(0, 240, 255, 0.15)',
-    btnGradient: 'linear-gradient(135deg, #00f0ff 0%, #0284c7 100%)',
-    chips: ['🎯 두 스위치 판단 (and)', '🔍 4상황 직관 발견', '⏱️ 약 5~8분'],
-  },
-  {
-    kernel: AC_COND_002,
-    track: 'condition',
-    tag: '🚪 대안 조건을 판단하기 (or)',
-    badge: '⚡ 입문 항로',
-    badgeStyle: {
-      background: 'rgba(56, 189, 248, 0.18)',
-      border: '1px solid rgba(56, 189, 248, 0.5)',
-      color: '#bae6fd',
-    },
-    icon: '🚪',
-    accentColor: '#38bdf8',
-    borderColor: 'rgba(56, 189, 248, 0.3)',
-    glowColor: 'rgba(56, 189, 248, 0.15)',
-    btnGradient: 'linear-gradient(135deg, #38bdf8 0%, #0284c7 100%)',
-    chips: ['🚪 구명정 대안 판단 (or)', '🔍 4상황 직관 발견', '⏱️ 약 6~8분'],
-  },
-  {
-    kernel: AC_PAT_003_PUBLIC_KERNEL,
-    track: 'pattern',
-    tag: '⏳ 반복되는 신호 주기 찾기 (%)',
-    badge: '❄️ 심화 항로',
-    badgeStyle: {
-      background: 'rgba(129, 140, 248, 0.18)',
-      border: '1px solid rgba(129, 140, 248, 0.5)',
-      color: '#c7d2fe',
-    },
-    icon: '❄️',
-    accentColor: '#818cf8',
-    borderColor: 'rgba(129, 140, 248, 0.3)',
-    glowColor: 'rgba(129, 140, 248, 0.15)',
-    btnGradient: 'linear-gradient(135deg, #818cf8 0%, #4f46e5 100%)',
-    chips: ['⏳ 3초 주기 나머지 (%)', '📊 시간 흐름 시뮬레이션', '⏱️ 약 8~10분'],
-  },
-  {
-    kernel: AC_PAT_004,
-    track: 'pattern',
-    tag: '💡 회전하는 등대 발광 구간 (<)',
-    badge: '❄️ 심화 항로',
-    badgeStyle: {
-      background: 'rgba(168, 85, 247, 0.18)',
-      border: '1px solid rgba(168, 85, 247, 0.5)',
-      color: '#e9d5ff',
-    },
-    icon: '💡',
-    accentColor: '#a855f7',
-    borderColor: 'rgba(168, 85, 247, 0.3)',
-    glowColor: 'rgba(168, 85, 247, 0.15)',
-    btnGradient: 'linear-gradient(135deg, #a855f7 0%, #7c3aed 100%)',
-    chips: ['💡 주기 구간 판별', '📊 발광 시간대 관찰', '⏱️ 약 8~10분'],
-  },
-  {
-    kernel: AC_SEQ_005,
-    track: 'sequence',
-    tag: '🪐 유효 데이터 선별 누적',
-    badge: '🪐 도약 항로',
-    badgeStyle: {
-      background: 'rgba(52, 211, 153, 0.18)',
-      border: '1px solid rgba(52, 211, 153, 0.5)',
-      color: '#a7f3d0',
-    },
-    icon: '🪐',
-    accentColor: '#34d399',
-    borderColor: 'rgba(52, 211, 153, 0.3)',
-    glowColor: 'rgba(52, 211, 153, 0.15)',
-    btnGradient: 'linear-gradient(135deg, #34d399 0%, #059669 100%)',
-    chips: ['📦 유효 에너지 선별 합산', '🔍 캡슐 순회 및 필터링', '⏱️ 약 10~12분'],
-  },
-  {
-    kernel: AC_NAV_005,
-    track: 'navigation',
-    tag: '📡 선입선출 신호 대기열',
-    badge: '🚀 심우주 항로',
-    badgeStyle: {
-      background: 'rgba(251, 146, 60, 0.18)',
-      border: '1px solid rgba(251, 146, 60, 0.5)',
-      color: '#fed7aa',
-    },
-    icon: '📡',
-    accentColor: '#fb923c',
-    borderColor: 'rgba(251, 146, 60, 0.3)',
-    glowColor: 'rgba(251, 146, 60, 0.15)',
-    btnGradient: 'linear-gradient(135deg, #fb923c 0%, #ea580c 100%)',
-    chips: ['📡 도착 순서대로 처리', '🔍 대기열 구조 관찰', '⏱️ 약 10~12분'],
-  },
-  {
-    kernel: AC_NAV_006,
-    track: 'navigation',
-    tag: '🗺️ 성운 최단 경로 탐색',
-    badge: '🚀 심우주 항로',
-    badgeStyle: {
-      background: 'rgba(244, 63, 94, 0.18)',
-      border: '1px solid rgba(244, 63, 94, 0.5)',
-      color: '#fecdd3',
-    },
-    icon: '🗺️',
-    accentColor: '#f43f5e',
-    borderColor: 'rgba(244, 63, 94, 0.3)',
-    glowColor: 'rgba(244, 63, 94, 0.15)',
-    btnGradient: 'linear-gradient(135deg, #f43f5e 0%, #e11d48 100%)',
-    chips: ['🗺️ 최단 경로 탐색', '🔒 중복 방문 방지', '⏱️ 약 15~20분'],
-  },
-]
+const PUBLISHED_ENTRIES = ALGORITHM_EDITORIAL_CATALOG.filter((item) => item.status === 'published')
+const DEFAULT_CONSTELLATION_ID = CONSTELLATIONS.find((constellation) =>
+  PUBLISHED_ENTRIES.some((entry) => entry.constellationId === constellation.id)
+)?.id || 'constellation-0'
 
 export default function AlgorithmConstellationHub({ onBack }) {
   const navigate = useNavigate()
+  const [selectedConstellationId, setSelectedConstellationId] = useState(DEFAULT_CONSTELLATION_ID)
+  const [routeFilter, setRouteFilter] = useState('all')
   const [selectedProblem, setSelectedProblem] = useState(null)
   const [hoveredCard, setHoveredCard] = useState(null)
-  const [activeTab, setActiveTab] = useState('all')
+  const [progressMap, setProgressMap] = useState({})
 
   const gateway = useMemo(() => {
     if (import.meta.env.DEV) {
@@ -156,31 +35,90 @@ export default function AlgorithmConstellationHub({ onBack }) {
     return createAlgorithmConstellationGateway(firebaseApp)
   }, [])
 
+  // Authoritative progress loading
+  useEffect(() => {
+    let isMounted = true
+    async function loadProgress() {
+      try {
+        const res = await gateway.getProgress({ problemId: 'all' })
+        if (isMounted && res) {
+          setProgressMap(res)
+        }
+      } catch (err) {
+        console.warn('Failed to load algorithm progress:', err)
+      }
+    }
+    loadProgress()
+    return () => {
+      isMounted = false
+    }
+  }, [gateway])
+
+  const completedProblemIds = useMemo(() => {
+    const ids = []
+    for (const [pid, record] of Object.entries(progressMap)) {
+      if (record && ((record.bestStars || 0) >= 1 || record.masteryStatus === 'mastered' || record.masteryStatus === 'preview_only')) {
+        ids.push(pid)
+      }
+    }
+    return ids
+  }, [progressMap])
+
   const handleBack = () => {
     soundManager.playWarp?.()
     if (onBack) onBack()
     else navigate('/')
   }
 
-  const handleSelectMission = (kernel) => {
-    soundManager.playClick?.()
-    setSelectedProblem(kernel)
-  }
+  const activeConstellation = useMemo(() => {
+    return CONSTELLATIONS.find((c) => c.id === selectedConstellationId) || CONSTELLATIONS[0]
+  }, [selectedConstellationId])
 
-  const filteredMissions = useMemo(() => {
-    if (activeTab === 'all') return MISSIONS
-    return MISSIONS.filter((m) => m.track === activeTab)
-  }, [activeTab])
+  const constellationMissions = useMemo(() => {
+    const entries = PUBLISHED_ENTRIES.filter((item) => item.constellationId === activeConstellation.id)
+    if (routeFilter === 'all') return entries
+    return entries.filter((item) => item.routeRole === routeFilter)
+  }, [activeConstellation, routeFilter])
+
+  const totalStarsEarned = useMemo(() => {
+    return Object.values(progressMap).reduce((sum, p) => sum + (p?.bestStars || 0), 0)
+  }, [progressMap])
+
+  const totalMasteredCount = useMemo(() => {
+    return Object.values(progressMap).filter((p) => p?.masteryStatus === 'mastered' || p?.masteryStatus === 'preview_only' || (p?.bestStars || 0) >= 3).length
+  }, [progressMap])
+
+  const handleSelectMission = (problemId) => {
+    if (getMissingPrerequisites(problemId, completedProblemIds, ALGORITHM_EDITORIAL_CATALOG).length > 0) {
+      return
+    }
+    const kernel = PUBLIC_KERNELS[problemId]
+    if (kernel) {
+      soundManager.playClick?.()
+      setSelectedProblem(kernel)
+    }
+  }
 
   if (selectedProblem) {
     return (
       <AlgorithmMissionShell
-        key={selectedProblem.id}
+        key={selectedProblem.problemId || selectedProblem.id}
         kernel={selectedProblem}
         gateway={gateway}
+        draftOwnerKey={auth.currentUser?.uid || 'guest_pilot'}
         initialShell="explorer"
-        onExit={() => {
+        onProgressUpdate={(record) => {
+          if (!record?.problemId) return
+          setProgressMap((previous) => ({ ...previous, [record.problemId]: record }))
+        }}
+        onExit={async () => {
           soundManager.playWarp?.()
+          try {
+            const fresh = await gateway.getProgress({ problemId: 'all' })
+            if (fresh) setProgressMap(fresh)
+          } catch (e) {
+            console.warn('Failed to refresh progress on exit:', e)
+          }
           setSelectedProblem(null)
         }}
       />
@@ -200,15 +138,17 @@ export default function AlgorithmConstellationHub({ onBack }) {
         alignItems: 'center',
       }}
     >
-      {/* Top Navigation Bar */}
+      {/* Top Header Navigation */}
       <header
         style={{
           width: '100%',
-          maxWidth: '1040px',
+          maxWidth: '1080px',
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
           marginBottom: '28px',
+          flexWrap: 'wrap',
+          gap: '12px',
         }}
       >
         <button
@@ -218,320 +158,406 @@ export default function AlgorithmConstellationHub({ onBack }) {
             background: 'rgba(255, 255, 255, 0.08)',
             border: '1px solid rgba(255, 255, 255, 0.18)',
             borderRadius: '12px',
-            color: '#94a3b8',
             padding: '10px 18px',
+            color: '#e2e8f0',
             fontSize: '14px',
-            fontWeight: 600,
+            fontWeight: '600',
             cursor: 'pointer',
             display: 'flex',
             alignItems: 'center',
             gap: '8px',
-            transition: 'all 0.2s ease',
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.background = 'rgba(255, 255, 255, 0.15)'
-            e.currentTarget.style.color = '#ffffff'
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)'
-            e.currentTarget.style.color = '#94a3b8'
+            transition: 'all 0.2s',
           }}
         >
           <span>←</span>
-          <span>우주로 돌아가기</span>
+          <span>우주 기지로 귀환</span>
         </button>
 
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            background: 'rgba(0, 240, 255, 0.08)',
-            border: '1px solid rgba(0, 240, 255, 0.25)',
-            borderRadius: '20px',
-            padding: '6px 14px',
-            fontSize: '13px',
-            color: '#38bdf8',
-            fontWeight: 600,
-          }}
-        >
-          <span>✦</span>
-          <span>컴퓨팅 사고력 코어 가동 중</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <div
+            style={{
+              padding: '6px 14px',
+              borderRadius: '20px',
+              background: 'rgba(234, 179, 8, 0.15)',
+              border: '1px solid rgba(234, 179, 8, 0.4)',
+              color: '#fde047',
+              fontSize: '13px',
+              fontWeight: 'bold',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+            }}
+          >
+            <span>⭐</span>
+            <span>획득한 별: {totalStarsEarned}개</span>
+          </div>
+
+          <div
+            style={{
+              padding: '6px 14px',
+              borderRadius: '20px',
+              background: 'rgba(16, 185, 129, 0.15)',
+              border: '1px solid rgba(16, 185, 129, 0.4)',
+              color: '#6ee7b7',
+              fontSize: '13px',
+              fontWeight: 'bold',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+            }}
+          >
+            <span>🏆</span>
+            <span>마스터 미션: {totalMasteredCount}개</span>
+          </div>
         </div>
       </header>
 
-      {/* Hero Header */}
-      <section
-        style={{
-          textAlign: 'center',
-          maxWidth: '820px',
-          marginBottom: '32px',
-        }}
-      >
-        <div
-          style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '8px',
-            background: 'rgba(129, 140, 248, 0.15)',
-            border: '1px solid rgba(129, 140, 248, 0.4)',
-            borderRadius: '999px',
-            padding: '6px 16px',
-            fontSize: '13px',
-            fontWeight: 700,
-            color: '#c7d2fe',
-            marginBottom: '14px',
-          }}
-        >
-          <span>🌌</span>
-          <span>LUMI ALGORITHM CONSTELLATION</span>
-        </div>
-
+      {/* Main Title Banner */}
+      <div style={{ textAlign: 'center', maxWidth: '800px', marginBottom: '32px' }}>
         <h1
           style={{
             fontSize: '32px',
-            fontWeight: 800,
-            letterSpacing: '-0.5px',
-            margin: '0 0 10px',
-            background: 'linear-gradient(135deg, #ffffff 30%, #38bdf8 70%, #818cf8 100%)',
+            fontWeight: '900',
+            margin: '0 0 10px 0',
+            background: 'linear-gradient(135deg, #ffffff 0%, #38bdf8 50%, #818cf8 100%)',
             WebkitBackgroundClip: 'text',
             WebkitTextFillColor: 'transparent',
+            letterSpacing: '-0.02em',
           }}
         >
-          생각의 항로 (알고리즘 성단)
+          🌌 LUMI 알고리즘 성단 : 생각의 항로
         </h1>
-
-        <p
-          style={{
-            fontSize: '15px',
-            color: '#cbd5e1',
-            lineHeight: 1.6,
-            margin: '0 auto',
-            maxWidth: '640px',
-          }}
-        >
-          정답 코드를 외워 입력하는 곳이 아닙니다.
-          현상을 관측하고, 규칙을 발견하고, 자신의 생각이 Python 코드로 자라나는 과정을 경험하세요.
+        <p style={{ margin: 0, fontSize: '15px', color: '#94a3b8', lineHeight: '1.6' }}>
+          정답 코드를 외우는 대신, 작은 장면을 관찰하고 규칙을 발견하며 스스로 생각의 알고리즘을 구축합니다.
         </p>
-      </section>
+      </div>
 
-      {/* Track Filter Tabs */}
+      {/* Constellation Selector Bar */}
       <nav
+        aria-label="성단 선택"
         style={{
           width: '100%',
-          maxWidth: '1040px',
-          display: 'flex',
+          maxWidth: '1080px',
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
           gap: '10px',
-          flexWrap: 'wrap',
-          marginBottom: '28px',
-          justifyContent: 'center',
+          marginBottom: '32px',
         }}
       >
-        {TRACK_TABS.map((tab) => {
-          const isActive = activeTab === tab.id
+        {CONSTELLATIONS.map((c) => {
+          const isSelected = c.id === activeConstellation.id
+          const access = getConstellationAccess(c.number, completedProblemIds, ALGORITHM_EDITORIAL_CATALOG)
+          const isUnlocked = access.accessible
+          const constellationCoreProblems = PUBLISHED_ENTRIES.filter(
+            (item) => item.constellationId === c.id && item.routeRole === 'core'
+          )
+          const completedInConstellation = constellationCoreProblems.filter((p) =>
+            completedProblemIds.includes(p.problemId)
+          ).length
+
           return (
             <button
-              key={tab.id}
-              type="button"
+              key={c.id}
               onClick={() => {
-                soundManager.playClick?.()
-                setActiveTab(tab.id)
+                if (isUnlocked) {
+                  soundManager.playClick?.()
+                  setSelectedConstellationId(c.id)
+                }
               }}
+              disabled={!isUnlocked}
               style={{
-                padding: '10px 18px',
-                borderRadius: '12px',
-                border: isActive ? '1px solid #38bdf8' : '1px solid rgba(255, 255, 255, 0.12)',
-                background: isActive ? 'rgba(56, 189, 248, 0.18)' : 'rgba(255, 255, 255, 0.04)',
-                color: isActive ? '#38bdf8' : '#94a3b8',
-                fontWeight: isActive ? 700 : 500,
-                fontSize: '14px',
-                cursor: 'pointer',
-                transition: 'all 0.2s ease',
                 display: 'flex',
-                alignItems: 'center',
-                gap: '6px',
+                flexDirection: 'column',
+                alignItems: 'flex-start',
+                padding: '12px 14px',
+                borderRadius: '12px',
+                border: isSelected
+                  ? `2px solid ${c.accentColor}`
+                  : isUnlocked
+                  ? '1px solid rgba(255, 255, 255, 0.1)'
+                  : '1px dashed rgba(255, 255, 255, 0.05)',
+                background: isSelected
+                  ? `linear-gradient(135deg, ${c.accentColor}22 0%, rgba(15, 23, 42, 0.8) 100%)`
+                  : isUnlocked
+                  ? 'rgba(15, 23, 42, 0.5)'
+                  : 'rgba(10, 15, 28, 0.3)',
+                color: isUnlocked ? '#f8fafc' : '#64748b',
+                cursor: isUnlocked ? 'pointer' : 'not-allowed',
+                textAlign: 'left',
+                transition: 'all 0.2s ease',
+                boxShadow: isSelected ? `0 0 15px ${c.accentColor}33` : 'none',
+                opacity: isUnlocked ? 1 : 0.5,
               }}
             >
-              <span>{tab.icon}</span>
-              <span>{tab.label}</span>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', marginBottom: '4px' }}>
+                <span style={{ fontSize: '18px' }}>{isUnlocked ? c.icon : access.mode === 'unavailable' ? '🛠️' : '🔒'}</span>
+                <span style={{ fontSize: '11px', color: isSelected ? c.accentColor : isUnlocked ? '#94a3b8' : '#64748b', fontWeight: 'bold' }}>
+                  {access.mode === 'early-access' ? '선공개' : isUnlocked ? `성단 ${c.number}` : access.mode === 'unavailable' ? '준비 중' : '잠김'}
+                </span>
+              </div>
+              <span style={{ fontSize: '14px', fontWeight: 'bold', color: isSelected ? '#ffffff' : isUnlocked ? '#cbd5e1' : '#64748b', marginBottom: '2px' }}>
+                {c.title}
+              </span>
+              <span style={{ fontSize: '11px', color: isUnlocked ? '#94a3b8' : '#475569' }}>
+                {completedInConstellation}/{constellationCoreProblems.length} 공개 Core 완료
+              </span>
             </button>
           )
         })}
       </nav>
 
-      {/* Missions Grid */}
+      {/* Active Constellation Information & Route Filter Bar */}
       <section
         style={{
           width: '100%',
-          maxWidth: '1040px',
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))',
-          gap: '24px',
+          maxWidth: '1080px',
+          background: 'rgba(15, 23, 42, 0.7)',
+          border: '1px solid rgba(255, 255, 255, 0.1)',
+          borderRadius: '16px',
+          padding: '20px 24px',
+          marginBottom: '24px',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          flexWrap: 'wrap',
+          gap: '16px',
         }}
       >
-        {filteredMissions.map((item, index) => {
-          const { kernel, tag, badge, badgeStyle, icon, accentColor, borderColor, glowColor, btnGradient, chips } = item
-          const isHovered = hoveredCard === kernel.id
-          const explorerShell = kernel.shells?.explorer
+        <div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+            <span style={{ fontSize: '22px' }}>{activeConstellation.icon}</span>
+            <h2 style={{ margin: 0, fontSize: '20px', fontWeight: 'bold', color: '#f8fafc' }}>
+              성단 {activeConstellation.number}. {activeConstellation.title}
+            </h2>
+          </div>
+          <p style={{ margin: 0, fontSize: '13px', color: '#94a3b8' }}>
+            {activeConstellation.subtitle} • 현재 출판된 미션 {constellationMissions.length}개
+          </p>
+        </div>
+
+        {/* Route Filter Tabs */}
+        <div style={{ display: 'flex', gap: '6px', background: 'rgba(0,0,0,0.3)', padding: '4px', borderRadius: '10px' }}>
+          {ROUTE_FILTERS.map((f) => (
+            <button
+              key={f.id}
+              onClick={() => setRouteFilter(f.id)}
+              style={{
+                background: routeFilter === f.id ? 'rgba(56, 189, 248, 0.2)' : 'transparent',
+                border: routeFilter === f.id ? '1px solid rgba(56, 189, 248, 0.5)' : 'none',
+                color: routeFilter === f.id ? '#38bdf8' : '#94a3b8',
+                borderRadius: '8px',
+                padding: '6px 14px',
+                fontSize: '13px',
+                fontWeight: '600',
+                cursor: 'pointer',
+              }}
+            >
+              {f.label}
+            </button>
+          ))}
+        </div>
+      </section>
+
+      {/* Problem Cards Grid */}
+      <section
+        style={{
+          width: '100%',
+          maxWidth: '1080px',
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))',
+          gap: '20px',
+        }}
+      >
+        {constellationMissions.map((item) => {
+          const kernel = PUBLIC_KERNELS[item.problemId]
+          const isPublished = item.status === 'published' && Boolean(kernel)
+          const missingPrereqIds = isPublished
+            ? getMissingPrerequisites(item.problemId, completedProblemIds, ALGORITHM_EDITORIAL_CATALOG)
+            : []
+          const isPrereqUnlocked = missingPrereqIds.length === 0
+          const isPlayable = isPublished && isPrereqUnlocked
+
+          const isHovered = hoveredCard === item.problemId
+          const record = progressMap[item.problemId]
+          const stars = record?.bestStars || 0
+          const isMastered = record?.masteryStatus === 'mastered' || record?.masteryStatus === 'preview_only' || stars >= 3
+
+          const missingPrereqTitles = missingPrereqIds.map((pid) => {
+            const entry = ALGORITHM_EDITORIAL_CATALOG.find((cat) => cat.problemId === pid)
+            return entry?.studentTitle || pid
+          })
 
           return (
             <article
-              key={kernel.id}
-              onMouseEnter={() => setHoveredCard(kernel.id)}
+              key={item.problemId}
+              onMouseEnter={() => setHoveredCard(item.problemId)}
               onMouseLeave={() => setHoveredCard(null)}
               style={{
-                background: 'rgba(10, 20, 42, 0.75)',
-                backdropFilter: 'blur(16px)',
-                WebkitBackdropFilter: 'blur(16px)',
-                borderRadius: '20px',
-                border: `1px solid ${isHovered ? accentColor : borderColor}`,
-                boxShadow: isHovered
-                  ? `0 12px 36px -8px ${glowColor}, 0 0 20px -2px ${glowColor}`
-                  : '0 8px 24px -4px rgba(0, 0, 0, 0.5)',
-                padding: '24px',
+                background: isPlayable
+                  ? isMastered
+                    ? 'linear-gradient(135deg, rgba(16, 185, 129, 0.15) 0%, rgba(15, 23, 42, 0.95) 100%)'
+                    : 'linear-gradient(135deg, rgba(30, 41, 59, 0.9) 0%, rgba(15, 23, 42, 0.95) 100%)'
+                  : 'rgba(15, 23, 42, 0.4)',
+                border: isPlayable
+                  ? isMastered
+                    ? '1px solid rgba(16, 185, 129, 0.5)'
+                    : isHovered
+                    ? '1px solid rgba(56, 189, 248, 0.6)'
+                    : '1px solid rgba(255, 255, 255, 0.12)'
+                  : '1px dashed rgba(255, 255, 255, 0.08)',
+                borderRadius: '16px',
+                padding: '22px',
                 display: 'flex',
                 flexDirection: 'column',
                 justifyContent: 'space-between',
-                transition: 'all 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
-                transform: isHovered ? 'translateY(-4px)' : 'translateY(0)',
-                cursor: 'pointer',
+                transition: 'all 0.25s ease',
+                transform: isPlayable && isHovered ? 'translateY(-3px)' : 'none',
+                boxShadow: isPlayable && isHovered
+                  ? '0 12px 28px rgba(0, 0, 0, 0.4), 0 0 16px rgba(56, 189, 248, 0.15)'
+                  : '0 4px 12px rgba(0, 0, 0, 0.2)',
+                opacity: isPlayable ? 1 : isPublished ? 0.6 : 0.45,
               }}
-              onClick={() => handleSelectMission(kernel)}
             >
               <div>
-                {/* Header with Badge and ID */}
-                <div
-                  style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    marginBottom: '16px',
-                  }}
-                >
-                  <span
-                    style={{
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '5px',
-                      borderRadius: '8px',
-                      padding: '4px 10px',
-                      fontSize: '12px',
-                      fontWeight: 700,
-                      ...badgeStyle,
-                    }}
-                  >
-                    {badge}
-                  </span>
-
-                  <span
-                    style={{
-                      fontSize: '12px',
-                      fontFamily: 'monospace',
-                      color: 'rgba(255, 255, 255, 0.45)',
-                      fontWeight: 600,
-                    }}
-                  >
-                    {kernel.id}
-                  </span>
-                </div>
-
-                {/* Title & Tag */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
-                  <span style={{ fontSize: '24px' }}>{icon}</span>
-                  <h2
-                    style={{
-                      margin: 0,
-                      fontSize: '20px',
-                      fontWeight: 700,
-                      color: '#ffffff',
-                    }}
-                  >
-                    {kernel.identity?.studentTitle || kernel.title}
-                  </h2>
-                </div>
-
-                <div
-                  style={{
-                    fontSize: '13px',
-                    fontWeight: 600,
-                    color: accentColor,
-                    marginBottom: '14px',
-                  }}
-                >
-                  {tag}
-                </div>
-
-                {/* Story preview */}
-                <p
-                  style={{
-                    fontSize: '13px',
-                    color: 'rgba(255, 255, 255, 0.75)',
-                    lineHeight: 1.6,
-                    margin: '0 0 18px',
-                    minHeight: '42px',
-                  }}
-                >
-                  {explorerShell?.story || kernel.description}
-                </p>
-
-                {/* Chips */}
-                <div
-                  style={{
-                    display: 'flex',
-                    flexWrap: 'wrap',
-                    gap: '6px',
-                    marginBottom: '20px',
-                  }}
-                >
-                  {chips.map((chip) => (
+                {/* Badges Header */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                     <span
-                      key={chip}
                       style={{
-                        background: 'rgba(255, 255, 255, 0.06)',
+                        fontSize: '12px',
+                        fontWeight: 'bold',
+                        padding: '4px 10px',
+                        borderRadius: '8px',
+                        background: item.learningRole === 'anchor'
+                          ? 'rgba(234, 179, 8, 0.15)'
+                          : item.learningRole === 'capstone'
+                          ? 'rgba(236, 72, 153, 0.15)'
+                          : 'rgba(56, 189, 248, 0.15)',
+                        color: item.learningRole === 'anchor'
+                          ? '#fde047'
+                          : item.learningRole === 'capstone'
+                          ? '#f472b6'
+                          : '#38bdf8',
                         border: '1px solid rgba(255, 255, 255, 0.1)',
-                        borderRadius: '6px',
-                        padding: '4px 8px',
-                        fontSize: '11px',
-                        color: 'rgba(255, 255, 255, 0.75)',
-                        fontWeight: 500,
                       }}
                     >
-                      {chip}
+                      #{item.catalogOrder} • {item.learningRole.toUpperCase()}
                     </span>
-                  ))}
+
+                    {stars > 0 && (
+                      <span
+                        style={{
+                          fontSize: '12px',
+                          fontWeight: 'bold',
+                          padding: '4px 8px',
+                          borderRadius: '8px',
+                          background: 'rgba(234, 179, 8, 0.2)',
+                          color: '#fde047',
+                        }}
+                      >
+                        {'⭐'.repeat(stars)}
+                      </span>
+                    )}
+                  </div>
+
+                  <span style={{ fontSize: '11px', color: '#94a3b8', fontWeight: '500' }}>
+                    {item.routeRole === 'core' ? '🌟 본 항로' : item.routeRole === 'capstone' ? '👑 캡스톤' : '🌿 선택 항로'}
+                  </span>
                 </div>
+
+                {/* Problem Title & Subtitle */}
+                <h3 style={{ fontSize: '17px', fontWeight: 'bold', margin: '0 0 6px 0', color: '#f8fafc' }}>
+                  {item.studentTitle}
+                </h3>
+                <p style={{ fontSize: '13px', color: '#94a3b8', margin: '0 0 16px 0', lineHeight: '1.5' }}>
+                  {kernel?.identity?.subtitle || item.provenance?.adaptationNotes || '사고력 훈련 미션'}
+                </p>
               </div>
 
-              {/* Action Button */}
-              <button
-                type="button"
-                style={{
-                  width: '100%',
-                  padding: '13px 0',
-                  borderRadius: '12px',
-                  border: 'none',
-                  background: btnGradient,
-                  color: '#ffffff',
-                  fontWeight: 700,
-                  fontSize: '14px',
-                  cursor: 'pointer',
-                  boxShadow: `0 4px 14px 0 ${glowColor}`,
-                  display: 'flex',
-                  justifyContent: 'center',
-                  alignItems: 'center',
-                  gap: '6px',
-                  transition: 'opacity 0.2s',
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.opacity = '0.9'
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.opacity = '1'
-                }}
-              >
-                <span>🚀 항로 탐사 시작</span>
-                <span style={{ fontSize: '12px' }}>➔</span>
-              </button>
+              {/* Action Button & Prerequisite Notices */}
+              <div>
+                {isPublished && !isPrereqUnlocked && (
+                  <div
+                    style={{
+                      marginBottom: '8px',
+                      padding: '8px 12px',
+                      borderRadius: '8px',
+                      background: 'rgba(239, 68, 68, 0.1)',
+                      border: '1px solid rgba(239, 68, 68, 0.25)',
+                      fontSize: '11px',
+                      color: '#fca5a5',
+                      lineHeight: '1.4',
+                    }}
+                  >
+                    🔒 먼저 완료할 항로: <strong>{missingPrereqTitles.join(', ')}</strong>
+                  </div>
+                )}
+
+                {isPlayable ? (
+                  <button
+                    onClick={() => handleSelectMission(item.problemId)}
+                    style={{
+                      width: '100%',
+                      padding: '10px',
+                      borderRadius: '10px',
+                      background: isMastered
+                        ? 'linear-gradient(135deg, #059669 0%, #047857 100%)'
+                        : stars > 0
+                        ? 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)'
+                        : 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)',
+                      border: 'none',
+                      color: '#ffffff',
+                      fontWeight: 'bold',
+                      fontSize: '14px',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '6px',
+                      transition: 'all 0.2s',
+                    }}
+                  >
+                    <span>{isMastered ? '🏆 마스터 복습하기' : stars > 0 ? '🔄 다시 풀기 (복습)' : '🚀 탐사 시작하기'}</span>
+                    <span>→</span>
+                  </button>
+                ) : isPublished ? (
+                  <button
+                    disabled
+                    style={{
+                      width: '100%',
+                      padding: '10px',
+                      borderRadius: '10px',
+                      background: 'rgba(51, 65, 85, 0.5)',
+                      border: '1px dashed rgba(255, 255, 255, 0.1)',
+                      color: '#94a3b8',
+                      fontWeight: 'bold',
+                      fontSize: '13px',
+                      cursor: 'not-allowed',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '6px',
+                    }}
+                  >
+                    <span>🔒 선수 항로를 먼저 완료하세요</span>
+                  </button>
+                ) : (
+                  <div
+                    style={{
+                      width: '100%',
+                      padding: '8px',
+                      borderRadius: '8px',
+                      background: 'rgba(255, 255, 255, 0.04)',
+                      textAlign: 'center',
+                      fontSize: '12px',
+                      color: '#64748b',
+                      fontWeight: '600',
+                    }}
+                  >
+                    🚧 탐사 준비 중 (출판 대기)
+                  </div>
+                )}
+              </div>
             </article>
           )
         })}

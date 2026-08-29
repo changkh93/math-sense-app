@@ -90,8 +90,10 @@ console.log('  -> [PASS] All Intended Wrong Fixtures Parity Verified')
 console.log('[Matrix 3] Checking Security Sandbox & Escape Parity...')
 const ESCAPE_SNIPPETS = [
   'import os\ndef check_gate(s1, s2):\n    return True',
+  'import random\ndef check_gate(s1, s2):\n    return True',
   'def check_gate(s1, s2):\n    return globalThis.process',
   'def check_gate(s1, s2):\n    return s1.__class__',
+  'def check_gate(s1, s2):\n    return missing_name',
 ]
 
 for (const snippet of ESCAPE_SNIPPETS) {
@@ -122,5 +124,97 @@ const serverLoopRes = serverRunFunction(INFINITE_LOOP_CODE, 'check_gate', { s1: 
 assert.equal(clientLoopThrew, true, 'Client must terminate infinite loop on step limit')
 assert.equal(serverLoopRes.ok, false, 'Server must terminate infinite loop on step limit')
 console.log('  -> [PASS] Infinite Loop Step Limit Terminated Identically')
+
+// [Matrix 5] Python Control Flow Semantics (if/elif/else, nesting, variable assignment)
+console.log('[Matrix 5] Checking if/elif/else Control Flow Semantics & Correctness...')
+const CONTROL_FLOW_CASES = [
+  {
+    name: 'if/else variable assignment counterexample',
+    code: `def choose(flag):
+    value = 0
+    if flag:
+        value = 1
+    else:
+        value = 2
+    return value
+`,
+    fn: 'choose',
+    tests: [
+      { args: { flag: true }, expected: 1 },
+      { args: { flag: false }, expected: 2 },
+    ],
+  },
+  {
+    name: 'if/elif/else multi-branch decision',
+    code: `def categorize(score):
+    if score >= 90:
+        grade = "A"
+    elif score >= 80:
+        grade = "B"
+    elif score >= 70:
+        grade = "C"
+    else:
+        grade = "F"
+    return grade
+`,
+    fn: 'categorize',
+    tests: [
+      { args: { score: 95 }, expected: 'A' },
+      { args: { score: 85 }, expected: 'B' },
+      { args: { score: 75 }, expected: 'C' },
+      { args: { score: 50 }, expected: 'F' },
+    ],
+  },
+  {
+    name: 'nested if/else inside branches',
+    code: `def quadrant(x, y):
+    if x > 0:
+        if y > 0:
+            return "Q1"
+        else:
+            return "Q4"
+    else:
+        if y > 0:
+            return "Q2"
+        else:
+            return "Q3"
+`,
+    fn: 'quadrant',
+    tests: [
+      { args: { x: 1, y: 1 }, expected: 'Q1' },
+      { args: { x: 1, y: -1 }, expected: 'Q4' },
+      { args: { x: -1, y: 1 }, expected: 'Q2' },
+      { args: { x: -1, y: -1 }, expected: 'Q3' },
+    ],
+  },
+  {
+    name: 'if/else inside for loop',
+    code: `def filter_and_scale(items):
+    result = []
+    for x in items:
+        if x > 0:
+            result.append(x * 2)
+        else:
+            result.append(0)
+    return result
+`,
+    fn: 'filter_and_scale',
+    tests: [
+      { args: { items: [1, -2, 3, 0] }, expected: [2, 0, 6, 0] },
+    ],
+  },
+]
+
+for (const tc of CONTROL_FLOW_CASES) {
+  for (const t of tc.tests) {
+    const clientVal = clientRunFunction(tc.code, tc.fn, t.args)
+    const serverRes = serverRunFunction(tc.code, tc.fn, t.args)
+
+    assert.equal(serverRes.ok, true, `Server failed on ${tc.name}`)
+    assert.deepEqual(clientVal, t.expected, `Client returned wrong value for ${tc.name} with args ${JSON.stringify(t.args)}`)
+    assert.deepEqual(serverRes.result, t.expected, `Server returned wrong value for ${tc.name} with args ${JSON.stringify(t.args)}`)
+  }
+}
+console.log('  -> [PASS] if/elif/else & Nested Control Flow Semantics 100% Correct and Parity Verified')
 
 console.log('\n=== Client-Server Runtime Parity Matrix Test Passed 100%! ===\n')

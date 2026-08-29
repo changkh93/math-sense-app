@@ -11,7 +11,7 @@ module.exports = {
   canonicalStrategy: 'BFS on unweighted grid using deque and visited set',
   officialSolutionCode: `from collections import deque\n\ndef shortest_path(grid, start, target):\n    if start[0] == target[0] and start[1] == target[1]:\n        return 0\n    rows = len(grid)\n    cols = len(grid[0])\n    queue = deque([(start[0], start[1], 0)])\n    visited = {(start[0], start[1])}\n\n    while queue:\n        r, c, dist = queue.popleft()\n        if r == target[0] and c == target[1]:\n            return dist\n        for dr, dc in [(-1, 0), (1, 0), (0, -1), (0, 1)]:\n            nr = r + dr\n            nc = c + dc\n            if 0 <= nr < rows and 0 <= nc < cols and grid[nr][nc] == 0:\n                if (nr, nc) not in visited:\n                    visited.add((nr, nc))\n                    queue.append((nr, nc, dist + 1))\n    return -1\n`,
   alternativeSolutions: [
-    `from collections import deque\n\ndef shortest_path(grid, start, target):\n    sr, sc = start\n    tr, tc = target\n    if (sr, sc) == (tr, tc):\n        return 0\n    R, C = len(grid), len(grid[0])\n    q = deque([(sr, sc, 0)])\n    vis = {(sr, sc)}\n    while q:\n        r, c, d = q.popleft()\n        if (r, c) == (tr, tc):\n            return d\n        for nr, nc in [(r-1, c), (r+1, c), (r, c-1), (r, c+1)]:\n            if 0 <= nr < R and 0 <= nc < C and grid[nr][nc] == 0 and (nr, nc) not in vis:\n                vis.add((nr, nc))\n                q.append((nr, nc, d + 1))\n    return -1\n`,
+    `from collections import deque\n\ndef shortest_path(grid, start, target):\n    sr = start[0]\n    sc = start[1]\n    tr = target[0]\n    tc = target[1]\n    if sr == tr and sc == tc:\n        return 0\n    R = len(grid)\n    C = len(grid[0])\n    q = deque([(sr, sc, 0)])\n    vis = {(sr, sc)}\n    while q:\n        r, c, d = q.popleft()\n        if r == tr and c == tc:\n            return d\n        for nr, nc in [(r-1, c), (r+1, c), (r, c-1), (r, c+1)]:\n            if 0 <= nr < R and 0 <= nc < C and grid[nr][nc] == 0 and (nr, nc) not in vis:\n                vis.add((nr, nc))\n                q.append((nr, nc, d + 1))\n    return -1\n`,
   ],
   intendedWrongSolutions: [
     {
@@ -68,6 +68,20 @@ module.exports = {
   hiddenTests: [
     {
       id: 'h1',
+      inputs: {
+        grid: [
+          [0, 0, 0],
+          [0, 1, 0],
+          [0, 0, 0],
+        ],
+        start: [0, 0],
+        target: [2, 0],
+      },
+      expected: 2,
+      group: 'branching_shortest_path',
+    },
+    {
+      id: 'h1_snake',
       inputs: {
         grid: [
           [0, 0, 0, 0],

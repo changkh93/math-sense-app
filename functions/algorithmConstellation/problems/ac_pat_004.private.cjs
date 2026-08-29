@@ -12,7 +12,7 @@ module.exports = {
   officialSolutionCode: `def beacon_light(time):\n    return time % 4 < 2\n`,
   alternativeSolutions: [
     `def beacon_light(time):\n    if time % 4 < 2:\n        return True\n    return False\n`,
-    `def beacon_light(time):\n    return (time % 4 == 0) or (time % 4 == 1)\n`,
+    `def beacon_light(time):\n    return time % 4 == 0 or time % 4 == 1\n`,
   ],
   intendedWrongSolutions: [
     {

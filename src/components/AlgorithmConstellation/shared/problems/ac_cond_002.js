@@ -13,6 +13,8 @@ export const AC_COND_002 = deepFreeze({
   version: 1,
   schemaVersion: 1,
   family: 'COND',
+  evidenceRecipe: { primitives: ['decision'] },
+  pythonConcepts: { introduces: ['operator:or'], requires: ['value:boolean'] },
 
   identity: {
     systemTitle: 'Condition Decomposition - Disjunctive Boarding Rule',

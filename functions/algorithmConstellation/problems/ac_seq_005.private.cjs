@@ -12,7 +12,7 @@ module.exports = {
   officialSolutionCode: `def collect_energy(capsules):\n    total = 0\n    for energy in capsules:\n        if energy > 0:\n            total = total + energy\n    return total\n`,
   alternativeSolutions: [
     `def collect_energy(capsules):\n    total = 0\n    for x in capsules:\n        if x > 0:\n            total += x\n    return total\n`,
-    `def collect_energy(capsules):\n    return sum(x for x in capsules if x > 0)\n`,
+    `def collect_energy(capsules):\n    res = 0\n    for val in capsules:\n        if val >= 1:\n            res = res + val\n    return res\n`,
   ],
   intendedWrongSolutions: [
     {

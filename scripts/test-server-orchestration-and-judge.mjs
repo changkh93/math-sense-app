@@ -2,6 +2,7 @@ import assert from 'assert'
 import { createCallableOrchestrator } from '../functions/algorithmConstellation/callableOrchestrator.cjs'
 import { createInMemoryAlgorithmStore } from '../functions/algorithmConstellation/algorithmProgressLedger.cjs'
 import { evaluateBaseSubmission } from '../functions/algorithmConstellation/isolatedJudgeRuntime.cjs'
+import { evaluateAuthoritativeSubmission } from '../functions/algorithmConstellation/algorithmAuthoritativeJudge.cjs'
 import { getPrivateProblemDefinition } from '../functions/algorithmConstellation/privateProblemCatalog.cjs'
 
 console.log('\n=== Running Server Orchestration & Restricted Judge Tests ===')
@@ -122,6 +123,66 @@ assert.equal(normal.transfer.masteryStatus, 'mastered')
 const progress = await handlers.handleGetAlgorithmProgress({ problemId: definition.problemId }, auth('student_alpha'))
 assert.equal(progress.bestStars, 3)
 assert.equal(progress.masteryStatus, 'mastered')
+const allProgress = await handlers.handleGetAlgorithmProgress({ problemId: 'all' }, auth('student_alpha'))
+assert.deepEqual(Object.keys(allProgress), [definition.problemId])
+assert.equal(allProgress[definition.problemId].bestStars, 3)
+assert.equal(Object.hasOwn(allProgress[definition.problemId], 'updatedAt'), false)
+
+console.log('[Test 2b] Constellation 0 and 1 newly published problems complete the production callable lifecycle...')
+for (const pid of [
+  'AC-EXP-SEQ-01',
+  'AC-EXP-STEP-03',
+  'AC-EXP-BOUND-05',
+  'AC-EXP-WHILE-07',
+  'AC-EXP-EQUIV-09',
+  'AC-EXP-REVERSE-10',
+  'AC-COND-NOT-13',
+  'AC-COND-ELIF-14',
+  'AC-COND-RANGE-15',
+  'AC-COND-CLAMP-16',
+  'AC-COND-GRADE-17',
+  'AC-COND-COMPLEX-18',
+  'AC-COND-TOGGLE-19',
+  'AC-COND-ORDER-20',
+]) {
+  const waveDefinition = getPrivateProblemDefinition(pid, 1)
+  const waveContext = auth(`student_${pid.toLowerCase().replace(/-/g, '_')}`)
+  const waveStarted = await handlers.handleStartAlgorithmAttempt({
+    problemId: waveDefinition.problemId,
+    problemVersion: 1,
+    shell: 'explorer',
+    intent: 'learn',
+    requestId: `request_${pid}_transfer_contract_01`,
+  }, waveContext)
+  const waveBase = await handlers.handleSubmitAlgorithmBase({
+    attemptId: waveStarted.attemptId,
+    submissionId: `base_${pid}_transfer_contract_01`,
+    code: waveDefinition.officialSolutionCode,
+  }, waveContext)
+  const wavePrivateChallenge = waveDefinition.understandingChallenges.find(
+    (item) => item.challengeId === waveBase.understandingChallenge.challengeId
+  )
+  await handlers.handleSubmitUnderstandingEvidence({
+    attemptId: waveStarted.attemptId,
+    challengeId: wavePrivateChallenge.challengeId,
+    answers: Object.fromEntries(wavePrivateChallenge.questions.map((question) => [question.id, question.expected])),
+  }, waveContext)
+  const waveIssued = await handlers.handleIssueTransferChallenge({ attemptId: waveStarted.attemptId }, waveContext)
+  assert.ok(waveIssued.transferChallenge.starterCode.includes(`def ${waveIssued.transferChallenge.entryFunction}(`))
+  const waveTransferDefinition = waveDefinition.transferMasterSet.find(
+    (item) => item.transferChallengeId === waveIssued.transferChallenge.transferChallengeId
+  )
+  const waveTransfer = await handlers.handleSubmitAlgorithmTransfer({
+    attemptId: waveStarted.attemptId,
+    challengeToken: waveIssued.challengeToken,
+    transferCode: waveTransferDefinition.officialSolutionCode,
+  }, waveContext)
+  assert.equal(waveTransfer.passed, true, `Lifecycle Transfer submit failed for ${pid}`)
+}
+await assert.rejects(
+  () => handlers.handleGetAlgorithmProgress({}, auth('student_alpha')),
+  (error) => error.code === 'INVALID_ARGUMENT'
+)
 const duplicateTransfer = await handlers.handleSubmitAlgorithmTransfer({
   attemptId: normal.started.attemptId,
   challengeToken: normal.issued.challengeToken,
@@ -183,5 +244,38 @@ await assert.rejects(
   }, arenaContext),
   (error) => error.code === 'FAILED_PRECONDITION'
 )
+
+console.log('[Test 7] Cumulative step limit halts execution across multiple tests...')
+
+// Code that executes ~35,000 steps per invocation.
+// Across 8 tests (2 public + 6 hidden), 35,000 * 8 = 280,000 > 200,000 MAX_CUMULATIVE_STEPS.
+const heavyLoopCode = `def check_gate(s1, s2):
+    i = 0
+    while i < 35000:
+        i += 1
+    return s1 and s2
+`
+// 1. Direct evaluation on production isolatedJudgeRuntime.evaluateBaseSubmission
+const directBaseEval = evaluateBaseSubmission(definition.problemId, 1, heavyLoopCode)
+assert.equal(directBaseEval.resultStar, false, 'evaluateBaseSubmission MUST reject cumulative step overrun')
+assert.equal(directBaseEval.passed, false)
+assert.ok(directBaseEval.cumulativeStepsUsed >= 200000, `evaluateBaseSubmission cumulative steps (${directBaseEval.cumulativeStepsUsed}) must reach budget limit`)
+
+// 2. Evaluation on authoritative judge facade
+const heavyEval = evaluateAuthoritativeSubmission({
+  problemId: definition.problemId,
+  problemVersion: 1,
+  studentPythonCode: heavyLoopCode,
+  entryFunction: 'check_gate',
+  publicTests: [
+    { inputs: { s1: true, s2: true }, expected: true },
+    { inputs: { s1: false, s2: true }, expected: false },
+  ],
+})
+
+assert.equal(heavyEval.hiddenPassed, false, 'Cumulative step overrun across test suite MUST fail hidden suite')
+assert.equal(heavyEval.resultStar, false, 'Result star must be false when cumulative steps overrun')
+assert.ok(heavyEval.cumulativeStepsUsed >= 200000, `Cumulative steps (${heavyEval.cumulativeStepsUsed}) must reach budget limit`)
+console.log('  -> [PASS] Cumulative Step Limit (200,000) strictly bounded on both isolatedJudgeRuntime & AuthoritativeJudge')
 
 console.log('\n=== Server Orchestration & Restricted Judge Tests Passed ===\n')

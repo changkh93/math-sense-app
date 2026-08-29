@@ -2,6 +2,7 @@ import { useState } from 'react'
 
 export default function UnderstandingCheckMode({
   challenge,
+  code,
   onSubmitUnderstanding,
   onProceedToTransfer,
 }) {
@@ -11,6 +12,7 @@ export default function UnderstandingCheckMode({
   const [submitting, setSubmitting] = useState(false)
 
   const questions = challenge?.questions || []
+  const displayCode = challenge?.codeSnippet || code
 
   const handleSelect = (qid, val) => {
     setAnswers((prev) => ({ ...prev, [qid]: val }))
@@ -32,23 +34,42 @@ export default function UnderstandingCheckMode({
     }
   }
 
+  const defaultBooleanOptions = [
+    { value: 'true', label: 'True (참)' },
+    { value: 'false', label: 'False (거짓)' },
+  ]
+
   return (
     <div style={{ padding: '24px', background: 'rgba(10, 20, 40, 0.75)', borderRadius: '16px', border: '1px solid rgba(0, 240, 255, 0.2)', color: '#fff' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
         <span style={{ fontSize: '28px' }}>🎯</span>
         <div>
           <h3 style={{ margin: 0, fontSize: '19px', color: '#00f0ff' }}>
-            ★★ 규칙 이해 도전 (15초 퀴즈)
+            {challenge?.title || '★★ 실행 흐름 이해하기'}
           </h3>
           <p style={{ margin: '4px 0 0', fontSize: '14px', color: '#cbd5e1' }}>
-            {challenge?.prompt || '상황에 따른 조건식의 참/거짓 결과를 신속하게 예측해 보세요.'}
+            {challenge?.prompt || '앞 명령의 결과가 다음 명령에 어떻게 이어지는지 확인해 보세요.'}
           </p>
         </div>
       </div>
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '24px' }}>
+      {/* Code Snippet Box if available */}
+      {displayCode && (
+        <div style={{ background: 'rgba(15, 23, 42, 0.85)', padding: '14px 18px', borderRadius: '10px', marginBottom: '20px', border: '1px solid rgba(0, 240, 255, 0.2)' }}>
+          <div style={{ fontSize: '12px', color: '#38bdf8', marginBottom: '6px', fontWeight: 'bold' }}>
+            {challenge?.codeSnippet ? '📋 탐사 기준 알고리즘 (단계별 실행 흐름):' : '📋 작성한 코드 살펴보기:'}
+          </div>
+          <pre style={{ margin: 0, fontFamily: 'monospace', fontSize: '13px', color: '#fef08a', lineHeight: '1.6', whiteSpace: 'pre-wrap' }}>
+            {displayCode}
+          </pre>
+        </div>
+      )}
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', marginBottom: '24px' }}>
         {questions.map((q) => {
           const selected = answers[q.id]
+          const options = q.options && q.options.length > 0 ? q.options : defaultBooleanOptions
+
           return (
             <div
               key={q.id}
@@ -56,60 +77,58 @@ export default function UnderstandingCheckMode({
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'space-between',
-                padding: '14px 18px',
+                flexWrap: 'wrap',
+                gap: '12px',
+                padding: '16px 18px',
                 background: 'rgba(255, 255, 255, 0.05)',
-                borderRadius: '8px',
+                borderRadius: '10px',
                 border: '1px solid rgba(255, 255, 255, 0.1)',
               }}
             >
-              <div style={{ fontSize: '14px' }}>{q.text}</div>
-              <div style={{ display: 'flex', gap: '8px' }}>
-                <button
-                  type="button"
-                  onClick={() => handleSelect(q.id, true)}
-                  style={{
-                    padding: '8px 16px',
-                    borderRadius: '6px',
-                    border: selected === true ? '2px solid #00f0ff' : '1px solid rgba(255, 255, 255, 0.2)',
-                    background: selected === true ? 'rgba(0, 240, 255, 0.25)' : 'rgba(0, 0, 0, 0.3)',
-                    color: selected === true ? '#00f0ff' : '#fff',
-                    fontWeight: 'bold',
-                    cursor: 'pointer',
-                  }}
-                >
-                  열림 (True)
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleSelect(q.id, false)}
-                  style={{
-                    padding: '8px 16px',
-                    borderRadius: '6px',
-                    border: selected === false ? '2px solid #00f0ff' : '1px solid rgba(255, 255, 255, 0.2)',
-                    background: selected === false ? 'rgba(0, 240, 255, 0.25)' : 'rgba(0, 0, 0, 0.3)',
-                    color: selected === false ? '#00f0ff' : '#fff',
-                    fontWeight: 'bold',
-                    cursor: 'pointer',
-                  }}
-                >
-                  닫힘 (False)
-                </button>
+              <div style={{ fontSize: '15px', fontWeight: '500', flex: '1 1 240px' }}>{q.text}</div>
+              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                {options.map((opt, optIdx) => {
+                  const optVal = typeof opt === 'object' && opt !== null ? opt.value : String(opt)
+                  const optLabel = typeof opt === 'object' && opt !== null ? (opt.label || opt.value) : String(opt)
+                  const isSelected = selected !== undefined && String(selected) === String(optVal)
+
+                  return (
+                    <button
+                      key={optIdx}
+                      type="button"
+                      onClick={() => handleSelect(q.id, optVal)}
+                      style={{
+                        padding: '8px 16px',
+                        borderRadius: '6px',
+                        border: isSelected ? '2px solid #00f0ff' : '1px solid rgba(255, 255, 255, 0.2)',
+                        background: isSelected ? 'rgba(0, 240, 255, 0.25)' : 'rgba(0, 0, 0, 0.3)',
+                        color: isSelected ? '#00f0ff' : '#cbd5e1',
+                        fontWeight: 'bold',
+                        cursor: 'pointer',
+                        fontSize: '14px',
+                        transition: 'all 0.15s',
+                      }}
+                    >
+                      {optLabel}
+                    </button>
+                  )
+                })}
               </div>
             </div>
           )
         })}
       </div>
 
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
         <div>
           {submitted && isPassed && (
             <span style={{ color: '#10b981', fontWeight: 'bold', fontSize: '15px' }}>
-              ✨ 축하합니다! 신호 이해 별(★★)을 획득했습니다!
+              ✨ 축하합니다! 규칙 이해 별(★★)을 획득했습니다!
             </span>
           )}
           {submitted && !isPassed && (
             <span style={{ color: '#f87171', fontSize: '14px' }}>
-              ⚠️ 오답이 있습니다. 스위치 조건을 다시 생각해보세요.
+              ⚠️ 오답이 있습니다. 상태 변화와 규칙을 다시 확인해 보세요.
             </span>
           )}
         </div>

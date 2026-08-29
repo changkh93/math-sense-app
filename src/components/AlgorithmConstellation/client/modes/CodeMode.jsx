@@ -2,10 +2,10 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { projectRawToMeaningfulTrace, distillToLearningTrace } from '../../runtime/traceProjection/meaningfulStepProjector.js'
 import { createAlgorithmRuntimeAdapter } from '../../runtime/algorithmRuntimeAdapter.js'
 import { matchRuleBasedMisconception } from '../../shared/taxonomy/ruleBasedMisconceptionMatcher.js'
+import { buildEvidenceFromTrace } from '../../shared/evidence/evidencePrimitives.js'
 import { createStagnationDetector } from '../scaffold/stagnationDetector.js'
 import { getScaffoldByLevel } from '../scaffold/scaffoldGraph.js'
 import ScaffoldDrawer from '../scaffold/ScaffoldDrawer.jsx'
-import DiagnosticMissionModal from './DiagnosticMissionModal.jsx'
 import ProtocolRepairModal from '../scaffold/ProtocolRepairModal.jsx'
 import AlgorithmPythonEditor from '../editor/AlgorithmPythonEditor.jsx'
 
@@ -13,7 +13,93 @@ function formatPythonValue(val) {
   if (val === null || val === undefined) return 'None'
   if (val === true) return 'True'
   if (val === false) return 'False'
+  if (typeof val === 'object') {
+    try {
+      return JSON.stringify(val)
+    } catch {
+      return String(val)
+    }
+  }
   return String(val)
+}
+
+function traceStateRows(stateDiff) {
+  if (Array.isArray(stateDiff)) {
+    return stateDiff.map((diff) => `${diff.path}: ${formatPythonValue(diff.before)} → ${formatPythonValue(diff.after)}`)
+  }
+  return Object.entries(stateDiff || {}).map(([key, value]) => `${key}: ${formatPythonValue(value)}`)
+}
+
+function getSceneHeader(scene, index, total) {
+  const type = scene?.eventType || scene?.type
+  if (type === 'function-enter') {
+    return {
+      icon: '📥',
+      title: '함수 호출 및 입력값 확인',
+      color: '#38bdf8',
+    }
+  }
+  if (type === 'assignment') {
+    return {
+      icon: '⚡',
+      title: '변수 계산 및 상태 변화',
+      color: '#fbbf24',
+    }
+  }
+  if (type === 'branch-decision') {
+    return {
+      icon: '🔀',
+      title: '조건 분기 판정',
+      color: '#c084fc',
+    }
+  }
+  if (type === 'loop-iteration') {
+    return {
+      icon: '🔄',
+      title: '반복 실행',
+      color: '#a78bfa',
+    }
+  }
+  if (type === 'function-return') {
+    return {
+      icon: '📤',
+      title: '함수 결과 반환 (return)',
+      color: '#34d399',
+    }
+  }
+  if (type === 'public-test-result') {
+    return {
+      icon: '🎯',
+      title: '테스트 결과 검증',
+      color: scene?.metadata?.passed ? '#34d399' : '#f87171',
+    }
+  }
+  if (type === 'runtime-error' || type === 'error') {
+    return {
+      icon: '⚠️',
+      title: '실행 오류',
+      color: '#f87171',
+    }
+  }
+  if (index === 0) {
+    return {
+      icon: '🔍',
+      title: '입력 상황 점검',
+      color: '#38bdf8',
+    }
+  }
+  if (index === total - 1) {
+    return {
+      icon: '🏁',
+      title: '최종 실행 완료',
+      color: '#34d399',
+    }
+  }
+  return {
+    icon: '🔍',
+    title: '실행 과정',
+    color: '#38bdf8',
+  }
 }
 
 function cleanPythonError(errMsg) {
@@ -58,7 +144,6 @@ export default function CodeMode({
   const [misconceptionDiagnosis, setMisconceptionDiagnosis] = useState(null)
   const [stagnationSuggestion, setStagnationSuggestion] = useState(null)
   const [isScaffoldOpen, setIsScaffoldOpen] = useState(false)
-  const [isDiagnosticOpen, setIsDiagnosticOpen] = useState(false)
   const [isRepairOpen, setIsRepairOpen] = useState(false)
   const [scaffoldLevel, setScaffoldLevel] = useState(1)
   const revealedScaffoldLevels = useRef(new Set())
@@ -123,6 +208,11 @@ export default function CodeMode({
         code,
         entryFunction: kernel.modes?.code?.entryFunction || 'check_gate',
         publicTests,
+        traceConfig: {
+          inputKey: kernel.world?.cycleLength ? 'time' : null,
+          cycleLength: kernel.world?.cycleLength,
+          resultKey: kernel.runtime?.worldModel || 'result',
+        },
       })
 
       if (!runRes.ok) {
@@ -201,6 +291,10 @@ export default function CodeMode({
   }
 
   const currentScene = learningTrace[selectedSceneIndex] || null
+  const learningEvidence = useMemo(
+    () => buildEvidenceFromTrace(kernel.evidenceRecipe, learningTrace, runResult || {}),
+    [kernel.evidenceRecipe, learningTrace, runResult],
+  )
   const isAiUnlocked = runCount >= 2 || Boolean(stagnationSuggestion)
 
   return (
@@ -232,8 +326,13 @@ export default function CodeMode({
         </div>
 
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-          <div style={{ fontWeight: 'bold', color: '#00f0ff', fontSize: '15px' }}>
-            🐍 Python Editor
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <div style={{ fontWeight: 'bold', color: '#00f0ff', fontSize: '15px' }}>
+              🐍 Python Editor
+            </div>
+            <span style={{ fontSize: '11px', padding: '2px 8px', borderRadius: '4px', background: shell === 'pro' ? 'rgba(168, 85, 247, 0.2)' : shell === 'explorer' ? 'rgba(56, 189, 248, 0.2)' : 'rgba(34, 197, 94, 0.2)', color: shell === 'pro' ? '#d8b4fe' : shell === 'explorer' ? '#7dd3fc' : '#86efac', border: '1px solid rgba(255, 255, 255, 0.1)' }}>
+              {shell === 'pro' ? '🚀 독립 도전' : shell === 'explorer' ? '🔎 함께 탐색' : '🧭 기본 항해'}
+            </span>
           </div>
           <div style={{ display: 'flex', gap: '8px' }}>
             <button
@@ -255,7 +354,7 @@ export default function CodeMode({
             </button>
             <button
               type="button"
-              onClick={() => isAiUnlocked && onOpenAiPromptModal?.({ currentCode: code, diagnosis: misconceptionDiagnosis, scenes: learningTrace, publicTestError: stdout })}
+              onClick={() => isAiUnlocked && onOpenAiPromptModal?.({ currentCode: code, diagnosis: misconceptionDiagnosis, scenes: learningTrace, learningEvidence, publicTestError: stdout })}
               disabled={!assistanceAllowed || !isAiUnlocked}
               style={{
                 padding: '6px 12px',
@@ -277,6 +376,7 @@ export default function CodeMode({
             value={code}
             onChange={handleCodeChange}
             minHeight="240px"
+            activeSourceSpan={currentScene?.sourceSpan || (currentScene?.sourceLine ? { startLine: currentScene.sourceLine, endLine: currentScene.sourceLine } : null)}
           />
         </div>
 
@@ -417,30 +517,101 @@ export default function CodeMode({
               />
 
               <div style={{ background: 'rgba(0, 0, 0, 0.5)', padding: '14px', borderRadius: '10px', border: '1px solid rgba(0, 240, 255, 0.2)' }}>
-                <div style={{ fontSize: '13px', color: '#38bdf8', fontWeight: 'bold', marginBottom: '6px' }}>
-                  🔍 장면 {selectedSceneIndex + 1}: 입력 상황 점검
-                </div>
-                {currentScene.stateDiff && (
-                  <div style={{ fontSize: '14px', color: '#fff', lineHeight: '1.6' }}>
-                    {Object.entries(currentScene.stateDiff)
-                      .map(([k, v]) => `${k}: ${typeof v === 'boolean' ? (v ? '🟢 ON' : '🔴 OFF') : v}`)
-                      .join(' | ')}
-                    {currentScene.worldDiff && (
-                      <div style={{ marginTop: '4px', color: '#a5f3fc' }}>
-                        결과 ➔ {Object.entries(currentScene.worldDiff)
-                          .map(([k, v]) => `${k}: ${v ? '🔓 열림 (True)' : '🔒 닫힘 (False)'}`)
-                          .join(', ')}
+                {(() => {
+                  const header = getSceneHeader(currentScene, selectedSceneIndex, learningTrace.length)
+                  const isInputScene = currentScene.eventType === 'function-enter'
+                  const isTestResult = currentScene.eventType === 'public-test-result'
+                  const isReturn = currentScene.eventType === 'function-return'
+                  const isBranch = currentScene.eventType === 'branch-decision'
+                  const isAssign = currentScene.eventType === 'assignment'
+
+                  return (
+                    <div>
+                      <div style={{ fontSize: '13px', color: header.color, fontWeight: 'bold', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <span>{header.icon}</span>
+                        <span>장면 {selectedSceneIndex + 1}: {header.title}</span>
                       </div>
-                    )}
-                    {currentScene.metadata && (
-                      <div style={{ marginTop: '6px', fontSize: '12px', color: currentScene.metadata.passed ? '#34d399' : '#f87171' }}>
-                        {currentScene.metadata.passed
-                          ? '✅ 예상 결과와 일치합니다.'
-                          : `⚠️ 예상: ${formatPythonValue(currentScene.metadata.expected)} | 실제 코드 반환: None`}
-                      </div>
-                    )}
-                  </div>
-                )}
+
+                      {/* Code Statement (if present and not a synthetic test result) */}
+                      {currentScene.statementText && !isTestResult && (
+                        <div style={{ fontFamily: 'monospace', fontSize: '12px', color: '#fef08a', background: 'rgba(255, 255, 255, 0.07)', padding: '6px 10px', borderRadius: '6px', marginBottom: '8px', borderLeft: '3px solid #38bdf8' }}>
+                          {currentScene.statementText}
+                        </div>
+                      )}
+
+                      {/* Input parameters scene */}
+                      {isInputScene && currentScene.metadata?.args && (
+                        <div style={{ fontSize: '13px', color: '#e2e8f0', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                          <div style={{ color: '#94a3b8', fontSize: '12px' }}>전달된 입력 매개변수:</div>
+                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                            {Object.entries(currentScene.metadata.args).map(([k, v]) => (
+                              <span key={k} style={{ background: 'rgba(56, 189, 248, 0.15)', padding: '2px 8px', borderRadius: '4px', border: '1px solid rgba(56, 189, 248, 0.3)', color: '#bae6fd', fontFamily: 'monospace', fontSize: '12px' }}>
+                                {k} = {formatPythonValue(v)}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Variable changes / State diff */}
+                      {isAssign && currentScene.stateDiff && currentScene.stateDiff.length > 0 && (
+                        <div style={{ fontSize: '13px', color: '#e2e8f0', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                          {currentScene.stateDiff.map((diff, idx) => (
+                            <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                              <span style={{ color: '#fbbf24', fontWeight: 'bold' }}>상태 변화:</span>
+                              <span style={{ fontFamily: 'monospace' }}>{diff.path}</span>
+                              {diff.before !== null && diff.before !== undefined && (
+                                <span style={{ color: '#94a3b8' }}>({formatPythonValue(diff.before)} ➔)</span>
+                              )}
+                              <span style={{ color: '#86efac', fontWeight: 'bold', fontFamily: 'monospace' }}>{formatPythonValue(diff.after)}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Branch decision */}
+                      {isBranch && currentScene.metadata && (
+                        <div style={{ fontSize: '13px', color: '#cbd5e1' }}>
+                          <span style={{ color: '#94a3b8' }}>판정 조건: </span>
+                          <code style={{ color: '#fcd34d' }}>{currentScene.metadata.condition}</code>
+                          <div style={{ marginTop: '4px', color: currentScene.metadata.result ? '#86efac' : '#f87171', fontWeight: 'bold' }}>
+                            결과 ➔ {currentScene.metadata.result ? '참 (True) - 분기 실행' : '거짓 (False) - 분기 건너뜀'}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Function return */}
+                      {isReturn && currentScene.metadata && (
+                        <div style={{ fontSize: '14px', color: '#86efac', fontWeight: 'bold' }}>
+                          반환값 (return): {formatPythonValue(currentScene.metadata.value)}
+                        </div>
+                      )}
+
+                      {/* Public Test Result scene */}
+                      {isTestResult && currentScene.metadata && (
+                        <div style={{ fontSize: '13px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                          <div style={{ color: '#cbd5e1' }}>
+                            코드 반환값: <strong style={{ color: '#86efac', fontFamily: 'monospace' }}>{formatPythonValue(currentScene.metadata.actual)}</strong>
+                            {' | '}
+                            예상 결과: <strong style={{ color: '#fcd34d', fontFamily: 'monospace' }}>{formatPythonValue(currentScene.metadata.expected)}</strong>
+                          </div>
+                          <div style={{ color: currentScene.metadata.passed ? '#34d399' : '#f87171', fontWeight: 'bold' }}>
+                            {currentScene.metadata.passed
+                              ? '✅ 예상 결과와 일치합니다.'
+                              : '⚠️ 예상 결과와 일치하지 않습니다.'}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Fallback state display if not specialized above */}
+                      {!isInputScene && !isAssign && !isBranch && !isReturn && !isTestResult && currentScene.stateDiff && (
+                        <div style={{ fontSize: '13px', color: '#fff', lineHeight: '1.6' }}>
+                          {traceStateRows(currentScene.stateDiff).join(' | ')}
+                        </div>
+                      )}
+                    </div>
+                  )
+                })()}
               </div>
 
               {/* Step navigation buttons */}
@@ -531,23 +702,17 @@ export default function CodeMode({
         onClose={() => setIsScaffoldOpen(false)}
       />
 
-      {/* Diagnostic Mission Modal */}
-      <DiagnosticMissionModal
-        isOpen={isDiagnosticOpen}
-        diagnosis={misconceptionDiagnosis}
-        onClose={() => setIsDiagnosticOpen(false)}
-      />
-
       {/* Protocol Repair Modal */}
-      <ProtocolRepairModal
-        isOpen={isRepairOpen}
-        syntaxError={stdout}
-        onCompleteRepair={({ fixedCode }) => {
-          handleCodeChange(fixedCode)
-          setIsRepairOpen(false)
-        }}
-        onClose={() => setIsRepairOpen(false)}
-      />
+      {isRepairOpen && (
+        <ProtocolRepairModal
+          isOpen
+          syntaxError={stdout}
+          onCompleteRepair={() => {
+            setIsRepairOpen(false)
+          }}
+          onClose={() => setIsRepairOpen(false)}
+        />
+      )}
     </div>
   )
 }

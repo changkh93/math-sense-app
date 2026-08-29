@@ -8,11 +8,13 @@
 const {
   PRIVATE_PROBLEMS,
   getPrivateProblemDefinition,
+  getTransferChallenges,
   listRegisteredProblemIds,
 } = require('./problems/index.cjs')
 
 module.exports = {
   PRIVATE_PROBLEM_DEFINITIONS: PRIVATE_PROBLEMS,
   getPrivateProblemDefinition,
+  getTransferChallenges,
   listRegisteredProblemIds,
 }

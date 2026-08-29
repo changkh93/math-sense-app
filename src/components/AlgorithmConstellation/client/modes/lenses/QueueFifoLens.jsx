@@ -1,6 +1,6 @@
 import { useState } from 'react'
 
-export default function QueueFifoLens({ kernel, shell = 'explorer', onDiscoveryComplete }) {
+export default function QueueFifoLens({ kernel, onDiscoveryComplete }) {
   const initialSignals = kernel.modes?.explore?.lensConfig?.initialSignals || ['ALPHA', 'BETA', 'GAMMA', 'DELTA']
   const [queue, setQueue] = useState(() => [...initialSignals])
   const [processed, setProcessed] = useState([])

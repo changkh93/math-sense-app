@@ -13,6 +13,8 @@ export const AC_NAV_006 = deepFreeze({
   version: 1,
   schemaVersion: 1,
   family: 'NAV',
+  evidenceRecipe: { primitives: ['ordered-buffer', 'container-membership', 'grid-frontier'] },
+  pythonConcepts: { introduces: ['builtin:set', 'method:set_add'], requires: ['class:deque', 'method:popleft', 'method:append'] },
 
   identity: {
     systemTitle: 'Navigation - Grid Breadth-First Search (BFS)',

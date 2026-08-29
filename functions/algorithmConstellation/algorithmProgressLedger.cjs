@@ -54,6 +54,18 @@ function createInMemoryAlgorithmStore() {
       return clone(progress.get(`${uid}:${problemId}`) || null)
     },
 
+    async getAllProgress(uid) {
+      const userProgress = {}
+      const prefix = `${uid}:`
+      for (const [key, value] of progress.entries()) {
+        if (key.startsWith(prefix)) {
+          const problemId = key.slice(prefix.length)
+          userProgress[problemId] = clone(value)
+        }
+      }
+      return userProgress
+    },
+
     async finalizeSuccessfulTransfer({
       attemptId,
       uid,
@@ -145,6 +157,17 @@ function createFirestoreAlgorithmStore({ db, FieldValue }) {
     async getProgress(uid, problemId) {
       const snap = await progressRef(uid, problemId).get()
       return snap.exists ? snap.data() : null
+    },
+
+    async getAllProgress(uid) {
+      const snap = await db.collection('users').doc(uid).collection('algorithmProgress')
+        .select('problemId', 'bestStars', 'masteryStatus', 'nextReturnAt', 'masteryHoldReasons', 'lastFinalizedAtMs')
+        .get()
+      const userProgress = {}
+      snap.forEach((doc) => {
+        userProgress[doc.id] = doc.data()
+      })
+      return userProgress
     },
 
     async finalizeSuccessfulTransfer({

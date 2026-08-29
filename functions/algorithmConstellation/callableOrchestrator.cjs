@@ -4,7 +4,7 @@
  */
 
 const crypto = require('crypto')
-const { getPrivateProblemDefinition } = require('./privateProblemCatalog.cjs')
+const { getPrivateProblemDefinition, getTransferChallenges } = require('./privateProblemCatalog.cjs')
 const { ATTEMPT_STATES, validateAttemptTransition } = require('./attemptStateMachine.cjs')
 const defaultJudge = require('./isolatedJudgeRuntime.cjs')
 
@@ -123,8 +123,16 @@ function publicUnderstandingChallenge(challenge) {
   return {
     challengeId: challenge.challengeId,
     type: challenge.type,
+    title: challenge.title,
     prompt: challenge.prompt,
-    questions: challenge.questions.map(({ id, text }) => ({ id, text })),
+    codeSnippet: challenge.codeSnippet,
+    questions: (challenge.questions || []).map(({ id, text, prompt, options }) => ({
+      id,
+      text: text || prompt || '',
+      options: Array.isArray(options)
+        ? options.map((opt) => (typeof opt === 'object' && opt !== null ? { value: String(opt.value), label: String(opt.label || opt.value) } : { value: String(opt), label: String(opt) }))
+        : undefined,
+    })),
   }
 }
 
@@ -342,8 +350,10 @@ function createCallableOrchestrator({
       }
       const definition = getPrivateProblemDefinition(session.problemId, session.problemVersion)
       const challenge = (definition.understandingChallenges || []).find((item) => item.challengeId === challengeId)
-      if (!challenge) throw domainError('JUDGE_UNAVAILABLE', '이해 확인 문제를 찾을 수 없습니다.')
-      passed = challenge.questions.every((question) => answers?.[question.id] === question.expected)
+      passed = challenge.questions.every((question) => {
+        const studentAns = answers?.[question.id]
+        return studentAns === question.expected || String(studentAns).trim() === String(question.expected).trim()
+      })
       if (passed) {
         validateAttemptTransition(session.state, ATTEMPT_STATES.UNDERSTANDING_PASSED)
         session.state = ATTEMPT_STATES.UNDERSTANDING_PASSED
@@ -369,7 +379,7 @@ function createCallableOrchestrator({
         throw domainError('FAILED_PRECONDITION', 'Star 1과 Star 2가 먼저 필요합니다.')
       }
       const definition = getPrivateProblemDefinition(session.problemId, session.problemVersion)
-      const challenges = definition.transferChallenges || []
+      const challenges = getTransferChallenges(definition)
       if (challenges.length === 0) throw domainError('JUDGE_UNAVAILABLE', '전이 문제를 준비하지 못했습니다.')
       challenge = session.transferChallengeId
         ? challenges.find((item) => item.transferChallengeId === session.transferChallengeId)
@@ -509,14 +519,25 @@ function createCallableOrchestrator({
   async function handleGetAlgorithmProgress(data, context) {
     const uid = requireAuthenticatedUid(context)
     const problemId = data?.problemId
-    safeIdentifier(problemId, 'problemId', 80)
-    return (await store.getProgress(uid, problemId)) || {
-      problemId,
-      bestStars: 0,
-      masteryStatus: 'unstarted',
-      nextReturnAt: null,
-      masteryHoldReasons: [],
+    if (problemId !== 'all') {
+      safeIdentifier(problemId, 'problemId', 80)
+      return (await store.getProgress(uid, problemId)) || {
+        problemId,
+        bestStars: 0,
+        masteryStatus: 'unstarted',
+        nextReturnAt: null,
+        masteryHoldReasons: [],
+      }
     }
+    const records = (await store.getAllProgress(uid)) || {}
+    return Object.fromEntries(Object.entries(records).map(([id, record]) => [id, {
+      problemId: id,
+      bestStars: Math.max(0, Math.min(3, Number(record?.bestStars) || 0)),
+      masteryStatus: record?.masteryStatus || 'unstarted',
+      nextReturnAt: record?.nextReturnAt ?? null,
+      masteryHoldReasons: Array.isArray(record?.masteryHoldReasons) ? record.masteryHoldReasons : [],
+      lastFinalizedAtMs: record?.lastFinalizedAtMs ?? null,
+    }]))
   }
 
   return {

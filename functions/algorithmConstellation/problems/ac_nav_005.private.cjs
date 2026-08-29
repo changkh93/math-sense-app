@@ -11,7 +11,7 @@ module.exports = {
   canonicalStrategy: 'from collections import deque; queue = deque(signals); while queue: processed.append(queue.popleft())',
   officialSolutionCode: `from collections import deque\n\ndef process_signals(signals):\n    queue = deque(signals)\n    processed = []\n    while queue:\n        signal = queue.popleft()\n        processed.append(signal)\n    return processed\n`,
   alternativeSolutions: [
-    `def process_signals(signals):\n    return [s for s in signals]\n`,
+    `def process_signals(signals):\n    res = []\n    for s in signals:\n        res.append(s)\n    return res\n`,
   ],
   intendedWrongSolutions: [
     {

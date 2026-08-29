@@ -9,7 +9,16 @@ import { buildExternalAiCoachPrompt } from '../aiCoach/buildExternalAiCoachPromp
 import { createMissionStateMachine, MISSION_STATES } from './missionStateMachine.js'
 import { createAlgorithmConstellationMockGateway } from '../services/AlgorithmConstellationMockGateway.js'
 import { createSustainedBlurGuard } from '../../../../utils/quizFocusGuard.js'
-import { loadAlgorithmDraft, saveAlgorithmDraft, clearAlgorithmDraft } from '../services/algorithmDraftStorage.js'
+import { auth } from '../../../../firebase.js'
+import {
+  loadAlgorithmDraft,
+  saveAlgorithmDraft,
+  loadCompletedPythonConceptIds,
+  markPythonConceptCompleted,
+} from '../services/algorithmDraftStorage.js'
+import FirstEncounterCard from '../scaffold/FirstEncounterCard.jsx'
+import { getConceptsNeededForProblem } from '../../shared/python/pythonConceptRegistry.js'
+import { getPatternsNeededForProblem } from '../../shared/patterns/problemSolvingPatternRegistry.js'
 
 function normalizeCallableErrorCode(error) {
   return String(error?.code || '')
@@ -23,25 +32,38 @@ export default function AlgorithmMissionShell({
   initialShell = 'explorer',
   gateway,
   intent = 'learn',
-  draftOwnerKey = 'guest_default',
+  draftOwnerKey,
+  allowBypass = false,
   onExit,
+  onProgressUpdate,
 }) {
+  const safeOwnerKey = draftOwnerKey || auth.currentUser?.uid || 'guest_pilot'
   const existingDraft = useMemo(() => {
-    return loadAlgorithmDraft({ problemId: kernel.id, problemVersion: kernel.version, ownerKey: draftOwnerKey })
-  }, [draftOwnerKey, kernel.id, kernel.version])
+    return loadAlgorithmDraft({ problemId: kernel.id, problemVersion: kernel.version, ownerKey: safeOwnerKey })
+  }, [kernel.id, kernel.version, safeOwnerKey])
 
   const [shell, setShell] = useState(existingDraft?.shell || initialShell)
   const [fsmState, setFsmState] = useState(existingDraft?.fsmState || MISSION_STATES.OBSERVE)
+  const [observeCompleted, setObserveCompleted] = useState(
+    Boolean(existingDraft?.observeCompleted || existingDraft?.fsmState === MISSION_STATES.EXPLORE || existingDraft?.fsmState === MISSION_STATES.CODE || existingDraft?.fsmState === MISSION_STATES.RUN_SUCCESS || existingDraft?.fsmState === MISSION_STATES.UNDERSTANDING_CHECK || existingDraft?.fsmState === MISSION_STATES.TRANSFER_CHALLENGE || existingDraft?.fsmState === MISSION_STATES.COMPLETE)
+  )
+  const [exploreCompleted, setExploreCompleted] = useState(
+    Boolean(existingDraft?.exploreCompleted || existingDraft?.fsmState === MISSION_STATES.CODE || existingDraft?.fsmState === MISSION_STATES.RUN_SUCCESS || existingDraft?.fsmState === MISSION_STATES.UNDERSTANDING_CHECK || existingDraft?.fsmState === MISSION_STATES.TRANSFER_CHALLENGE || existingDraft?.fsmState === MISSION_STATES.COMPLETE)
+  )
   const [attemptSession, setAttemptSession] = useState(null)
   const [currentProgress, setCurrentProgress] = useState({})
   const [isAiModalOpen, setIsAiModalOpen] = useState(false)
   const [transferData, setTransferData] = useState(null)
-  const [completionResult, setCompletionResult] = useState(null)
+  const [completionResult, setCompletionResult] = useState(existingDraft?.completionResult || null)
   const [understandingChallenge, setUnderstandingChallenge] = useState(null)
   const [currentCode, setCurrentCode] = useState(existingDraft?.code || kernel.modes?.code?.starterCode || '')
   const [activeMisconception, setActiveMisconception] = useState(null)
   const [recentTraceScenes, setRecentTraceScenes] = useState([])
+  const [recentLearningEvidence, setRecentLearningEvidence] = useState([])
   const [recentPublicTestError, setRecentPublicTestError] = useState('')
+  const [completedConceptIds, setCompletedConceptIds] = useState(() => new Set(
+    loadCompletedPythonConceptIds({ ownerKey: safeOwnerKey })
+  ))
   const generatedRequestId = `start_${useId().replace(/[^A-Za-z0-9_-]/g, '_')}`
   const startRequestId = existingDraft?.requestId || generatedRequestId
   const [focusLockReason, setFocusLockReason] = useState('')
@@ -50,6 +72,14 @@ export default function AlgorithmMissionShell({
   const [studentErrorMessage, setStudentErrorMessage] = useState(null)
   const lastIntegrityEventAt = useRef(0)
   const recordedScaffoldLevels = useRef(new Set())
+  const neededConcepts = useMemo(() => {
+    const py = getConceptsNeededForProblem(kernel.id, kernel.pythonConcepts)
+    const pat = getPatternsNeededForProblem(kernel.id, kernel.thinkingPatterns)
+    return [...py, ...pat]
+  }, [kernel.id, kernel.pythonConcepts, kernel.thinkingPatterns])
+  const pendingFirstEncounter = neededConcepts.find(
+    (concept) => !completedConceptIds.has(concept.conceptId || concept.patternId)
+  ) || null
 
   // Use provided gateway or default to mock gateway for safe standalone dev
   const activeGateway = useMemo(() => {
@@ -65,6 +95,25 @@ export default function AlgorithmMissionShell({
     })
   }, [existingDraft?.fsmState])
 
+  // Guarded transition helper to prevent bypassing prerequisites
+  const handleTransition = (targetState) => {
+    if (shell === 'pro') {
+      fsm.transition(targetState)
+      return
+    }
+    if (targetState === MISSION_STATES.EXPLORE) {
+      if (!observeCompleted && !allowBypass && fsmState === MISSION_STATES.OBSERVE) {
+        return
+      }
+    }
+    if (targetState === MISSION_STATES.CODE) {
+      if ((!observeCompleted || !exploreCompleted) && !allowBypass && (fsmState === MISSION_STATES.OBSERVE || fsmState === MISSION_STATES.EXPLORE)) {
+        return
+      }
+    }
+    fsm.transition(targetState)
+  }
+
   // Start Attempt Session on mount
   useEffect(() => {
     let isMounted = true
@@ -78,17 +127,15 @@ export default function AlgorithmMissionShell({
           requestId: startRequestId,
         })
         if (isMounted) {
-          recordedScaffoldLevels.current.clear()
           setAttemptSession(session)
           setCurrentProgress(session.progress || {})
         }
       } catch (err) {
-        console.error('Failed to start algorithm attempt session:', err)
         if (isMounted) {
-          if (normalizeCallableErrorCode(err) === 'FAILED_PRECONDITION' && intent === 'independent_return') {
+          if (['RATE_LIMITED', 'RESOURCE_EXHAUSTED'].includes(normalizeCallableErrorCode(err))) {
             setStudentErrorMessage({
-              title: '독립 귀환 대기 중',
-              description: '아직 24시간 독립 귀환 예약 시간이 도래하지 않았습니다.',
+              title: '잠시 후 다시 시도해 주세요',
+              description: '연속 요청이 많아 채점소가 잠시 숨을 고르고 있어요. 잠시 후 다시 시도해 주세요.',
             })
           } else {
             setStudentErrorMessage({
@@ -107,24 +154,24 @@ export default function AlgorithmMissionShell({
 
   // Debounced draft auto-save effect
   useEffect(() => {
-    if (fsmState === MISSION_STATES.COMPLETE) {
-      clearAlgorithmDraft({ problemId: kernel.id, problemVersion: kernel.version, ownerKey: draftOwnerKey })
-      return undefined
-    }
     const timer = setTimeout(() => {
       saveAlgorithmDraft({
         problemId: kernel.id,
         problemVersion: kernel.version,
-        ownerKey: draftOwnerKey,
+        ownerKey: safeOwnerKey,
         requestId: startRequestId,
         attemptId: attemptSession?.attemptId || existingDraft?.attemptId || null,
         code: currentCode,
         fsmState,
         shell,
+        observeCompleted,
+        exploreCompleted,
+        stars: completionResult?.stars || currentProgress?.bestStars || (fsmState === MISSION_STATES.COMPLETE ? 3 : 0),
+        completionResult,
       })
-    }, 1500)
+    }, 1000)
     return () => clearTimeout(timer)
-  }, [attemptSession?.attemptId, currentCode, draftOwnerKey, existingDraft?.attemptId, fsmState, kernel.id, kernel.version, shell, startRequestId])
+  }, [attemptSession?.attemptId, completionResult, currentCode, currentProgress?.bestStars, existingDraft?.attemptId, exploreCompleted, fsmState, kernel.id, kernel.version, observeCompleted, safeOwnerKey, shell, startRequestId])
 
   // Integrity Guard:
   // - Learn mode: Zero focus lock (gentle learning).
@@ -301,22 +348,26 @@ export default function AlgorithmMissionShell({
       transferCode,
     })
     if (res.passed) {
-      setCompletionResult(res)
-      setCurrentProgress((prev) => ({
-        ...prev,
-        bestStars: Math.max(prev.bestStars || 0, res.stars || 3),
+      const nextProgress = {
+        problemId: kernel.id,
+        bestStars: Math.max(currentProgress.bestStars || 0, res.stars || 3),
         masteryStatus: res.masteryStatus,
         nextReturnAt: res.nextReturnAt,
         masteryHoldReasons: res.masteryHoldReasons || [],
-      }))
+      }
+      setCompletionResult(res)
+      setCurrentProgress((prev) => ({ ...prev, ...nextProgress }))
+      onProgressUpdate?.(nextProgress)
     }
     return res
   }
 
   const generatedPrompt = buildExternalAiCoachPrompt({
     problemTitle: kernel.identity?.studentTitle,
+    learningObjective: kernel.learning?.objective,
     studentCode: currentCode,
     traceScenes: recentTraceScenes,
+    learningEvidence: recentLearningEvidence,
     misconceptionDiagnosis: activeMisconception,
     publicTestError: recentPublicTestError,
   })
@@ -355,27 +406,44 @@ export default function AlgorithmMissionShell({
 
         {/* Shell Selector & Status */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
-          <div style={{ display: 'flex', background: 'rgba(0, 0, 0, 0.4)', borderRadius: '8px', padding: '4px', border: '1px solid rgba(255, 255, 255, 0.15)' }}>
-            {['explorer', 'navigator', 'pro'].map((s) => (
-              <button
-                key={s}
-                type="button"
-                onClick={() => setShell(s)}
-                style={{
-                  padding: '6px 12px',
-                  borderRadius: '6px',
-                  border: 'none',
-                  background: shell === s ? '#00f0ff' : 'transparent',
-                  color: shell === s ? '#000' : 'rgba(255, 255, 255, 0.7)',
-                  fontWeight: shell === s ? 'bold' : 'normal',
-                  fontSize: '12px',
-                  cursor: 'pointer',
-                  textTransform: 'uppercase',
-                }}
-              >
-                {s}
-              </button>
-            ))}
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px' }}>
+            <div style={{ display: 'flex', background: 'rgba(0, 0, 0, 0.4)', borderRadius: '8px', padding: '4px', border: '1px solid rgba(255, 255, 255, 0.15)' }}>
+              {[
+                { key: 'explorer', label: '🔎 함께 탐색', desc: '작은 예를 보며 하나씩 발견하고 힌트를 받아요' },
+                { key: 'navigator', label: '🧭 기본 항해', desc: '예측·실험 후 코드로 직접 구현해요 (기본)' },
+                { key: 'pro', label: '🚀 독립 도전', desc: '최소한의 도움으로 코드 에디터에서 바로 해결해요' },
+              ].map((s) => (
+                <button
+                  key={s.key}
+                  type="button"
+                  onClick={() => {
+                    setShell(s.key)
+                    if (s.key === 'pro') {
+                      fsm.transition(MISSION_STATES.CODE)
+                    }
+                  }}
+                  title={s.desc}
+                  style={{
+                    padding: '6px 12px',
+                    borderRadius: '6px',
+                    border: 'none',
+                    background: shell === s.key ? '#00f0ff' : 'transparent',
+                    color: shell === s.key ? '#000' : 'rgba(255, 255, 255, 0.7)',
+                    fontWeight: shell === s.key ? 'bold' : 'normal',
+                    fontSize: '12px',
+                    cursor: 'pointer',
+                    transition: 'all 0.15s ease',
+                  }}
+                >
+                  {s.label}
+                </button>
+              ))}
+            </div>
+            <div style={{ fontSize: '11px', color: '#94a3b8' }}>
+              {shell === 'explorer' && '💡 작은 예시를 보며 단계별 힌트와 함께 발견해요'}
+              {shell === 'navigator' && '🧭 예측과 실험을 거쳐 표준 코드로 구현해요'}
+              {shell === 'pro' && '🚀 에디터에서 바로 독립 구현에 도전해요'}
+            </div>
           </div>
 
           <div style={{ textAlign: 'right' }}>
@@ -426,27 +494,45 @@ export default function AlgorithmMissionShell({
       {/* Mode Navigation Tabs */}
       <div style={{ display: 'flex', gap: '10px', marginBottom: '20px' }}>
         {[
-          { key: MISSION_STATES.OBSERVE, label: '1. 관찰 및 예측' },
-          { key: MISSION_STATES.EXPLORE, label: '2. 대화형 실험' },
-          { key: MISSION_STATES.CODE, label: '3. Python 코드' },
+          {
+            key: MISSION_STATES.OBSERVE,
+            label: '1. 관찰 및 예측',
+            isAccessible: true,
+          },
+          {
+            key: MISSION_STATES.EXPLORE,
+            label: '2. 대화형 실험',
+            isAccessible: shell === 'pro' || observeCompleted || allowBypass || fsmState === MISSION_STATES.EXPLORE || fsmState === MISSION_STATES.CODE || fsmState === MISSION_STATES.RUN_SUCCESS || fsmState === MISSION_STATES.UNDERSTANDING_CHECK || fsmState === MISSION_STATES.TRANSFER_CHALLENGE || fsmState === MISSION_STATES.COMPLETE,
+            lockReason: '1단계 관찰 및 예측을 먼저 완료해 주세요 (🚀 독립 도전 모드에서는 바로 진입 가능).',
+          },
+          {
+            key: MISSION_STATES.CODE,
+            label: '3. Python 코드',
+            isAccessible: shell === 'pro' || (observeCompleted && exploreCompleted) || allowBypass || fsmState === MISSION_STATES.CODE || fsmState === MISSION_STATES.RUN_SUCCESS || fsmState === MISSION_STATES.UNDERSTANDING_CHECK || fsmState === MISSION_STATES.TRANSFER_CHALLENGE || fsmState === MISSION_STATES.COMPLETE,
+            lockReason: '2단계 대화형 실험실에서 규칙을 발견해야 코드로 진입할 수 있습니다 (🚀 독립 도전 모드에서는 바로 진입 가능).',
+          },
         ].map((tab) => {
           const isActive = fsmState === tab.key || (tab.key === MISSION_STATES.CODE && (fsmState === MISSION_STATES.RUN_SUCCESS || fsmState === MISSION_STATES.UNDERSTANDING_CHECK || fsmState === MISSION_STATES.TRANSFER_CHALLENGE || fsmState === MISSION_STATES.COMPLETE))
+          const isAccessible = tab.isAccessible
           return (
             <button
               key={tab.key}
               type="button"
-              onClick={() => fsm.transition(tab.key)}
+              onClick={() => isAccessible && handleTransition(tab.key)}
+              disabled={!isAccessible}
+              title={!isAccessible ? tab.lockReason : ''}
               style={{
                 padding: '8px 16px',
                 borderRadius: '8px',
                 border: isActive ? '1px solid #00f0ff' : '1px solid rgba(255, 255, 255, 0.1)',
                 background: isActive ? 'rgba(0, 240, 255, 0.15)' : 'rgba(0, 0, 0, 0.3)',
-                color: isActive ? '#00f0ff' : 'rgba(255, 255, 255, 0.6)',
+                color: isActive ? '#00f0ff' : isAccessible ? 'rgba(255, 255, 255, 0.6)' : 'rgba(255, 255, 255, 0.25)',
                 fontWeight: isActive ? 'bold' : 'normal',
-                cursor: 'pointer',
+                cursor: isAccessible ? 'pointer' : 'not-allowed',
+                opacity: isAccessible ? 1 : 0.6,
               }}
             >
-              {tab.label}
+              {tab.label} {!isAccessible && '🔒'}
             </button>
           )
         })}
@@ -457,8 +543,19 @@ export default function AlgorithmMissionShell({
         <ObserveMode
           kernel={kernel}
           shell={shell}
-          onProceedToExplore={() => fsm.transition(MISSION_STATES.EXPLORE)}
-          onProceedToCode={() => fsm.transition(MISSION_STATES.CODE)}
+          onCompleteMicroEvidence={() => setObserveCompleted(true)}
+          onProceedToExplore={() => {
+            setObserveCompleted(true)
+            handleTransition(MISSION_STATES.EXPLORE)
+          }}
+          onProceedToCode={() => {
+            setObserveCompleted(true)
+            if (exploreCompleted || allowBypass) {
+              handleTransition(MISSION_STATES.CODE)
+            } else {
+              handleTransition(MISSION_STATES.EXPLORE)
+            }
+          }}
         />
       )}
 
@@ -466,29 +563,47 @@ export default function AlgorithmMissionShell({
         <ExploreMode
           kernel={kernel}
           shell={shell}
-          onBackToObserve={() => fsm.transition(MISSION_STATES.OBSERVE)}
-          onProceedToCode={() => fsm.transition(MISSION_STATES.CODE)}
+          allowBypass={allowBypass}
+          onCompleteMicroEvidence={() => setExploreCompleted(true)}
+          onBackToObserve={() => handleTransition(MISSION_STATES.OBSERVE)}
+          onProceedToCode={() => {
+            setExploreCompleted(true)
+            handleTransition(MISSION_STATES.CODE)
+          }}
         />
       )}
 
       {(fsmState === MISSION_STATES.CODE || fsmState === MISSION_STATES.RUN_SUCCESS) && (
         <div>
-          <CodeMode
-            kernel={kernel}
-            shell={shell}
-            initialCode={currentCode}
-            assistanceAllowed={Boolean(attemptSession?.policy?.assistanceAllowed)}
-            onCodeChange={(c) => setCurrentCode(c)}
-            onSubmitSolution={handleSubmitBaseCode}
-            onOpenAiPromptModal={({ currentCode: c, diagnosis, scenes, publicTestError }) => {
-              setCurrentCode(c)
-              setActiveMisconception(diagnosis)
-              setRecentTraceScenes(scenes || [])
-              setRecentPublicTestError(publicTestError || '')
-              setIsAiModalOpen(true)
-            }}
-            onRequestHint={handleRequestHint}
-          />
+          {pendingFirstEncounter ? (
+            <FirstEncounterCard
+              key={pendingFirstEncounter.conceptId || pendingFirstEncounter.patternId}
+              concept={pendingFirstEncounter}
+              onComplete={(conceptId) => {
+                const id = conceptId || pendingFirstEncounter.conceptId || pendingFirstEncounter.patternId
+                setCompletedConceptIds((previous) => new Set([...previous, id]))
+                markPythonConceptCompleted({ ownerKey: draftOwnerKey, conceptId: id })
+              }}
+            />
+          ) : (
+            <CodeMode
+              kernel={kernel}
+              shell={shell}
+              initialCode={currentCode}
+              assistanceAllowed={Boolean(attemptSession?.policy?.assistanceAllowed)}
+              onCodeChange={(c) => setCurrentCode(c)}
+              onSubmitSolution={handleSubmitBaseCode}
+              onOpenAiPromptModal={({ currentCode: c, diagnosis, scenes, learningEvidence, publicTestError }) => {
+                setCurrentCode(c)
+                setActiveMisconception(diagnosis)
+                setRecentTraceScenes(scenes || [])
+                setRecentLearningEvidence(learningEvidence || [])
+                setRecentPublicTestError(publicTestError || '')
+                setIsAiModalOpen(true)
+              }}
+              onRequestHint={handleRequestHint}
+            />
+          )}
           {fsmState === MISSION_STATES.RUN_SUCCESS && (
             <div style={{ marginTop: '20px', padding: '16px', background: 'rgba(16, 185, 129, 0.15)', border: '1px solid #10b981', borderRadius: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div>
@@ -517,7 +632,9 @@ export default function AlgorithmMissionShell({
       {fsmState === MISSION_STATES.UNDERSTANDING_CHECK && (
         understandingChallenge ? (
           <UnderstandingCheckMode
+            key={understandingChallenge.challengeId}
             challenge={understandingChallenge}
+            code={currentCode}
             onSubmitUnderstanding={handleSubmitUnderstanding}
             onProceedToTransfer={handleProceedToTransfer}
           />
@@ -530,6 +647,7 @@ export default function AlgorithmMissionShell({
 
       {fsmState === MISSION_STATES.TRANSFER_CHALLENGE && (
         <TransferChallengeMode
+          key={transferData?.transferChallenge?.transferChallengeId || 'transfer-pending'}
           transferChallenge={transferData?.transferChallenge}
           challengeToken={transferData?.challengeToken}
           onSubmitTransfer={handleSubmitTransfer}
@@ -541,31 +659,52 @@ export default function AlgorithmMissionShell({
         <div style={{ padding: '32px', background: 'rgba(10, 20, 40, 0.85)', borderRadius: '16px', border: '2px solid #fbbf24', textAlign: 'center' }}>
           <div style={{ fontSize: '48px', marginBottom: '12px' }}>🏆</div>
           <h2 style={{ fontSize: '24px', color: '#fbbf24', margin: '0 0 12px' }}>
-            {kernel.id} 생각의 항로 탐사 완료!
+            {kernel.identity?.studentTitle || kernel.id} 생각의 항로 탐사 완료!
           </h2>
           <div style={{ fontSize: '28px', color: '#fbbf24', marginBottom: '16px' }}>
             {'★'.repeat(completionResult?.stars || 3)}
           </div>
           <p style={{ color: '#e2e8f0', fontSize: '15px', maxWidth: '600px', margin: '0 auto 24px', lineHeight: '1.6' }}>
-            {completionResult?.masteryStatus === 'mastered'
+            {completionResult?.authoritative === false
+              ? '축하합니다! 이 문제의 모든 탐사와 전이 미션을 3★으로 완수했습니다.'
+              : completionResult?.masteryStatus === 'mastered'
               ? '스스로 모든 증거와 전이 문제를 완결하여 마스터리를 달성했습니다!'
               : '강한 지원 또는 외부 도구를 활용해 탐사를 마쳤습니다. 24시간 후 도움 없는 독립 귀환에 성공하면 완전한 마스터리가 부여됩니다.'}
           </p>
-          <button
-            type="button"
-            onClick={() => fsm.transition(MISSION_STATES.OBSERVE)}
-            style={{
-              padding: '12px 24px',
-              background: 'linear-gradient(135deg, #00f0ff, #0284c7)',
-              color: '#000',
-              fontWeight: 'bold',
-              border: 'none',
-              borderRadius: '8px',
-              cursor: 'pointer',
-            }}
-          >
-            다시 탐사하기
-          </button>
+          <div style={{ display: 'flex', justifyContent: 'center', gap: '12px', flexWrap: 'wrap' }}>
+            <button
+              type="button"
+              onClick={onExit}
+              style={{
+                padding: '12px 28px',
+                background: 'linear-gradient(135deg, #10b981, #059669)',
+                color: '#fff',
+                fontWeight: 'bold',
+                fontSize: '15px',
+                border: 'none',
+                borderRadius: '10px',
+                cursor: 'pointer',
+                boxShadow: '0 4px 14px rgba(16, 185, 129, 0.4)',
+              }}
+            >
+              🌌 다음 탐사 항로로 이동 (목록으로) ➔
+            </button>
+            <button
+              type="button"
+              onClick={() => fsm.transition(MISSION_STATES.OBSERVE)}
+              style={{
+                padding: '12px 20px',
+                background: 'rgba(255, 255, 255, 0.08)',
+                border: '1px solid rgba(255, 255, 255, 0.2)',
+                color: '#94a3b8',
+                fontWeight: '600',
+                borderRadius: '10px',
+                cursor: 'pointer',
+              }}
+            >
+              🔄 이 문제 다시 풀기 (복습)
+            </button>
+          </div>
         </div>
       )}
 

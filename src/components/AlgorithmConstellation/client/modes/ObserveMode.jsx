@@ -3,9 +3,9 @@ import { useState } from 'react'
 function isAnswerMatch(selected, expected) {
   if (selected === undefined || selected === null) return false
   if (typeof expected === 'boolean') return selected === expected
-  if (typeof expected === 'number') return Number(selected) === expected
+  if (typeof expected === 'number') return typeof selected === 'number' ? selected === expected : Number(selected) === expected
   if (typeof selected === 'string' && typeof expected === 'string') {
-    return selected === expected || selected.startsWith(expected) || expected.startsWith(selected)
+    return selected.trim() === expected.trim()
   }
   return JSON.stringify(selected) === JSON.stringify(expected)
 }
@@ -201,7 +201,7 @@ export default function ObserveMode({
                     </>
                   ) : answerSchema.options && Array.isArray(answerSchema.options) ? (
                     answerSchema.options.map((opt, optIdx) => {
-                      const isOptionSelected = selected === opt || (typeof opt === 'string' && opt.startsWith(String(selected)))
+                      const isOptionSelected = isAnswerMatch(selected, opt)
                       return (
                         <button
                           key={optIdx}

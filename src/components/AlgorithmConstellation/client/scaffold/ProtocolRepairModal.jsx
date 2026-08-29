@@ -20,7 +20,6 @@ export default function ProtocolRepairModal({
         { id: 'opt1', text: '함수 선언 끝에 콜론(:)이 누락되었습니다.', isCorrect: true },
         { id: 'opt2', text: 'return 앞에 들여쓰기가 잘못되었습니다.', isCorrect: false },
       ],
-      fixedCode: 'def check_gate(s1, s2):\n    return s1 and s2\n',
     },
   ]
 
@@ -30,7 +29,7 @@ export default function ProtocolRepairModal({
     setSubmitted(true)
     const isCorrect = currentExercise.options.find((o) => o.id === selectedFix)?.isCorrect
     if (isCorrect) {
-      onCompleteRepair?.({ fixedCode: currentExercise.fixedCode })
+      onCompleteRepair?.({ repairKind: currentExercise.id })
     }
   }
 
@@ -152,7 +151,7 @@ export default function ProtocolRepairModal({
                 cursor: 'pointer',
               }}
             >
-              수정된 코드로 탐사 계속하기
+              내 코드로 돌아가기
             </button>
           )}
         </div>
