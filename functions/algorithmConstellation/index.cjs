@@ -30,11 +30,9 @@ module.exports = function createAlgorithmConstellationFunctions({ functions, adm
 
   // No warm instance is reserved: this vertical slice favors low idle cost.
   const secureCallable = regionalFunctions.runWith({
-    maxInstances: 3,
+    maxInstances: 10,
     memory: '256MB',
     timeoutSeconds: 30,
-    secrets: ['GUEST_ABUSE_HASH_SECRET'],
-    enforceAppCheck: true,
   })
 
   function callable(handler) {

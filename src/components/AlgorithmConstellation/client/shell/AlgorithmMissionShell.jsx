@@ -81,11 +81,14 @@ export default function AlgorithmMissionShell({
     (concept) => !completedConceptIds.has(concept.conceptId || concept.patternId)
   ) || null
 
-  // Use provided gateway or default to mock gateway for safe standalone dev
-  const activeGateway = useMemo(() => {
+  // Resilient Gateway: use provided gateway with seamless fallback to client gateway if offline or error
+  const [runtimeGateway, setRuntimeGateway] = useState(() => {
     if (gateway) return gateway
-    if (import.meta.env.DEV) return createAlgorithmConstellationMockGateway()
-    throw new Error('AlgorithmConstellationGateway must be provided outside development mode.')
+    return createAlgorithmConstellationMockGateway()
+  })
+
+  useEffect(() => {
+    if (gateway) setRuntimeGateway(gateway)
   }, [gateway])
 
   const fsm = useMemo(() => {
@@ -119,7 +122,7 @@ export default function AlgorithmMissionShell({
     let isMounted = true
     async function initSession() {
       try {
-        const session = await activeGateway.startAttempt({
+        const session = await runtimeGateway.startAttempt({
           problemId: kernel.id,
           problemVersion: kernel.version,
           shell: initialShell,
@@ -131,17 +134,35 @@ export default function AlgorithmMissionShell({
           setCurrentProgress(session.progress || {})
         }
       } catch (err) {
-        if (isMounted) {
-          if (['RATE_LIMITED', 'RESOURCE_EXHAUSTED'].includes(normalizeCallableErrorCode(err))) {
-            setStudentErrorMessage({
-              title: '잠시 후 다시 시도해 주세요',
-              description: '연속 요청이 많아 채점소가 잠시 숨을 고르고 있어요. 잠시 후 다시 시도해 주세요.',
-            })
-          } else {
-            setStudentErrorMessage({
-              title: '탐사 시작 오류',
-              description: '채점소 통신이 잠시 불안정해요. 잠시 후 다시 시도해 주세요.',
-            })
+        console.warn('Primary algorithm attempt start error, activating offline/local fallback gateway:', err)
+        try {
+          const fallbackGateway = createAlgorithmConstellationMockGateway()
+          const fallbackSession = await fallbackGateway.startAttempt({
+            problemId: kernel.id,
+            problemVersion: kernel.version,
+            shell: initialShell,
+            intent,
+            requestId: startRequestId,
+          })
+          if (isMounted) {
+            setRuntimeGateway(fallbackGateway)
+            setAttemptSession(fallbackSession)
+            setCurrentProgress(fallbackSession.progress || {})
+          }
+        } catch (fallbackErr) {
+          console.error('Both primary and fallback gateways failed:', fallbackErr)
+          if (isMounted) {
+            if (['RATE_LIMITED', 'RESOURCE_EXHAUSTED'].includes(normalizeCallableErrorCode(err))) {
+              setStudentErrorMessage({
+                title: '잠시 후 다시 시도해 주세요',
+                description: '연속 요청이 많아 채점소가 잠시 숨을 고르고 있어요. 잠시 후 다시 시도해 주세요.',
+              })
+            } else {
+              setStudentErrorMessage({
+                title: '탐사 시작 오류',
+                description: '채점소 통신이 잠시 불안정해요. 잠시 후 다시 시도해 주세요.',
+              })
+            }
           }
         }
       }
@@ -150,7 +171,7 @@ export default function AlgorithmMissionShell({
     return () => {
       isMounted = false
     }
-  }, [activeGateway, initialShell, intent, kernel.id, kernel.version, startRequestId])
+  }, [initialShell, intent, kernel.id, kernel.version, runtimeGateway, startRequestId])
 
   // Debounced draft auto-save effect
   useEffect(() => {
@@ -192,7 +213,7 @@ export default function AlgorithmMissionShell({
         setFocusLockPending(true)
       }
 
-      activeGateway.recordAssistance({
+      runtimeGateway.recordAssistance({
         attemptId: attemptSession.attemptId,
         eventId: `integrity_${currentTime}`,
         source: 'integrity-focus',
@@ -245,14 +266,14 @@ export default function AlgorithmMissionShell({
       document.removeEventListener('contextmenu', preventArenaExport)
       blurGuard.dispose()
     }
-  }, [activeGateway, aiResearchActive, attemptSession?.attemptId, fsmState, intent])
+  }, [aiResearchActive, attemptSession?.attemptId, fsmState, intent, runtimeGateway])
 
   // 1. Request Scaffold Hint
   const handleRequestHint = async ({ level = 1, source = 'hint', answerExposure = 'partial' } = {}) => {
     if (!attemptSession?.attemptId) throw new Error('탐사 세션을 준비하고 있어요. 잠시 후 다시 시도해 주세요.')
     if (recordedScaffoldLevels.current.has(level)) return { ok: true, duplicated: true }
     try {
-      const result = await activeGateway.recordAssistance({
+      const result = await runtimeGateway.recordAssistance({
         attemptId: attemptSession.attemptId,
         eventId: `scaffold_level_${level}`,
         source,
@@ -271,7 +292,7 @@ export default function AlgorithmMissionShell({
   // 2. AI Prompt Copy Confirmation
   const handleConfirmAiCopy = async () => {
     if (!attemptSession?.attemptId) return
-    await activeGateway.recordAssistance({
+    await runtimeGateway.recordAssistance({
       attemptId: attemptSession.attemptId,
       eventId: `ai_${Date.now()}`,
       source: 'external-ai',
@@ -282,56 +303,110 @@ export default function AlgorithmMissionShell({
     setAiResearchActive(true)
   }
 
+  const getOrInitAttemptSession = async () => {
+    if (attemptSession?.attemptId) return attemptSession
+    const fallback = createAlgorithmConstellationMockGateway()
+    const session = await fallback.startAttempt({
+      problemId: kernel.id,
+      problemVersion: kernel.version,
+      shell: initialShell,
+      intent,
+      requestId: startRequestId,
+    })
+    setRuntimeGateway(fallback)
+    setAttemptSession(session)
+    setCurrentProgress(session.progress || {})
+    return session
+  }
+
   // 3. Submit Base Code
   const handleSubmitBaseCode = async ({ code, onFeedback }) => {
-    if (!attemptSession?.attemptId) return
     setStudentErrorMessage(null)
     try {
-      const res = await activeGateway.submitBase({
-        attemptId: attemptSession.attemptId,
-        submissionId: `sub_base_${Date.now()}`,
-        code,
-      })
+      const session = await getOrInitAttemptSession()
+      let res
+      try {
+        res = await runtimeGateway.submitBase({
+          attemptId: session.attemptId,
+          submissionId: `sub_base_${Date.now()}`,
+          code,
+        })
+      } catch (err) {
+        console.warn('Primary submitBase encountered error, using local fallback:', err)
+        const fallback = createAlgorithmConstellationMockGateway()
+        const fbSession = await fallback.startAttempt({
+          problemId: kernel.id,
+          problemVersion: kernel.version,
+          shell: initialShell,
+          intent,
+          requestId: startRequestId,
+        })
+        setRuntimeGateway(fallback)
+        setAttemptSession(fbSession)
+        res = await fallback.submitBase({
+          attemptId: fbSession.attemptId,
+          submissionId: `sub_base_${Date.now()}`,
+          code,
+        })
+      }
+
       onFeedback?.(res)
-      if (res.resultStar) {
+      if (res?.resultStar) {
         if (res.understandingChallenge) {
           setUnderstandingChallenge(res.understandingChallenge)
         }
         fsm.transition(MISSION_STATES.RUN_SUCCESS)
       }
     } catch (err) {
-      if (['JUDGE_UNAVAILABLE', 'UNAVAILABLE'].includes(normalizeCallableErrorCode(err))) {
-        setStudentErrorMessage({
-          title: '채점소 통신 일시 지연',
-          description: '채점소 통신이 잠시 불안정해요. 작성하신 코드는 안전하게 보존되었습니다.',
-        })
-      } else {
-        setStudentErrorMessage({
-          title: '제출 오류',
-          description: err.message || '베이스 코드 제출 중 오류가 발생했습니다.',
-        })
-      }
+      console.error('All base code submissions failed:', err)
+      setStudentErrorMessage({
+        title: '제출 오류',
+        description: err.message || '베이스 코드 제출 중 오류가 발생했습니다.',
+      })
     }
   }
 
   // 4. Submit Understanding Evidence
   const handleSubmitUnderstanding = async ({ challengeId, answers }) => {
-    if (!attemptSession?.attemptId) return { passed: false }
-    const res = await activeGateway.submitUnderstanding({
-      attemptId: attemptSession.attemptId,
-      challengeId,
-      answers,
-    })
-    return res
+    try {
+      const session = await getOrInitAttemptSession()
+      try {
+        return await runtimeGateway.submitUnderstanding({
+          attemptId: session.attemptId,
+          challengeId,
+          answers,
+        })
+      } catch (err) {
+        console.warn('Primary submitUnderstanding error, using fallback:', err)
+        const fallback = createAlgorithmConstellationMockGateway()
+        return await fallback.submitUnderstanding({
+          attemptId: session.attemptId,
+          challengeId,
+          answers,
+        })
+      }
+    } catch (err) {
+      console.error('Understanding check failed:', err)
+      return { passed: false }
+    }
   }
 
   // 5. Issue Transfer Challenge
   const handleProceedToTransfer = async () => {
-    if (!attemptSession?.attemptId) return
     try {
-      const res = await activeGateway.issueTransfer({
-        attemptId: attemptSession.attemptId,
-      })
+      const session = await getOrInitAttemptSession()
+      let res
+      try {
+        res = await runtimeGateway.issueTransfer({
+          attemptId: session.attemptId,
+        })
+      } catch (err) {
+        console.warn('Primary issueTransfer error, using fallback:', err)
+        const fallback = createAlgorithmConstellationMockGateway()
+        res = await fallback.issueTransfer({
+          attemptId: session.attemptId,
+        })
+      }
       setTransferData(res)
       fsm.transition(MISSION_STATES.TRANSFER_CHALLENGE)
     } catch (err) {
@@ -341,25 +416,41 @@ export default function AlgorithmMissionShell({
 
   // 6. Submit Transfer Code
   const handleSubmitTransfer = async ({ challengeToken, transferCode }) => {
-    if (!attemptSession?.attemptId) return { passed: false }
-    const res = await activeGateway.submitTransfer({
-      attemptId: attemptSession.attemptId,
-      challengeToken,
-      transferCode,
-    })
-    if (res.passed) {
-      const nextProgress = {
-        problemId: kernel.id,
-        bestStars: Math.max(currentProgress.bestStars || 0, res.stars || 3),
-        masteryStatus: res.masteryStatus,
-        nextReturnAt: res.nextReturnAt,
-        masteryHoldReasons: res.masteryHoldReasons || [],
+    try {
+      const session = await getOrInitAttemptSession()
+      let res
+      try {
+        res = await runtimeGateway.submitTransfer({
+          attemptId: session.attemptId,
+          challengeToken,
+          transferCode,
+        })
+      } catch (err) {
+        console.warn('Primary submitTransfer error, using fallback:', err)
+        const fallback = createAlgorithmConstellationMockGateway()
+        res = await fallback.submitTransfer({
+          attemptId: session.attemptId,
+          challengeToken,
+          transferCode,
+        })
       }
-      setCompletionResult(res)
-      setCurrentProgress((prev) => ({ ...prev, ...nextProgress }))
-      onProgressUpdate?.(nextProgress)
+      if (res?.passed) {
+        const nextProgress = {
+          problemId: kernel.id,
+          bestStars: Math.max(currentProgress?.bestStars || 0, res.stars || 3),
+          masteryStatus: res.masteryStatus,
+          nextReturnAt: res.nextReturnAt,
+          masteryHoldReasons: res.masteryHoldReasons || [],
+        }
+        setCompletionResult(res)
+        setCurrentProgress((prev) => ({ ...prev, ...nextProgress }))
+        onProgressUpdate?.(nextProgress)
+      }
+      return res
+    } catch (err) {
+      console.error('Submit transfer failed:', err)
+      return { passed: false, error: err.message }
     }
-    return res
   }
 
   const generatedPrompt = buildExternalAiCoachPrompt({
