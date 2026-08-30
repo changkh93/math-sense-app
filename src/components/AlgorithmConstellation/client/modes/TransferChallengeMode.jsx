@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import AlgorithmPythonEditor from '../editor/AlgorithmPythonEditor.jsx'
 
 export default function TransferChallengeMode({
@@ -9,11 +9,32 @@ export default function TransferChallengeMode({
 }) {
   const starterCode =
     transferChallenge?.starterCode ||
-    '# 전이 문제를 불러오지 못했습니다. 이전 화면에서 다시 시도해 주세요.\n'
+    (transferChallenge?.entryFunction
+      ? `def ${transferChallenge.entryFunction}():\n    # 여기에 전이 코드를 작성하세요.\n    pass\n`
+      : '# 전이 미션을 준비 중입니다.\n')
 
   const [code, setCode] = useState(starterCode)
+
+  useEffect(() => {
+    if (transferChallenge?.starterCode) {
+      setCode((prev) => (!prev || prev === '# 전이 미션을 준비 중입니다.\n' ? transferChallenge.starterCode : prev))
+    }
+  }, [transferChallenge?.starterCode])
   const [submitting, setSubmitting] = useState(false)
   const [result, setResult] = useState(null)
+
+  // Thought check state
+  const [selectedThoughtId, setSelectedThoughtId] = useState(null)
+  const [thoughtFeedback, setThoughtFeedback] = useState(null)
+
+  const handleSelectThought = (opt) => {
+    setSelectedThoughtId(opt.id)
+    if (opt.isCorrect) {
+      setThoughtFeedback(thoughtCheck?.feedback || '맞아요! 필요한 정보는 덮어쓰기 전에 미리 보관해야 합니다.')
+    } else {
+      setThoughtFeedback('변수에 새 값을 넣으면 이전 값은 사라집니다. 다시 생각해 보세요.')
+    }
+  }
 
   const handleSubmit = async () => {
     setSubmitting(true)
@@ -28,23 +49,95 @@ export default function TransferChallengeMode({
     }
   }
 
+  const contextCard = transferChallenge?.contextCard
+  const thoughtCheck = transferChallenge?.thoughtCheck
+
   return (
-    <div style={{ padding: '24px', background: 'rgba(10, 20, 40, 0.75)', borderRadius: '16px', border: '1px solid rgba(0, 240, 255, 0.2)', color: '#fff' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
-        <span style={{ fontSize: '28px' }}>🚀</span>
+    <div style={{ padding: '24px', background: 'rgba(10, 20, 40, 0.85)', borderRadius: '16px', border: '1px solid rgba(0, 240, 255, 0.25)', color: '#fff' }}>
+      {/* Header */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '14px', marginBottom: '18px' }}>
+        <span style={{ fontSize: '32px' }}>🚀</span>
         <div>
-          <h3 style={{ margin: 0, fontSize: '19px', color: '#00f0ff' }}>
-            ★★★ 새로운 상황 적용 (Fresh Transfer)
+          <h3 style={{ margin: 0, fontSize: '20px', color: '#00f0ff', fontFamily: 'monospace' }}>
+            ★★★ 새로운 상황 적용 (Fresh Transfer) — {transferChallenge?.title || '관제소 재고 보정'}
           </h3>
-          <p style={{ margin: '4px 0 0', fontSize: '14px', color: '#cbd5e1' }}>
-            {transferChallenge?.description || '새로운 상황에서도 발견한 규칙을 동일하게 적용할 수 있는지 확인합니다.'}
+          <p style={{ margin: '6px 0 0', fontSize: '14px', color: '#cbd5e1', lineHeight: '1.6' }}>
+            {transferChallenge?.description || '앞에서 발견한 원리를 완전히 새로운 상황에 스스로 적용해 보세요.'}
           </p>
         </div>
       </div>
 
-      <div style={{ marginBottom: '16px' }}>
-        <div style={{ fontSize: '13px', color: '#38bdf8', fontWeight: 'bold', marginBottom: '8px' }}>
-          작성할 함수: <code style={{ color: '#fff' }}>{transferChallenge?.entryFunction || '불러오는 중'}</code>
+      {/* Context Card / Flow Demonstration */}
+      {contextCard && (
+        <div style={{ background: 'linear-gradient(145deg, rgba(15, 23, 42, 0.95), rgba(8, 14, 30, 0.95))', borderRadius: '12px', padding: '16px 20px', marginBottom: '18px', border: '1px solid rgba(56, 189, 248, 0.3)' }}>
+          <div style={{ fontSize: '13px', fontWeight: 'bold', color: '#38bdf8', marginBottom: '10px' }}>
+            {contextCard.title || '📋 탐사 상황 분석'}
+          </div>
+          {contextCard.steps && Array.isArray(contextCard.steps) && (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '10px' }}>
+              {contextCard.steps.map((step, idx) => (
+                <div key={idx} style={{ padding: '10px 14px', borderRadius: '8px', background: 'rgba(30, 41, 59, 0.7)', border: '1px solid rgba(255, 255, 255, 0.08)' }}>
+                  <div style={{ fontSize: '11px', color: '#94a3b8', marginBottom: '4px' }}>{step.label}</div>
+                  <div style={{ fontSize: '13px', fontWeight: 'bold', color: '#fef08a', fontFamily: 'monospace' }}>{step.text}</div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* 10-Second Interactive Scaffold Thought Check */}
+      {thoughtCheck && (
+        <div style={{ background: 'rgba(30, 41, 59, 0.8)', borderRadius: '12px', padding: '16px 20px', marginBottom: '18px', border: '1px solid rgba(129, 140, 248, 0.3)' }}>
+          <div style={{ fontSize: '14px', fontWeight: 'bold', color: '#fef08a', marginBottom: '10px' }}>
+            💡 사고 점검: {thoughtCheck.prompt}
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            {thoughtCheck.options.map((opt) => {
+              const isSelected = selectedThoughtId === opt.id
+              return (
+                <button
+                  key={opt.id}
+                  type="button"
+                  onClick={() => handleSelectThought(opt)}
+                  style={{
+                    textAlign: 'left',
+                    padding: '8px 14px',
+                    borderRadius: '8px',
+                    border: isSelected
+                      ? (opt.isCorrect ? '2px solid #10b981' : '2px solid #ef4444')
+                      : '1px solid rgba(255, 255, 255, 0.15)',
+                    background: isSelected
+                      ? (opt.isCorrect ? 'rgba(16, 185, 129, 0.2)' : 'rgba(239, 68, 68, 0.2)')
+                      : 'rgba(0, 0, 0, 0.3)',
+                    color: isSelected ? '#fff' : '#cbd5e1',
+                    fontWeight: isSelected ? 'bold' : 'normal',
+                    fontSize: '13px',
+                    cursor: 'pointer',
+                  }}
+                >
+                  {opt.isCorrect && isSelected ? '✅ ' : isSelected ? '❌ ' : '○ '}{opt.label}
+                </button>
+              )
+            })}
+          </div>
+          {thoughtFeedback && (
+            <div style={{ marginTop: '10px', fontSize: '13px', color: '#6ee7b7', lineHeight: '1.5' }}>
+              {thoughtFeedback}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Editor Section */}
+      <div style={{ marginBottom: '18px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+          <span style={{ fontSize: '13px', color: '#38bdf8', fontWeight: 'bold' }}>
+            작성할 함수: <code style={{ color: '#fef08a', background: 'rgba(0,0,0,0.4)', padding: '2px 8px', borderRadius: '4px' }}>{transferChallenge?.entryFunction || '함수 작성'}</code>
+          </span>
+          <span style={{ fontSize: '12px', color: '#94a3b8' }}>
+            💡 발견한 상태 덮어쓰기 원리를 적용하여 함수를 완성하세요.
+          </span>
         </div>
         <div style={{ marginBottom: '12px' }}>
           <AlgorithmPythonEditor
@@ -55,16 +148,17 @@ export default function TransferChallengeMode({
         </div>
       </div>
 
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      {/* Action and Result */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
         <div>
           {result?.passed && (
             <span style={{ color: '#10b981', fontWeight: 'bold', fontSize: '15px' }}>
-              🌟 축하합니다! 전이 문제 검증 통과 — ★★★ 3스타 달성!
+              🌟 축하합니다! 새로운 상황 전이 성공 — ★★★ 3스타 달성!
             </span>
           )}
           {result && !result.passed && (
             <span style={{ color: '#f87171', fontSize: '14px' }}>
-              ⚠️ 전이 문제 테스트를 통과하지 못했습니다. 조건을 다시 점검해보세요.
+              ⚠️ 전이 문제 테스트를 통과하지 못했습니다. 상태 갱신 순서와 대입값을 점검해 보세요.
             </span>
           )}
         </div>
@@ -82,7 +176,9 @@ export default function TransferChallengeMode({
                 border: 'none',
                 borderRadius: '8px',
                 fontWeight: 'bold',
+                fontSize: '14px',
                 cursor: submitting ? 'wait' : 'pointer',
+                boxShadow: '0 0 16px rgba(16, 185, 129, 0.3)',
               }}
             >
               {submitting ? '채점 중...' : '★★★ 전이 코드 최종 제출'}
@@ -98,10 +194,12 @@ export default function TransferChallengeMode({
                 border: 'none',
                 borderRadius: '8px',
                 fontWeight: 'bold',
+                fontSize: '14px',
                 cursor: 'pointer',
+                boxShadow: '0 0 16px rgba(251, 191, 36, 0.4)',
               }}
             >
-              🏆 임무 완료 화면으로 이동
+              🌌 탐사 완수 화면으로 이동 ➔
             </button>
           )}
         </div>

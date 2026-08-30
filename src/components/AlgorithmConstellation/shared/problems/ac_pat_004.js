@@ -14,7 +14,7 @@ export const AC_PAT_004 = deepFreeze({
   schemaVersion: 1,
   family: 'PAT',
   evidenceRecipe: { primitives: ['scalar-sequence', 'decision'] },
-  pythonConcepts: { introduces: [], requires: ['operator:modulo'] },
+  pythonConcepts: { introduces: [], requires: ['operator:modulo', 'operator:comparison-bound'] },
 
   identity: {
     systemTitle: 'Pattern & Modulo - Interval Periodic Beacon',
@@ -26,7 +26,7 @@ export const AC_PAT_004 = deepFreeze({
     objective: '한 주기 안에서 특정 구간 동안 상태가 유지되는 주기적 구간 패턴을 나머지 수식(time % 4 < 2)으로 모델링한다.',
     thinkingSkills: ['구간 주기 발견 (Periodic Interval Discovery)', '불변성 및 부등식 모델링'],
     concepts: ['Modulo %', 'Comparison <', 'Periodic Interval', 'Inequality'],
-    prerequisites: ['AC-PAT-003', '기본 비교 연산자'],
+    prerequisites: ['AC-PAT-003', 'AC-EXP-BOUND-05'],
   },
 
   shells: {

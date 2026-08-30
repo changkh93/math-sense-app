@@ -27,16 +27,71 @@ export function evaluatorError(code, message) {
   return error
 }
 
+export function isDictionary(val) {
+  return val !== null && typeof val === 'object' && !Array.isArray(val) && !(val instanceof Set)
+}
+
+export function assertSafeKey(key) {
+  if (typeof key !== 'string') {
+    throw evaluatorError('TYPE_ERROR', `이름표(key)는 문자열이어야 합니다: ${typeof key}`)
+  }
+  const keyStr = String(key)
+  if (keyStr === '__proto__' || keyStr === 'prototype' || keyStr === 'constructor') {
+    throw evaluatorError('SECURITY_ERROR', `안전하지 않은 이름표(key)는 사용할 수 없습니다: ${keyStr}`)
+  }
+}
+
+export function assertSafeInputs(val) {
+  if (val === null || val === undefined || typeof val !== 'object') return
+  if (Array.isArray(val)) {
+    for (const item of val) assertSafeInputs(item)
+    return
+  }
+  if (val instanceof Set) {
+    for (const item of val) assertSafeInputs(item)
+    return
+  }
+  if (isDictionary(val)) {
+    for (const key of Object.keys(val)) {
+      assertSafeKey(key)
+      assertSafeInputs(val[key])
+    }
+  }
+}
+
 export function isPythonTruthy(val) {
   if (val === null || val === undefined || val === false || val === 0 || val === '') return false
   if (Array.isArray(val) && val.length === 0) return false
   if (val instanceof Set && val.size === 0) return false
+  if (isDictionary(val) && Object.keys(val).length === 0) return false
   return true
 }
 
 export function matchesExpected(actual, expected) {
   if (Array.isArray(actual) && Array.isArray(expected)) {
-    return JSON.stringify(actual) === JSON.stringify(expected)
+    if (actual.length !== expected.length) return false
+    for (let i = 0; i < actual.length; i++) {
+      if (!matchesExpected(actual[i], expected[i])) return false
+    }
+    return true
+  }
+  if (actual instanceof Set && expected instanceof Set) {
+    if (actual.size !== expected.size) return false
+    for (const item of expected) {
+      if (!actual.has(item)) return false
+    }
+    return true
+  }
+  if (isDictionary(actual) && isDictionary(expected)) {
+    const actualKeys = Object.keys(actual)
+    const expectedKeys = Object.keys(expected)
+    if (actualKeys.length !== expectedKeys.length) return false
+    for (const key of expectedKeys) {
+      assertSafeKey(key)
+      if (!Object.hasOwn(actual, key)) return false
+      if (!matchesExpected(actual[key], expected[key])) return false
+    }
+    return true
   }
   return actual === expected
 }
@@ -80,6 +135,7 @@ export class SafePythonInterpreter {
   constructor(source, entryFunction, args = {}, options = {}) {
     this.source = source
     this.entryFunction = entryFunction
+    assertSafeInputs(args)
     this.args = typeof structuredClone === 'function' ? structuredClone(args) : JSON.parse(JSON.stringify(args || {}))
     this.steps = 0
     this.maxSteps = Math.max(1, Math.min(options.maxSteps ?? MAX_STEPS, MAX_STEPS))
@@ -97,7 +153,8 @@ export class SafePythonInterpreter {
       len: (obj) => {
         if (Array.isArray(obj) || typeof obj === 'string') return obj.length
         if (obj instanceof Set) return obj.size
-        throw evaluatorError('TYPE_ERROR', 'len()은 목록, 문자열, 집합에만 사용할 수 있습니다.')
+        if (isDictionary(obj)) return Object.keys(obj).length
+        throw evaluatorError('TYPE_ERROR', 'len()은 목록, 문자열, 집합, 기록표에만 사용할 수 있습니다.')
       },
       sum: (list) => {
         if (!Array.isArray(list)) throw evaluatorError('TYPE_ERROR', 'sum()은 목록에만 사용할 수 있습니다.')
@@ -288,27 +345,25 @@ export class SafePythonInterpreter {
     // Set / Dict / Tuple literal: {(0, 0)}, {'k': v} or (0, 0, 0)
     if (trimmed.startsWith('{') && trimmed.endsWith('}')) {
       const inner = trimmed.slice(1, -1).trim()
+      if (!inner) return {}
       if (inner.includes(':')) {
         const obj = {}
-        if (inner) {
-          this.splitArguments(inner).forEach((pair) => {
-            const colonIdx = pair.indexOf(':')
-            if (colonIdx !== -1) {
-              const k = this.evaluateExpression(pair.slice(0, colonIdx).trim(), env)
-              const v = this.evaluateExpression(pair.slice(colonIdx + 1).trim(), env)
-              obj[k] = v
-            }
-          })
-        }
+        this.splitArguments(inner).forEach((pair) => {
+          const colonIdx = pair.indexOf(':')
+          if (colonIdx !== -1) {
+            const k = this.evaluateExpression(pair.slice(0, colonIdx).trim(), env)
+            const v = this.evaluateExpression(pair.slice(colonIdx + 1).trim(), env)
+            assertSafeKey(k)
+            obj[String(k)] = v
+          }
+        })
         return obj
       }
       const s = new Set()
-      if (inner) {
-        this.splitArguments(inner).forEach((item) => {
-          const val = this.evaluateExpression(item, env)
-          s.add(typeof val === 'object' && val !== null ? JSON.stringify(val) : val)
-        })
-      }
+      this.splitArguments(inner).forEach((item) => {
+        const val = this.evaluateExpression(item, env)
+        s.add(typeof val === 'object' && val !== null ? JSON.stringify(val) : val)
+      })
       return s
     }
     if (trimmed.startsWith('(') && trimmed.endsWith(')')) {
@@ -377,11 +432,21 @@ export class SafePythonInterpreter {
         if (trimmedOp === 'in') {
           if (right instanceof Set) return right.has(typeof left === 'object' ? JSON.stringify(left) : left)
           if (Array.isArray(right)) return right.some((r) => matchesExpected(r, left))
+          if (isDictionary(right)) {
+            assertSafeKey(left)
+            return Object.hasOwn(right, String(left))
+          }
+          if (typeof right === 'string') return typeof left === 'string' && right.includes(left)
           return false
         }
         if (trimmedOp === 'not in') {
           if (right instanceof Set) return !right.has(typeof left === 'object' ? JSON.stringify(left) : left)
           if (Array.isArray(right)) return !right.some((r) => matchesExpected(r, left))
+          if (isDictionary(right)) {
+            assertSafeKey(left)
+            return !Object.hasOwn(right, String(left))
+          }
+          if (typeof right === 'string') return !(typeof left === 'string' && right.includes(left))
           return true
         }
       }
@@ -524,6 +589,13 @@ export class SafePythonInterpreter {
           if (typeof current === 'string' || Array.isArray(current)) {
             const resolvedIdx = idx < 0 ? current.length + idx : idx
             current = current[resolvedIdx]
+          } else if (isDictionary(current)) {
+            assertSafeKey(idx)
+            const keyStr = String(idx)
+            if (!Object.hasOwn(current, keyStr)) {
+              throw evaluatorError('KEY_ERROR', `기록표에 해당 이름표가 아직 없습니다: ${keyStr}`)
+            }
+            current = current[keyStr]
           } else {
             current = current[idx]
           }
@@ -846,14 +918,45 @@ export class SafePythonInterpreter {
             let curr = targetObj
             for (let b = 0; b < brackets.length - 1; b++) {
               const idx = this.evaluateExpression(brackets[b].slice(1, -1), env)
-              curr = curr[idx]
+              if (Array.isArray(curr)) {
+                if (!Number.isInteger(idx)) {
+                  throw evaluatorError('TYPE_ERROR', '목록의 방 번호는 정수여야 합니다.')
+                }
+                const resolvedIdx = idx < 0 ? curr.length + idx : idx
+                if (resolvedIdx < 0 || resolvedIdx >= curr.length) {
+                  throw evaluatorError('INDEX_ERROR', '목록의 범위를 벗어난 번호입니다.')
+                }
+                curr = curr[resolvedIdx]
+              } else if (isDictionary(curr)) {
+                assertSafeKey(idx)
+                if (!Object.hasOwn(curr, idx)) {
+                  throw evaluatorError('KEY_ERROR', `기록표에 해당 이름표가 아직 없습니다: ${idx}`)
+                }
+                curr = curr[idx]
+              } else {
+                throw evaluatorError('TYPE_ERROR', '목록이나 기록표만 번호로 접근할 수 있습니다.')
+              }
             }
             const finalIdx = this.evaluateExpression(brackets[brackets.length - 1].slice(1, -1), env)
             const assignVal = values[tIdx]
-            const before = this.snapshotValue(curr[finalIdx])
-            curr[finalIdx] = assignVal
+            let resolvedFinalIdx = finalIdx
+            if (Array.isArray(curr)) {
+              if (!Number.isInteger(finalIdx)) {
+                throw evaluatorError('TYPE_ERROR', '목록의 방 번호는 정수여야 합니다.')
+              }
+              resolvedFinalIdx = finalIdx < 0 ? curr.length + finalIdx : finalIdx
+              if (resolvedFinalIdx < 0 || resolvedFinalIdx >= curr.length) {
+                throw evaluatorError('INDEX_ERROR', '목록의 범위를 벗어난 번호입니다.')
+              }
+            } else if (isDictionary(curr)) {
+              assertSafeKey(finalIdx)
+            } else {
+              throw evaluatorError('TYPE_ERROR', '목록이나 기록표만 번호로 값을 바꿀 수 있습니다.')
+            }
+            const before = this.snapshotValue(curr[resolvedFinalIdx])
+            curr[resolvedFinalIdx] = assignVal
             this.emitTrace('container-mutation', {
-              stateDiff: [{ kind: 'mutation', path: `${varName}[${finalIdx}]`, before, after: this.snapshotValue(assignVal) }],
+              stateDiff: [{ kind: 'mutation', path: `${varName}[${resolvedFinalIdx}]`, before, after: this.snapshotValue(assignVal) }],
               metadata: { operation: 'index-assignment' },
             })
           }
@@ -892,7 +995,7 @@ export class SafePythonInterpreter {
 
       // If / Elif / Else compound or single-line statement
       if (trimmed.startsWith('if ')) {
-        const singleLineIf = trimmed.match(/^if\s+(.+?):\s*(\S.*)$/)
+        const singleLineIf = !trimmed.endsWith(':') ? trimmed.match(/^if\s+(.+?):\s*(\S.*)$/) : null
         if (singleLineIf) {
           const [, condExpr, stmt] = singleLineIf
           const conditionResult = isPythonTruthy(this.evaluateExpression(condExpr, env))

@@ -1,10 +1,33 @@
 import { useState } from 'react'
 
-function formatState(state) {
-  if (!state || typeof state !== 'object') return String(state)
-  return Object.entries(state)
-    .map(([key, value]) => `${key} = ${JSON.stringify(value)}`)
-    .join(', ')
+function formatValue(val) {
+  if (val === null || val === undefined || val === '미정' || val === '값 없음') {
+    return '아직 값 없음'
+  }
+  if (typeof val === 'string') return JSON.stringify(val)
+  return String(val)
+}
+
+function formatStateDisplay(state) {
+  if (!state || typeof state !== 'object') return formatValue(state)
+  return Object.entries(state).map(([key, val]) => {
+    const isNone = val === null || val === undefined || val === '미정' || val === '값 없음'
+    return (
+      <span key={key} style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', margin: '0 4px' }}>
+        <span style={{ color: '#a5f3fc', fontFamily: 'monospace' }}>{key}</span>
+        <span style={{ color: '#64748b' }}>=</span>
+        {isNone ? (
+          <span style={{ color: '#94a3b8', fontStyle: 'italic', background: 'rgba(255,255,255,0.06)', padding: '2px 8px', borderRadius: '4px', fontSize: '13px' }}>
+            아직 값 없음
+          </span>
+        ) : (
+          <span style={{ color: '#38bdf8', fontWeight: 'bold', fontFamily: 'monospace' }}>
+            {formatValue(val)}
+          </span>
+        )}
+      </span>
+    )
+  })
 }
 
 const timelineButtonStyle = (active, disabled) => ({
@@ -16,11 +39,12 @@ const timelineButtonStyle = (active, disabled) => ({
   fontWeight: 'bold',
   fontSize: '13px',
   cursor: disabled ? 'not-allowed' : 'pointer',
+  whiteSpace: 'nowrap',
 })
 
 export default function StateTransitionLens({ kernel, onDiscoveryComplete }) {
   const exploreConfig = kernel?.modes?.explore?.lensConfig || {}
-  const initialState = exploreConfig.initialState || { state: '초기 상태' }
+  const initialState = exploreConfig.initialState || { signal: null }
   const frames = Array.isArray(exploreConfig.frames) ? exploreConfig.frames : []
   const [currentFrameIndex, setCurrentFrameIndex] = useState(-1)
   const [furthestFrameIndex, setFurthestFrameIndex] = useState(-1)
@@ -37,6 +61,11 @@ export default function StateTransitionLens({ kernel, onDiscoveryComplete }) {
   const [optionFeedback, setOptionFeedback] = useState(null)
   const [choiceAttempts, setChoiceAttempts] = useState({})
 
+  // Discovery Question state
+  const [selectedDiscoveryId, setSelectedDiscoveryId] = useState(null)
+  const [discoveryFeedback, setDiscoveryFeedback] = useState(null)
+  const [discoveryPassed, setDiscoveryPassed] = useState(false)
+
   const handleSelectOption = (opt) => {
     setSelectedOptionId(opt.id)
     if (nextFrame?.id) {
@@ -51,9 +80,26 @@ export default function StateTransitionLens({ kernel, onDiscoveryComplete }) {
       } else {
         setOptionFeedback({
           type: 'error',
-          text: `선택한 명령 결과: ${formatState(opt.stateAfter)}. 목표 상태와 다릅니다. 다시 선택해 보세요.`,
+          text: `선택한 명령 결과 상태가 목표와 다릅니다. 다시 선택해 보세요.`,
         })
       }
+    }
+  }
+
+  const handleSelectDiscovery = (opt) => {
+    setSelectedDiscoveryId(opt.id)
+    if (opt.isCorrect) {
+      setDiscoveryPassed(true)
+      setRevealedRule(true)
+      setDiscoveryFeedback({
+        isCorrect: true,
+        text: exploreConfig.discoveryQuestion?.successFeedback || '맞아요! 정확한 발견입니다.',
+      })
+    } else {
+      setDiscoveryFeedback({
+        isCorrect: false,
+        text: exploreConfig.discoveryQuestion?.wrongFeedback || '변수는 새 값을 넣으면 이전 값을 덮어씁니다. 다시 골라보세요.',
+      })
     }
   }
 
@@ -78,18 +124,53 @@ export default function StateTransitionLens({ kernel, onDiscoveryComplete }) {
       ruleConfirmed: true,
       viewedSteps: frames.length,
       choiceAttempts,
+      discoveryPassed,
     })
   }
 
+  const hasDiscovery = Boolean(exploreConfig.discoveryQuestion)
+  const isAtFinalFrame = currentFrameIndex === frames.length - 1
+  const canFinalize = !hasDiscovery || discoveryPassed || revealedRule
+
   return (
     <div style={{ display: 'grid', gap: '18px', color: '#f8fafc' }}>
-      <div style={{ padding: '16px 20px', borderRadius: '12px', background: 'rgba(15, 23, 42, 0.8)', border: '1px solid rgba(56, 189, 248, 0.25)' }}>
-        <div style={{ fontSize: '13px', color: '#38bdf8', fontWeight: 'bold', marginBottom: '4px' }}>🔍 상태 전이 관찰 연구실</div>
-        <div style={{ fontSize: '15px', color: '#e2e8f0', lineHeight: 1.5 }}>
-          {exploreConfig.predictionPrompt || '다음 명령 뒤의 상태를 먼저 예상하고 결과를 확인해 보세요.'}
+      {/* 1. Intro Condition & Setup Box */}
+      {exploreConfig.introContext ? (
+        <div style={{ padding: '16px 20px', borderRadius: '12px', background: 'linear-gradient(145deg, rgba(15, 23, 42, 0.95), rgba(8, 14, 30, 0.95))', border: '1px solid rgba(56, 189, 248, 0.3)' }}>
+          <div style={{ fontSize: '15px', color: '#38bdf8', fontWeight: 'bold', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+            {exploreConfig.introContext.title || '🔍 상태 변화 실험실'}
+          </div>
+          {exploreConfig.introContext.description && (
+            <div style={{ fontSize: '14px', color: '#cbd5e1', marginBottom: '10px', lineHeight: '1.5' }}>
+              {exploreConfig.introContext.description}
+            </div>
+          )}
+          {exploreConfig.introContext.variables && Array.isArray(exploreConfig.introContext.variables) && (
+            <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', marginBottom: '10px' }}>
+              {exploreConfig.introContext.variables.map((v, i) => (
+                <div key={i} style={{ padding: '6px 14px', borderRadius: '8px', background: 'rgba(30, 41, 59, 0.8)', border: '1px solid rgba(129, 140, 248, 0.35)', fontSize: '13px' }}>
+                  <span style={{ color: '#94a3b8' }}>{v.label ? `${v.label}: ` : ''}</span>
+                  <strong style={{ color: '#fef08a', fontFamily: 'monospace' }}>{v.name} = {String(v.value)}</strong>
+                </div>
+              ))}
+            </div>
+          )}
+          {exploreConfig.introContext.guidance && (
+            <div style={{ fontSize: '13px', color: '#a5f3fc', lineHeight: '1.5' }}>
+              💡 {exploreConfig.introContext.guidance}
+            </div>
+          )}
         </div>
-      </div>
+      ) : (
+        <div style={{ padding: '16px 20px', borderRadius: '12px', background: 'rgba(15, 23, 42, 0.8)', border: '1px solid rgba(56, 189, 248, 0.25)' }}>
+          <div style={{ fontSize: '13px', color: '#38bdf8', fontWeight: 'bold', marginBottom: '4px' }}>🔍 상태 전이 관찰 연구실</div>
+          <div style={{ fontSize: '15px', color: '#e2e8f0', lineHeight: 1.5 }}>
+            {exploreConfig.predictionPrompt || '다음 명령 뒤의 상태를 먼저 예상하고 결과를 확인해 보세요.'}
+          </div>
+        </div>
+      )}
 
+      {/* 2. Step Navigator Timeline */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', overflowX: 'auto', paddingBottom: '4px' }}>
         <button
           type="button"
@@ -97,7 +178,7 @@ export default function StateTransitionLens({ kernel, onDiscoveryComplete }) {
           onClick={() => setCurrentFrameIndex(-1)}
           style={timelineButtonStyle(currentFrameIndex === -1, false)}
         >
-          초기 상태
+          {exploreConfig.initialStepTitle || '🚀 시작 (값 없음)'}
         </button>
         {frames.map((frame, index) => {
           const disabled = index > furthestFrameIndex
@@ -110,49 +191,61 @@ export default function StateTransitionLens({ kernel, onDiscoveryComplete }) {
               onClick={() => setCurrentFrameIndex(index)}
               style={timelineButtonStyle(currentFrameIndex === index, disabled)}
             >
-              단계 {index + 1} ({frame.operationLabel || `명령 ${index + 1}`})
+              {frame.stepTitle || `단계 ${index + 1} (${frame.operationLabel || `명령 ${index + 1}`})`}
             </button>
           )
         })}
       </div>
 
+      {/* 3. Main Stage Content */}
       {currentFrame ? (
-        <div style={{ display: 'grid', gap: '12px', padding: '22px', borderRadius: '12px', background: 'rgba(30, 41, 59, 0.7)', border: '1px solid rgba(255, 255, 255, 0.1)' }}>
+        <div style={{ display: 'grid', gap: '14px', padding: '22px', borderRadius: '12px', background: 'rgba(30, 41, 59, 0.7)', border: '1px solid rgba(255, 255, 255, 0.1)' }}>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', gap: '16px', alignItems: 'center' }}>
-            <div style={{ padding: '16px', borderRadius: '10px', background: 'rgba(15, 23, 42, 0.85)', border: '1px solid rgba(255, 255, 255, 0.08)', textAlign: 'center' }}>
-              <div style={{ fontSize: '12px', color: '#94a3b8', marginBottom: '6px' }}>직전 상태</div>
-              <div style={{ fontSize: '18px', fontWeight: 'bold', color: '#cbd5e1' }}>{formatState(previousState)}</div>
+            <div style={{ padding: '14px', borderRadius: '10px', background: 'rgba(15, 23, 42, 0.85)', border: '1px solid rgba(255, 255, 255, 0.08)', textAlign: 'center' }}>
+              <div style={{ fontSize: '12px', color: '#94a3b8', marginBottom: '6px' }}>실행 전 상태</div>
+              <div style={{ fontSize: '17px', fontWeight: 'bold' }}>{formatStateDisplay(previousState)}</div>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
               <span style={{ fontSize: '12px', fontWeight: 'bold', color: '#38bdf8', padding: '4px 10px', borderRadius: '12px', background: 'rgba(56, 189, 248, 0.15)', border: '1px solid rgba(56, 189, 248, 0.3)' }}>
-                {currentFrame.operationLabel || '전이'}
+                {currentFrame.operationLabel || '명령 실행'}
               </span>
               <span style={{ fontSize: '20px', color: '#38bdf8' }}>➔</span>
             </div>
-            <div style={{ padding: '16px', borderRadius: '10px', background: 'rgba(15, 23, 42, 0.85)', border: '1px solid #38bdf8', textAlign: 'center' }}>
-              <div style={{ fontSize: '12px', color: '#38bdf8', marginBottom: '6px' }}>확인한 현재 상태</div>
-              <div style={{ fontSize: '18px', fontWeight: 'bold', color: '#38bdf8' }}>{formatState(currentState)}</div>
+            <div style={{ padding: '14px', borderRadius: '10px', background: 'rgba(15, 23, 42, 0.85)', border: '1px solid #38bdf8', textAlign: 'center' }}>
+              <div style={{ fontSize: '12px', color: '#38bdf8', marginBottom: '6px' }}>실행 후 현재 상태</div>
+              <div style={{ fontSize: '17px', fontWeight: 'bold' }}>{formatStateDisplay(currentState)}</div>
             </div>
           </div>
+
+          {currentFrame.codeSnippet && (
+            <div style={{ background: 'rgba(15, 23, 42, 0.9)', padding: '10px 14px', borderRadius: '8px', border: '1px solid rgba(129, 140, 248, 0.3)', fontFamily: 'monospace', fontSize: '13px', color: '#fef08a' }}>
+              {currentFrame.codeSnippet}
+            </div>
+          )}
+
           {currentFrame.prompt && (
-            <div style={{ padding: '10px 14px', borderRadius: '8px', background: 'rgba(56, 189, 248, 0.08)', color: '#bae6fd', fontSize: '14px', lineHeight: 1.5 }}>
-              {currentFrame.prompt}
+            <div style={{ padding: '12px 16px', borderRadius: '8px', background: 'rgba(56, 189, 248, 0.1)', color: '#bae6fd', fontSize: '14px', lineHeight: 1.6 }}>
+              💡 {currentFrame.prompt}
             </div>
           )}
         </div>
       ) : (
         <div style={{ padding: '22px', borderRadius: '12px', background: 'rgba(30, 41, 59, 0.7)', border: '1px solid rgba(255, 255, 255, 0.1)', textAlign: 'center' }}>
-          <div style={{ fontSize: '12px', color: '#94a3b8', marginBottom: '6px' }}>현재 초기 상태</div>
-          <div style={{ fontSize: '20px', fontWeight: 'bold', color: '#e2e8f0' }}>{formatState(initialState)}</div>
+          <div style={{ fontSize: '13px', color: '#94a3b8', marginBottom: '6px' }}>
+            {exploreConfig.initialStateLabel || '아직 변수에 값을 저장하지 않았습니다.'}
+          </div>
+          <div style={{ fontSize: '20px', fontWeight: 'bold', color: '#e2e8f0', marginBottom: '12px' }}>
+            {formatStateDisplay(initialState)}
+          </div>
           {nextFrame && (
-            <div style={{ marginTop: '12px', color: '#fef08a', fontSize: '14px' }}>
-              다음 명령 <strong>{nextFrame.operationLabel}</strong> 뒤의 상태를 먼저 예상해 보세요.
+            <div style={{ color: '#fef08a', fontSize: '14px' }}>
+              {exploreConfig.initialPrompt || `다음 명령 ${nextFrame.operationLabel || nextFrame.stepTitle} 뒤의 상태를 먼저 예상해 보세요.`}
             </div>
           )}
         </div>
       )}
 
-      {/* Choice Frame UI when nextFrame requires selecting an operation */}
+      {/* 4. Choice Frame UI when nextFrame requires selecting an operation */}
       {nextFrame && nextFrame.operationOptions && (
         <div style={{ padding: '16px 20px', borderRadius: '12px', background: 'rgba(56, 189, 248, 0.08)', border: '1px solid rgba(56, 189, 248, 0.3)' }}>
           <div style={{ fontSize: '14px', fontWeight: 'bold', color: '#38bdf8', marginBottom: '10px' }}>
@@ -190,6 +283,7 @@ export default function StateTransitionLens({ kernel, onDiscoveryComplete }) {
         </div>
       )}
 
+      {/* 5. Navigation Controls */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px' }}>
         <button
           type="button"
@@ -225,18 +319,63 @@ export default function StateTransitionLens({ kernel, onDiscoveryComplete }) {
           }}
         >
           {nextFrame
-            ? `${nextFrame.operationLabel || '다음 명령'} 뒤 상태 확인 ➔`
-            : '핵심 규칙 확인 ➔'}
+            ? `${nextFrame.stepTitle || nextFrame.operationLabel || '다음 명령'} 확인 ➔`
+            : (hasDiscovery && !discoveryPassed ? '발견 퀴즈로 이동 ➔' : '핵심 규칙 확인 ➔')}
         </button>
       </div>
 
-      {revealedRule && (
+      {/* 6. Discovery Question (Golden Bridge to SWAP) */}
+      {hasDiscovery && isAtFinalFrame && (
+        <div style={{ marginTop: '8px', padding: '18px 22px', borderRadius: '12px', background: 'linear-gradient(145deg, rgba(30, 41, 59, 0.95), rgba(15, 23, 42, 0.95))', border: '1px solid rgba(56, 189, 248, 0.4)' }}>
+          <div style={{ fontSize: '15px', fontWeight: 'bold', color: '#fef08a', marginBottom: '12px' }}>
+            {exploreConfig.discoveryQuestion.prompt}
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            {exploreConfig.discoveryQuestion.options.map((opt) => {
+              const isSelected = selectedDiscoveryId === opt.id
+              return (
+                <button
+                  key={opt.id}
+                  type="button"
+                  onClick={() => handleSelectDiscovery(opt)}
+                  style={{
+                    textAlign: 'left',
+                    padding: '10px 16px',
+                    borderRadius: '8px',
+                    border: isSelected
+                      ? (opt.isCorrect ? '2px solid #10b981' : '2px solid #ef4444')
+                      : '1px solid rgba(255, 255, 255, 0.15)',
+                    background: isSelected
+                      ? (opt.isCorrect ? 'rgba(16, 185, 129, 0.2)' : 'rgba(239, 68, 68, 0.2)')
+                      : 'rgba(0, 0, 0, 0.3)',
+                    color: isSelected ? '#fff' : '#cbd5e1',
+                    fontWeight: isSelected ? 'bold' : 'normal',
+                    cursor: 'pointer',
+                    fontSize: '14px',
+                    transition: 'all 0.15s',
+                  }}
+                >
+                  {opt.isCorrect && isSelected ? '✅ ' : isSelected ? '❌ ' : '○ '}{opt.label}
+                </button>
+              )
+            })}
+          </div>
+          {discoveryFeedback && (
+            <div style={{ marginTop: '12px', padding: '12px 14px', borderRadius: '8px', background: discoveryFeedback.isCorrect ? 'rgba(16, 185, 129, 0.15)' : 'rgba(239, 68, 68, 0.15)', color: discoveryFeedback.isCorrect ? '#6ee7b7' : '#fca5a5', fontSize: '14px', lineHeight: 1.5 }}>
+              {discoveryFeedback.text}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* 7. Final Rule Confirmation */}
+      {revealedRule && canFinalize && (
         <div style={{ marginTop: '8px', padding: '18px 22px', borderRadius: '12px', background: 'rgba(16, 185, 129, 0.12)', border: '1px solid rgba(16, 185, 129, 0.45)' }}>
           <div style={{ fontSize: '13px', color: '#34d399', fontWeight: 'bold', marginBottom: '6px' }}>
             💡 {exploreConfig.rulePrompt || '핵심 사고 규칙'}
           </div>
           <div style={{ color: '#a7f3d0', fontSize: '15px', lineHeight: 1.6, fontWeight: '500' }}>
-            {exploreConfig.ruleStatement || '프로그램은 명령을 순서대로 실행하며, 각 단계의 결과가 다음 단계의 입력 상태가 됩니다.'}
+            {exploreConfig.ruleStatement || '변수에 새 값을 대입(=)하면 이전 값은 완전히 덮어씌워져 사라지고 새 값으로 교체됩니다.'}
           </div>
           <button
             type="button"

@@ -79,11 +79,36 @@ const grandfatheredAccess = getConstellationAccess(1, ['AC-COND-001'], ALGORITHM
 assert.equal(grandfatheredAccess.accessible, true)
 assert.equal(grandfatheredAccess.mode, 'grandfathered')
 
-// Constellation 4 still has unachievable previous gate -> early-access
-assert.equal(getConstellationAccess(4, [], ALGORITHM_EDITORIAL_CATALOG).mode, 'early-access')
+// Constellation 2 is now gate-ready (8 core published >= 6, anchor AC-PAT-003 published)
+const const2CoreProblems = ALGORITHM_EDITORIAL_CATALOG
+  .filter((e) => e.constellationId === 'constellation-2' && e.routeRole === 'core')
+  .map((e) => e.problemId)
+
+// Constellation 3 is now strictly gated
+const gatedConstellation3 = getConstellationAccess(3, [], ALGORITHM_EDITORIAL_CATALOG)
+assert.equal(gatedConstellation3.accessible, false, 'Constellation 3 is now strictly gated since Constellation 2 has 8 published Core missions')
+assert.equal(gatedConstellation3.mode, 'gated')
+
+// If 5 core completed -> NOT unlocked
+assert.equal(isConstellationUnlocked(3, const2CoreProblems.slice(0, 5), ALGORITHM_EDITORIAL_CATALOG), false)
+// If 6 core completed without anchor AC-PAT-003 -> NOT unlocked
+const sixCoreWithoutPat003 = const2CoreProblems.filter((id) => id !== 'AC-PAT-003').slice(0, 6)
+assert.equal(isConstellationUnlocked(3, sixCoreWithoutPat003, ALGORITHM_EDITORIAL_CATALOG), false)
+// If anchor AC-PAT-003 + 5 other core (6 total) -> UNLOCKED
+const sixCoreWithAnchor = ['AC-PAT-003', ...const2CoreProblems.filter((id) => id !== 'AC-PAT-003').slice(0, 5)]
+assert.equal(isConstellationUnlocked(3, sixCoreWithAnchor, ALGORITHM_EDITORIAL_CATALOG), true)
+
+// Grandfathered access for Constellation 3 (e.g. AC-SEQ-005)
+const grandfatheredConst3 = getConstellationAccess(3, ['AC-SEQ-005'], ALGORITHM_EDITORIAL_CATALOG)
+assert.equal(grandfatheredConst3.accessible, true)
+assert.equal(grandfatheredConst3.mode, 'grandfathered')
+
+// Constellation 4 previous gate (Constellation 3) is now fully ready -> gated
+assert.equal(getConstellationAccess(4, [], ALGORITHM_EDITORIAL_CATALOG).mode, 'gated')
+assert.equal(getConstellationAccess(4, [], ALGORITHM_EDITORIAL_CATALOG).accessible, false)
 // Constellation 9 is unavailable
 assert.equal(getConstellationAccess(9, [], ALGORITHM_EDITORIAL_CATALOG).mode, 'unavailable')
-console.log('  -> [PASS] Unlock Gating strictly verified (3 Required Anchors + 6/8 Core + Grandfathered Protection)')
+console.log('  -> [PASS] Unlock Gating strictly verified (Required Anchors + 6/8 Core + Grandfathered Protection)')
 
 // [Test 4] Python Concept Registry & Canonical First Encounter
 console.log('[Test 4] Validating Python Concept Registry & First Encounter Schema...')
@@ -312,5 +337,524 @@ assert.equal(
 )
 
 console.log('  -> [PASS] Constellation 1 Branch Missions 19~20 prerequisites and gate isolation verified')
+
+// [Test 11] Constellation 2 C2-A and C2-B curriculum contract
+console.log('[Test 11] Validating Constellation 2 C2-A and C2-B missions and staged gate...')
+const c2PublishedCore = ALGORITHM_EDITORIAL_CATALOG.filter(
+  (entry) => entry.constellationId === 'constellation-2' && entry.routeRole === 'core' && entry.status === 'published'
+)
+assert.deepEqual(
+  c2PublishedCore.map((entry) => entry.problemId),
+  [
+    'AC-PAT-003',
+    'AC-PAT-004',
+    'AC-PAT-EVEN-23',
+    'AC-PAT-DIGIT-24',
+    'AC-PAT-REVNUM-25',
+    'AC-PAT-DIVISOR-26',
+    'AC-PAT-PRIME-27',
+    'AC-PAT-GCD-28',
+  ]
+)
+
+assert.deepEqual(
+  ALGORITHM_EDITORIAL_CATALOG.find((entry) => entry.problemId === 'AC-PAT-EVEN-23').prerequisites,
+  ['AC-PAT-003']
+)
+assert.deepEqual(
+  ALGORITHM_EDITORIAL_CATALOG.find((entry) => entry.problemId === 'AC-PAT-DIGIT-24').prerequisites,
+  ['AC-PAT-003', 'AC-CODE-FIRST-ERROR-01']
+)
+assert.deepEqual(
+  ALGORITHM_EDITORIAL_CATALOG.find((entry) => entry.problemId === 'AC-PAT-REVNUM-25').prerequisites,
+  ['AC-PAT-DIGIT-24', 'AC-EXP-WHILE-07']
+)
+assert.deepEqual(
+  ALGORITHM_EDITORIAL_CATALOG.find((entry) => entry.problemId === 'AC-PAT-DIVISOR-26').prerequisites,
+  ['AC-PAT-003', 'AC-EXP-LOOP-06', 'AC-CODE-FIRST-ERROR-01']
+)
+assert.deepEqual(
+  ALGORITHM_EDITORIAL_CATALOG.find((entry) => entry.problemId === 'AC-PAT-PRIME-27').prerequisites,
+  ['AC-PAT-DIVISOR-26', 'AC-EXP-BOUND-05']
+)
+assert.deepEqual(
+  ALGORITHM_EDITORIAL_CATALOG.find((entry) => entry.problemId === 'AC-PAT-GCD-28').prerequisites,
+  ['AC-PAT-DIVISOR-26', 'AC-EXP-WHILE-07', 'AC-PAT-DIGIT-24', 'AC-EXP-SWAP-04']
+)
+
+assert.equal(
+  isMissionPrerequisitesMet('AC-PAT-REVNUM-25', ['AC-PAT-DIGIT-24'], ALGORITHM_EDITORIAL_CATALOG),
+  false
+)
+assert.equal(
+  isMissionPrerequisitesMet(
+    'AC-PAT-REVNUM-25',
+    ['AC-PAT-DIGIT-24', 'AC-EXP-WHILE-07'],
+    ALGORITHM_EDITORIAL_CATALOG
+  ),
+  true
+)
+assert.equal(
+  isMissionPrerequisitesMet('AC-PAT-DIVISOR-26', ['AC-PAT-003'], ALGORITHM_EDITORIAL_CATALOG),
+  false
+)
+assert.equal(
+  isMissionPrerequisitesMet(
+    'AC-PAT-DIVISOR-26',
+    ['AC-PAT-003', 'AC-EXP-LOOP-06', 'AC-CODE-FIRST-ERROR-01'],
+    ALGORITHM_EDITORIAL_CATALOG
+  ),
+  true
+)
+assert.equal(
+  isMissionPrerequisitesMet('AC-PAT-GCD-28', ['AC-PAT-DIVISOR-26', 'AC-EXP-WHILE-07'], ALGORITHM_EDITORIAL_CATALOG),
+  false
+)
+assert.equal(
+  isMissionPrerequisitesMet(
+    'AC-PAT-GCD-28',
+    ['AC-PAT-DIVISOR-26', 'AC-EXP-WHILE-07', 'AC-PAT-DIGIT-24', 'AC-EXP-SWAP-04'],
+    ALGORITHM_EDITORIAL_CATALOG
+  ),
+  true
+)
+
+assert.equal(
+  getConstellationAccess(3, [], ALGORITHM_EDITORIAL_CATALOG).mode,
+  'gated',
+  'Constellation 3 must be strictly gated now that Constellation 2 has 8 Core missions published'
+)
+console.log('  -> [PASS] C2-A and C2-B prerequisites and strict 6/8 gate verified')
+
+// [Test 12] Constellation 2 Branch Missions (CALENDAR-29, PRIME-REV-30)
+console.log('[Test 12] Validating Constellation 2 Branch Missions (CALENDAR-29, PRIME-REV-30)...')
+const c2BranchProblemIds = ['AC-PAT-CALENDAR-29', 'AC-PAT-PRIME-REV-30']
+for (const branchId of c2BranchProblemIds) {
+  const entry = ALGORITHM_EDITORIAL_CATALOG.find((e) => e.problemId === branchId)
+  assert.ok(entry, `Missing catalog entry for ${branchId}`)
+  assert.equal(entry.routeRole, 'branch', `${branchId} must have routeRole: branch`)
+  assert.equal(entry.status, 'published', `${branchId} must have status: published`)
+}
+
+assert.deepEqual(
+  ALGORITHM_EDITORIAL_CATALOG.find((entry) => entry.problemId === 'AC-PAT-CALENDAR-29').prerequisites,
+  ['AC-PAT-003']
+)
+assert.deepEqual(
+  ALGORITHM_EDITORIAL_CATALOG.find((entry) => entry.problemId === 'AC-PAT-PRIME-REV-30').prerequisites,
+  ['AC-PAT-PRIME-27', 'AC-CODE-FIRST-ERROR-01']
+)
+
+assert.equal(
+  isMissionPrerequisitesMet('AC-PAT-CALENDAR-29', [], ALGORITHM_EDITORIAL_CATALOG),
+  false
+)
+assert.equal(
+  isMissionPrerequisitesMet('AC-PAT-CALENDAR-29', ['AC-PAT-003'], ALGORITHM_EDITORIAL_CATALOG),
+  true
+)
+assert.equal(
+  isMissionPrerequisitesMet('AC-PAT-PRIME-REV-30', ['AC-PAT-PRIME-27'], ALGORITHM_EDITORIAL_CATALOG),
+  false
+)
+assert.equal(
+  isMissionPrerequisitesMet(
+    'AC-PAT-PRIME-REV-30',
+    ['AC-PAT-PRIME-27', 'AC-CODE-FIRST-ERROR-01'],
+    ALGORITHM_EDITORIAL_CATALOG
+  ),
+  true
+)
+
+// Branch completions do NOT affect the minimum core unlock requirement
+const sixCoreWithoutBranches = [
+  'AC-PAT-003',
+  'AC-PAT-004',
+  'AC-PAT-EVEN-23',
+  'AC-PAT-DIGIT-24',
+  'AC-PAT-REVNUM-25',
+  'AC-PAT-DIVISOR-26',
+]
+const sixCoreWithBranches = [
+  ...sixCoreWithoutBranches,
+  ...c2BranchProblemIds,
+]
+const fiveCoreWithBranches = [
+  ...sixCoreWithoutBranches.slice(0, 5),
+  ...c2BranchProblemIds,
+]
+assert.equal(
+  isConstellationUnlocked(3, fiveCoreWithBranches, ALGORITHM_EDITORIAL_CATALOG),
+  false,
+  'C2 Branch completions must not substitute for a missing sixth Core mission'
+)
+assert.equal(
+  isConstellationUnlocked(3, sixCoreWithBranches, ALGORITHM_EDITORIAL_CATALOG),
+  true,
+  'C2 Branch completion must not block an otherwise valid six-Core unlock'
+)
+console.log('  -> [PASS] Constellation 2 Branch Missions 29~30 prerequisites and gate isolation verified')
+
+// [Test 13] Constellation 3 (31~38) Curriculum & Full Core Gate Contracts
+console.log('[Test 13] Validating Constellation 3 (31~38) missions and full Core unlock gate...')
+const c3Published = ALGORITHM_EDITORIAL_CATALOG.filter(
+  (entry) => entry.constellationId === 'constellation-3' && entry.routeRole === 'core' && entry.status === 'published'
+)
+assert.deepEqual(
+  c3Published.map((entry) => entry.problemId),
+  [
+    'AC-SEQ-005',
+    'AC-SEQ-MINMAX-32',
+    'AC-SEQ-COUNT-33',
+    'AC-SEQ-ADJACENT-34',
+    'AC-SEQ-RUNNING-35',
+    'AC-STR-REVERSE-01',
+    'AC-STR-PALIN-37',
+    'AC-SEQ-ROTATE-38',
+  ]
+)
+
+// Prerequisites check
+assert.deepEqual(
+  ALGORITHM_EDITORIAL_CATALOG.find((entry) => entry.problemId === 'AC-SEQ-005').prerequisites,
+  ['AC-CODE-FIRST-ERROR-01', 'AC-EXP-LOOP-06', 'AC-COND-ELIF-14']
+)
+assert.deepEqual(
+  ALGORITHM_EDITORIAL_CATALOG.find((entry) => entry.problemId === 'AC-SEQ-MINMAX-32').prerequisites,
+  ['AC-SEQ-005', 'AC-EXP-BOUND-05']
+)
+assert.deepEqual(
+  ALGORITHM_EDITORIAL_CATALOG.find((entry) => entry.problemId === 'AC-SEQ-COUNT-33').prerequisites,
+  ['AC-SEQ-005', 'AC-COND-RANGE-15']
+)
+assert.deepEqual(
+  ALGORITHM_EDITORIAL_CATALOG.find((entry) => entry.problemId === 'AC-SEQ-ADJACENT-34').prerequisites,
+  ['AC-SEQ-MINMAX-32', 'AC-EXP-SWAP-04']
+)
+assert.deepEqual(
+  ALGORITHM_EDITORIAL_CATALOG.find((entry) => entry.problemId === 'AC-SEQ-RUNNING-35').prerequisites,
+  ['AC-SEQ-005']
+)
+assert.deepEqual(
+  ALGORITHM_EDITORIAL_CATALOG.find((entry) => entry.problemId === 'AC-STR-REVERSE-01').prerequisites,
+  ['AC-SEQ-005']
+)
+assert.deepEqual(
+  ALGORITHM_EDITORIAL_CATALOG.find((entry) => entry.problemId === 'AC-STR-PALIN-37').prerequisites,
+  ['AC-STR-REVERSE-01']
+)
+assert.deepEqual(
+  ALGORITHM_EDITORIAL_CATALOG.find((entry) => entry.problemId === 'AC-SEQ-ROTATE-38').prerequisites,
+  ['AC-SEQ-RUNNING-35', 'AC-STR-REVERSE-01']
+)
+
+// Mission prerequisite locking
+assert.equal(
+  isMissionPrerequisitesMet('AC-SEQ-RUNNING-35', [], ALGORITHM_EDITORIAL_CATALOG),
+  false
+)
+assert.equal(
+  isMissionPrerequisitesMet('AC-SEQ-RUNNING-35', ['AC-SEQ-005'], ALGORITHM_EDITORIAL_CATALOG),
+  true
+)
+assert.equal(
+  isMissionPrerequisitesMet('AC-STR-PALIN-37', [], ALGORITHM_EDITORIAL_CATALOG),
+  false
+)
+assert.equal(
+  isMissionPrerequisitesMet('AC-STR-PALIN-37', ['AC-STR-REVERSE-01'], ALGORITHM_EDITORIAL_CATALOG),
+  true
+)
+assert.equal(
+  isMissionPrerequisitesMet('AC-SEQ-ROTATE-38', ['AC-SEQ-RUNNING-35'], ALGORITHM_EDITORIAL_CATALOG),
+  false
+)
+assert.equal(
+  isMissionPrerequisitesMet('AC-SEQ-ROTATE-38', ['AC-STR-REVERSE-01'], ALGORITHM_EDITORIAL_CATALOG),
+  false
+)
+assert.equal(
+  isMissionPrerequisitesMet('AC-SEQ-ROTATE-38', ['AC-SEQ-RUNNING-35', 'AC-STR-REVERSE-01'], ALGORITHM_EDITORIAL_CATALOG),
+  true
+)
+
+// Constellation 4 unlock tests: Required Anchors (31 and 36) + at least 6 of 8 Core missions
+const c3CoreMissions = [
+  'AC-SEQ-005',
+  'AC-SEQ-MINMAX-32',
+  'AC-SEQ-COUNT-33',
+  'AC-SEQ-ADJACENT-34',
+  'AC-SEQ-RUNNING-35',
+  'AC-STR-REVERSE-01',
+  'AC-STR-PALIN-37',
+  'AC-SEQ-ROTATE-38',
+]
+
+// 5 Core with both anchors -> locked
+const fiveCoreWithBothAnchors = [
+  'AC-SEQ-005',
+  'AC-STR-REVERSE-01',
+  'AC-SEQ-MINMAX-32',
+  'AC-SEQ-COUNT-33',
+  'AC-SEQ-ADJACENT-34',
+]
+assert.equal(
+  isConstellationUnlocked(4, fiveCoreWithBothAnchors, ALGORITHM_EDITORIAL_CATALOG),
+  false,
+  'Constellation 4 must be locked when fewer than 6 Core missions are completed'
+)
+
+// 6 Core missing Anchor 31 -> locked
+const sixCoreMissingAnchor31 = [
+  'AC-SEQ-MINMAX-32',
+  'AC-SEQ-COUNT-33',
+  'AC-SEQ-ADJACENT-34',
+  'AC-SEQ-RUNNING-35',
+  'AC-STR-REVERSE-01',
+  'AC-STR-PALIN-37',
+]
+assert.equal(
+  isConstellationUnlocked(4, sixCoreMissingAnchor31, ALGORITHM_EDITORIAL_CATALOG),
+  false,
+  'Constellation 4 must be locked if required Anchor AC-SEQ-005 is missing'
+)
+
+// 6 Core missing Anchor 36 (replace index 5 with index 6) -> locked if 36 is missing
+const sixCoreMissingAnchor36 = [
+  'AC-SEQ-005',
+  'AC-SEQ-MINMAX-32',
+  'AC-SEQ-COUNT-33',
+  'AC-SEQ-ADJACENT-34',
+  'AC-SEQ-RUNNING-35',
+  'AC-STR-PALIN-37', // 37 instead of 36
+]
+assert.equal(
+  isConstellationUnlocked(4, sixCoreMissingAnchor36, ALGORITHM_EDITORIAL_CATALOG),
+  false,
+  'Constellation 4 must be locked if required Anchor AC-STR-REVERSE-01 is missing'
+)
+
+// 6 Core with both anchors (31 and 36) -> unlocked
+const sixCoreWithBothAnchors = [
+  'AC-SEQ-005',
+  'AC-SEQ-MINMAX-32',
+  'AC-SEQ-COUNT-33',
+  'AC-SEQ-ADJACENT-34',
+  'AC-SEQ-RUNNING-35',
+  'AC-STR-REVERSE-01',
+]
+assert.equal(
+  isConstellationUnlocked(4, sixCoreWithBothAnchors, ALGORITHM_EDITORIAL_CATALOG),
+  true,
+  'Constellation 4 must unlock when both required Anchors (31 and 36) and 6 Core missions are completed'
+)
+
+console.log('  -> [PASS] Constellation 3 (31~38) prerequisites and Constellation 4 full Core unlock gate verified')
+
+// [Test 14] Constellation 3 Branch Missions (39·40) Curriculum & Gate Isolation Contracts
+console.log('[Test 14] Validating Constellation 3 Branch Missions (39·40) and gate isolation...')
+const c3AllPublished = ALGORITHM_EDITORIAL_CATALOG.filter(
+  (entry) => entry.constellationId === 'constellation-3' && entry.status === 'published'
+)
+assert.deepEqual(
+  c3AllPublished.map((entry) => entry.problemId),
+  [
+    'AC-SEQ-005',
+    'AC-SEQ-MINMAX-32',
+    'AC-SEQ-COUNT-33',
+    'AC-SEQ-ADJACENT-34',
+    'AC-SEQ-RUNNING-35',
+    'AC-STR-REVERSE-01',
+    'AC-STR-PALIN-37',
+    'AC-SEQ-ROTATE-38',
+    'AC-STR-COMPRESS-39',
+    'AC-STR-PATTERN-40',
+  ],
+  'Constellation 3 must have all 10 (8 Core + 2 Branch) problems published'
+)
+
+// Branch prerequisites check
+assert.deepEqual(
+  ALGORITHM_EDITORIAL_CATALOG.find((entry) => entry.problemId === 'AC-STR-COMPRESS-39').prerequisites,
+  ['AC-SEQ-ADJACENT-34', 'AC-SEQ-RUNNING-35', 'AC-STR-REVERSE-01']
+)
+assert.deepEqual(
+  ALGORITHM_EDITORIAL_CATALOG.find((entry) => entry.problemId === 'AC-STR-PATTERN-40').prerequisites,
+  ['AC-SEQ-COUNT-33', 'AC-SEQ-RUNNING-35', 'AC-STR-REVERSE-01']
+)
+
+// Mission prerequisite locking for Branch 39 & 40
+assert.equal(
+  isMissionPrerequisitesMet('AC-STR-COMPRESS-39', ['AC-SEQ-ADJACENT-34', 'AC-SEQ-RUNNING-35'], ALGORITHM_EDITORIAL_CATALOG),
+  false
+)
+assert.equal(
+  isMissionPrerequisitesMet('AC-STR-COMPRESS-39', ['AC-SEQ-ADJACENT-34', 'AC-SEQ-RUNNING-35', 'AC-STR-REVERSE-01'], ALGORITHM_EDITORIAL_CATALOG),
+  true
+)
+assert.equal(
+  isMissionPrerequisitesMet('AC-STR-PATTERN-40', ['AC-SEQ-COUNT-33', 'AC-STR-REVERSE-01'], ALGORITHM_EDITORIAL_CATALOG),
+  false
+)
+assert.equal(
+  isMissionPrerequisitesMet('AC-STR-PATTERN-40', ['AC-SEQ-COUNT-33', 'AC-SEQ-RUNNING-35', 'AC-STR-REVERSE-01'], ALGORITHM_EDITORIAL_CATALOG),
+  true
+)
+
+// Branch completion isolation: completing Branch 39 and 40 must NOT contribute to Core 6/8 unlock gate
+const c3FiveCoreWithBranches = [
+  'AC-SEQ-005',
+  'AC-STR-REVERSE-01',
+  'AC-SEQ-MINMAX-32',
+  'AC-SEQ-COUNT-33',
+  'AC-SEQ-ADJACENT-34',
+  'AC-STR-COMPRESS-39', // Branch
+  'AC-STR-PATTERN-40',  // Branch
+]
+assert.equal(
+  isConstellationUnlocked(4, c3FiveCoreWithBranches, ALGORITHM_EDITORIAL_CATALOG),
+  false,
+  'Completing Branch missions must NOT bypass the Core 6/8 unlock requirement for Constellation 4'
+)
+
+const c3SixCoreWithBranches = [
+  'AC-SEQ-005',
+  'AC-STR-REVERSE-01',
+  'AC-SEQ-MINMAX-32',
+  'AC-SEQ-COUNT-33',
+  'AC-SEQ-ADJACENT-34',
+  'AC-SEQ-RUNNING-35',
+  'AC-STR-COMPRESS-39', // Branch
+  'AC-STR-PATTERN-40',  // Branch
+]
+assert.equal(
+  isConstellationUnlocked(4, c3SixCoreWithBranches, ALGORITHM_EDITORIAL_CATALOG),
+  true,
+  'Completing 6 Core missions with required anchors must unlock Constellation 4 regardless of Branch state'
+)
+
+console.log('  -> [PASS] Constellation 3 Branch Missions (39·40) prerequisites and gate isolation verified')
+
+// [Test 15] Constellation 4 Set & Dictionary Foundations (41~48) Curriculum & Gate Contracts
+console.log('[Test 15] Validating Constellation 4 Set & Dictionary Foundations (41~48) and gate isolation...')
+const c4Published = ALGORITHM_EDITORIAL_CATALOG.filter(
+  (entry) => entry.constellationId === 'constellation-4' && entry.status === 'published'
+)
+assert.deepEqual(
+  c4Published.map((entry) => entry.problemId),
+  [
+    'AC-SET-UNIQUE-01',
+    'AC-SET-MEMBERSHIP-42',
+    'AC-SET-INTERSECT-43',
+    'AC-DICT-FREQ-44',
+    'AC-DICT-MODE-45',
+    'AC-DICT-STOCK-46',
+    'AC-DICT-TWOSUM-47',
+    'AC-DICT-ONESHOT-48',
+  ],
+  'Constellation 4 must currently have all 8 published Core problems (41~48)'
+)
+
+// Prerequisites checks
+assert.deepEqual(
+  ALGORITHM_EDITORIAL_CATALOG.find((entry) => entry.problemId === 'AC-SET-UNIQUE-01').prerequisites,
+  ['AC-SEQ-005']
+)
+assert.deepEqual(
+  ALGORITHM_EDITORIAL_CATALOG.find((entry) => entry.problemId === 'AC-SET-MEMBERSHIP-42').prerequisites,
+  ['AC-SET-UNIQUE-01']
+)
+assert.deepEqual(
+  ALGORITHM_EDITORIAL_CATALOG.find((entry) => entry.problemId === 'AC-SET-INTERSECT-43').prerequisites,
+  ['AC-SET-MEMBERSHIP-42']
+)
+assert.deepEqual(
+  ALGORITHM_EDITORIAL_CATALOG.find((entry) => entry.problemId === 'AC-DICT-FREQ-44').prerequisites,
+  ['AC-SET-MEMBERSHIP-42']
+)
+assert.deepEqual(
+  ALGORITHM_EDITORIAL_CATALOG.find((entry) => entry.problemId === 'AC-DICT-MODE-45').prerequisites,
+  ['AC-DICT-FREQ-44']
+)
+assert.deepEqual(
+  ALGORITHM_EDITORIAL_CATALOG.find((entry) => entry.problemId === 'AC-DICT-STOCK-46').prerequisites,
+  ['AC-DICT-FREQ-44']
+)
+assert.deepEqual(
+  ALGORITHM_EDITORIAL_CATALOG.find((entry) => entry.problemId === 'AC-DICT-TWOSUM-47').prerequisites,
+  ['AC-DICT-STOCK-46', 'AC-STR-REVERSE-01']
+)
+assert.deepEqual(
+  ALGORITHM_EDITORIAL_CATALOG.find((entry) => entry.problemId === 'AC-DICT-ONESHOT-48').prerequisites,
+  ['AC-DICT-TWOSUM-47', 'AC-SET-INTERSECT-43']
+)
+
+// Mission prerequisite locking for 42 ~ 48
+assert.equal(isMissionPrerequisitesMet('AC-SET-MEMBERSHIP-42', [], ALGORITHM_EDITORIAL_CATALOG), false)
+assert.equal(isMissionPrerequisitesMet('AC-SET-MEMBERSHIP-42', ['AC-SET-UNIQUE-01'], ALGORITHM_EDITORIAL_CATALOG), true)
+
+assert.equal(isMissionPrerequisitesMet('AC-SET-INTERSECT-43', ['AC-SET-UNIQUE-01'], ALGORITHM_EDITORIAL_CATALOG), false)
+assert.equal(isMissionPrerequisitesMet('AC-SET-INTERSECT-43', ['AC-SET-MEMBERSHIP-42'], ALGORITHM_EDITORIAL_CATALOG), true)
+
+assert.equal(isMissionPrerequisitesMet('AC-DICT-FREQ-44', ['AC-SET-UNIQUE-01'], ALGORITHM_EDITORIAL_CATALOG), false)
+assert.equal(isMissionPrerequisitesMet('AC-DICT-FREQ-44', ['AC-SET-MEMBERSHIP-42'], ALGORITHM_EDITORIAL_CATALOG), true)
+
+assert.equal(isMissionPrerequisitesMet('AC-DICT-MODE-45', ['AC-SET-MEMBERSHIP-42'], ALGORITHM_EDITORIAL_CATALOG), false)
+assert.equal(isMissionPrerequisitesMet('AC-DICT-MODE-45', ['AC-DICT-FREQ-44'], ALGORITHM_EDITORIAL_CATALOG), true)
+
+assert.equal(isMissionPrerequisitesMet('AC-DICT-STOCK-46', ['AC-SET-MEMBERSHIP-42'], ALGORITHM_EDITORIAL_CATALOG), false)
+assert.equal(isMissionPrerequisitesMet('AC-DICT-STOCK-46', ['AC-DICT-FREQ-44'], ALGORITHM_EDITORIAL_CATALOG), true)
+
+assert.equal(isMissionPrerequisitesMet('AC-DICT-TWOSUM-47', ['AC-DICT-STOCK-46'], ALGORITHM_EDITORIAL_CATALOG), false)
+assert.equal(isMissionPrerequisitesMet('AC-DICT-TWOSUM-47', ['AC-STR-REVERSE-01'], ALGORITHM_EDITORIAL_CATALOG), false)
+assert.equal(isMissionPrerequisitesMet('AC-DICT-TWOSUM-47', ['AC-DICT-STOCK-46', 'AC-STR-REVERSE-01'], ALGORITHM_EDITORIAL_CATALOG), true)
+
+assert.equal(isMissionPrerequisitesMet('AC-DICT-ONESHOT-48', ['AC-DICT-TWOSUM-47'], ALGORITHM_EDITORIAL_CATALOG), false)
+assert.equal(isMissionPrerequisitesMet('AC-DICT-ONESHOT-48', ['AC-SET-INTERSECT-43'], ALGORITHM_EDITORIAL_CATALOG), false)
+assert.equal(isMissionPrerequisitesMet('AC-DICT-ONESHOT-48', ['AC-DICT-TWOSUM-47', 'AC-SET-INTERSECT-43'], ALGORITHM_EDITORIAL_CATALOG), true)
+
+// Constellation 5 unlock gating:
+// 1. Core 5/8 completed (41~45) -> Constellation 5 remains locked
+const c4FiveCore = [
+  'AC-SET-UNIQUE-01',
+  'AC-SET-MEMBERSHIP-42',
+  'AC-SET-INTERSECT-43',
+  'AC-DICT-FREQ-44',
+  'AC-DICT-MODE-45',
+]
+assert.equal(
+  isConstellationUnlocked(5, c4FiveCore, ALGORITHM_EDITORIAL_CATALOG),
+  false,
+  'Constellation 5 must remain locked when only 5 Core missions of Constellation 4 are completed'
+)
+
+// 2. Core 6/8 completed (41~46) + Required Anchor 41 -> Constellation 5 unlocked (grandfathered progression preserved)!
+const c4SixCore = [
+  'AC-SET-UNIQUE-01',
+  'AC-SET-MEMBERSHIP-42',
+  'AC-SET-INTERSECT-43',
+  'AC-DICT-FREQ-44',
+  'AC-DICT-MODE-45',
+  'AC-DICT-STOCK-46',
+]
+assert.equal(
+  isConstellationUnlocked(5, c4SixCore, ALGORITHM_EDITORIAL_CATALOG),
+  true,
+  'Constellation 5 must unlock when 6 Core missions of Constellation 4 are completed including required anchor 41'
+)
+
+// 3. Full Core 8/8 completed (41~48) + Required Anchor 41 -> Constellation 5 remains unlocked
+const c4EightCore = [
+  ...c4SixCore,
+  'AC-DICT-TWOSUM-47',
+  'AC-DICT-ONESHOT-48',
+]
+assert.equal(
+  isConstellationUnlocked(5, c4EightCore, ALGORITHM_EDITORIAL_CATALOG),
+  true,
+  'Constellation 5 must remain unlocked when all 8 Core missions of Constellation 4 are completed'
+)
+
+console.log('  -> [PASS] Constellation 4 (41~48) Set & Dictionary prerequisites and Core 8/8 unlock verified')
 
 console.log('\n=== Gate 0 Curriculum & Contract Tests Passed 100%! ===\n')

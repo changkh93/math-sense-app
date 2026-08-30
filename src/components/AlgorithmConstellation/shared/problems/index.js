@@ -27,6 +27,29 @@ import { AC_COND_GRADE_17 } from './ac_cond_grade_17.js'
 import { AC_COND_COMPLEX_18 } from './ac_cond_complex_18.js'
 import { AC_COND_TOGGLE_19 } from './ac_cond_toggle_19.js'
 import { AC_COND_ORDER_20 } from './ac_cond_order_20.js'
+import { AC_PAT_EVEN_23 } from './ac_pat_even_23.js'
+import { AC_PAT_DIGIT_24 } from './ac_pat_digit_24.js'
+import { AC_PAT_REVNUM_25 } from './ac_pat_revnum_25.js'
+import { AC_PAT_DIVISOR_26 } from './ac_pat_divisor_26.js'
+import { AC_PAT_PRIME_27 } from './ac_pat_prime_27.js'
+import { AC_PAT_GCD_28 } from './ac_pat_gcd_28.js'
+import { AC_PAT_CALENDAR_29 } from './ac_pat_calendar_29.js'
+import { AC_PAT_PRIME_REV_30 } from './ac_pat_prime_review_30.js'
+import { AC_SEQ_MINMAX_32 } from './ac_seq_minmax_32.js'
+import { AC_SEQ_COUNT_33 } from './ac_seq_count_33.js'
+import { AC_SEQ_ADJACENT_34 } from './ac_seq_adjacent_34.js'
+import { AC_SEQ_RUNNING_35 } from './ac_seq_running_35.js'
+import { AC_STR_PALIN_37 } from './ac_str_palin_37.js'
+import { AC_SEQ_ROTATE_38 } from './ac_seq_rotate_38.js'
+import { AC_STR_COMPRESS_39 } from './ac_str_compress_39.js'
+import { AC_STR_PATTERN_40 } from './ac_str_pattern_40.js'
+import { AC_SET_MEMBERSHIP_42 } from './ac_set_membership_42.js'
+import { AC_SET_INTERSECT_43 } from './ac_set_intersect_43.js'
+import { AC_DICT_FREQ_44 } from './ac_dict_freq_44.js'
+import { AC_DICT_MODE_45 } from './ac_dict_mode_45.js'
+import { AC_DICT_STOCK_46 } from './ac_dict_stock_46.js'
+import { AC_DICT_TWOSUM_47 } from './ac_dict_twosum_47.js'
+import { AC_DICT_ONESHOT_48 } from './ac_dict_oneshot_48.js'
 
 export const PUBLIC_KERNELS = Object.freeze({
   'AC-COND-001': AC_COND_001,
@@ -58,6 +81,29 @@ export const PUBLIC_KERNELS = Object.freeze({
   'AC-COND-COMPLEX-18': AC_COND_COMPLEX_18,
   'AC-COND-TOGGLE-19': AC_COND_TOGGLE_19,
   'AC-COND-ORDER-20': AC_COND_ORDER_20,
+  'AC-PAT-EVEN-23': AC_PAT_EVEN_23,
+  'AC-PAT-DIGIT-24': AC_PAT_DIGIT_24,
+  'AC-PAT-REVNUM-25': AC_PAT_REVNUM_25,
+  'AC-PAT-DIVISOR-26': AC_PAT_DIVISOR_26,
+  'AC-PAT-PRIME-27': AC_PAT_PRIME_27,
+  'AC-PAT-GCD-28': AC_PAT_GCD_28,
+  'AC-PAT-CALENDAR-29': AC_PAT_CALENDAR_29,
+  'AC-PAT-PRIME-REV-30': AC_PAT_PRIME_REV_30,
+  'AC-SEQ-MINMAX-32': AC_SEQ_MINMAX_32,
+  'AC-SEQ-COUNT-33': AC_SEQ_COUNT_33,
+  'AC-SEQ-ADJACENT-34': AC_SEQ_ADJACENT_34,
+  'AC-SEQ-RUNNING-35': AC_SEQ_RUNNING_35,
+  'AC-STR-PALIN-37': AC_STR_PALIN_37,
+  'AC-SEQ-ROTATE-38': AC_SEQ_ROTATE_38,
+  'AC-STR-COMPRESS-39': AC_STR_COMPRESS_39,
+  'AC-STR-PATTERN-40': AC_STR_PATTERN_40,
+  'AC-SET-MEMBERSHIP-42': AC_SET_MEMBERSHIP_42,
+  'AC-SET-INTERSECT-43': AC_SET_INTERSECT_43,
+  'AC-DICT-FREQ-44': AC_DICT_FREQ_44,
+  'AC-DICT-MODE-45': AC_DICT_MODE_45,
+  'AC-DICT-STOCK-46': AC_DICT_STOCK_46,
+  'AC-DICT-TWOSUM-47': AC_DICT_TWOSUM_47,
+  'AC-DICT-ONESHOT-48': AC_DICT_ONESHOT_48,
 })
 
 export function getPublicKernel(problemId) {
@@ -95,5 +141,28 @@ export {
   AC_COND_COMPLEX_18,
   AC_COND_TOGGLE_19,
   AC_COND_ORDER_20,
+  AC_PAT_EVEN_23,
+  AC_PAT_DIGIT_24,
+  AC_PAT_REVNUM_25,
+  AC_PAT_DIVISOR_26,
+  AC_PAT_PRIME_27,
+  AC_PAT_GCD_28,
+  AC_PAT_CALENDAR_29,
+  AC_PAT_PRIME_REV_30,
+  AC_SEQ_MINMAX_32,
+  AC_SEQ_COUNT_33,
+  AC_SEQ_ADJACENT_34,
+  AC_SEQ_RUNNING_35,
+  AC_STR_PALIN_37,
+  AC_SEQ_ROTATE_38,
+  AC_STR_COMPRESS_39,
+  AC_STR_PATTERN_40,
+  AC_SET_MEMBERSHIP_42,
+  AC_SET_INTERSECT_43,
+  AC_DICT_FREQ_44,
+  AC_DICT_MODE_45,
+  AC_DICT_STOCK_46,
+  AC_DICT_TWOSUM_47,
+  AC_DICT_ONESHOT_48,
 }
 

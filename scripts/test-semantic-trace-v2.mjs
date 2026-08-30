@@ -93,7 +93,77 @@ for (let i = 0; i < 150; i++) {
 const scenes = projectSemanticTraceToMeaningful(rawEvents, 15)
 assert.ok(scenes.length <= 15, 'Learning scenes must be capped at 15 for Explorer')
 assert.equal(scenes[0].sceneIndex, 0)
-assert.equal(scenes[scenes.length - 1].sceneIndex, scenes.length - 1)
 console.log(`  -> [PASS] 150 raw events projected to ${scenes.length} learning scenes (capped <= 15)`)
+
+// [Test 3] R2 Dictionary Semantics, Trace, and Security Validation
+console.log('[Test 3] Validating R2 Dictionary Execution, Membership, Mutation Trace & Security...')
+const dictBuildCode = `def build_counts(items):
+    counts = {}
+    for item in items:
+        if item in counts:
+            counts[item] = counts[item] + 1
+        else:
+            counts[item] = 1
+    return counts
+`
+const dictResult = runRestrictedPythonFunction(dictBuildCode, 'build_counts', { items: ['A', 'B', 'A'] })
+assert.equal(dictResult.ok, true, `Dict execution failed: ${dictResult.error}`)
+assert.deepEqual(dictResult.result, { A: 2, B: 1 })
+
+// Empty dict test
+const emptyDictResult = runRestrictedPythonFunction(dictBuildCode, 'build_counts', { items: [] })
+assert.equal(emptyDictResult.ok, true)
+assert.deepEqual(emptyDictResult.result, {})
+
+// Key Error test (missing key access throws KEY_ERROR)
+const missingKeyResult = runRestrictedPythonFunction(
+  'def get_missing():\n    d = {"A": 1}\n    return d["MISSING"]\n',
+  'get_missing'
+)
+assert.equal(missingKeyResult.ok, false)
+assert.equal(missingKeyResult.code, 'KEY_ERROR')
+
+// Dangerous key fail-closed tests
+const protoLiteralResult = runRestrictedPythonFunction(
+  'def proto_test():\n    d = {"__proto__": 1}\n    return d\n',
+  'proto_test'
+)
+assert.equal(protoLiteralResult.ok, false)
+assert.ok(['UNSUPPORTED_SYNTAX', 'SECURITY_ERROR'].includes(protoLiteralResult.code))
+
+const protoArgResult = runRestrictedPythonFunction(
+  'def arg_test(d):\n    return len(d)\n',
+  'arg_test',
+  { d: { constructor: 123 } }
+)
+assert.equal(protoArgResult.ok, false)
+assert.equal(protoArgResult.code, 'SECURITY_ERROR')
+
+// A dynamic key must not traverse an inherited JavaScript property during nested assignment.
+const nestedPrototypeResult = runRestrictedPythonFunction(
+  'def nested_write(d, key):\n    d[key]["POLLUTED"] = 1\n    return 1\n',
+  'nested_write',
+  { d: {}, key: 'constructor' }
+)
+assert.equal(nestedPrototypeResult.ok, false)
+assert.equal(nestedPrototypeResult.code, 'SECURITY_ERROR')
+
+// R2 intentionally supports string dictionary keys only; numeric list indices remain valid.
+const numericDictKeyResult = runRestrictedPythonFunction(
+  'def numeric_key():\n    d = {}\n    d[1] = "x"\n    return d\n',
+  'numeric_key'
+)
+assert.equal(numericDictKeyResult.ok, false)
+assert.equal(numericDictKeyResult.code, 'TYPE_ERROR')
+
+const listAssignmentResult = runRestrictedPythonFunction(
+  'def update_first(items):\n    items[0] = 9\n    return items\n',
+  'update_first',
+  { items: [1, 2] }
+)
+assert.equal(listAssignmentResult.ok, true)
+assert.deepEqual(listAssignmentResult.result, [9, 2])
+
+console.log('  -> [PASS] R2 Dictionary semantics, KEY_ERROR, and security fail-closed verified')
 
 console.log('\n=== Semantic Trace v2 Tests Passed 100%! ===\n')

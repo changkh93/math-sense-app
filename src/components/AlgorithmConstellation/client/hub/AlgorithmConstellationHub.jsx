@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import firebaseApp, { auth } from '../../../../firebase.js'
 import AlgorithmMissionShell from '../shell/AlgorithmMissionShell.jsx'
@@ -75,7 +75,7 @@ export default function AlgorithmConstellationHub({ onBack }) {
     return createAlgorithmConstellationGateway(firebaseApp)
   }, [])
 
-  const syncProgress = async () => {
+  const syncProgress = useCallback(async () => {
     const localSnap = readLocalProgressSnapshot()
     let serverSnap = {}
     try {
@@ -98,12 +98,15 @@ export default function AlgorithmConstellationHub({ onBack }) {
       }
     }
     setProgressMap(merged)
-  }
+  }, [gateway])
 
   // Authoritative & resilient progress loading
   useEffect(() => {
-    syncProgress()
-  }, [gateway])
+    const timeoutId = window.setTimeout(() => {
+      void syncProgress()
+    }, 0)
+    return () => window.clearTimeout(timeoutId)
+  }, [syncProgress])
 
   const completedProblemIds = useMemo(() => {
     const ids = []

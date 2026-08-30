@@ -133,15 +133,16 @@ export function createAlgorithmConstellationMockGateway() {
         ? kernel.assessment?.understandingChallenges?.[0] || {
             challengeId: `uc_${session.problemId}_mock`,
             type: 'trace_understanding',
-            prompt: `${kernel.identity?.studentTitle}의 핵심 실행 규칙을 확인하세요.`,
+            title: `★★ ${kernel.identity?.studentTitle || '핵심 원리 이해하기'}`,
+            prompt: `${kernel.identity?.subtitle || '단계별 실행 흐름과 상태 변화를 확인하세요.'}`,
             codeSnippet: code,
             questions: [
               {
                 id: 'q1',
-                text: '작성한 코드가 문제에서 요구하는 상태 변환 순서를 올바르게 따르고 있나요?',
+                text: '이 코드가 실행될 때 명령의 실행 순서와 상태 갱신 규칙으로 알맞은 것은 무엇인가요?',
                 options: [
-                  { value: 'true', label: '예 (참)' },
-                  { value: 'false', label: '아니오 (거짓)' },
+                  { value: 'true', label: '위에서 아래로 순차적으로 실행되며 상태가 갱신된다' },
+                  { value: 'false', label: '순서와 관계없이 무작위로 실행된다' },
                 ],
                 expected: 'true',
               },

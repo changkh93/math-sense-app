@@ -14,7 +14,7 @@ export const AC_NAV_005 = deepFreeze({
   schemaVersion: 1,
   family: 'NAV',
   evidenceRecipe: { primitives: ['ordered-buffer', 'container-scan'] },
-  pythonConcepts: { introduces: ['class:deque', 'method:popleft', 'method:append'], requires: [] },
+  pythonConcepts: { introduces: ['class:deque', 'method:popleft'], requires: ['method:append'] },
 
   identity: {
     systemTitle: 'Navigation - FIFO Queue and Deque Operations',

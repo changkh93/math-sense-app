@@ -10,15 +10,43 @@ import { validateProblemKernelSchema, deepFreeze } from '../contracts/problemKer
 
 export const AC_SEQ_005 = deepFreeze({
   id: 'AC-SEQ-005',
+  problemId: 'AC-SEQ-005',
   version: 1,
+  problemVersion: 1,
   schemaVersion: 1,
   family: 'SEQ',
+  curriculum: {
+    constellationId: 'constellation-3',
+    routeRole: 'core',
+    learningRole: 'anchor',
+    recommendedBand: 'E',
+    prerequisites: [
+      'AC-CODE-FIRST-ERROR-01',
+      'AC-EXP-LOOP-06',
+      'AC-COND-ELIF-14',
+    ],
+  },
   evidenceRecipe: { primitives: ['container-scan', 'scalar-sequence', 'decision'] },
-  pythonConcepts: { introduces: ['builtin:list', 'statement:for', 'statement:if'], requires: [] },
+  pythonConcepts: {
+    requires: [
+      'builtin:list',
+      'statement:for',
+      'statement:if',
+      'operator:comparison-lower-bound',
+      'operator:assignment',
+      'operator:arithmetic-state-update',
+    ],
+    introduces: [],
+  },
+  thinkingPatterns: {
+    requires: [],
+    introduces: ['pattern:filter-accumulate'],
+  },
 
   identity: {
     systemTitle: 'Sequence - Filter and Accumulator Pattern',
     studentTitle: '에너지 캡슐 선별 수거',
+    subtitle: '여러 캡슐을 차례로 확인해 정상 캡슐의 총 에너지를 구합니다.',
     difficultyLevel: 2,
   },
 
@@ -103,6 +131,75 @@ export const AC_SEQ_005 = deepFreeze({
       { id: 'd2', inputs: { capsules: [10, 20, 30] }, expected: 60 },
       { id: 'd3', inputs: { capsules: [-5, -10, 0] }, expected: 0 },
       { id: 'd4', inputs: { capsules: [] }, expected: 0 },
+    ],
+    understandingChallenges: [
+      {
+        challengeId: 'uc_seq_005_1',
+        title: '★★ 선별 합산 누적자 추적',
+        type: 'trace_understanding',
+        prompt: 'capsules = [4, -2, 7, 0] 일 때 collect_energy(capsules)의 실행 과정을 확인하세요.',
+        codeSnippet: `def collect_energy(capsules):\n    total = 0\n    for energy in capsules:\n        if energy > 0:\n            total = total + energy\n    return total`,
+        questions: [
+          {
+            id: 'q1',
+            text: '손상된 캡슐(-2)을 만났을 때 total 값은 어떻게 될까요?',
+            options: [
+              { value: 'keep_state', label: '조건(energy > 0)을 만족하지 않으므로 total 값이 유지된다' },
+              { value: 'decrease', label: '2만큼 감소한다' },
+              { value: 'reset', label: '0으로 초기화된다' },
+            ],
+            expected: 'keep_state',
+          },
+          {
+            id: 'q2',
+            text: '[4, -2, 7, 0]을 순회한 후 최종 반환되는 total 값은 얼마일까요?',
+            options: [
+              { value: 'val_11', label: '11 (4 + 7)' },
+              { value: 'val_9', label: '9 (4 - 2 + 7)' },
+              { value: 'val_2', label: '2 (양수 캡슐의 개수)' },
+            ],
+            expected: 'val_11',
+          },
+          {
+            id: 'q3',
+            text: '이 문제에서 양수 캡슐의 개수를 세는 것과 에너지 합을 구하는 것의 차이는 무엇일까요?',
+            options: [
+              { value: 'sum_vs_count', label: '개수는 1씩 더하지만, 합은 energy 값 자체를 더한다' },
+              { value: 'same_thing', label: '둘은 완전히 같은 계산이다' },
+            ],
+            expected: 'sum_vs_count',
+          },
+        ],
+      },
+    ],
+    transferChallenges: [
+      {
+        transferChallengeId: 'AC-SEQ-005-T1',
+        title: '수정 광석 선별 수거',
+        description: '광석 리스트(ores)에서 순도가 양수(purity > 0)인 광석의 순도 총합을 구하세요.',
+        contextCard: {
+          title: '📋 수정 광석 선별 수거 흐름',
+          steps: [
+            { label: '빠짐없이 확인', text: '광석을 처음부터 끝까지 하나씩 살펴보세요.' },
+            { label: '수거 대상 구분', text: '수거할 광석과 건너뛸 광석의 공통점을 찾아보세요.' },
+            { label: '결과에 모으기', text: '수거한 광석의 순도를 하나의 결과에 계속 모으세요.' },
+          ],
+        },
+        thoughtCheck: {
+          prompt: '캡슐 에너지 합산과 수정 광석 순도 합산의 공통적인 생각의 규칙은 무엇일까요?',
+          options: [
+            { id: 'opt_filter_sum', label: '0보다 큰 유효한 값만 골라 누적 변수에 더한다', isCorrect: true },
+            { id: 'opt_count_only', label: '양수 광석의 개수만 1씩 센다', isCorrect: false },
+          ],
+          feedback: '맞아요! 조건에 맞는 항목의 값 자체를 total에 누적하는 동일한 filter-accumulate 패턴입니다.',
+        },
+        entryFunction: 'collect_crystals',
+        starterCode: `def collect_crystals(ores):\n    # 양의 순도(> 0) 광석만 선별하여 합산하세요.\n    pass\n`,
+        testCases: [
+          { inputs: { ores: [6, -2, 4] }, expected: 10 },
+          { inputs: { ores: [] }, expected: 0 },
+        ],
+      },
     ],
     hiddenTestsRef: 'sec_seq_005_hidden_suite_v1',
     transferFamily: 'linear-filter-accumulator',

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 
 function isAnswerMatch(selected, expected) {
   if (selected === undefined || selected === null) return false
@@ -18,13 +18,39 @@ export default function ObserveMode({
   onProceedToCode,
 }) {
   const shellInfo = kernel.shells?.[shell] || kernel.shells?.explorer || {}
-  const truthTable = kernel.modes?.observe?.truthTable || []
+  const truthTable = useMemo(() => kernel.modes?.observe?.truthTable || [], [kernel.modes?.observe?.truthTable])
   const givenRecords = kernel.modes?.observe?.givenRecords || []
   const timelineScenes = kernel.modes?.observe?.timelineScenes || []
   const isSignalBridge = kernel.world?.type === 'signal-bridge' || kernel.id === 'AC-PAT-003'
 
   const [answers, setAnswers] = useState({})
   const [submitted, setSubmitted] = useState(false)
+
+  // Shuffle multiple-choice options deterministically so the correct answer is not always in the first position
+  const displayOptionsMap = useMemo(() => {
+    const map = {}
+    truthTable.forEach((item, idx) => {
+      const rawOptions = item.answer?.options || []
+      if (Array.isArray(rawOptions) && rawOptions.length > 1) {
+        const seedStr = `${kernel.id}_q${idx}_${item.input || ''}`
+        let hash = 0
+        for (let i = 0; i < seedStr.length; i++) {
+          hash = (hash * 31 + seedStr.charCodeAt(i)) >>> 0
+        }
+        const shuffled = [...rawOptions]
+        for (let i = shuffled.length - 1; i > 0; i--) {
+          const j = (hash + i * 17 + 3) % (i + 1)
+          const temp = shuffled[i]
+          shuffled[i] = shuffled[j]
+          shuffled[j] = temp
+        }
+        map[idx] = shuffled
+      } else {
+        map[idx] = rawOptions
+      }
+    })
+    return map
+  }, [kernel.id, truthTable])
 
   const handleSelectAnswer = (qIndex, value) => {
     setAnswers((prev) => ({
@@ -200,7 +226,7 @@ export default function ObserveMode({
                       </button>
                     </>
                   ) : answerSchema.options && Array.isArray(answerSchema.options) ? (
-                    answerSchema.options.map((opt, optIdx) => {
+                    (displayOptionsMap[idx] || answerSchema.options).map((opt, optIdx) => {
                       const isOptionSelected = isAnswerMatch(selected, opt)
                       return (
                         <button

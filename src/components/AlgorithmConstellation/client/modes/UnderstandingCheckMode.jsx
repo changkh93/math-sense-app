@@ -1,4 +1,9 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
+
+const DEFAULT_BOOLEAN_OPTIONS = Object.freeze([
+  { value: 'true', label: 'True (참)' },
+  { value: 'false', label: 'False (거짓)' },
+])
 
 export default function UnderstandingCheckMode({
   challenge,
@@ -11,7 +16,7 @@ export default function UnderstandingCheckMode({
   const [isPassed, setIsPassed] = useState(false)
   const [submitting, setSubmitting] = useState(false)
 
-  const questions = challenge?.questions || []
+  const questions = useMemo(() => challenge?.questions || [], [challenge?.questions])
   const displayCode = challenge?.codeSnippet || code
 
   const handleSelect = (qid, val) => {
@@ -34,10 +39,39 @@ export default function UnderstandingCheckMode({
     }
   }
 
-  const defaultBooleanOptions = [
-    { value: 'true', label: 'True (참)' },
-    { value: 'false', label: 'False (거짓)' },
-  ]
+  // Deterministically shuffle multiple choice options for 2★ understanding check (excluding standard True/False)
+  const displayOptionsMap = useMemo(() => {
+    const map = {}
+    questions.forEach((q) => {
+      const rawOptions = q.options && q.options.length > 0 ? q.options : DEFAULT_BOOLEAN_OPTIONS
+      const isStandardBoolean = rawOptions.length === 2 &&
+        ((rawOptions[0]?.value === 'true' && rawOptions[1]?.value === 'false') ||
+         (rawOptions[0] === 'true' && rawOptions[1] === 'false'))
+      if (isStandardBoolean) {
+        map[q.id] = rawOptions
+        return
+      }
+
+      if (Array.isArray(rawOptions) && rawOptions.length > 1) {
+        const seedStr = `${challenge?.challengeId || 'challenge'}_${q.id}`
+        let hash = 0
+        for (let i = 0; i < seedStr.length; i++) {
+          hash = (hash * 31 + seedStr.charCodeAt(i)) >>> 0
+        }
+        const shuffled = [...rawOptions]
+        for (let i = shuffled.length - 1; i > 0; i--) {
+          const j = (hash + i * 19 + 7) % (i + 1)
+          const temp = shuffled[i]
+          shuffled[i] = shuffled[j]
+          shuffled[j] = temp
+        }
+        map[q.id] = shuffled
+      } else {
+        map[q.id] = rawOptions
+      }
+    })
+    return map
+  }, [challenge?.challengeId, questions])
 
   return (
     <div style={{ padding: '24px', background: 'rgba(10, 20, 40, 0.75)', borderRadius: '16px', border: '1px solid rgba(0, 240, 255, 0.2)', color: '#fff' }}>
@@ -68,7 +102,7 @@ export default function UnderstandingCheckMode({
       <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', marginBottom: '24px' }}>
         {questions.map((q) => {
           const selected = answers[q.id]
-          const options = q.options && q.options.length > 0 ? q.options : defaultBooleanOptions
+          const options = displayOptionsMap[q.id] || (q.options && q.options.length > 0 ? q.options : DEFAULT_BOOLEAN_OPTIONS)
 
           return (
             <div

@@ -128,7 +128,7 @@ assert.deepEqual(Object.keys(allProgress), [definition.problemId])
 assert.equal(allProgress[definition.problemId].bestStars, 3)
 assert.equal(Object.hasOwn(allProgress[definition.problemId], 'updatedAt'), false)
 
-console.log('[Test 2b] Constellation 0 and 1 newly published problems complete the production callable lifecycle...')
+console.log('[Test 2b] Newly published Constellation 0~2 problems complete the production callable lifecycle...')
 for (const pid of [
   'AC-EXP-SEQ-01',
   'AC-EXP-STEP-03',
@@ -144,6 +144,32 @@ for (const pid of [
   'AC-COND-COMPLEX-18',
   'AC-COND-TOGGLE-19',
   'AC-COND-ORDER-20',
+  'AC-PAT-EVEN-23',
+  'AC-PAT-DIGIT-24',
+  'AC-PAT-REVNUM-25',
+  'AC-PAT-DIVISOR-26',
+  'AC-PAT-PRIME-27',
+  'AC-PAT-GCD-28',
+  'AC-PAT-CALENDAR-29',
+  'AC-PAT-PRIME-REV-30',
+  'AC-SEQ-005',
+  'AC-SEQ-MINMAX-32',
+  'AC-SEQ-COUNT-33',
+  'AC-SEQ-ADJACENT-34',
+  'AC-SEQ-RUNNING-35',
+  'AC-STR-REVERSE-01',
+  'AC-STR-PALIN-37',
+  'AC-SEQ-ROTATE-38',
+  'AC-STR-COMPRESS-39',
+  'AC-STR-PATTERN-40',
+  'AC-SET-UNIQUE-01',
+  'AC-SET-MEMBERSHIP-42',
+  'AC-SET-INTERSECT-43',
+  'AC-DICT-FREQ-44',
+  'AC-DICT-MODE-45',
+  'AC-DICT-STOCK-46',
+  'AC-DICT-TWOSUM-47',
+  'AC-DICT-ONESHOT-48',
 ]) {
   const waveDefinition = getPrivateProblemDefinition(pid, 1)
   const waveContext = auth(`student_${pid.toLowerCase().replace(/-/g, '_')}`)

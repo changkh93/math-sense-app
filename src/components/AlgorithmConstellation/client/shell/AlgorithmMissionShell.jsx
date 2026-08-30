@@ -88,7 +88,9 @@ export default function AlgorithmMissionShell({
   })
 
   useEffect(() => {
-    if (gateway) setRuntimeGateway(gateway)
+    if (!gateway) return undefined
+    const timeoutId = window.setTimeout(() => setRuntimeGateway(gateway), 0)
+    return () => window.clearTimeout(timeoutId)
   }, [gateway])
 
   const fsm = useMemo(() => {
@@ -463,6 +465,25 @@ export default function AlgorithmMissionShell({
     publicTestError: recentPublicTestError,
   })
 
+  // The callable keeps its payload minimal and returns only the authoritative
+  // transfer identity and executable starter. Reattach student-facing context
+  // from the matching public kernel while letting signed server fields win.
+  const issuedTransferChallenge =
+    transferData?.transferChallenge || transferData?.challenge || null
+  const publicTransferChallenges = kernel.assessment?.transferChallenges || []
+  const matchingPublicTransferChallenge = issuedTransferChallenge
+    ? publicTransferChallenges.find(
+        (challenge) =>
+          challenge.transferChallengeId ===
+          issuedTransferChallenge.transferChallengeId,
+      )
+    : publicTransferChallenges[0]
+  const resolvedTransferChallenge = issuedTransferChallenge
+    ? matchingPublicTransferChallenge
+      ? { ...matchingPublicTransferChallenge, ...issuedTransferChallenge }
+      : issuedTransferChallenge
+    : matchingPublicTransferChallenge
+
   return (
     <div style={{ minHeight: '100vh', background: 'radial-gradient(ellipse at top, #0b192c 0%, #030712 100%)', padding: '24px', boxSizing: 'border-box', color: '#fff' }}>
       {/* Top Header */}
@@ -721,10 +742,10 @@ export default function AlgorithmMissionShell({
       )}
 
       {fsmState === MISSION_STATES.UNDERSTANDING_CHECK && (
-        understandingChallenge ? (
+        (understandingChallenge || kernel.assessment?.understandingChallenges?.[0]) ? (
           <UnderstandingCheckMode
-            key={understandingChallenge.challengeId}
-            challenge={understandingChallenge}
+            key={(understandingChallenge || kernel.assessment?.understandingChallenges?.[0])?.challengeId || 'uc_default'}
+            challenge={understandingChallenge || kernel.assessment?.understandingChallenges?.[0]}
             code={currentCode}
             onSubmitUnderstanding={handleSubmitUnderstanding}
             onProceedToTransfer={handleProceedToTransfer}
@@ -737,13 +758,19 @@ export default function AlgorithmMissionShell({
       )}
 
       {fsmState === MISSION_STATES.TRANSFER_CHALLENGE && (
-        <TransferChallengeMode
-          key={transferData?.transferChallenge?.transferChallengeId || 'transfer-pending'}
-          transferChallenge={transferData?.transferChallenge}
-          challengeToken={transferData?.challengeToken}
-          onSubmitTransfer={handleSubmitTransfer}
-          onCompleteMission={() => fsm.transition(MISSION_STATES.COMPLETE)}
-        />
+        resolvedTransferChallenge && transferData?.challengeToken ? (
+          <TransferChallengeMode
+            key={resolvedTransferChallenge.transferChallengeId}
+            transferChallenge={resolvedTransferChallenge}
+            challengeToken={transferData.challengeToken}
+            onSubmitTransfer={handleSubmitTransfer}
+            onCompleteMission={() => fsm.transition(MISSION_STATES.COMPLETE)}
+          />
+        ) : (
+          <div role="alert" style={{ padding: '20px', borderRadius: '12px', background: 'rgba(239, 68, 68, 0.12)', border: '1px solid #ef4444' }}>
+            전이 항로를 안전하게 발급하지 못했어요. 작성한 코드는 보존되어 있으니 이해 확인 단계에서 다시 시도해 주세요.
+          </div>
+        )
       )}
 
       {fsmState === MISSION_STATES.COMPLETE && (

@@ -54,8 +54,9 @@ for (const kernel of ALL_PUBLIC_KERNELS) {
   assert.equal(typeof privateDef.officialSolutionCode, 'string')
   assert.equal(Array.isArray(privateDef.hiddenTests), true)
   assert.equal(privateDef.hiddenTests.length >= 3, true)
-  assert.equal(Array.isArray(privateDef.intendedWrongSolutions), true)
-  assert.equal(privateDef.intendedWrongSolutions.length >= 2, true)
+  const wrongList = privateDef.intendedWrongFixtures || privateDef.intendedWrongSolutions
+  assert.equal(Array.isArray(wrongList), true)
+  assert.equal(wrongList.length >= 2, true)
 }
 console.log('  -> All 6 private definitions properly isolated and configured')
 
@@ -138,9 +139,9 @@ const resSeq5 = evaluateAuthoritativeSubmission({
   studentPythonCode: defSeq5.officialSolutionCode,
   entryFunction: 'collect_energy',
   understandingAnswer: {
-    challengeId: 'uc_seq_05_01',
-    type: 'accumulator_trace_prediction',
-    answers: { q1: false, q2: true },
+    challengeId: 'uc_seq_005_1',
+    type: 'trace_understanding',
+    answers: { q1: 'keep_state', q2: 'val_11', q3: 'sum_vs_count' },
   },
   transferPythonCode: `def collect_crystals(ores):\n    total = 0\n    for x in ores:\n        if x > 0:\n            total += x\n    return total\n`,
   publicTests: AC_SEQ_005.assessment.publicTests,
@@ -188,11 +189,13 @@ for (const kernel of ALL_PUBLIC_KERNELS) {
   const def = getPrivateProblemDefinition(kernel.id, 1)
   const definedGroups = new Set(def.hiddenTests.map((t) => t.group))
 
-  for (const wrong of def.intendedWrongSolutions) {
-    if (wrong.expectedFailureGroup) {
+  const wrongList = def.intendedWrongFixtures || def.intendedWrongSolutions
+  for (const wrong of wrongList) {
+    const expGroup = wrong.expectedFailingGroup || wrong.expectedFailureGroup
+    if (expGroup) {
       assert.ok(
-        definedGroups.has(wrong.expectedFailureGroup),
-        `Catalog error: expectedFailureGroup "${wrong.expectedFailureGroup}" declared in wrong solution ${wrong.id} does not exist in hiddenTests for ${kernel.id}`
+        definedGroups.has(expGroup),
+        `Catalog error: expectedFailureGroup "${expGroup}" declared in wrong solution ${wrong.id} does not exist in hiddenTests for ${kernel.id}`
       )
     }
 
@@ -207,9 +210,9 @@ for (const kernel of ALL_PUBLIC_KERNELS) {
     assert.equal(res.resultStar, false, `Wrong fixture ${wrong.id} for ${kernel.id} MUST NOT achieve resultStar`)
     assert.equal(res.hiddenPassed, false, `Wrong fixture ${wrong.id} for ${kernel.id} MUST fail hidden tests`)
 
-    if (wrong.expectedFailureGroup) {
-      const failedGroup = res.testGroupSummaries.find((g) => g.group === wrong.expectedFailureGroup)
-      assert.ok(failedGroup, `Group summary for "${wrong.expectedFailureGroup}" must exist in results for ${kernel.id}`)
+    if (expGroup) {
+      const failedGroup = res.testGroupSummaries.find((g) => g.group === expGroup)
+      assert.ok(failedGroup, `Group summary for "${expGroup}" must exist in results for ${kernel.id}`)
       assert.ok(
         failedGroup.passed < failedGroup.total,
         `Wrong fixture ${wrong.id} for ${kernel.id} MUST fail in group "${wrong.expectedFailureGroup}" (passed ${failedGroup.passed}/${failedGroup.total})`

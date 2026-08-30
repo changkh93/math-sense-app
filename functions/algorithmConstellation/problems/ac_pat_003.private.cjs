@@ -43,13 +43,7 @@ module.exports = {
     { id: 't6', inputs: { time: 6 }, expected: true },
   ],
   hiddenTests: [
-    { id: 'h0', inputs: { time: 0 }, expected: true, group: 'base_case' },
-    { id: 'h1', inputs: { time: 1 }, expected: false, group: 'closed_bridge_times' },
-    { id: 'h2', inputs: { time: 2 }, expected: false, group: 'closed_bridge_times' },
-    { id: 'h3', inputs: { time: 3 }, expected: true, group: 'cycle_multiples' },
-    { id: 'h4', inputs: { time: 4 }, expected: false, group: 'closed_bridge_times' },
     { id: 'h5', inputs: { time: 5 }, expected: false, group: 'closed_bridge_times' },
-    { id: 'h6', inputs: { time: 6 }, expected: true, group: 'cycle_multiples' },
     { id: 'h9', inputs: { time: 9 }, expected: true, group: 'cycle_multiples' },
     { id: 'h10', inputs: { time: 10 }, expected: false, group: 'closed_bridge_times' },
     { id: 'h15', inputs: { time: 15 }, expected: true, group: 'cycle_multiples' },

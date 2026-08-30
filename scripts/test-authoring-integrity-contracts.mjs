@@ -10,6 +10,7 @@ import { PUBLIC_KERNELS } from '../src/components/AlgorithmConstellation/shared/
 import { PYTHON_CONCEPT_REGISTRY } from '../src/components/AlgorithmConstellation/shared/python/pythonConceptRegistry.js'
 import { PROBLEM_SOLVING_PATTERN_REGISTRY } from '../src/components/AlgorithmConstellation/shared/patterns/problemSolvingPatternRegistry.js'
 import { ALGORITHM_EDITORIAL_CATALOG } from '../src/components/AlgorithmConstellation/shared/catalog/algorithmEditorialCatalog.js'
+import { EVIDENCE_PRIMITIVES } from '../src/components/AlgorithmConstellation/shared/evidence/evidencePrimitives.js'
 
 const require = createRequire(import.meta.url)
 const { PRIVATE_PROBLEMS, getPrivateProblemDefinition, getTransferChallenges } = require('../functions/algorithmConstellation/problems/index.cjs')
@@ -466,4 +467,962 @@ for (const reqDelay of [0, 5, 6, 20, 21, 100]) {
   assert.ok(orderTransferDelays.has(reqDelay), `ORDER-20 transfer missing required delay boundary: ${reqDelay}`)
 }
 
+// 15. Constellation 2 C2-R + C2-A contracts
+const c2ProblemIds = ['AC-PAT-003', 'AC-PAT-004', 'AC-PAT-EVEN-23', 'AC-PAT-DIGIT-24', 'AC-PAT-REVNUM-25']
+const inputKey = (test) => JSON.stringify(test.inputs)
+
+for (const problemId of c2ProblemIds) {
+  const publicKernel = PUBLIC_KERNELS[problemId]
+  const privateDef = getPrivateProblemDefinition(problemId, 1)
+  const publicInputs = new Set(publicKernel.assessment.publicTests.map(inputKey))
+  assert.equal(
+    privateDef.hiddenTests.some((test) => publicInputs.has(inputKey(test))),
+    false,
+    `${problemId} hidden tests must not repeat public inputs`
+  )
+}
+
+assert.deepEqual(
+  PUBLIC_KERNELS['AC-PAT-003'].pythonConcepts.introduces,
+  ['operator:modulo', 'operator:equality'],
+  'PAT-003 must introduce modulo and equality together'
+)
+assert.ok(
+  PUBLIC_KERNELS['AC-PAT-004'].pythonConcepts.requires.includes('operator:comparison-bound'),
+  'PAT-004 must declare its comparison-bound dependency'
+)
+
+const c2DomainContracts = [
+  { problemId: 'AC-PAT-EVEN-23', field: 'signal_number', min: 0, max: 10_000 },
+  { problemId: 'AC-PAT-DIGIT-24', field: 'number', min: 100, max: 999 },
+  { problemId: 'AC-PAT-REVNUM-25', field: 'number', min: 0, max: 9_999 },
+]
+for (const { problemId, field, min, max } of c2DomainContracts) {
+  const publicKernel = PUBLIC_KERNELS[problemId]
+  const privateDef = getPrivateProblemDefinition(problemId, 1)
+  for (const test of [...publicKernel.assessment.publicTests, ...privateDef.hiddenTests]) {
+    const value = test.inputs[field]
+    assert.ok(Number.isInteger(value) && value >= min && value <= max, `${problemId} ${field} out of range: ${value}`)
+  }
+
+  const publicTransfer = publicKernel.assessment.transferChallenges[0]
+  const privateTransfer = privateDef.transferMasterSet[0]
+  const previewInputs = new Set((publicTransfer.testCases || []).map(inputKey))
+  assert.ok(previewInputs.size >= 2, `${problemId} must provide at least two non-authoritative preview cases`)
+  assert.equal(
+    privateTransfer.testCases.some((test) => previewInputs.has(inputKey(test))),
+    false,
+    `${problemId} authoritative transfer tests must not repeat client preview inputs`
+  )
+}
+
+const revnumPrivate = getPrivateProblemDefinition('AC-PAT-REVNUM-25', 1)
+assert.ok(
+  revnumPrivate.hiddenTests.some((test) => test.inputs.number === 0 && test.expected === 0),
+  'REVNUM-25 authoritative base suite must cover the zero-input boundary'
+)
+assert.ok(
+  (revnumPrivate.intendedWrongFixtures || []).some((fixture) => fixture.expectedFailingGroup === 'zero_input'),
+  'REVNUM-25 must include an intended wrong fixture that fails the zero-input boundary'
+)
+
+// 16. Constellation 2 C2-B (26~28) Domain & Quality Contracts
+const c2bProblemIds = ['AC-PAT-DIVISOR-26', 'AC-PAT-PRIME-27', 'AC-PAT-GCD-28']
+const validEvidencePrimitives = new Set(Object.values(EVIDENCE_PRIMITIVES))
+for (const problemId of c2bProblemIds) {
+  const publicKernel = PUBLIC_KERNELS[problemId]
+  const privateDef = getPrivateProblemDefinition(problemId, 1)
+  const publicInputs = new Set(publicKernel.assessment.publicTests.map(inputKey))
+  assert.equal(
+    privateDef.hiddenTests.some((test) => publicInputs.has(inputKey(test))),
+    false,
+    `${problemId} hidden tests must not repeat public inputs`
+  )
+
+  const publicTransfer = publicKernel.assessment.transferChallenges[0]
+  const privateTransfer = privateDef.transferMasterSet[0]
+  const previewInputs = new Set((publicTransfer.testCases || []).map(inputKey))
+  assert.ok(previewInputs.size >= 2, `${problemId} must provide at least two preview cases`)
+  assert.equal(
+    privateTransfer.testCases.some((test) => previewInputs.has(inputKey(test))),
+    false,
+    `${problemId} authoritative transfer tests must not repeat client preview inputs`
+  )
+
+  for (const primitive of publicKernel.evidenceRecipe.primitives) {
+    assert.ok(validEvidencePrimitives.has(primitive), `${problemId} uses unsupported evidence primitive: ${primitive}`)
+  }
+
+  const baseWithinBudget = evaluateBaseSubmission(
+    problemId,
+    publicKernel.version,
+    privateDef.officialSolutionCode,
+    { maxCumulativeSteps: 20_000 }
+  )
+  assert.equal(baseWithinBudget.passed, true, `${problemId} official Base must pass within 20,000 steps`)
+
+  const transferWithinBudget = evaluateTransferSubmission(
+    problemId,
+    publicKernel.version,
+    privateTransfer.transferChallengeId,
+    privateTransfer.officialSolutionCode,
+    { maxCumulativeSteps: 20_000 }
+  )
+  assert.equal(transferWithinBudget.passed, true, `${problemId} official Transfer must pass within 20,000 steps`)
+}
+
+// DIVISOR-26
+const divisorPublic = PUBLIC_KERNELS['AC-PAT-DIVISOR-26']
+const divisorPrivate = getPrivateProblemDefinition('AC-PAT-DIVISOR-26', 1)
+for (const t of [...divisorPublic.assessment.publicTests, ...divisorPrivate.hiddenTests]) {
+  assert.ok(Number.isInteger(t.inputs.number) && t.inputs.number >= 1 && t.inputs.number <= 100, `DIVISOR-26 out of range: ${t.inputs.number}`)
+}
+for (const t of [...divisorPublic.assessment.transferChallenges[0].testCases, ...divisorPrivate.transferMasterSet[0].testCases]) {
+  assert.ok(Number.isInteger(t.inputs.number) && t.inputs.number >= 1 && t.inputs.number <= 100, `DIVISOR-26 transfer out of range: ${t.inputs.number}`)
+}
+assert.ok(divisorPrivate.hiddenTests.some((t) => t.inputs.number === 1 && t.expected === 1), 'DIVISOR-26 hidden tests must contain 1')
+const divisorCandidateFiveFrame = divisorPublic.modes.explore.lensConfig.frames.find(
+  (frame) => frame.id === 'candidate_5'
+)
+assert.ok(
+  divisorCandidateFiveFrame?.codeSnippet.includes('12 % 5 == 0'),
+  'DIVISOR-26 candidate-5 scene must show the actual divisibility predicate'
+)
+assert.ok(
+  divisorPublic.assessment.understandingChallenges[0].questions.some(
+    (question) => question.id === 'q3' && question.expected === 'one_candidate_once'
+  ) && divisorPrivate.understandingChallenges[0].questions.some(
+    (question) => question.id === 'q3' && question.expected === 'one_candidate_once'
+  ),
+  'DIVISOR-26 understanding evidence must explain why a square-root divisor is counted once'
+)
+
+// PRIME-27
+const primePublic = PUBLIC_KERNELS['AC-PAT-PRIME-27']
+const primePrivate = getPrivateProblemDefinition('AC-PAT-PRIME-27', 1)
+for (const t of [...primePublic.assessment.publicTests, ...primePrivate.hiddenTests]) {
+  assert.ok(Number.isInteger(t.inputs.number) && t.inputs.number >= 0 && t.inputs.number <= 200, `PRIME-27 out of range: ${t.inputs.number}`)
+}
+for (const t of [...primePublic.assessment.transferChallenges[0].testCases, ...primePrivate.transferMasterSet[0].testCases]) {
+  assert.ok(Number.isInteger(t.inputs.number) && t.inputs.number >= 0 && t.inputs.number <= 200, `PRIME-27 transfer out of range: ${t.inputs.number}`)
+}
+assert.ok(primePrivate.hiddenTests.some((t) => t.inputs.number === 0 && t.expected === false), 'PRIME-27 hidden tests must contain 0')
+assert.ok(primePrivate.hiddenTests.some((t) => t.inputs.number === 1 && t.expected === false), 'PRIME-27 hidden tests must contain 1')
+assert.ok(primePrivate.hiddenTests.some((t) => t.inputs.number === 2 && t.expected === true), 'PRIME-27 hidden tests must contain 2')
+assert.ok(primePrivate.hiddenTests.some((t) => t.inputs.number === 49 && t.expected === false), 'PRIME-27 hidden tests must contain 49')
+
+// GCD-28
+const gcdPublic = PUBLIC_KERNELS['AC-PAT-GCD-28']
+const gcdPrivate = getPrivateProblemDefinition('AC-PAT-GCD-28', 1)
+for (const t of [...gcdPublic.assessment.publicTests, ...gcdPrivate.hiddenTests]) {
+  assert.ok(Number.isInteger(t.inputs.a) && t.inputs.a >= 1 && t.inputs.a <= 100, `GCD-28 a out of range: ${t.inputs.a}`)
+  assert.ok(Number.isInteger(t.inputs.b) && t.inputs.b >= 1 && t.inputs.b <= 100, `GCD-28 b out of range: ${t.inputs.b}`)
+}
+for (const t of [...gcdPublic.assessment.transferChallenges[0].testCases, ...gcdPrivate.transferMasterSet[0].testCases]) {
+  assert.ok(Number.isInteger(t.inputs.a) && t.inputs.a >= 1 && t.inputs.a <= 100, `GCD-28 transfer a out of range: ${t.inputs.a}`)
+  assert.ok(Number.isInteger(t.inputs.b) && t.inputs.b >= 1 && t.inputs.b <= 100, `GCD-28 transfer b out of range: ${t.inputs.b}`)
+}
+assert.ok(gcdPrivate.hiddenTests.some((t) => t.inputs.a === t.inputs.b), 'GCD-28 hidden tests must contain same value test')
+assert.ok(gcdPrivate.hiddenTests.some((t) => t.inputs.a === 100 && t.inputs.b === 1), 'GCD-28 hidden tests must contain (100, 1) long reduction')
+assert.ok(gcdPrivate.hiddenTests.some((t) => t.group === 'coprime'), 'GCD-28 hidden tests must contain coprime test')
+
+assert.ok(
+  PUBLIC_KERNELS['AC-PAT-GCD-28'].thinkingPatterns.requires.includes('pattern:preserve-before-overwrite'),
+  'GCD-28 must declare pattern:preserve-before-overwrite as required pattern'
+)
+
+// 17. Constellation 2 C2-C (29~30) Domain & Quality Contracts
+const c2cProblemIds = ['AC-PAT-CALENDAR-29', 'AC-PAT-PRIME-REV-30']
+for (const problemId of c2cProblemIds) {
+  const publicKernel = PUBLIC_KERNELS[problemId]
+  const privateDef = getPrivateProblemDefinition(problemId, 1)
+  const publicInputs = new Set(publicKernel.assessment.publicTests.map(inputKey))
+  assert.equal(
+    privateDef.hiddenTests.some((test) => publicInputs.has(inputKey(test))),
+    false,
+    `${problemId} hidden tests must not repeat public inputs`
+  )
+
+  const publicTransfer = publicKernel.assessment.transferChallenges[0]
+  const privateTransfer = privateDef.transferMasterSet[0]
+  const previewInputs = new Set((publicTransfer.testCases || []).map(inputKey))
+  assert.ok(previewInputs.size >= 2, `${problemId} must provide at least two preview cases`)
+  assert.equal(
+    privateTransfer.testCases.some((test) => previewInputs.has(inputKey(test))),
+    false,
+    `${problemId} authoritative transfer tests must not repeat client preview inputs`
+  )
+
+  for (const primitive of publicKernel.evidenceRecipe.primitives) {
+    assert.ok(validEvidencePrimitives.has(primitive), `${problemId} uses unsupported evidence primitive: ${primitive}`)
+  }
+
+  const baseWithinBudget = evaluateBaseSubmission(
+    problemId,
+    publicKernel.version,
+    privateDef.officialSolutionCode,
+    { maxCumulativeSteps: 20_000 }
+  )
+  assert.equal(baseWithinBudget.passed, true, `${problemId} official Base must pass within 20,000 steps`)
+
+  const transferWithinBudget = evaluateTransferSubmission(
+    problemId,
+    publicKernel.version,
+    privateTransfer.transferChallengeId,
+    privateTransfer.officialSolutionCode,
+    { maxCumulativeSteps: 20_000 }
+  )
+  assert.equal(transferWithinBudget.passed, true, `${problemId} official Transfer must pass within 20,000 steps`)
+}
+
+// CALENDAR-29
+const calPublic = PUBLIC_KERNELS['AC-PAT-CALENDAR-29']
+const calPrivate = getPrivateProblemDefinition('AC-PAT-CALENDAR-29', 1)
+assert.equal(
+  calPublic.modes.explore.lensId,
+  'state-transition',
+  'CALENDAR-29 must use a lens that renders start-offset weekday states instead of hard-coded bridge states'
+)
+assert.deepEqual(
+  calPublic.modes.explore.lensConfig.frames.map((frame) => frame.id),
+  ['move_0', 'move_1', 'move_4', 'wrap_5', 'large_12'],
+  'CALENDAR-29 must render the five required offset and wrap scenes'
+)
+assert.ok(
+  !calPublic.identity.subtitle.includes('(start_day + days_later) % 7'),
+  'CALENDAR-29 identity must not expose the complete solution before Observe/Explore'
+)
+for (const t of [...calPublic.assessment.publicTests, ...calPrivate.hiddenTests]) {
+  assert.ok(Number.isInteger(t.inputs.start_day) && t.inputs.start_day >= 0 && t.inputs.start_day <= 6, `CALENDAR-29 start_day out of range: ${t.inputs.start_day}`)
+  assert.ok(Number.isInteger(t.inputs.days_later) && t.inputs.days_later >= 0 && t.inputs.days_later <= 1_000_000, `CALENDAR-29 days_later out of range: ${t.inputs.days_later}`)
+}
+for (const t of [...calPublic.assessment.transferChallenges[0].testCases, ...calPrivate.transferMasterSet[0].testCases]) {
+  assert.ok(Number.isInteger(t.inputs.seat_count) && t.inputs.seat_count >= 2 && t.inputs.seat_count <= 20, `CALENDAR-29 transfer seat_count out of range: ${t.inputs.seat_count}`)
+  assert.ok(Number.isInteger(t.inputs.start) && t.inputs.start >= 0 && t.inputs.start < t.inputs.seat_count, `CALENDAR-29 transfer start out of range: ${t.inputs.start}`)
+  assert.ok(Number.isInteger(t.inputs.moves) && t.inputs.moves >= 0 && t.inputs.moves <= 1_000_000, `CALENDAR-29 transfer moves out of range: ${t.inputs.moves}`)
+}
+
+// PRIME-REV-30
+const primeRevPublic = PUBLIC_KERNELS['AC-PAT-PRIME-REV-30']
+const primeRevPrivate = getPrivateProblemDefinition('AC-PAT-PRIME-REV-30', 1)
+assert.ok(
+  !primeRevPublic.identity.subtitle.includes('0과 1에서'),
+  'PRIME-REV-30 identity must not reveal the first counterexample before exploration'
+)
+assert.ok(
+  !JSON.stringify(primeRevPublic.assessment.transferChallenges[0].contextCard).includes('return False'),
+  'PRIME-REV-30 transfer context must guide the boundary review without exposing the repaired line'
+)
+for (const t of [...primeRevPublic.assessment.publicTests, ...primeRevPrivate.hiddenTests]) {
+  assert.ok(Number.isInteger(t.inputs.number) && t.inputs.number >= 0 && t.inputs.number <= 200, `PRIME-REV-30 out of range: ${t.inputs.number}`)
+}
+for (const t of [...primeRevPublic.assessment.transferChallenges[0].testCases, ...primeRevPrivate.transferMasterSet[0].testCases]) {
+  assert.ok(Number.isInteger(t.inputs.number) && t.inputs.number >= 0 && t.inputs.number <= 200, `PRIME-REV-30 transfer out of range: ${t.inputs.number}`)
+}
+assert.ok(
+  primeRevPublic.thinkingPatterns.requires.includes('pattern:counterexample-search'),
+  'PRIME-REV-30 must declare pattern:counterexample-search as required pattern'
+)
+assert.equal(
+  evaluateBaseSubmission('AC-PAT-PRIME-REV-30', 1, primeRevPublic.modes.code.starterCode).passed,
+  false,
+  'PRIME-REV-30 buggy starter code must fail hidden test suite until repaired'
+)
+assert.equal(
+  evaluateTransferSubmission(
+    'AC-PAT-PRIME-REV-30',
+    1,
+    primeRevPrivate.transferMasterSet[0].transferChallengeId,
+    primeRevPrivate.transferMasterSet[0].starterCode
+  ).passed,
+  false,
+  'PRIME-REV-30 buggy transfer starter code must fail transfer test suite until repaired'
+)
+
+// 18. Constellation 3 (31~40) Domain & Quality Contracts
+const c3ProblemIds = [
+  'AC-SEQ-005',
+  'AC-SEQ-MINMAX-32',
+  'AC-SEQ-COUNT-33',
+  'AC-SEQ-ADJACENT-34',
+  'AC-SEQ-RUNNING-35',
+  'AC-STR-REVERSE-01',
+  'AC-STR-PALIN-37',
+  'AC-SEQ-ROTATE-38',
+  'AC-STR-COMPRESS-39',
+  'AC-STR-PATTERN-40',
+]
+for (const problemId of c3ProblemIds) {
+  const publicKernel = PUBLIC_KERNELS[problemId]
+  const privateDef = getPrivateProblemDefinition(problemId, 1)
+  const publicInputs = new Set(publicKernel.assessment.publicTests.map(inputKey))
+  assert.equal(
+    privateDef.hiddenTests.some((test) => publicInputs.has(inputKey(test))),
+    false,
+    `${problemId} hidden tests must not repeat public inputs`
+  )
+
+  const publicTransfer = publicKernel.assessment.transferChallenges[0]
+  const privateTransfer = privateDef.transferMasterSet[0]
+  const publicContextText = JSON.stringify(publicTransfer.contextCard || {})
+  const solutionSyntaxPattern = /\b(?:def|for|if|return)\b|=/
+  assert.equal(
+    solutionSyntaxPattern.test(publicContextText),
+    false,
+    `${problemId} transfer context must guide the strategy without exposing solution code`
+  )
+  assert.deepEqual(
+    privateTransfer.contextCard,
+    publicTransfer.contextCard,
+    `${problemId} public/private transfer context must stay synchronized`
+  )
+  assert.deepEqual(
+    privateDef.understandingChallenges,
+    publicKernel.assessment.understandingChallenges,
+    `${problemId} public/private understanding challenge must stay synchronized`
+  )
+  for (const field of [
+    'transferChallengeId',
+    'title',
+    'description',
+    'thoughtCheck',
+    'entryFunction',
+    'starterCode',
+  ]) {
+    assert.deepEqual(
+      privateTransfer[field],
+      publicTransfer[field],
+      `${problemId} public/private transfer ${field} must stay synchronized`
+    )
+  }
+  const previewInputs = new Set((publicTransfer.testCases || []).map(inputKey))
+  assert.ok(previewInputs.size >= 2, `${problemId} must provide at least two preview cases`)
+  assert.equal(
+    privateTransfer.testCases.some((test) => previewInputs.has(inputKey(test))),
+    false,
+    `${problemId} authoritative transfer tests must not repeat client preview inputs`
+  )
+
+  for (const primitive of publicKernel.evidenceRecipe.primitives) {
+    assert.ok(validEvidencePrimitives.has(primitive), `${problemId} uses unsupported evidence primitive: ${primitive}`)
+  }
+
+  const baseWithinBudget = evaluateBaseSubmission(
+    problemId,
+    publicKernel.version,
+    privateDef.officialSolutionCode,
+    { maxCumulativeSteps: 20_000 }
+  )
+  assert.equal(baseWithinBudget.passed, true, `${problemId} official Base must pass within 20,000 steps`)
+
+  const transferWithinBudget = evaluateTransferSubmission(
+    problemId,
+    publicKernel.version,
+    privateTransfer.transferChallengeId,
+    privateTransfer.officialSolutionCode,
+    { maxCumulativeSteps: 20_000 }
+  )
+  assert.equal(transferWithinBudget.passed, true, `${problemId} official Transfer must pass within 20,000 steps`)
+}
+
+// 31 AC-SEQ-005
+const seq005Public = PUBLIC_KERNELS['AC-SEQ-005']
+const seq005Private = getPrivateProblemDefinition('AC-SEQ-005', 1)
+assert.ok(
+  seq005Public.thinkingPatterns.introduces.includes('pattern:filter-accumulate'),
+  'AC-SEQ-005 must declare pattern:filter-accumulate as introduced pattern'
+)
+assert.equal(
+  Object.hasOwn(seq005Private, 'version'),
+  false,
+  'AC-SEQ-005 private definition must use problemVersion only'
+)
+
+// 32 AC-SEQ-MINMAX-32
+const minmaxPublic = PUBLIC_KERNELS['AC-SEQ-MINMAX-32']
+const minmaxPrivate = getPrivateProblemDefinition('AC-SEQ-MINMAX-32', 1)
+assert.ok(
+  minmaxPublic.thinkingPatterns.introduces.includes('pattern:first-item-initialization'),
+  'AC-SEQ-MINMAX-32 must declare pattern:first-item-initialization as introduced pattern'
+)
+for (const t of [...minmaxPublic.assessment.publicTests, ...minmaxPrivate.hiddenTests]) {
+  assert.ok(Array.isArray(t.inputs.signals) && t.inputs.signals.length >= 1 && t.inputs.signals.length <= 20, `MINMAX-32 signals length out of range: ${t.inputs.signals.length}`)
+  for (const x of t.inputs.signals) {
+    assert.ok(Number.isInteger(x) && x >= -100 && x <= 100, `MINMAX-32 signal value out of range: ${x}`)
+  }
+}
+assert.ok(minmaxPrivate.hiddenTests.some((t) => t.group === 'negative_only'), 'MINMAX-32 hidden tests must contain negative_only group')
+
+// 33 AC-SEQ-COUNT-33
+const countPublic = PUBLIC_KERNELS['AC-SEQ-COUNT-33']
+const countPrivate = getPrivateProblemDefinition('AC-SEQ-COUNT-33', 1)
+for (const t of [...countPublic.assessment.publicTests, ...countPrivate.hiddenTests]) {
+  assert.ok(Array.isArray(t.inputs.capsules) && t.inputs.capsules.length >= 0 && t.inputs.capsules.length <= 20, `COUNT-33 capsules length out of range: ${t.inputs.capsules.length}`)
+  assert.ok(t.inputs.min_energy <= t.inputs.max_energy, `COUNT-33 min_energy > max_energy: ${t.inputs.min_energy} > ${t.inputs.max_energy}`)
+}
+
+// 34 AC-SEQ-ADJACENT-34
+const adjacentPublic = PUBLIC_KERNELS['AC-SEQ-ADJACENT-34']
+const adjacentPrivate = getPrivateProblemDefinition('AC-SEQ-ADJACENT-34', 1)
+for (const t of [...adjacentPublic.assessment.publicTests, ...adjacentPrivate.hiddenTests]) {
+  assert.ok(Array.isArray(t.inputs.signals) && t.inputs.signals.length >= 1 && t.inputs.signals.length <= 20, `ADJACENT-34 signals length out of range: ${t.inputs.signals.length}`)
+}
+assert.ok(
+  adjacentPublic.thinkingPatterns.requires.includes('pattern:preserve-before-overwrite'),
+  'ADJACENT-34 must require pattern:preserve-before-overwrite'
+)
+
+// 35 AC-SEQ-RUNNING-35
+const runningPublic = PUBLIC_KERNELS['AC-SEQ-RUNNING-35']
+const runningPrivate = getPrivateProblemDefinition('AC-SEQ-RUNNING-35', 1)
+assert.ok(
+  runningPublic.pythonConcepts.introduces.includes('method:append'),
+  'AC-SEQ-RUNNING-35 must introduce method:append'
+)
+assert.ok(
+  runningPublic.thinkingPatterns.introduces.includes('pattern:running-prefix-state'),
+  'AC-SEQ-RUNNING-35 must introduce pattern:running-prefix-state'
+)
+assert.equal(
+  JSON.stringify({
+    identity: runningPublic.identity,
+    observe: runningPublic.modes.observe,
+    explore: runningPublic.modes.explore,
+  }).includes('.append('),
+  false,
+  'AC-SEQ-RUNNING-35 must not expose append syntax before First Encounter'
+)
+for (const t of [...runningPublic.assessment.publicTests, ...runningPrivate.hiddenTests]) {
+  assert.ok(Array.isArray(t.inputs.changes) && t.inputs.changes.length >= 0 && t.inputs.changes.length <= 20, `RUNNING-35 changes length out of range: ${t.inputs.changes.length}`)
+  for (const delta of t.inputs.changes) {
+    assert.ok(Number.isInteger(delta) && delta >= -20 && delta <= 20, `RUNNING-35 delta out of range: ${delta}`)
+  }
+  assert.ok(Array.isArray(t.expected) && t.expected.length === t.inputs.changes.length, 'RUNNING-35 result length must match input length')
+}
+
+// 36 AC-STR-REVERSE-01
+const reversePublic = PUBLIC_KERNELS['AC-STR-REVERSE-01']
+assert.equal(reversePublic.modes.explore.lensId, 'state-transition', 'AC-STR-REVERSE-01 explore must use state-transition')
+assert.ok(reversePublic.pythonConcepts.introduces.includes('syntax:slicing'), 'AC-STR-REVERSE-01 must introduce slicing')
+assert.ok(!reversePublic.pythonConcepts.introduces.includes('builtin:range'), 'AC-STR-REVERSE-01 must not introduce builtin:range')
+
+// 37 AC-STR-PALIN-37
+const palinPublic = PUBLIC_KERNELS['AC-STR-PALIN-37']
+const palinPrivate = getPrivateProblemDefinition('AC-STR-PALIN-37', 1)
+for (const t of [...palinPublic.assessment.publicTests, ...palinPrivate.hiddenTests]) {
+  assert.ok(typeof t.inputs.message === 'string' && t.inputs.message.length >= 1 && t.inputs.message.length <= 20, `PALIN-37 message length out of range: ${t.inputs.message}`)
+  assert.ok(/^[A-Z]+$/.test(t.inputs.message), `PALIN-37 message must contain uppercase letters only: ${t.inputs.message}`)
+  assert.equal(typeof t.expected, 'boolean', 'PALIN-37 must return a Boolean result')
+}
+
+// 38 AC-SEQ-ROTATE-38
+const rotatePublic = PUBLIC_KERNELS['AC-SEQ-ROTATE-38']
+const rotatePrivate = getPrivateProblemDefinition('AC-SEQ-ROTATE-38', 1)
+assert.ok(
+  rotatePublic.thinkingPatterns.introduces.includes('pattern:boundary-wraparound'),
+  'AC-SEQ-ROTATE-38 must introduce pattern:boundary-wraparound'
+)
+for (const t of [...rotatePublic.assessment.publicTests, ...rotatePrivate.hiddenTests]) {
+  assert.ok(Array.isArray(t.inputs.cargos) && t.inputs.cargos.length >= 1 && t.inputs.cargos.length <= 20, `ROTATE-38 cargos length out of range: ${t.inputs.cargos.length}`)
+  for (const c of t.inputs.cargos) {
+    assert.ok(Number.isInteger(c) && c >= -100 && c <= 100, `ROTATE-38 cargo value out of range: ${c}`)
+  }
+  assert.ok(Array.isArray(t.expected) && t.expected.length === t.inputs.cargos.length, 'ROTATE-38 must preserve list length')
+}
+assert.equal(
+  JSON.stringify(rotatePublic.assessment.transferChallenges[0].thoughtCheck).includes('signals[1:]'),
+  false,
+  'ROTATE-38 transfer thought check must not expose the solution slice'
+)
+
+// 39 AC-STR-COMPRESS-39
+const compressPublic = PUBLIC_KERNELS['AC-STR-COMPRESS-39']
+const compressPrivate = getPrivateProblemDefinition('AC-STR-COMPRESS-39', 1)
+const compressPattern = PROBLEM_SOLVING_PATTERN_REGISTRY['pattern:run-boundary-flush']
+assert.ok(
+  compressPublic.thinkingPatterns.introduces.includes('pattern:run-boundary-flush'),
+  'AC-STR-COMPRESS-39 must introduce pattern:run-boundary-flush'
+)
+for (const t of [...compressPublic.assessment.publicTests, ...compressPrivate.hiddenTests]) {
+  assert.ok(typeof t.inputs.signal === 'string' && t.inputs.signal.length >= 1 && t.inputs.signal.length <= 20, `COMPRESS-39 signal length out of range: ${t.inputs.signal}`)
+  assert.ok(/^[A-Z]+$/.test(t.inputs.signal), `COMPRESS-39 signal must be uppercase: ${t.inputs.signal}`)
+  assert.ok(Array.isArray(t.expected), 'COMPRESS-39 expected must be an array of groups')
+  for (let i = 0; i < t.expected.length; i++) {
+    const [sym, count] = t.expected[i]
+    assert.ok(typeof sym === 'string' && sym.length === 1, `COMPRESS-39 invalid symbol: ${sym}`)
+    assert.ok(Number.isInteger(count) && count >= 1, `COMPRESS-39 count must be positive integer: ${count}`)
+    if (i > 0) {
+      assert.notEqual(sym, t.expected[i - 1][0], 'COMPRESS-39 adjacent groups must have different symbols')
+    }
+  }
+  const reconstructed = t.expected.map(([sym, count]) => sym.repeat(count)).join('')
+  assert.equal(reconstructed, t.inputs.signal, 'COMPRESS-39 expanded groups must match original signal')
+}
+for (const transfer of [compressPublic.assessment.transferChallenges[0], compressPrivate.transferMasterSet[0]]) {
+  for (const t of transfer.testCases) {
+    assert.ok(Array.isArray(t.inputs.readings) && t.inputs.readings.length >= 1 && t.inputs.readings.length <= 15, 'COMPRESS-39 transfer readings length must be 1..15')
+    assert.ok(t.inputs.readings.every((value) => Number.isInteger(value) && value >= -100 && value <= 100), 'COMPRESS-39 transfer readings must contain bounded integers')
+    const reconstructed = t.expected.flatMap(([value, count]) => Array(count).fill(value))
+    assert.deepEqual(reconstructed, t.inputs.readings, 'COMPRESS-39 transfer groups must reconstruct the input')
+  }
+}
+
+// 40 AC-STR-PATTERN-40
+const patternPublic = PUBLIC_KERNELS['AC-STR-PATTERN-40']
+const patternPrivate = getPrivateProblemDefinition('AC-STR-PATTERN-40', 1)
+const slidingPattern = PROBLEM_SOLVING_PATTERN_REGISTRY['pattern:sliding-window-scan']
+assert.ok(
+  patternPublic.thinkingPatterns.introduces.includes('pattern:sliding-window-scan'),
+  'AC-STR-PATTERN-40 must introduce pattern:sliding-window-scan'
+)
+for (const t of [...patternPublic.assessment.publicTests, ...patternPrivate.hiddenTests]) {
+  assert.ok(typeof t.inputs.message === 'string' && t.inputs.message.length >= 0 && t.inputs.message.length <= 30, `PATTERN-40 message length out of range: ${t.inputs.message}`)
+  assert.ok(/^[IO]*$/.test(t.inputs.message), `PATTERN-40 message must contain only I and O: ${t.inputs.message}`)
+  assert.ok(Number.isInteger(t.expected) && t.expected >= 0, `PATTERN-40 expected must be non-negative integer: ${t.expected}`)
+  let expected = 0
+  for (let start = 0; start <= t.inputs.message.length - 3; start += 1) {
+    if (t.inputs.message.slice(start, start + 3) === 'IOI') expected += 1
+  }
+  assert.equal(t.expected, expected, `PATTERN-40 expected count mismatch: ${t.inputs.message}`)
+}
+
+for (const transfer of [patternPublic.assessment.transferChallenges[0], patternPrivate.transferMasterSet[0]]) {
+  for (const t of transfer.testCases) {
+    assert.ok(Array.isArray(t.inputs.beacons) && t.inputs.beacons.length <= 30, 'PATTERN-40 transfer beacons length must be 0..30')
+    assert.ok(t.inputs.beacons.every((value) => value === 0 || value === 1), 'PATTERN-40 transfer beacons must contain only 0 or 1')
+    let expected = 0
+    for (let start = 0; start <= t.inputs.beacons.length - 3; start += 1) {
+      if (t.inputs.beacons[start] === 1 && t.inputs.beacons[start + 1] === 0 && t.inputs.beacons[start + 2] === 1) expected += 1
+    }
+    assert.equal(t.expected, expected, `PATTERN-40 transfer expected count mismatch: ${JSON.stringify(t.inputs.beacons)}`)
+  }
+}
+
+const branch39And40 = [
+  { publicKernel: compressPublic, privateDef: compressPrivate, pattern: compressPattern },
+  { publicKernel: patternPublic, privateDef: patternPrivate, pattern: slidingPattern },
+]
+const solutionSyntaxPattern = /\b(?:def|for|if|return)\b|\.append\s*\(|\[-?\d*:\]/
+const unsupportedStudentToolPattern = /\b(?:len|range|str)\s*\(|\.(?:join|find|count)\s*\(/
+for (const { publicKernel, privateDef, pattern } of branch39And40) {
+  const understandingGuidance = publicKernel.assessment.understandingChallenges.map((challenge) => ({
+    title: challenge.title,
+    prompt: challenge.prompt,
+    questions: challenge.questions.map((question) => ({
+      text: question.text,
+      optionLabels: question.options.map((option) => option.label),
+    })),
+  }))
+  const transfer = publicKernel.assessment.transferChallenges[0]
+  const assessmentGuidance = JSON.stringify({
+    understandingGuidance,
+    transfer: {
+      title: transfer.title,
+      description: transfer.description,
+      contextCard: transfer.contextCard,
+      thoughtCheck: transfer.thoughtCheck,
+    },
+  })
+  assert.equal(solutionSyntaxPattern.test(assessmentGuidance), false, `${publicKernel.id} assessment guidance must not expose solution syntax`)
+
+  const discoveryText = JSON.stringify({
+    observe: publicKernel.modes.observe,
+    explore: publicKernel.modes.explore,
+    firstEncounter: { tinyExample: pattern.tinyExample, syntaxExample: pattern.syntaxExample },
+  })
+  assert.equal(solutionSyntaxPattern.test(discoveryText), false, `${publicKernel.id} discovery flow must use thinking language instead of complete solution syntax`)
+
+  const acceptedCodes = [privateDef.officialSolutionCode, ...(privateDef.alternativeSolutions || [])]
+  assert.equal(acceptedCodes.some((code) => unsupportedStudentToolPattern.test(code)), false, `${publicKernel.id} accepted solutions must not depend on unlearned convenience tools`)
+
+  const executableCodes = [
+    publicKernel.modes.code.starterCode,
+    transfer.starterCode,
+    privateDef.officialSolutionCode,
+    ...(privateDef.alternativeSolutions || []),
+    ...privateDef.intendedWrongFixtures.map((fixture) => fixture.code),
+    ...privateDef.transferMasterSet.map((challenge) => challenge.officialSolutionCode),
+  ]
+  assert.equal(executableCodes.some((code) => /\bwindow\b/.test(code)), false, `${publicKernel.id} executable code must not use the sandbox-reserved window identifier`)
+}
+
+// 19. Constellation 4 (41~48) Set & Dictionary Foundations Domain & Quality Contracts
+const c4ProblemIds = [
+  'AC-SET-UNIQUE-01',
+  'AC-SET-MEMBERSHIP-42',
+  'AC-SET-INTERSECT-43',
+  'AC-DICT-FREQ-44',
+  'AC-DICT-MODE-45',
+  'AC-DICT-STOCK-46',
+  'AC-DICT-TWOSUM-47',
+  'AC-DICT-ONESHOT-48',
+]
+for (const problemId of c4ProblemIds) {
+  const publicKernel = PUBLIC_KERNELS[problemId]
+  const privateDef = getPrivateProblemDefinition(problemId, 1)
+  const publicInputs = new Set(publicKernel.assessment.publicTests.map(inputKey))
+  assert.equal(
+    privateDef.hiddenTests.some((test) => publicInputs.has(inputKey(test))),
+    false,
+    `${problemId} hidden tests must not repeat public inputs`
+  )
+
+  const publicTransfer = publicKernel.assessment.transferChallenges[0]
+  const privateTransfer = privateDef.transferMasterSet[0]
+  const publicContextText = JSON.stringify(publicTransfer.contextCard || {})
+  const solutionSyntaxPattern = /\b(?:def|for|if|return)\b|=/
+  assert.equal(
+    solutionSyntaxPattern.test(publicContextText),
+    false,
+    `${problemId} transfer context must guide the strategy without exposing solution code`
+  )
+  assert.deepEqual(
+    privateTransfer.contextCard,
+    publicTransfer.contextCard,
+    `${problemId} public/private transfer context must stay synchronized`
+  )
+  assert.deepEqual(
+    privateDef.understandingChallenges,
+    publicKernel.assessment.understandingChallenges,
+    `${problemId} public/private understanding challenge must stay synchronized`
+  )
+  for (const field of [
+    'transferChallengeId',
+    'title',
+    'description',
+    'thoughtCheck',
+    'entryFunction',
+    'starterCode',
+  ]) {
+    assert.deepEqual(
+      privateTransfer[field],
+      publicTransfer[field],
+      `${problemId} transfer ${field} must stay synchronized`
+    )
+  }
+  const previewInputs = new Set((publicTransfer.testCases || []).map(inputKey))
+  assert.ok(previewInputs.size >= 2, `${problemId} must provide at least two preview cases`)
+  assert.equal(
+    privateTransfer.testCases.some((test) => previewInputs.has(inputKey(test))),
+    false,
+    `${problemId} authoritative transfer tests must not repeat client preview inputs`
+  )
+
+  for (const primitive of publicKernel.evidenceRecipe.primitives) {
+    assert.ok(validEvidencePrimitives.has(primitive), `${problemId} uses unsupported evidence primitive: ${primitive}`)
+  }
+
+  const baseWithinBudget = evaluateBaseSubmission(
+    problemId,
+    publicKernel.version,
+    privateDef.officialSolutionCode,
+    { maxCumulativeSteps: 20_000 }
+  )
+  assert.equal(baseWithinBudget.passed, true, `${problemId} official Base must pass within 20,000 steps`)
+
+  const transferWithinBudget = evaluateTransferSubmission(
+    problemId,
+    publicKernel.version,
+    privateTransfer.transferChallengeId,
+    privateTransfer.officialSolutionCode,
+    { maxCumulativeSteps: 20_000 }
+  )
+  assert.equal(transferWithinBudget.passed, true, `${problemId} official Transfer must pass within 20,000 steps`)
+}
+
+// Discovery must establish the mental model before First Encounter reveals syntax.
+const uniqueDiscoveryText = JSON.stringify({
+  observe: PUBLIC_KERNELS['AC-SET-UNIQUE-01'].modes.observe,
+  explore: PUBLIC_KERNELS['AC-SET-UNIQUE-01'].modes.explore,
+})
+assert.equal(/\.add\s*\(/.test(uniqueDiscoveryText), false, 'SET-01 must not expose .add() before its First Encounter at SET-43')
+assert.equal(uniqueDiscoveryText.includes('집합'), false, 'SET-01 discovery must establish the unique-container idea before naming set')
+assert.equal(PUBLIC_KERNELS['AC-SET-UNIQUE-01'].modes.explore.lensConfig.frames.length, 5, 'SET-01 discovery must represent all five observed minerals')
+
+const membershipDiscoveryText = JSON.stringify({
+  observe: PUBLIC_KERNELS['AC-SET-MEMBERSHIP-42'].modes.observe,
+  explore: PUBLIC_KERNELS['AC-SET-MEMBERSHIP-42'].modes.explore,
+})
+assert.equal(/\bin\b/.test(membershipDiscoveryText), false, 'MEMBERSHIP-42 discovery must precede the in syntax First Encounter')
+assert.equal(
+  PUBLIC_KERNELS['AC-SET-MEMBERSHIP-42'].pythonConcepts.requires.includes('builtin:set'),
+  false,
+  'MEMBERSHIP-42 must not imply that a one-off membership query requires set conversion'
+)
+assert.equal(
+  /\bset\s*\(/.test(getPrivateProblemDefinition('AC-SET-MEMBERSHIP-42', 1).officialSolutionCode),
+  false,
+  'MEMBERSHIP-42 official solution must avoid an unnecessary set allocation'
+)
+
+const intersectDiscoveryText = JSON.stringify({
+  observe: PUBLIC_KERNELS['AC-SET-INTERSECT-43'].modes.observe,
+  explore: PUBLIC_KERNELS['AC-SET-INTERSECT-43'].modes.explore,
+})
+assert.equal(/\.add\s*\(/.test(intersectDiscoveryText), false, 'INTERSECT-43 discovery must precede the .add() syntax First Encounter')
+
+// AC-SET-UNIQUE-01 is an existing v1 anchor. These identifiers are progress/replay compatibility keys.
+const compatibilityUniquePublic = PUBLIC_KERNELS['AC-SET-UNIQUE-01']
+assert.equal(compatibilityUniquePublic.version, 1, 'SET-01 must preserve problemVersion 1')
+assert.equal(compatibilityUniquePublic.modes.code.entryFunction, 'count_unique_minerals', 'SET-01 must preserve its entry function')
+assert.equal(compatibilityUniquePublic.assessment.understandingChallenges[0].challengeId, 'uc_set_041_1', 'SET-01 must preserve its understanding challenge ID')
+assert.equal(compatibilityUniquePublic.assessment.transferChallenges[0].transferChallengeId, 'tc_set_041_transfer_1', 'SET-01 must preserve its transfer challenge ID')
+
+// 41 AC-SET-UNIQUE-01
+const uniquePublic = PUBLIC_KERNELS['AC-SET-UNIQUE-01']
+const uniquePrivate = getPrivateProblemDefinition('AC-SET-UNIQUE-01', 1)
+assert.ok(
+  uniquePublic.pythonConcepts.introduces.includes('builtin:set') && uniquePublic.pythonConcepts.introduces.includes('builtin:len'),
+  'AC-SET-UNIQUE-01 must introduce builtin:set and builtin:len'
+)
+assert.ok(
+  !uniquePublic.pythonConcepts.introduces.includes('method:set_add'),
+  'AC-SET-UNIQUE-01 must not introduce method:set_add'
+)
+assert.ok(
+  uniquePublic.thinkingPatterns.introduces.includes('pattern:deduplicate-then-measure'),
+  'AC-SET-UNIQUE-01 must introduce pattern:deduplicate-then-measure'
+)
+for (const t of [...uniquePublic.assessment.publicTests, ...uniquePrivate.hiddenTests]) {
+  assert.ok(Array.isArray(t.inputs.minerals) && t.inputs.minerals.length >= 0 && t.inputs.minerals.length <= 20, `SET-01 minerals length out of range: ${t.inputs.minerals.length}`)
+  const expected = new Set(t.inputs.minerals).size
+  assert.equal(t.expected, expected, `SET-01 oracle mismatch for: ${JSON.stringify(t.inputs.minerals)}`)
+}
+for (const transfer of [uniquePublic.assessment.transferChallenges[0], uniquePrivate.transferMasterSet[0]]) {
+  for (const t of transfer.testCases) {
+    assert.ok(Array.isArray(t.inputs.planets) && t.inputs.planets.length >= 0 && t.inputs.planets.length <= 20, `SET-01 planets length out of range: ${t.inputs.planets.length}`)
+    const expected = new Set(t.inputs.planets).size
+    assert.equal(t.expected, expected, `SET-01 transfer oracle mismatch for: ${JSON.stringify(t.inputs.planets)}`)
+  }
+}
+
+// 42 AC-SET-MEMBERSHIP-42
+const membershipPublic = PUBLIC_KERNELS['AC-SET-MEMBERSHIP-42']
+const membershipPrivate = getPrivateProblemDefinition('AC-SET-MEMBERSHIP-42', 1)
+assert.ok(
+  membershipPublic.pythonConcepts.introduces.includes('operator:membership-in'),
+  'AC-SET-MEMBERSHIP-42 must introduce operator:membership-in'
+)
+assert.ok(
+  membershipPublic.thinkingPatterns.introduces.includes('pattern:membership-query'),
+  'AC-SET-MEMBERSHIP-42 must introduce pattern:membership-query'
+)
+for (const t of [...membershipPublic.assessment.publicTests, ...membershipPrivate.hiddenTests]) {
+  assert.ok(typeof t.inputs.passenger === 'string', 'MEMBERSHIP-42 passenger must be string')
+  assert.ok(Array.isArray(t.inputs.manifest) && t.inputs.manifest.length >= 0 && t.inputs.manifest.length <= 20, `MEMBERSHIP-42 manifest length out of range: ${t.inputs.manifest.length}`)
+  const expected = t.inputs.manifest.includes(t.inputs.passenger)
+  assert.equal(t.expected, expected, `MEMBERSHIP-42 oracle mismatch for: ${JSON.stringify(t.inputs)}`)
+}
+for (const transfer of [membershipPublic.assessment.transferChallenges[0], membershipPrivate.transferMasterSet[0]]) {
+  for (const t of transfer.testCases) {
+    assert.ok(typeof t.inputs.part === 'string', 'MEMBERSHIP-42 transfer part must be string')
+    assert.ok(Array.isArray(t.inputs.inventory) && t.inputs.inventory.length >= 0 && t.inputs.inventory.length <= 20, `MEMBERSHIP-42 inventory length out of range: ${t.inputs.inventory.length}`)
+    const expected = t.inputs.inventory.includes(t.inputs.part)
+    assert.equal(t.expected, expected, `MEMBERSHIP-42 transfer oracle mismatch for: ${JSON.stringify(t.inputs)}`)
+  }
+}
+
+// 43 AC-SET-INTERSECT-43
+const intersectPublic = PUBLIC_KERNELS['AC-SET-INTERSECT-43']
+const intersectPrivate = getPrivateProblemDefinition('AC-SET-INTERSECT-43', 1)
+assert.ok(
+  intersectPublic.pythonConcepts.introduces.includes('method:set_add'),
+  'AC-SET-INTERSECT-43 must introduce method:set_add'
+)
+assert.ok(
+  intersectPublic.thinkingPatterns.introduces.includes('pattern:intersection-by-membership'),
+  'AC-SET-INTERSECT-43 must introduce pattern:intersection-by-membership'
+)
+for (const t of [...intersectPublic.assessment.publicTests, ...intersectPrivate.hiddenTests]) {
+  assert.ok(Array.isArray(t.inputs.base_a) && t.inputs.base_a.length >= 0 && t.inputs.base_a.length <= 20, `INTERSECT-43 base_a length out of range: ${t.inputs.base_a.length}`)
+  assert.ok(Array.isArray(t.inputs.base_b) && t.inputs.base_b.length >= 0 && t.inputs.base_b.length <= 20, `INTERSECT-43 base_b length out of range: ${t.inputs.base_b.length}`)
+  const expected = new Set(t.inputs.base_a.filter((x) => t.inputs.base_b.includes(x))).size
+  assert.equal(t.expected, expected, `INTERSECT-43 oracle mismatch for: ${JSON.stringify(t.inputs)}`)
+}
+for (const transfer of [intersectPublic.assessment.transferChallenges[0], intersectPrivate.transferMasterSet[0]]) {
+  for (const t of transfer.testCases) {
+    assert.ok(Array.isArray(t.inputs.badges_a) && t.inputs.badges_a.length >= 0 && t.inputs.badges_a.length <= 20, `INTERSECT-43 transfer badges_a length out of range: ${t.inputs.badges_a.length}`)
+    assert.ok(Array.isArray(t.inputs.badges_b) && t.inputs.badges_b.length >= 0 && t.inputs.badges_b.length <= 20, `INTERSECT-43 transfer badges_b length out of range: ${t.inputs.badges_b.length}`)
+    const expected = new Set(t.inputs.badges_a.filter((x) => t.inputs.badges_b.includes(x))).size
+    assert.equal(t.expected, expected, `INTERSECT-43 transfer oracle mismatch for: ${JSON.stringify(t.inputs)}`)
+  }
+}
+
+// 44 AC-DICT-FREQ-44
+const freqPublic = PUBLIC_KERNELS['AC-DICT-FREQ-44']
+const freqPrivate = getPrivateProblemDefinition('AC-DICT-FREQ-44', 1)
+assert.ok(
+  freqPublic.pythonConcepts.introduces.includes('builtin:dict'),
+  'AC-DICT-FREQ-44 must introduce builtin:dict'
+)
+assert.ok(
+  freqPublic.thinkingPatterns.introduces.includes('pattern:frequency-table'),
+  'AC-DICT-FREQ-44 must introduce pattern:frequency-table'
+)
+for (const t of [...freqPublic.assessment.publicTests, ...freqPrivate.hiddenTests]) {
+  assert.ok(Array.isArray(t.inputs.signals) && t.inputs.signals.length >= 0 && t.inputs.signals.length <= 20, `FREQ-44 signals length out of range: ${t.inputs.signals.length}`)
+  const oracle = t.inputs.signals.reduce((acc, s) => {
+    acc[s] = (acc[s] || 0) + 1
+    return acc
+  }, {})
+  assert.deepEqual(t.expected, oracle, `FREQ-44 oracle mismatch for: ${JSON.stringify(t.inputs)}`)
+}
+for (const transfer of [freqPublic.assessment.transferChallenges[0], freqPrivate.transferMasterSet[0]]) {
+  for (const t of transfer.testCases) {
+    assert.ok(Array.isArray(t.inputs.votes) && t.inputs.votes.length >= 0 && t.inputs.votes.length <= 20, `FREQ-44 transfer votes length out of range: ${t.inputs.votes.length}`)
+    const oracle = t.inputs.votes.reduce((acc, v) => {
+      acc[v] = (acc[v] || 0) + 1
+      return acc
+    }, {})
+    assert.deepEqual(t.expected, oracle, `FREQ-44 transfer oracle mismatch for: ${JSON.stringify(t.inputs)}`)
+  }
+}
+
+// 45 AC-DICT-MODE-45
+const modePublic = PUBLIC_KERNELS['AC-DICT-MODE-45']
+const modePrivate = getPrivateProblemDefinition('AC-DICT-MODE-45', 1)
+assert.ok(
+  modePublic.thinkingPatterns.introduces.includes('pattern:argmax-by-associated-value'),
+  'AC-DICT-MODE-45 must introduce pattern:argmax-by-associated-value'
+)
+for (const t of [...modePublic.assessment.publicTests, ...modePrivate.hiddenTests]) {
+  assert.ok(Array.isArray(t.inputs.signals) && t.inputs.signals.length >= 1 && t.inputs.signals.length <= 20, `MODE-45 signals length out of range: ${t.inputs.signals.length}`)
+  const freq = t.inputs.signals.reduce((acc, s) => {
+    acc[s] = (acc[s] || 0) + 1
+    return acc
+  }, {})
+  let best = t.inputs.signals[0]
+  for (const s of t.inputs.signals) {
+    if (freq[s] > freq[best]) best = s
+  }
+  assert.equal(t.expected, best, `MODE-45 oracle mismatch for: ${JSON.stringify(t.inputs)}`)
+}
+for (const transfer of [modePublic.assessment.transferChallenges[0], modePrivate.transferMasterSet[0]]) {
+  for (const t of transfer.testCases) {
+    assert.ok(Array.isArray(t.inputs.badges) && t.inputs.badges.length >= 1 && t.inputs.badges.length <= 20, `MODE-45 transfer badges length out of range: ${t.inputs.badges.length}`)
+    const freq = t.inputs.badges.reduce((acc, b) => {
+      acc[b] = (acc[b] || 0) + 1
+      return acc
+    }, {})
+    let best = t.inputs.badges[0]
+    for (const b of t.inputs.badges) {
+      if (freq[b] > freq[best]) best = b
+    }
+    assert.equal(t.expected, best, `MODE-45 transfer oracle mismatch for: ${JSON.stringify(t.inputs)}`)
+  }
+}
+
+// 46 AC-DICT-STOCK-46
+const stockPublic = PUBLIC_KERNELS['AC-DICT-STOCK-46']
+const stockPrivate = getPrivateProblemDefinition('AC-DICT-STOCK-46', 1)
+assert.ok(
+  stockPublic.thinkingPatterns.introduces.includes('pattern:keyed-state-update'),
+  'AC-DICT-STOCK-46 must introduce pattern:keyed-state-update'
+)
+for (const t of [...stockPublic.assessment.publicTests, ...stockPrivate.hiddenTests]) {
+  assert.ok(typeof t.inputs.stock === 'object' && t.inputs.stock !== null, 'STOCK-46 stock must be object')
+  assert.ok(Array.isArray(t.inputs.updates), 'STOCK-46 updates must be array')
+  assert.ok(typeof t.inputs.requested_part === 'string', 'STOCK-46 requested_part must be string')
+  const simulated = { ...t.inputs.stock }
+  for (const [part, amount] of t.inputs.updates) {
+    simulated[part] = (simulated[part] || 0) + amount
+  }
+  const expected = simulated[t.inputs.requested_part] || 0
+  assert.equal(t.expected, expected, `STOCK-46 oracle mismatch for: ${JSON.stringify(t.inputs)}`)
+}
+for (const transfer of [stockPublic.assessment.transferChallenges[0], stockPrivate.transferMasterSet[0]]) {
+  for (const t of transfer.testCases) {
+    const simulated = { ...t.inputs.initial_scores }
+    for (const [team, score] of t.inputs.bonus_events) {
+      simulated[team] = (simulated[team] || 0) + score
+    }
+    const expected = simulated[t.inputs.requested_crew] || 0
+    assert.equal(t.expected, expected, `STOCK-46 transfer oracle mismatch for: ${JSON.stringify(t.inputs)}`)
+  }
+}
+
+// Independent Oracle for Two Sum (distinct index pair)
+function hasDistinctPairOracle(values, target) {
+  for (let i = 0; i < values.length; i += 1) {
+    for (let j = i + 1; j < values.length; j += 1) {
+      if (values[i] + values[j] === target) return true
+    }
+  }
+  return false
+}
+
+// 47 AC-DICT-TWOSUM-47
+const twosumPublic = PUBLIC_KERNELS['AC-DICT-TWOSUM-47']
+const twosumPrivate = getPrivateProblemDefinition('AC-DICT-TWOSUM-47', 1)
+assert.ok(
+  twosumPublic.thinkingPatterns.introduces.includes('pattern:complement-search'),
+  'AC-DICT-TWOSUM-47 must introduce pattern:complement-search'
+)
+for (const t of [...twosumPublic.assessment.publicTests, ...twosumPrivate.hiddenTests]) {
+  assert.ok(Array.isArray(t.inputs.energies) && t.inputs.energies.length >= 0 && t.inputs.energies.length <= 20, `TWOSUM-47 energies length out of range: ${t.inputs.energies.length}`)
+  assert.ok(typeof t.inputs.target === 'number', 'TWOSUM-47 target must be number')
+  for (const e of t.inputs.energies) {
+    assert.ok(e >= -50 && e <= 50, `TWOSUM-47 energy element out of domain [-50, 50]: ${e}`)
+  }
+  assert.ok(t.inputs.target >= -100 && t.inputs.target <= 100, `TWOSUM-47 target out of domain [-100, 100]: ${t.inputs.target}`)
+  const oracle = hasDistinctPairOracle(t.inputs.energies, t.inputs.target)
+  assert.equal(t.expected, oracle, `TWOSUM-47 oracle mismatch for: ${JSON.stringify(t.inputs)}`)
+}
+for (const transfer of [twosumPublic.assessment.transferChallenges[0], twosumPrivate.transferMasterSet[0]]) {
+  for (const t of transfer.testCases) {
+    assert.ok(Array.isArray(t.inputs.weights) && t.inputs.weights.length >= 0 && t.inputs.weights.length <= 20, `TWOSUM-47 transfer weights length out of range: ${t.inputs.weights.length}`)
+    assert.ok(typeof t.inputs.capacity === 'number', 'TWOSUM-47 capacity must be number')
+    const oracle = hasDistinctPairOracle(t.inputs.weights, t.inputs.capacity)
+    assert.equal(t.expected, oracle, `TWOSUM-47 transfer oracle mismatch for: ${JSON.stringify(t.inputs)}`)
+  }
+}
+
+// 48 AC-DICT-ONESHOT-48
+const oneshotPublic = PUBLIC_KERNELS['AC-DICT-ONESHOT-48']
+const oneshotPrivate = getPrivateProblemDefinition('AC-DICT-ONESHOT-48', 1)
+assert.ok(
+  oneshotPublic.thinkingPatterns.introduces.includes('pattern:remember-then-query'),
+  'AC-DICT-ONESHOT-48 must introduce pattern:remember-then-query'
+)
+for (const t of [...oneshotPublic.assessment.publicTests, ...oneshotPrivate.hiddenTests]) {
+  assert.ok(Array.isArray(t.inputs.energies) && t.inputs.energies.length >= 0 && t.inputs.energies.length <= 20, `ONESHOT-48 energies length out of range: ${t.inputs.energies.length}`)
+  assert.ok(typeof t.inputs.target === 'number', 'ONESHOT-48 target must be number')
+  for (const e of t.inputs.energies) {
+    assert.ok(e >= -50 && e <= 50, `ONESHOT-48 energy element out of domain [-50, 50]: ${e}`)
+  }
+  assert.ok(t.inputs.target >= -100 && t.inputs.target <= 100, `ONESHOT-48 target out of domain [-100, 100]: ${t.inputs.target}`)
+  const oracle = hasDistinctPairOracle(t.inputs.energies, t.inputs.target)
+  assert.equal(t.expected, oracle, `ONESHOT-48 oracle mismatch for: ${JSON.stringify(t.inputs)}`)
+}
+for (const transfer of [oneshotPublic.assessment.transferChallenges[0], oneshotPrivate.transferMasterSet[0]]) {
+  for (const t of transfer.testCases) {
+    assert.ok(Array.isArray(t.inputs.times) && t.inputs.times.length >= 0 && t.inputs.times.length <= 20, `ONESHOT-48 transfer times length out of range: ${t.inputs.times.length}`)
+    assert.ok(typeof t.inputs.required_time === 'number', 'ONESHOT-48 required_time must be number')
+    const oracle = hasDistinctPairOracle(t.inputs.times, t.inputs.required_time)
+    assert.equal(t.expected, oracle, `ONESHOT-48 transfer oracle mismatch for: ${JSON.stringify(t.inputs)}`)
+  }
+}
+
+// Pattern Card Syntax Leak Check for 41~48
+for (const patternId of [
+  'pattern:deduplicate-then-measure',
+  'pattern:membership-query',
+  'pattern:intersection-by-membership',
+  'pattern:frequency-table',
+  'pattern:argmax-by-associated-value',
+  'pattern:keyed-state-update',
+  'pattern:complement-search',
+  'pattern:remember-then-query',
+]) {
+  const pattern = PROBLEM_SOLVING_PATTERN_REGISTRY[patternId]
+  assert.ok(pattern, `Pattern registry missing: ${patternId}`)
+  const patternText = JSON.stringify({ tinyExample: pattern.tinyExample, syntaxExample: pattern.syntaxExample })
+  assert.equal(
+    solutionSyntaxPattern.test(patternText),
+    false,
+    `${patternId} must not leak solution code syntax`
+  )
+}
+
+assert.equal(registeredProblemIds.length, 52, 'Total registered problems must be exactly 52')
 console.log(`✅ All 10 Authoring Invariants PASSED across all ${registeredProblemIds.length} registered problems!`)
