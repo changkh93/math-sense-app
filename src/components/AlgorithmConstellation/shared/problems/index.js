@@ -50,6 +50,8 @@ import { AC_DICT_MODE_45 } from './ac_dict_mode_45.js'
 import { AC_DICT_STOCK_46 } from './ac_dict_stock_46.js'
 import { AC_DICT_TWOSUM_47 } from './ac_dict_twosum_47.js'
 import { AC_DICT_ONESHOT_48 } from './ac_dict_oneshot_48.js'
+import { AC_DICT_ANAGRAM_49 } from './ac_dict_anagram_49.js'
+import { AC_DICT_BUG_50 } from './ac_dict_bug_50.js'
 
 export const PUBLIC_KERNELS = Object.freeze({
   'AC-COND-001': AC_COND_001,
@@ -104,6 +106,8 @@ export const PUBLIC_KERNELS = Object.freeze({
   'AC-DICT-STOCK-46': AC_DICT_STOCK_46,
   'AC-DICT-TWOSUM-47': AC_DICT_TWOSUM_47,
   'AC-DICT-ONESHOT-48': AC_DICT_ONESHOT_48,
+  'AC-DICT-ANAGRAM-49': AC_DICT_ANAGRAM_49,
+  'AC-DICT-BUG-50': AC_DICT_BUG_50,
 })
 
 export function getPublicKernel(problemId) {
@@ -164,5 +168,7 @@ export {
   AC_DICT_STOCK_46,
   AC_DICT_TWOSUM_47,
   AC_DICT_ONESHOT_48,
+  AC_DICT_ANAGRAM_49,
+  AC_DICT_BUG_50,
 }
 

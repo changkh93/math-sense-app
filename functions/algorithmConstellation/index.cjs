@@ -29,10 +29,13 @@ module.exports = function createAlgorithmConstellationFunctions({ functions, adm
   const handlers = createCallableOrchestrator({ store })
 
   // No warm instance is reserved: this vertical slice favors low idle cost.
+  // GUEST_ABUSE_HASH_SECRET is already provisioned for guestSecurityFunctions
+  // in functions/index.js; without this binding the orchestrator fails closed.
   const secureCallable = regionalFunctions.runWith({
     maxInstances: 10,
     memory: '256MB',
     timeoutSeconds: 30,
+    secrets: ['GUEST_ABUSE_HASH_SECRET'],
   })
 
   function callable(handler) {

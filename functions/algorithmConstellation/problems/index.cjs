@@ -55,6 +55,8 @@ const acDictMode45 = require('./ac_dict_mode_45.private.cjs')
 const acDictStock46 = require('./ac_dict_stock_46.private.cjs')
 const acDictTwosum47 = require('./ac_dict_twosum_47.private.cjs')
 const acDictOneshot48 = require('./ac_dict_oneshot_48.private.cjs')
+const acDictAnagram49 = require('./ac_dict_anagram_49.private.cjs')
+const acDictBug50 = require('./ac_dict_bug_50.private.cjs')
 
 const PRIVATE_PROBLEMS = {
   'AC-COND-001@v1': acCond001,
@@ -109,6 +111,8 @@ const PRIVATE_PROBLEMS = {
   'AC-DICT-STOCK-46@v1': acDictStock46,
   'AC-DICT-TWOSUM-47@v1': acDictTwosum47,
   'AC-DICT-ONESHOT-48@v1': acDictOneshot48,
+  'AC-DICT-ANAGRAM-49@v1': acDictAnagram49,
+  'AC-DICT-BUG-50@v1': acDictBug50,
 }
 
 function getPrivateProblemDefinition(problemId, version = 1) {

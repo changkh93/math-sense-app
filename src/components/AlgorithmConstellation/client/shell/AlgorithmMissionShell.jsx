@@ -27,6 +27,18 @@ function normalizeCallableErrorCode(error) {
     .toUpperCase()
 }
 
+// Attempts in these states are read-only on the server; every submission would
+// fail with FAILED_PRECONDITION until a fresh attempt (new requestId) is started.
+const TERMINAL_ATTEMPT_STATES = new Set(['FINALIZED', 'EXPIRED', 'ABANDONED', 'INTEGRITY_TERMINATED'])
+
+// The client-bundle mock judge ships public answer keys, so it must never grade
+// a signed-in student in production (gateway contract: "Zero automatic mock
+// fallback in production"). It stays available for DEV preview and for
+// unauthenticated guests, whose local pilot progress never reaches the ledger.
+function isMockFallbackAllowed() {
+  return Boolean(import.meta.env.DEV) || !auth.currentUser
+}
+
 export default function AlgorithmMissionShell({
   kernel,
   initialShell = 'explorer',
@@ -65,7 +77,8 @@ export default function AlgorithmMissionShell({
     loadCompletedPythonConceptIds({ ownerKey: safeOwnerKey })
   ))
   const generatedRequestId = `start_${useId().replace(/[^A-Za-z0-9_-]/g, '_')}`
-  const startRequestId = existingDraft?.requestId || generatedRequestId
+  const initialRequestId = existingDraft?.requestId || generatedRequestId
+  const [activeRequestId, setActiveRequestId] = useState(initialRequestId)
   const [focusLockReason, setFocusLockReason] = useState('')
   const [focusLockPending, setFocusLockPending] = useState(false)
   const [aiResearchActive, setAiResearchActive] = useState(intent === 'ai_research')
@@ -129,43 +142,43 @@ export default function AlgorithmMissionShell({
           problemVersion: kernel.version,
           shell: initialShell,
           intent,
-          requestId: startRequestId,
+          requestId: activeRequestId,
         })
         if (isMounted) {
           setAttemptSession(session)
           setCurrentProgress(session.progress || {})
         }
       } catch (err) {
-        console.warn('Primary algorithm attempt start error, activating offline/local fallback gateway:', err)
-        try {
-          const fallbackGateway = createAlgorithmConstellationMockGateway()
-          const fallbackSession = await fallbackGateway.startAttempt({
-            problemId: kernel.id,
-            problemVersion: kernel.version,
-            shell: initialShell,
-            intent,
-            requestId: startRequestId,
-          })
-          if (isMounted) {
+        console.warn('Algorithm attempt start failed:', err)
+        if (!isMounted) return
+        if (isMockFallbackAllowed()) {
+          try {
+            const fallbackGateway = createAlgorithmConstellationMockGateway()
+            const fallbackSession = await fallbackGateway.startAttempt({
+              problemId: kernel.id,
+              problemVersion: kernel.version,
+              shell: initialShell,
+              intent,
+              requestId: activeRequestId,
+            })
             setRuntimeGateway(fallbackGateway)
             setAttemptSession(fallbackSession)
             setCurrentProgress(fallbackSession.progress || {})
+            return
+          } catch (fallbackErr) {
+            console.error('Both primary and fallback gateways failed:', fallbackErr)
           }
-        } catch (fallbackErr) {
-          console.error('Both primary and fallback gateways failed:', fallbackErr)
-          if (isMounted) {
-            if (['RATE_LIMITED', 'RESOURCE_EXHAUSTED'].includes(normalizeCallableErrorCode(err))) {
-              setStudentErrorMessage({
-                title: '잠시 후 다시 시도해 주세요',
-                description: '연속 요청이 많아 채점소가 잠시 숨을 고르고 있어요. 잠시 후 다시 시도해 주세요.',
-              })
-            } else {
-              setStudentErrorMessage({
-                title: '탐사 시작 오류',
-                description: '채점소 통신이 잠시 불안정해요. 잠시 후 다시 시도해 주세요.',
-              })
-            }
-          }
+        }
+        if (['RATE_LIMITED', 'RESOURCE_EXHAUSTED'].includes(normalizeCallableErrorCode(err))) {
+          setStudentErrorMessage({
+            title: '잠시 후 다시 시도해 주세요',
+            description: '연속 요청이 많아 채점소가 잠시 숨을 고르고 있어요. 잠시 후 다시 시도해 주세요.',
+          })
+        } else {
+          setStudentErrorMessage({
+            title: '탐사 시작 오류',
+            description: '채점소 통신이 잠시 불안정해요. 잠시 후 다시 시도해 주세요.',
+          })
         }
       }
     }
@@ -173,7 +186,7 @@ export default function AlgorithmMissionShell({
     return () => {
       isMounted = false
     }
-  }, [initialShell, intent, kernel.id, kernel.version, runtimeGateway, startRequestId])
+  }, [activeRequestId, initialShell, intent, kernel.id, kernel.version, runtimeGateway])
 
   // Debounced draft auto-save effect
   useEffect(() => {
@@ -182,7 +195,7 @@ export default function AlgorithmMissionShell({
         problemId: kernel.id,
         problemVersion: kernel.version,
         ownerKey: safeOwnerKey,
-        requestId: startRequestId,
+        requestId: activeRequestId,
         attemptId: attemptSession?.attemptId || existingDraft?.attemptId || null,
         code: currentCode,
         fsmState,
@@ -194,7 +207,7 @@ export default function AlgorithmMissionShell({
       })
     }, 1000)
     return () => clearTimeout(timer)
-  }, [attemptSession?.attemptId, completionResult, currentCode, currentProgress?.bestStars, existingDraft?.attemptId, exploreCompleted, fsmState, kernel.id, kernel.version, observeCompleted, safeOwnerKey, shell, startRequestId])
+  }, [activeRequestId, attemptSession?.attemptId, completionResult, currentCode, currentProgress?.bestStars, existingDraft?.attemptId, exploreCompleted, fsmState, kernel.id, kernel.version, observeCompleted, safeOwnerKey, shell])
 
   // Integrity Guard:
   // - Learn mode: Zero focus lock (gentle learning).
@@ -272,11 +285,11 @@ export default function AlgorithmMissionShell({
 
   // 1. Request Scaffold Hint
   const handleRequestHint = async ({ level = 1, source = 'hint', answerExposure = 'partial' } = {}) => {
-    if (!attemptSession?.attemptId) throw new Error('탐사 세션을 준비하고 있어요. 잠시 후 다시 시도해 주세요.')
+    const session = await getOrInitAttemptSession()
     if (recordedScaffoldLevels.current.has(level)) return { ok: true, duplicated: true }
     try {
       const result = await runtimeGateway.recordAssistance({
-        attemptId: attemptSession.attemptId,
+        attemptId: session.attemptId,
         eventId: `scaffold_level_${level}`,
         source,
         stage: 'implementation',
@@ -293,9 +306,9 @@ export default function AlgorithmMissionShell({
 
   // 2. AI Prompt Copy Confirmation
   const handleConfirmAiCopy = async () => {
-    if (!attemptSession?.attemptId) return
+    const session = await getOrInitAttemptSession()
     await runtimeGateway.recordAssistance({
-      attemptId: attemptSession.attemptId,
+      attemptId: session.attemptId,
       eventId: `ai_${Date.now()}`,
       source: 'external-ai',
       stage: 'strategy',
@@ -305,16 +318,50 @@ export default function AlgorithmMissionShell({
     setAiResearchActive(true)
   }
 
-  const getOrInitAttemptSession = async () => {
-    if (attemptSession?.attemptId) return attemptSession
-    const fallback = createAlgorithmConstellationMockGateway()
-    const session = await fallback.startAttempt({
+  const startAttemptOn = async (gatewayImpl, requestId) => gatewayImpl.startAttempt({
+    problemId: kernel.id,
+    problemVersion: kernel.version,
+    shell: initialShell,
+    intent,
+    requestId,
+  })
+
+  // A finished attempt can never accept submissions again. Rotating the
+  // requestId starts a fresh authoritative attempt so "다시 풀기 (복습)" works
+  // instead of silently degrading every submit to the client mock.
+  const rotateFinishedAttempt = async () => {
+    const rotatedRequestId = `start_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`
+    saveAlgorithmDraft({
       problemId: kernel.id,
       problemVersion: kernel.version,
-      shell: initialShell,
-      intent,
-      requestId: startRequestId,
+      ownerKey: safeOwnerKey,
+      requestId: rotatedRequestId,
+      attemptId: null,
+      code: currentCode,
+      fsmState,
+      shell,
+      observeCompleted,
+      exploreCompleted,
+      stars: completionResult?.stars || currentProgress?.bestStars || 0,
+      completionResult,
     })
+    setActiveRequestId(rotatedRequestId)
+    const session = await startAttemptOn(runtimeGateway, rotatedRequestId)
+    setAttemptSession(session)
+    setCurrentProgress(session.progress || {})
+    return session
+  }
+
+  const getOrInitAttemptSession = async () => {
+    if (attemptSession?.attemptId) {
+      if (!TERMINAL_ATTEMPT_STATES.has(attemptSession.state)) return attemptSession
+      return rotateFinishedAttempt()
+    }
+    if (!isMockFallbackAllowed()) {
+      throw new Error('채점소와 아직 연결되지 않았어요. 잠시 후 다시 시도해 주세요.')
+    }
+    const fallback = createAlgorithmConstellationMockGateway()
+    const session = await startAttemptOn(fallback, activeRequestId)
     setRuntimeGateway(fallback)
     setAttemptSession(session)
     setCurrentProgress(session.progress || {})
@@ -334,14 +381,15 @@ export default function AlgorithmMissionShell({
           code,
         })
       } catch (err) {
-        console.warn('Primary submitBase encountered error, using local fallback:', err)
+        if (!isMockFallbackAllowed()) throw err
+        console.warn('Primary submitBase failed, falling back to preview grading:', err)
         const fallback = createAlgorithmConstellationMockGateway()
         const fbSession = await fallback.startAttempt({
           problemId: kernel.id,
           problemVersion: kernel.version,
           shell: initialShell,
           intent,
-          requestId: startRequestId,
+          requestId: activeRequestId,
         })
         setRuntimeGateway(fallback)
         setAttemptSession(fbSession)
@@ -379,7 +427,8 @@ export default function AlgorithmMissionShell({
           answers,
         })
       } catch (err) {
-        console.warn('Primary submitUnderstanding error, using fallback:', err)
+        if (!isMockFallbackAllowed()) throw err
+        console.warn('Primary submitUnderstanding failed, falling back to preview grading:', err)
         const fallback = createAlgorithmConstellationMockGateway()
         return await fallback.submitUnderstanding({
           attemptId: session.attemptId,
@@ -389,6 +438,10 @@ export default function AlgorithmMissionShell({
       }
     } catch (err) {
       console.error('Understanding check failed:', err)
+      setStudentErrorMessage({
+        title: '이해 확인 오류',
+        description: err.message || '이해 확인을 처리하지 못했어요. 잠시 후 다시 시도해 주세요.',
+      })
       return { passed: false }
     }
   }
@@ -403,7 +456,8 @@ export default function AlgorithmMissionShell({
           attemptId: session.attemptId,
         })
       } catch (err) {
-        console.warn('Primary issueTransfer error, using fallback:', err)
+        if (!isMockFallbackAllowed()) throw err
+        console.warn('Primary issueTransfer failed, falling back to preview grading:', err)
         const fallback = createAlgorithmConstellationMockGateway()
         res = await fallback.issueTransfer({
           attemptId: session.attemptId,
@@ -428,7 +482,8 @@ export default function AlgorithmMissionShell({
           transferCode,
         })
       } catch (err) {
-        console.warn('Primary submitTransfer error, using fallback:', err)
+        if (!isMockFallbackAllowed()) throw err
+        console.warn('Primary submitTransfer failed, falling back to preview grading:', err)
         const fallback = createAlgorithmConstellationMockGateway()
         res = await fallback.submitTransfer({
           attemptId: session.attemptId,
@@ -443,6 +498,9 @@ export default function AlgorithmMissionShell({
           masteryStatus: res.masteryStatus,
           nextReturnAt: res.nextReturnAt,
           masteryHoldReasons: res.masteryHoldReasons || [],
+          // Preview (mock) results must never outrank server-authoritative
+          // records when the hub merges progress.
+          source: res.authoritative === false ? 'local-preview' : 'server',
         }
         setCompletionResult(res)
         setCurrentProgress((prev) => ({ ...prev, ...nextProgress }))
@@ -784,7 +842,7 @@ export default function AlgorithmMissionShell({
           </div>
           <p style={{ color: '#e2e8f0', fontSize: '15px', maxWidth: '600px', margin: '0 auto 24px', lineHeight: '1.6' }}>
             {completionResult?.authoritative === false
-              ? '축하합니다! 이 문제의 모든 탐사와 전이 미션을 3★으로 완수했습니다.'
+              ? '미리보기(비공식) 모드로 탐사를 마쳤어요. 학습 기록은 남지만 공식 채점 기록이 아니에요. 로그인 상태에서 다시 도전하면 공식 별이 기록됩니다.'
               : completionResult?.masteryStatus === 'mastered'
               ? '스스로 모든 증거와 전이 문제를 완결하여 마스터리를 달성했습니다!'
               : '강한 지원 또는 외부 도구를 활용해 탐사를 마쳤습니다. 24시간 후 도움 없는 독립 귀환에 성공하면 완전한 마스터리가 부여됩니다.'}

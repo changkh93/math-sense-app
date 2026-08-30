@@ -14,7 +14,20 @@ import { EVIDENCE_PRIMITIVES } from '../src/components/AlgorithmConstellation/sh
 
 const require = createRequire(import.meta.url)
 const { PRIVATE_PROBLEMS, getPrivateProblemDefinition, getTransferChallenges } = require('../functions/algorithmConstellation/problems/index.cjs')
-const { evaluateBaseSubmission, evaluateTransferSubmission } = require('../functions/algorithmConstellation/isolatedJudgeRuntime.cjs')
+const { evaluateBaseSubmission, evaluateTransferSubmission, runRestrictedPythonFunction } = require('../functions/algorithmConstellation/isolatedJudgeRuntime.cjs')
+
+// Authoring-bug error classes: these mean the fixture cannot RUN in the
+// sandbox at all, so it never exercises the misconception it claims to test
+// (e.g. 'is not None' in a fixture for a sandbox without 'is not').
+// Step-limit hits (infinite-loop fixtures) and domain runtime errors such as
+// a dict KeyError ARE authentic misconception behavior and stay allowed.
+const AUTHORING_BUG_ERROR_PATTERNS = [
+  /정의되지 않았거나 지원하지 않는 표현식/, // NAME_ERROR: unsupported expression / undefined name
+  /지원하지 않는 Python 문장/,             // UNSUPPORTED_SYNTAX: unknown statement
+  /지원하지 않는 메서드/,                  // unsupported method call
+  /import를 사용할 수 없습니다/,           // forbidden import
+  /보안 정책상 허용되지 않는/,             // FORBIDDEN_SOURCE rejection
+]
 
 console.log('🧪 Running Authoring Integrity Contracts Validator (10 Invariants)...')
 
@@ -149,6 +162,25 @@ for (const problemId of registeredProblemIds) {
       failedGroups.has(failingGroup),
       `[Invariant 5 FAIL] Wrong fixture ${fixtureId} did not fail in expected group '${failingGroup}'. Failed groups: ${[...failedGroups].join(', ')}`
     )
+  }
+
+  // 5b. Fixture Validity: a wrong fixture must be a wrong ALGORITHM, not
+  // broken code. If a hidden test fails with a sandbox grammar/security
+  // error, the fixture never exercises its misconception at all — it fails
+  // every group for the wrong reason (e.g. 'is not' in AC-DICT-ONESHOT-48).
+  // Step-limit and domain runtime errors (KeyError-class) stay allowed.
+  for (const fixture of wrongFixtures) {
+    const fixtureId = fixture.id || fixture.label
+    for (const hiddenTest of privateDef.hiddenTests) {
+      const run = runRestrictedPythonFunction(fixture.code, privateDef.entryFunction, hiddenTest.inputs, { maxSteps: 20_000 })
+      if (run.ok) continue
+      const errorMessage = String(run.error || '')
+      const authoringBugPattern = AUTHORING_BUG_ERROR_PATTERNS.find((pattern) => pattern.test(errorMessage))
+      assert.ok(
+        !authoringBugPattern,
+        `[Invariant 5b FAIL] Wrong fixture ${fixtureId} crashes on hidden test group '${hiddenTest.group}' with an authoring error (matched: ${authoringBugPattern?.source}): ${errorMessage}. Fix the fixture to use sandbox-supported grammar so it fails by WRONG ANSWER, not by crash.`
+      )
+    }
   }
 
   // 6. Learning Support Coverage (First Encounter & Protocol Repair)
@@ -1056,6 +1088,8 @@ const c4ProblemIds = [
   'AC-DICT-STOCK-46',
   'AC-DICT-TWOSUM-47',
   'AC-DICT-ONESHOT-48',
+  'AC-DICT-ANAGRAM-49',
+  'AC-DICT-BUG-50',
 ]
 for (const problemId of c4ProblemIds) {
   const publicKernel = PUBLIC_KERNELS[problemId]
@@ -1403,7 +1437,138 @@ for (const transfer of [oneshotPublic.assessment.transferChallenges[0], oneshotP
   }
 }
 
-// Pattern Card Syntax Leak Check for 41~48
+// 49 AC-DICT-ANAGRAM-49
+// Independent Oracle: Map 기반 빈도 signature를 key 기준 정렬해 deep 비교한다.
+// 공식 Python 구현을 번역한 plain object 비교는 피한다.
+function frequencyOf(values) {
+  const counts = new Map()
+  for (const value of values) counts.set(value, (counts.get(value) || 0) + 1)
+  return [...counts.entries()].sort(([a], [b]) => String(a).localeCompare(String(b)))
+}
+function sameFrequencySignature(valuesA, valuesB) {
+  const signatureA = JSON.stringify(frequencyOf(valuesA))
+  const signatureB = JSON.stringify(frequencyOf(valuesB))
+  return signatureA === signatureB
+}
+
+const anagramPublic = PUBLIC_KERNELS['AC-DICT-ANAGRAM-49']
+const anagramPrivate = getPrivateProblemDefinition('AC-DICT-ANAGRAM-49', 1)
+assert.ok(
+  anagramPublic.thinkingPatterns.introduces.includes('pattern:frequency-signature-comparison'),
+  'AC-DICT-ANAGRAM-49 must introduce pattern:frequency-signature-comparison'
+)
+assert.ok(
+  anagramPublic.pythonConcepts.requires.includes('operator:equality'),
+  'AC-DICT-ANAGRAM-49 must declare the operator:equality dependency for structural dict comparison'
+)
+const packetDomain = (value) => typeof value === 'string' && value.length <= 20 && /^[A-Z]*$/.test(value)
+for (const t of [...anagramPublic.assessment.publicTests, ...anagramPrivate.hiddenTests]) {
+  assert.ok(packetDomain(t.inputs.packet_a), `ANAGRAM-49 packet_a out of domain: ${JSON.stringify(t.inputs.packet_a)}`)
+  assert.ok(packetDomain(t.inputs.packet_b), `ANAGRAM-49 packet_b out of domain: ${JSON.stringify(t.inputs.packet_b)}`)
+  assert.equal(typeof t.expected, 'boolean', `ANAGRAM-49 expected must be boolean: ${JSON.stringify(t.inputs)}`)
+  assert.equal(
+    t.expected,
+    sameFrequencySignature(t.inputs.packet_a, t.inputs.packet_b),
+    `ANAGRAM-49 oracle mismatch for: ${JSON.stringify(t.inputs)}`
+  )
+}
+// The empty-vs-nonempty boundary must be covered in BOTH directions: a suite
+// with only ('' , 'A') lets an asymmetric solution that returns True whenever
+// packet_b is empty pass, and vice versa.
+assert.ok(
+  anagramPrivate.hiddenTests.some((t) => t.inputs.packet_a === '' && t.inputs.packet_b !== ''),
+  'ANAGRAM-49 hidden suite must cover empty packet_a vs non-empty packet_b'
+)
+assert.ok(
+  anagramPrivate.hiddenTests.some((t) => t.inputs.packet_a !== '' && t.inputs.packet_b === ''),
+  'ANAGRAM-49 hidden suite must cover non-empty packet_a vs empty packet_b (asymmetric solutions must fail)'
+)
+assert.ok(
+  anagramPrivate.hiddenTests.some((t) => t.inputs.packet_a === '' && t.inputs.packet_b === '' && t.expected === true),
+  'ANAGRAM-49 hidden suite must cover two empty packets being equivalent'
+)
+for (const transfer of [anagramPublic.assessment.transferChallenges[0], anagramPrivate.transferMasterSet[0]]) {
+  for (const t of transfer.testCases) {
+    assert.ok(Array.isArray(t.inputs.badges_a) && t.inputs.badges_a.length <= 20, `ANAGRAM-49 transfer badges_a length out of range: ${t.inputs.badges_a.length}`)
+    assert.ok(Array.isArray(t.inputs.badges_b) && t.inputs.badges_b.length <= 20, `ANAGRAM-49 transfer badges_b length out of range: ${t.inputs.badges_b.length}`)
+    assert.equal(
+      t.expected,
+      sameFrequencySignature(t.inputs.badges_a, t.inputs.badges_b),
+      `ANAGRAM-49 transfer oracle mismatch for: ${JSON.stringify(t.inputs)}`
+    )
+  }
+}
+// The authoritative transfer suite must also cover the empty boundary in BOTH
+// directions, so asymmetric one-sided solutions fail 3-star evaluation.
+const anagramTransferAuthoritative = anagramPrivate.transferMasterSet[0].testCases
+assert.ok(
+  anagramTransferAuthoritative.some((t) => t.inputs.badges_a.length === 0 && t.inputs.badges_b.length > 0 && t.expected === false),
+  'ANAGRAM-49 authoritative transfer must fail empty badges_a vs non-empty badges_b'
+)
+assert.ok(
+  anagramTransferAuthoritative.some((t) => t.inputs.badges_a.length > 0 && t.inputs.badges_b.length === 0 && t.expected === false),
+  'ANAGRAM-49 authoritative transfer must fail non-empty badges_a vs empty badges_b'
+)
+
+// 50 AC-DICT-BUG-50
+const bugfixPublic = PUBLIC_KERNELS['AC-DICT-BUG-50']
+const bugfixPrivate = getPrivateProblemDefinition('AC-DICT-BUG-50', 1)
+assert.ok(
+  bugfixPublic.thinkingPatterns.introduces.includes('pattern:first-state-divergence'),
+  'AC-DICT-BUG-50 must introduce pattern:first-state-divergence'
+)
+assert.deepEqual(
+  bugfixPublic.curriculum.prerequisites,
+  ['AC-DICT-FREQ-44', 'AC-CODE-FIRST-ERROR-01'],
+  'AC-DICT-BUG-50 must declare both 44 and AC-CODE-FIRST-ERROR-01 prerequisites'
+)
+function countsToSortedEntries(counts) {
+  return Object.entries(counts).sort(([a], [b]) => String(a).localeCompare(String(b)))
+}
+for (const t of [...bugfixPublic.assessment.publicTests, ...bugfixPrivate.hiddenTests]) {
+  assert.ok(Array.isArray(t.inputs.signals) && t.inputs.signals.length <= 20, `BUG-50 signals length out of range: ${t.inputs.signals.length}`)
+  const oracle = new Map()
+  for (const signal of t.inputs.signals) oracle.set(signal, (oracle.get(signal) || 0) + 1)
+  assert.deepEqual(
+    countsToSortedEntries(t.expected),
+    [...oracle.entries()].sort(([a], [b]) => String(a).localeCompare(String(b))),
+    `BUG-50 oracle mismatch for: ${JSON.stringify(t.inputs)}`
+  )
+}
+assert.ok(
+  bugfixPrivate.hiddenTests.some((t) => t.inputs.signals.length === 0),
+  'BUG-50 hidden suite must keep the empty-input regression guard'
+)
+// Starter failure contract: the shipped buggy starter must ACTUALLY fail the
+// Base judge (['A'] -> {A: 0} instead of {A: 1}) and the buggy Transfer
+// starter must ACTUALLY fail the Transfer judge on a repeated-vote case.
+const bugStarterResult = evaluateBaseSubmission('AC-DICT-BUG-50', 1, bugfixPublic.modes.code.starterCode)
+assert.equal(bugStarterResult.passed, false, 'BUG-50 public starter (initializes 0) must fail the Base judge before repair')
+const bugTransferChallenge = bugfixPrivate.transferMasterSet[0]
+const bugTransferStarterResult = evaluateTransferSubmission(
+  'AC-DICT-BUG-50',
+  1,
+  bugTransferChallenge.transferChallengeId,
+  bugTransferChallenge.starterCode
+)
+assert.equal(bugTransferStarterResult.passed, false, 'BUG-50 transfer starter (resets repeat votes) must fail the Transfer judge before repair')
+// Representative wrong fixtures are rejected by the Base judge (declared group
+// targeting is already enforced by Invariant 5).
+for (const fixture of bugfixPrivate.intendedWrongFixtures) {
+  const result = evaluateBaseSubmission('AC-DICT-BUG-50', 1, fixture.code)
+  assert.equal(result.passed, false, `BUG-50 fixture ${fixture.id} must be rejected by the Base judge`)
+}
+// Transfer official solution must genuinely differ from the Base repair (the
+// repeat branch is the bug, initialization is correct) yet pass fully.
+const bugTransferOfficialResult = evaluateTransferSubmission(
+  'AC-DICT-BUG-50',
+  1,
+  bugTransferChallenge.transferChallengeId,
+  bugTransferChallenge.officialSolutionCode
+)
+assert.equal(bugTransferOfficialResult.passed, true, 'BUG-50 transfer official solution must pass fully')
+
+// Pattern Card Syntax Leak Check for 41~50
 for (const patternId of [
   'pattern:deduplicate-then-measure',
   'pattern:membership-query',
@@ -1413,6 +1578,8 @@ for (const patternId of [
   'pattern:keyed-state-update',
   'pattern:complement-search',
   'pattern:remember-then-query',
+  'pattern:frequency-signature-comparison',
+  'pattern:first-state-divergence',
 ]) {
   const pattern = PROBLEM_SOLVING_PATTERN_REGISTRY[patternId]
   assert.ok(pattern, `Pattern registry missing: ${patternId}`)
@@ -1424,5 +1591,5 @@ for (const patternId of [
   )
 }
 
-assert.equal(registeredProblemIds.length, 52, 'Total registered problems must be exactly 52')
+assert.equal(registeredProblemIds.length, 54, 'Total registered problems must be exactly 54')
 console.log(`✅ All 10 Authoring Invariants PASSED across all ${registeredProblemIds.length} registered problems!`)

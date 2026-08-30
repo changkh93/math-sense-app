@@ -65,6 +65,9 @@ export const AC_DICT_ONESHOT_48 = createCapabilityPrototypeKernel({
           guidance: '현재 캡슐을 보관함에 넣기 전에 필요한 짝이 이미 보관함에 있는지 먼저 검사합니다.',
         },
         initialState: { energy: null, needed: null, seen: [], found: null },
+        // seen은 list가 아니라 set이다: 렌즈가 {3, 8, 2} / set()으로 표시해
+        // "중복이 합쳐지는 보관함" 정신 모델을 화면에서도 유지한다.
+        stateDisplayTypes: { seen: 'set' },
         initialStateLabel: '시작: 빈 보관함 set(), 목표 9',
         initialStepTitle: '🚀 시작 (단일 순회 기억 탐색)',
         initialPrompt: '각 캡슐을 차례대로 확인하며 기억 보관함을 채웁니다.',
@@ -102,11 +105,15 @@ export const AC_DICT_ONESHOT_48 = createCapabilityPrototypeKernel({
             stateAfter: { energy: 7, needed: 2, seen: [3, 8, 2], found: true },
           },
           {
+            // 성공 실행(True 반환)과 별개의 새 입력이다: stateBefore + experimentReset으로
+            // "연속 실행"처럼 이어져 보이지 않게 명시적으로 새 실험을 시작한다.
             id: 'f4_counter',
-            stepTitle: '⑤ 반례: 캡슐 [5] 하나만 있을 때',
-            operationLabel: '필요한 짝 5가 빈 seen {}에 없음 -> False',
-            codeSnippet: '# 10 - 5 = 5 (빈 보관함에 없음) -> False',
-            prompt: '검사 전에 먼저 5를 넣지 않으므로 자기 자신을 두 번 쓰는 오류 없이 올바르게 False가 됩니다.',
+            stepTitle: '⑤ 새 실험: 캡슐 [5] 하나뿐일 때',
+            experimentReset: true,
+            stateBefore: { energy: null, needed: null, seen: [], found: null },
+            operationLabel: '새 입력 [5], 목표 10: 필요한 짝 5가 빈 seen set()에 없음 -> False',
+            codeSnippet: '# 새 실험: energies=[5], target=10 -> 10 - 5 = 5 (빈 보관함에 없음) -> False',
+            prompt: '위 성공 실행과는 다른 새로운 입력이에요. 검사 전에 먼저 5를 넣지 않으므로 자기 자신을 두 번 쓰는 오류 없이 올바르게 False가 됩니다.',
             stateAfter: { energy: 5, needed: 5, seen: [5], found: false },
           },
         ],

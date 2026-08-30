@@ -29,12 +29,19 @@ function requireAuthenticatedUid(context) {
   return uid
 }
 
+// The secret signs attemptIds, variant seeds, and transfer challenge tokens.
+// A committed fallback constant would let anyone precompute variant selection
+// and forge tokens, so a missing secret must fail closed in every deployed
+// environment. Local emulation can opt in explicitly via
+// ALGORITHM_CONSTELLATION_INSECURE_SECRET_FALLBACK=1.
 function requireServerSecret(secretProvider) {
   const secret = String(secretProvider?.() || '')
-  if (secret.length < 32) {
-    return 'msense_alg_constellation_default_hmac_secret_fallback_key_32bytes'
+  if (secret.length >= 32) return secret
+  if (process.env.ALGORITHM_CONSTELLATION_INSECURE_SECRET_FALLBACK === '1') {
+    console.warn('ALGORITHM_CONSTELLATION: insecure development secret fallback is ACTIVE. Never enable this in a deployed environment.')
+    return 'msense_alg_constellation_local_dev_secret_fallback_32bytes'
   }
-  return secret
+  throw domainError('FAILED_PRECONDITION', '채점 서버 보안 설정이 완료되지 않았습니다. 잠시 후 다시 시도해 주세요.')
 }
 
 function deriveHmacSeed(secret, uid, problemId, attemptFamilyId, generatorVersion) {
@@ -86,6 +93,10 @@ function codeHash(code) {
 function publicStartResponse(session, progress = null) {
   return {
     attemptId: session.attemptId,
+    // Clients need the state to detect finished attempts (e.g. revisiting a
+    // completed mission) and rotate to a fresh attempt instead of dead-ending
+    // on FAILED_PRECONDITION for every submission.
+    state: session.state,
     publicVariant: { seed: session.variantSeed },
     replayDescriptor: {
       problemId: session.problemId,

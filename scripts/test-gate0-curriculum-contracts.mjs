@@ -751,8 +751,10 @@ assert.deepEqual(
     'AC-DICT-STOCK-46',
     'AC-DICT-TWOSUM-47',
     'AC-DICT-ONESHOT-48',
+    'AC-DICT-ANAGRAM-49',
+    'AC-DICT-BUG-50',
   ],
-  'Constellation 4 must currently have all 8 published Core problems (41~48)'
+  'Constellation 4 must be complete: 8 published Core problems (41~48) + 2 published Branch problems (49~50)'
 )
 
 // Prerequisites checks
@@ -856,5 +858,69 @@ assert.equal(
 )
 
 console.log('  -> [PASS] Constellation 4 (41~48) Set & Dictionary prerequisites and Core 8/8 unlock verified')
+
+// [Test 16] Constellation 4 Branch Missions (49·50) Curriculum & Gate Isolation Contracts
+console.log('[Test 16] Validating Constellation 4 Branch Missions (49·50) and gate isolation...')
+const c4PublishedCores = c4Published.filter((entry) => entry.routeRole === 'core')
+const c4PublishedBranches = c4Published.filter((entry) => entry.routeRole === 'branch')
+assert.equal(c4PublishedCores.length, 8, 'Constellation 4 must keep exactly 8 published Core problems (41~48)')
+assert.equal(c4PublishedBranches.length, 2, 'Constellation 4 must have exactly 2 published Branch problems (49~50)')
+assert.deepEqual(
+  c4PublishedBranches.map((entry) => entry.problemId),
+  ['AC-DICT-ANAGRAM-49', 'AC-DICT-BUG-50'],
+  'Constellation 4 Branch missions must be exactly 49 and 50'
+)
+for (const branch of c4PublishedBranches) {
+  assert.equal(branch.lensId, 'state-transition', 'Branch 49·50 must reuse the existing state-transition lens')
+  assert.equal(branch.learningRole, 'review', 'Branch 49·50 must be review missions')
+  assert.deepEqual(
+    PUBLIC_KERNELS[branch.problemId].curriculum.prerequisites,
+    branch.prerequisites,
+    'Branch kernel and catalog prerequisites must stay synchronized'
+  )
+}
+
+// Branch 49: locked until 44 is complete.
+assert.equal(isMissionPrerequisitesMet('AC-DICT-ANAGRAM-49', [], ALGORITHM_EDITORIAL_CATALOG), false, '49 must be locked with no prerequisites completed')
+assert.equal(isMissionPrerequisitesMet('AC-DICT-ANAGRAM-49', ['AC-DICT-FREQ-44'], ALGORITHM_EDITORIAL_CATALOG), true, '49 must unlock once 44 is complete')
+
+// Branch 50: locked until BOTH 44 and AC-CODE-FIRST-ERROR-01 are complete.
+assert.equal(isMissionPrerequisitesMet('AC-DICT-BUG-50', [], ALGORITHM_EDITORIAL_CATALOG), false, '50 must be locked with no prerequisites completed')
+assert.equal(isMissionPrerequisitesMet('AC-DICT-BUG-50', ['AC-DICT-FREQ-44'], ALGORITHM_EDITORIAL_CATALOG), false, '50 must stay locked without AC-CODE-FIRST-ERROR-01')
+assert.equal(isMissionPrerequisitesMet('AC-DICT-BUG-50', ['AC-CODE-FIRST-ERROR-01'], ALGORITHM_EDITORIAL_CATALOG), false, '50 must stay locked without 44')
+assert.equal(
+  isMissionPrerequisitesMet('AC-DICT-BUG-50', ['AC-DICT-FREQ-44', 'AC-CODE-FIRST-ERROR-01'], ALGORITHM_EDITORIAL_CATALOG),
+  true,
+  '50 must unlock once both prerequisites are complete'
+)
+
+// Branch completion never gates Constellation 5: getConstellationAccess /
+// isConstellationUnlocked aggregate only previous-constellation Core missions
+// (routeRole === 'core'). Branch completions neither substitute for nor block
+// the 6-Core requirement.
+const c4FiveCorePlusBranches = [...c4FiveCore, 'AC-DICT-ANAGRAM-49', 'AC-DICT-BUG-50']
+assert.equal(
+  isConstellationUnlocked(5, c4FiveCorePlusBranches, ALGORITHM_EDITORIAL_CATALOG),
+  false,
+  'Branch 49·50 completions must not substitute for the 6-Core unlock requirement of Constellation 5'
+)
+assert.equal(
+  isConstellationUnlocked(5, [...c4EightCore, 'AC-DICT-ANAGRAM-49', 'AC-DICT-BUG-50'], ALGORITHM_EDITORIAL_CATALOG),
+  true,
+  'Constellation 5 must stay unlocked when Branch 49·50 complete after the Core requirement is met'
+)
+const c4AccessBranchesOnly = getConstellationAccess(5, ['AC-DICT-ANAGRAM-49', 'AC-DICT-BUG-50'], ALGORITHM_EDITORIAL_CATALOG)
+assert.equal(c4AccessBranchesOnly.accessible, false, 'Branch-only completion must not unlock Constellation 5')
+assert.equal(c4AccessBranchesOnly.mode, 'gated', 'Branch-only completion must leave Constellation 5 in gated mode')
+const c4AccessWithoutBranches = getConstellationAccess(5, c4EightCore, ALGORITHM_EDITORIAL_CATALOG)
+const c4AccessWithBranches = getConstellationAccess(5, [...c4EightCore, 'AC-DICT-ANAGRAM-49', 'AC-DICT-BUG-50'], ALGORITHM_EDITORIAL_CATALOG)
+assert.equal(c4AccessWithBranches.accessible, true, 'Constellation 5 must stay accessible after Branch 49·50 completions')
+assert.equal(
+  c4AccessWithBranches.accessible,
+  c4AccessWithoutBranches.accessible,
+  'Branch 49·50 completions must not change Constellation 5 accessibility (core-only aggregation regression)'
+)
+
+console.log('  -> [PASS] Constellation 4 Branch Missions (49·50) prerequisites and gate isolation verified')
 
 console.log('\n=== Gate 0 Curriculum & Contract Tests Passed 100%! ===\n')

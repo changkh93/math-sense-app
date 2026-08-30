@@ -66,21 +66,27 @@ module.exports = {
 `,
     },
     {
+      // "직전 값 하나만 기억" 오개념: 인접한 쌍만 찾는다. 제한형 Python은
+      // 'is not'을 지원하지 않으므로 불리언 플래그로 직전 값 존재를 표현한다.
       id: 'ONESHOT-LAST-VALUE-ONLY',
       expectedFailingGroup: 'late-complement',
       code: `def detect_energy_pair_once(energies, target):
     last = None
+    has_last = False
     for energy in energies:
         needed = target - energy
-        if last is not None and needed == last:
+        if has_last and needed == last:
             return True
         last = energy
+        has_last = True
     return False
 `,
     },
   ],
   hiddenTests: [
-    { inputs: { energies: [10, 20, 30, 40], target: 50 }, expected: true, group: 'late-complement' },
+    // 뒤쪽에 짝이 있지만 인접한 쌍(10+20, 20+40, 40+30)으로는 50을 만들 수
+    // 없는 입력. "직전 값만 기억" 오개념(인접 쌍만 확인)을 값 불일치로 잡는다.
+    { inputs: { energies: [10, 20, 40, 30], target: 50 }, expected: true, group: 'late-complement' },
     { inputs: { energies: [6, 6], target: 12 }, expected: true, group: 'duplicate-values' },
     { inputs: { energies: [6], target: 12 }, expected: false, group: 'single-self-reuse' },
     { inputs: { energies: [1, 5, 9, 13, 17], target: 18 }, expected: true, group: 'reset-memory' },

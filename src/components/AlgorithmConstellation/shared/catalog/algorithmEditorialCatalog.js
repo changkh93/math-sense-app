@@ -637,10 +637,10 @@ export const ALGORITHM_EDITORIAL_CATALOG = Object.freeze([
     studentTitle: '같은 문자로 된 통신 패킷',
     routeRole: 'branch',
     learningRole: 'review',
-    status: 'draft',
+    status: 'published',
     prerequisites: ['AC-DICT-FREQ-44'],
-    lensId: 'set-frequency-lens',
-    provenance: { sourceType: 'inspired', rightsStatus: 'reference-only', sourcePlatform: 'PAI', adaptationNotes: '아나그램 빈도 동치' },
+    lensId: 'state-transition',
+    provenance: { sourceType: 'inspired', rightsStatus: 'reference-only', sourcePlatform: 'PAI', adaptationNotes: '두 빈도표의 구조적 동치 비교' },
   },
   {
     problemId: 'AC-DICT-BUG-50',
@@ -649,10 +649,10 @@ export const ALGORITHM_EDITORIAL_CATALOG = Object.freeze([
     studentTitle: '빈도표 오류 찾기',
     routeRole: 'branch',
     learningRole: 'review',
-    status: 'draft',
-    prerequisites: ['AC-DICT-FREQ-44'],
-    lensId: 'source-debug-lens',
-    provenance: { sourceType: 'original', rightsStatus: 'original', sourcePlatform: 'MetaSense', adaptationNotes: '초기화 누락 오개념' },
+    status: 'published',
+    prerequisites: ['AC-DICT-FREQ-44', 'AC-CODE-FIRST-ERROR-01'],
+    lensId: 'state-transition',
+    provenance: { sourceType: 'original', rightsStatus: 'original', sourcePlatform: 'MetaSense', adaptationNotes: '최초 상태 차이로 초기화·갱신 오류 수리' },
   },
 
   // ==========================================

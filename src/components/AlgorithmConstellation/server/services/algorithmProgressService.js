@@ -2,6 +2,14 @@
  * Algorithm Progress & Attempt Service
  * Manages mutable progress summaries, immutable attempt logs,
  * adaptive delayed returns, and idempotent rewards.
+ *
+ * SPEC-ONLY MODULE — NOT WIRED TO PRODUCTION.
+ * The authoritative server logic lives in functions/algorithmConstellation/
+ * (callableOrchestrator.cjs + algorithmProgressLedger.cjs). This file exists
+ * as the readable spec fixture consumed by
+ * scripts/test-algorithm-constellation-contracts.mjs. Do NOT import it from
+ * client code: eligibility fields here (e.g. rankEligible) are client-derivable
+ * and must stay server-determined in production.
  */
 
 import { calculateASI } from '../../shared/contracts/assistanceEvidenceSchema.js'

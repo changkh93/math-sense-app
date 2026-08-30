@@ -20,34 +20,49 @@ const DEFAULT_CONSTELLATION_ID = CONSTELLATIONS.find((constellation) =>
   PUBLISHED_ENTRIES.some((entry) => entry.constellationId === constellation.id)
 )?.id || 'constellation-0'
 
-function readLocalProgressSnapshot() {
+// Local records (dev mock ledger + owner-scoped drafts) are PREVIEW data only:
+// they may display stars and fill gaps while offline, but they can never raise
+// or rewrite server-authoritative progress, mastery status, or unlock gating.
+const LOCAL_PREVIEW_SOURCE = 'local-preview'
+
+function readLocalProgressSnapshot(ownerKey) {
   const local = {}
   if (typeof window === 'undefined' || !window.localStorage) return local
   try {
     const raw = window.localStorage.getItem('msense_alg_dev_progress_v1')
     if (raw) {
       const parsed = JSON.parse(raw)
-      if (Array.isArray(parsed)) {
-        for (const [pid, record] of parsed) {
-          if (pid && record) local[pid] = record
+      // The dev mock ledger writes a plain object; accept the legacy array form too.
+      const entries = Array.isArray(parsed) ? parsed : Object.entries(parsed || {})
+      for (const [pid, record] of entries) {
+        if (pid && record) {
+          local[pid] = {
+            ...record,
+            problemId: pid,
+            source: LOCAL_PREVIEW_SOURCE,
+            masteryStatus: record.masteryStatus === 'mastered' ? 'mastered' : 'preview_only',
+          }
         }
       }
     }
+    const draftPrefix = ownerKey
+      ? `msense_alg_draft_v2_${encodeURIComponent(ownerKey.trim())}_`
+      : 'msense_alg_draft_v2_'
     for (let i = 0; i < window.localStorage.length; i++) {
       const k = window.localStorage.key(i)
-      if (k && k.startsWith('msense_alg_draft_v2_')) {
+      if (k && k.startsWith(draftPrefix)) {
         try {
           const draft = JSON.parse(window.localStorage.getItem(k))
           if (draft?.problemId) {
             const isCompleted = (draft.stars || 0) >= 1 || draft.fsmState === 'COMPLETE' || Boolean(draft.completionResult?.passed)
             if (isCompleted) {
-              const existing = local[draft.problemId] || {}
-              const stars = Math.max(existing.bestStars || 0, draft.stars || (draft.fsmState === 'COMPLETE' ? 3 : 1))
+              const existing = local[draft.problemId]
+              const stars = Math.max(existing?.bestStars || 0, draft.stars || (draft.fsmState === 'COMPLETE' ? 3 : 0))
               local[draft.problemId] = {
-                ...existing,
                 problemId: draft.problemId,
                 bestStars: stars,
-                masteryStatus: stars >= 3 ? 'mastered' : (existing.masteryStatus || 'in_progress'),
+                masteryStatus: 'preview_only',
+                source: LOCAL_PREVIEW_SOURCE,
               }
             }
           }
@@ -66,7 +81,8 @@ export default function AlgorithmConstellationHub({ onBack }) {
   const [routeFilter, setRouteFilter] = useState('all')
   const [selectedProblem, setSelectedProblem] = useState(null)
   const [hoveredCard, setHoveredCard] = useState(null)
-  const [progressMap, setProgressMap] = useState(() => readLocalProgressSnapshot())
+  const [serverAvailable, setServerAvailable] = useState(false)
+  const [progressMap, setProgressMap] = useState(() => readLocalProgressSnapshot(auth.currentUser?.uid || 'guest_pilot'))
 
   const gateway = useMemo(() => {
     if (import.meta.env.DEV) {
@@ -76,26 +92,27 @@ export default function AlgorithmConstellationHub({ onBack }) {
   }, [])
 
   const syncProgress = useCallback(async () => {
-    const localSnap = readLocalProgressSnapshot()
-    let serverSnap = {}
+    const localSnap = readLocalProgressSnapshot(auth.currentUser?.uid || 'guest_pilot')
+    let serverSnap = null
     try {
       serverSnap = (await gateway.getProgress({ problemId: 'all' })) || {}
     } catch (err) {
-      console.warn('Server progress load fallback to local:', err)
+      console.warn('Algorithm progress: server unavailable, using local preview only:', err)
     }
-    const merged = { ...localSnap }
-    for (const [pid, record] of Object.entries(serverSnap)) {
-      if (pid && record) {
-        const localRecord = merged[pid]
-        const bestStars = Math.max(localRecord?.bestStars || 0, record.bestStars || 0)
-        merged[pid] = {
-          ...localRecord,
-          ...record,
-          problemId: pid,
-          bestStars,
-          masteryStatus: bestStars >= 3 ? 'mastered' : (record.masteryStatus || localRecord?.masteryStatus || 'unstarted'),
-        }
+    const merged = {}
+    if (serverSnap) {
+      // Server truth wins. Local drafts may only fill problems the server
+      // does not know about, and always as non-authoritative previews.
+      for (const [pid, record] of Object.entries(serverSnap)) {
+        if (pid && record) merged[pid] = { ...record, problemId: pid, source: 'server' }
       }
+      for (const [pid, localRecord] of Object.entries(localSnap)) {
+        if (!merged[pid]) merged[pid] = localRecord
+      }
+      setServerAvailable(true)
+    } else {
+      Object.assign(merged, localSnap)
+      setServerAvailable(false)
     }
     setProgressMap(merged)
   }, [gateway])
@@ -108,15 +125,23 @@ export default function AlgorithmConstellationHub({ onBack }) {
     return () => window.clearTimeout(timeoutId)
   }, [syncProgress])
 
+  // Preview records count toward gating only while the server is unreachable
+  // (offline resilience); once server data is loaded, gating is server-only.
+  const isAuthoritativeRecord = (record) => (
+    record && (record.source !== LOCAL_PREVIEW_SOURCE || !serverAvailable)
+  )
+
   const completedProblemIds = useMemo(() => {
     const ids = []
     for (const [pid, record] of Object.entries(progressMap)) {
-      if (record && ((record.bestStars || 0) >= 1 || record.masteryStatus === 'mastered' || record.masteryStatus === 'preview_only')) {
+      if (!isAuthoritativeRecord(record)) continue
+      if ((record.bestStars || 0) >= 1 || record.masteryStatus === 'mastered' || record.masteryStatus === 'preview_only') {
         ids.push(pid)
       }
     }
     return ids
-  }, [progressMap])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [progressMap, serverAvailable])
 
   const handleBack = () => {
     soundManager.playWarp?.()
@@ -135,12 +160,28 @@ export default function AlgorithmConstellationHub({ onBack }) {
   }, [activeConstellation, routeFilter])
 
   const totalStarsEarned = useMemo(() => {
-    return Object.values(progressMap).reduce((sum, p) => sum + (p?.bestStars || 0), 0)
-  }, [progressMap])
+    return Object.values(progressMap).reduce(
+      (sum, p) => sum + (isAuthoritativeRecord(p) ? (p?.bestStars || 0) : 0),
+      0,
+    )
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [progressMap, serverAvailable])
+
+  const previewStarsCount = useMemo(() => {
+    return Object.values(progressMap).reduce(
+      (sum, p) => sum + (!isAuthoritativeRecord(p) ? (p?.bestStars || 0) : 0),
+      0,
+    )
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [progressMap, serverAvailable])
 
   const totalMasteredCount = useMemo(() => {
-    return Object.values(progressMap).filter((p) => p?.masteryStatus === 'mastered' || p?.masteryStatus === 'preview_only' || (p?.bestStars || 0) >= 3).length
-  }, [progressMap])
+    return Object.values(progressMap).filter((p) => (
+      isAuthoritativeRecord(p) &&
+      (p?.masteryStatus === 'mastered' || p?.masteryStatus === 'preview_only' || (p?.bestStars || 0) >= 3)
+    )).length
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [progressMap, serverAvailable])
 
   const handleSelectMission = (problemId) => {
     if (getMissingPrerequisites(problemId, completedProblemIds, ALGORITHM_EDITORIAL_CATALOG).length > 0) {
@@ -238,7 +279,7 @@ export default function AlgorithmConstellationHub({ onBack }) {
             }}
           >
             <span>⭐</span>
-            <span>획득한 별: {totalStarsEarned}개</span>
+            <span>획득한 별: {totalStarsEarned}개{previewStarsCount > 0 ? ` (미리보기 ${previewStarsCount})` : ''}</span>
           </div>
 
           <div
@@ -429,7 +470,10 @@ export default function AlgorithmConstellationHub({ onBack }) {
           const isHovered = hoveredCard === item.problemId
           const record = progressMap[item.problemId]
           const stars = record?.bestStars || 0
-          const isMastered = record?.masteryStatus === 'mastered' || record?.masteryStatus === 'preview_only' || stars >= 3
+          const isPreviewRecord = Boolean(record?.source === LOCAL_PREVIEW_SOURCE && serverAvailable)
+          const isMastered = !isPreviewRecord && (
+            record?.masteryStatus === 'mastered' || record?.masteryStatus === 'preview_only' || stars >= 3
+          )
 
           const missingPrereqTitles = missingPrereqIds.map((pid) => {
             const entry = ALGORITHM_EDITORIAL_CATALOG.find((cat) => cat.problemId === pid)
@@ -504,7 +548,23 @@ export default function AlgorithmConstellationHub({ onBack }) {
                           color: '#fde047',
                         }}
                       >
-                        {'⭐'.repeat(stars)}
+                        {isPreviewRecord ? '☆' : '⭐'}{isPreviewRecord ? stars : '⭐'.repeat(stars)}
+                      </span>
+                    )}
+
+                    {isPreviewRecord && (
+                      <span
+                        style={{
+                          fontSize: '10px',
+                          fontWeight: 'bold',
+                          padding: '3px 6px',
+                          borderRadius: '6px',
+                          background: 'rgba(148, 163, 184, 0.18)',
+                          color: '#cbd5e1',
+                          border: '1px solid rgba(148, 163, 184, 0.35)',
+                        }}
+                      >
+                        미리보기
                       </span>
                     )}
                   </div>

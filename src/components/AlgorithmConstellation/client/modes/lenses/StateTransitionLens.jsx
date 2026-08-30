@@ -1,14 +1,43 @@
 import { useState } from 'react'
 
-function formatValue(val) {
+// dict 내부 값은 문자열이든 숫자든 Python dict 리터럴 모양으로만 표시한다
+// (문자열 값에 따옴표를 붙이지 않는다: {STAR: 2}).
+function formatDictValue(value) {
+  if (value === null || value === undefined) return 'None'
+  if (Array.isArray(value)) return `[${value.join(', ')}]`
+  if (typeof value === 'object') return formatPlainObject(value)
+  return String(value)
+}
+
+function formatPlainObject(val) {
+  // Python dict 정신 모델: {A: 1, B: 2} / 빈 dict는 {}. 표시 순서는
+  // Object.entries 삽입 순서를 그대로 따른다(저작자가 작성한 순서가 곧
+  // 교육적 순서).
+  const entries = Object.entries(val)
+  if (entries.length === 0) return '{}'
+  return `{${entries.map(([key, value]) => `${key}: ${formatDictValue(value)}`).join(', ')}}`
+}
+
+function formatValue(val, displayType) {
   if (val === null || val === undefined || val === '미정' || val === '값 없음') {
     return '아직 값 없음'
+  }
+  if (!Array.isArray(val) && typeof val === 'object') {
+    return formatPlainObject(val)
+  }
+  if (Array.isArray(val)) {
+    // Python 자료구조의 정신 모델을 지키기 위해 list는 [a, b], set은 {a, b}
+    // 로 구분해 표시한다 (빈 set은 Python 문법대로 set()).
+    if (displayType === 'set') {
+      return val.length > 0 ? `{${val.join(', ')}}` : 'set()'
+    }
+    return `[${val.join(', ')}]`
   }
   if (typeof val === 'string') return JSON.stringify(val)
   return String(val)
 }
 
-function formatStateDisplay(state) {
+function formatStateDisplay(state, stateDisplayTypes = {}) {
   if (!state || typeof state !== 'object') return formatValue(state)
   return Object.entries(state).map(([key, val]) => {
     const isNone = val === null || val === undefined || val === '미정' || val === '값 없음'
@@ -22,7 +51,7 @@ function formatStateDisplay(state) {
           </span>
         ) : (
           <span style={{ color: '#38bdf8', fontWeight: 'bold', fontFamily: 'monospace' }}>
-            {formatValue(val)}
+            {formatValue(val, stateDisplayTypes[key])}
           </span>
         )}
       </span>
@@ -51,11 +80,14 @@ export default function StateTransitionLens({ kernel, onDiscoveryComplete }) {
   const [revealedRule, setRevealedRule] = useState(false)
 
   const currentFrame = currentFrameIndex >= 0 ? frames[currentFrameIndex] : null
+  // A frame may declare its own stateBefore to start a NEW experiment (e.g. a
+  // counterexample run) instead of continuing from the previous frame's result.
   const previousState = currentFrameIndex <= 0
-    ? initialState
-    : frames[currentFrameIndex - 1]?.stateAfter || initialState
+    ? (frames[0]?.stateBefore ?? initialState)
+    : (currentFrame?.stateBefore ?? frames[currentFrameIndex - 1]?.stateAfter ?? initialState)
   const currentState = currentFrame?.stateAfter || initialState
   const nextFrame = frames[currentFrameIndex + 1] || null
+  const stateDisplayTypes = exploreConfig.stateDisplayTypes || {}
 
   const [selectedOptionId, setSelectedOptionId] = useState(null)
   const [optionFeedback, setOptionFeedback] = useState(null)
@@ -200,10 +232,15 @@ export default function StateTransitionLens({ kernel, onDiscoveryComplete }) {
       {/* 3. Main Stage Content */}
       {currentFrame ? (
         <div style={{ display: 'grid', gap: '14px', padding: '22px', borderRadius: '12px', background: 'rgba(30, 41, 59, 0.7)', border: '1px solid rgba(255, 255, 255, 0.1)' }}>
+          {currentFrame.experimentReset && (
+            <div style={{ padding: '8px 14px', borderRadius: '8px', background: 'rgba(251, 191, 36, 0.12)', border: '1px solid rgba(251, 191, 36, 0.45)', color: '#fde68a', fontSize: '13px', fontWeight: 'bold', textAlign: 'center' }}>
+              🔄 새 실험 시작 — 이전 실행과 이어지지 않은 새로운 입력입니다
+            </div>
+          )}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', gap: '16px', alignItems: 'center' }}>
             <div style={{ padding: '14px', borderRadius: '10px', background: 'rgba(15, 23, 42, 0.85)', border: '1px solid rgba(255, 255, 255, 0.08)', textAlign: 'center' }}>
               <div style={{ fontSize: '12px', color: '#94a3b8', marginBottom: '6px' }}>실행 전 상태</div>
-              <div style={{ fontSize: '17px', fontWeight: 'bold' }}>{formatStateDisplay(previousState)}</div>
+              <div style={{ fontSize: '17px', fontWeight: 'bold' }}>{formatStateDisplay(previousState, stateDisplayTypes)}</div>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
               <span style={{ fontSize: '12px', fontWeight: 'bold', color: '#38bdf8', padding: '4px 10px', borderRadius: '12px', background: 'rgba(56, 189, 248, 0.15)', border: '1px solid rgba(56, 189, 248, 0.3)' }}>
@@ -213,7 +250,7 @@ export default function StateTransitionLens({ kernel, onDiscoveryComplete }) {
             </div>
             <div style={{ padding: '14px', borderRadius: '10px', background: 'rgba(15, 23, 42, 0.85)', border: '1px solid #38bdf8', textAlign: 'center' }}>
               <div style={{ fontSize: '12px', color: '#38bdf8', marginBottom: '6px' }}>실행 후 현재 상태</div>
-              <div style={{ fontSize: '17px', fontWeight: 'bold' }}>{formatStateDisplay(currentState)}</div>
+              <div style={{ fontSize: '17px', fontWeight: 'bold' }}>{formatStateDisplay(currentState, stateDisplayTypes)}</div>
             </div>
           </div>
 
@@ -235,7 +272,7 @@ export default function StateTransitionLens({ kernel, onDiscoveryComplete }) {
             {exploreConfig.initialStateLabel || '아직 변수에 값을 저장하지 않았습니다.'}
           </div>
           <div style={{ fontSize: '20px', fontWeight: 'bold', color: '#e2e8f0', marginBottom: '12px' }}>
-            {formatStateDisplay(initialState)}
+            {formatStateDisplay(initialState, stateDisplayTypes)}
           </div>
           {nextFrame && (
             <div style={{ color: '#fef08a', fontSize: '14px' }}>

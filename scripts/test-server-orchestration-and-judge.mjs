@@ -1,9 +1,10 @@
 import assert from 'assert'
 import { createCallableOrchestrator } from '../functions/algorithmConstellation/callableOrchestrator.cjs'
 import { createInMemoryAlgorithmStore } from '../functions/algorithmConstellation/algorithmProgressLedger.cjs'
-import { evaluateBaseSubmission } from '../functions/algorithmConstellation/isolatedJudgeRuntime.cjs'
+import { evaluateBaseSubmission, evaluateTransferSubmission } from '../functions/algorithmConstellation/isolatedJudgeRuntime.cjs'
 import { evaluateAuthoritativeSubmission } from '../functions/algorithmConstellation/algorithmAuthoritativeJudge.cjs'
 import { getPrivateProblemDefinition } from '../functions/algorithmConstellation/privateProblemCatalog.cjs'
+import { PUBLIC_KERNELS } from '../src/components/AlgorithmConstellation/shared/problems/index.js'
 
 console.log('\n=== Running Server Orchestration & Restricted Judge Tests ===')
 
@@ -170,6 +171,8 @@ for (const pid of [
   'AC-DICT-STOCK-46',
   'AC-DICT-TWOSUM-47',
   'AC-DICT-ONESHOT-48',
+  'AC-DICT-ANAGRAM-49',
+  'AC-DICT-BUG-50',
 ]) {
   const waveDefinition = getPrivateProblemDefinition(pid, 1)
   const waveContext = auth(`student_${pid.toLowerCase().replace(/-/g, '_')}`)
@@ -205,6 +208,33 @@ for (const pid of [
   }, waveContext)
   assert.equal(waveTransfer.passed, true, `Lifecycle Transfer submit failed for ${pid}`)
 }
+
+console.log('[Test 2c] Constellation 4 Branch (49·50) fixture rejection and 50 starter-failure contract...')
+// Representative intended-wrong fixtures must be rejected by the server judge
+// (group-targeted rejection is enforced by the authoring Invariant 5).
+const branch49Definition = getPrivateProblemDefinition('AC-DICT-ANAGRAM-49', 1)
+for (const wrong of branch49Definition.intendedWrongFixtures) {
+  assert.equal(
+    evaluateBaseSubmission('AC-DICT-ANAGRAM-49', 1, wrong.code).resultStar,
+    false,
+    `49 fixture ${wrong.id} must be rejected`
+  )
+}
+// 50's shipped Base starter is the repair target: it must be judged WRONG.
+const bug50Public = PUBLIC_KERNELS['AC-DICT-BUG-50']
+assert.equal(
+  evaluateBaseSubmission('AC-DICT-BUG-50', 1, bug50Public.modes.code.starterCode).resultStar,
+  false,
+  "50 Base starter must fail the judge (['A'] -> {A: 0} instead of {A: 1})"
+)
+// 50's shipped Transfer starter (reset-bug vote tally) must also be judged WRONG.
+const bug50Transfer = getPrivateProblemDefinition('AC-DICT-BUG-50', 1).transferMasterSet[0]
+assert.equal(
+  evaluateTransferSubmission('AC-DICT-BUG-50', 1, bug50Transfer.transferChallengeId, bug50Transfer.starterCode).passed,
+  false,
+  "50 Transfer starter must fail the judge (['X', 'X'] -> {X: 1} instead of {X: 2})"
+)
+console.log('  -> [PASS] Branch 49·50 fixture rejection and 50 starter-failure contract verified')
 await assert.rejects(
   () => handlers.handleGetAlgorithmProgress({}, auth('student_alpha')),
   (error) => error.code === 'INVALID_ARGUMENT'
