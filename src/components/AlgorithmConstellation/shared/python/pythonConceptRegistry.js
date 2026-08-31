@@ -217,21 +217,6 @@ export const PYTHON_CONCEPT_REGISTRY = Object.freeze({
     },
     protocolRepairId: 'PR-IF-001',
   },
-  'builtin:min': {
-    conceptId: 'builtin:min',
-    displayName: 'min() (가장 작은 값 찾기)',
-    kind: 'builtin-function',
-    canonicalFirstProblemId: 'AC-SORT-MIN-01',
-    why: '여러 값 가운데 가장 작은 값을 한 번에 찾을 때 사용해요.',
-    tinyExample: 'min([7, 3, 5]) → 3',
-    syntaxExample: 'smallest = min(cargos)',
-    predictionCheck: {
-      prompt: 'min([8, 2, 6])의 결과는 무엇일까요?',
-      options: ['2', '8', '6', '3'],
-      expected: '2',
-    },
-    protocolRepairId: 'PR-MIN-001',
-  },
   'syntax:swap': {
     conceptId: 'syntax:swap',
     displayName: 'a, b = b, a (두 값 교환)',

@@ -57,6 +57,15 @@ const acDictTwosum47 = require('./ac_dict_twosum_47.private.cjs')
 const acDictOneshot48 = require('./ac_dict_oneshot_48.private.cjs')
 const acDictAnagram49 = require('./ac_dict_anagram_49.private.cjs')
 const acDictBug50 = require('./ac_dict_bug_50.private.cjs')
+const acSimRover51 = require('./ac_sim_rover_51.private.cjs')
+const acSimCompass52 = require('./ac_sim_compass_52.private.cjs')
+const acSimClock53 = require('./ac_sim_clock_53.private.cjs')
+const acSimSwitch54 = require('./ac_sim_switch_54.private.cjs')
+const acSimBelt55 = require('./ac_sim_belt_55.private.cjs')
+const acSortBubble57 = require('./ac_sort_bubble_57.private.cjs')
+const acSrchLinear58 = require('./ac_srch_linear_58.private.cjs')
+const acSrchBinary59 = require('./ac_srch_binary_59.private.cjs')
+const acSrchPrefix60 = require('./ac_srch_prefix_60.private.cjs')
 
 const PRIVATE_PROBLEMS = {
   'AC-COND-001@v1': acCond001,
@@ -113,6 +122,15 @@ const PRIVATE_PROBLEMS = {
   'AC-DICT-ONESHOT-48@v1': acDictOneshot48,
   'AC-DICT-ANAGRAM-49@v1': acDictAnagram49,
   'AC-DICT-BUG-50@v1': acDictBug50,
+  'AC-SIM-ROVER-51@v1': acSimRover51,
+  'AC-SIM-COMPASS-52@v1': acSimCompass52,
+  'AC-SIM-CLOCK-53@v1': acSimClock53,
+  'AC-SIM-SWITCH-54@v1': acSimSwitch54,
+  'AC-SIM-BELT-55@v1': acSimBelt55,
+  'AC-SORT-BUBBLE-57@v1': acSortBubble57,
+  'AC-SRCH-LINEAR-58@v1': acSrchLinear58,
+  'AC-SRCH-BINARY-59@v1': acSrchBinary59,
+  'AC-SRCH-PREFIX-60@v1': acSrchPrefix60,
 }
 
 function getPrivateProblemDefinition(problemId, version = 1) {

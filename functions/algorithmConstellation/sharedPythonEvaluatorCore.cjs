@@ -478,7 +478,9 @@ class SafePythonInterpreter {
         if (['%', '//', '/'].includes(op) && right === 0) {
           throw evaluatorError('ZERO_DIVISION', '0으로 나눌 수 없습니다.')
         }
-        if (op === '%') return left % right
+        // Python 나머지 의미: 결과의 부호가 제수를 따른다 (예: (0-1) % 4 -> 3).
+        // JS의 %는 피제수 부호를 따르므로 floor 기반으로 정렬한다.
+        if (op === '%') return left - right * Math.floor(left / right)
         if (op === '*') return left * right
         if (op === '//') return Math.floor(left / right)
         if (op === '/') return left / right
@@ -1224,9 +1226,6 @@ module.exports = {
   evaluatorError,
   isPythonTruthy,
   matchesExpected,
-  isDictionary,
-  assertSafeKey,
-  assertSafeInputs,
   FORBIDDEN_SOURCE,
   MAX_STEPS,
 }

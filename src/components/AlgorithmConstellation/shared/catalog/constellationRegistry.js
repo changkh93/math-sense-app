@@ -89,7 +89,7 @@ export const CONSTELLATIONS = Object.freeze([
     branchCount: 2,
     capstoneCount: 0,
     totalCount: 10,
-    requiredAnchors: ['AC-SORT-MIN-01'],
+    requiredAnchors: ['AC-SIM-ROVER-51', 'AC-SIM-SWITCH-54', 'AC-SORT-MIN-01'],
     minimumCoreToUnlockNext: 6,
   },
   {

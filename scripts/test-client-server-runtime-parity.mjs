@@ -316,4 +316,55 @@ assert.equal(serverNumericKeyRes.code, 'TYPE_ERROR', 'Server numeric dictionary 
 
 console.log('  -> [PASS] R2 Dictionary Semantics, Key Membership & Argument Isolation 100% Parity Verified')
 
+// [Matrix 7] Python modulo semantics with negative operands (divisor-sign result)
+console.log('[Matrix 7] Checking Python Modulo Semantics (negative operands) Parity...')
+const MODULO_CASES = [
+  {
+    name: 'negative operand wrap (left turn)',
+    code: `def wrap_left(direction):
+    return (direction - 1) % 4
+`,
+    fn: 'wrap_left',
+    tests: [
+      { args: { direction: 0 }, expected: 3 },
+      { args: { direction: 1 }, expected: 0 },
+      { args: { direction: 3 }, expected: 2 },
+    ],
+  },
+  {
+    name: 'negative operand weekday PREV',
+    code: `def prev_day(day):
+    return (day - 1) % 7
+`,
+    fn: 'prev_day',
+    tests: [
+      { args: { day: 0 }, expected: 6 },
+      { args: { day: 3 }, expected: 2 },
+    ],
+  },
+  {
+    name: 'negative dividend non-cyclic',
+    code: `def python_mod(a, b):
+    return a % b
+`,
+    fn: 'python_mod',
+    tests: [
+      { args: { a: -7, b: 3 }, expected: 2 },
+      { args: { a: 7, b: -3 }, expected: -2 },
+      { args: { a: 10, b: 4 }, expected: 2 },
+    ],
+  },
+]
+
+for (const tc of MODULO_CASES) {
+  for (const t of tc.tests) {
+    const clientVal = clientRunFunction(tc.code, tc.fn, t.args)
+    const serverRes = serverRunFunction(tc.code, tc.fn, t.args)
+    assert.equal(serverRes.ok, true, `Server failed on ${tc.name}`)
+    assert.deepEqual(clientVal, t.expected, `Client modulo must follow Python semantics for ${tc.name} with args ${JSON.stringify(t.args)}`)
+    assert.deepEqual(serverRes.result, t.expected, `Server modulo must follow Python semantics for ${tc.name} with args ${JSON.stringify(t.args)}`)
+  }
+}
+console.log('  -> [PASS] Python Modulo Semantics (negative operands) 100% Parity Verified')
+
 console.log('\n=== Client-Server Runtime Parity Matrix Test Passed 100%! ===\n')

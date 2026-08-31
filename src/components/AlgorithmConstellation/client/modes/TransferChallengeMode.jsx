@@ -27,12 +27,24 @@ export default function TransferChallengeMode({
   const [selectedThoughtId, setSelectedThoughtId] = useState(null)
   const [thoughtFeedback, setThoughtFeedback] = useState(null)
 
+  // Authored kernels store the thought check as
+  // { question, options: [{ value, label }], expected } while older UI code
+  // expected { prompt, options: [{ id, label, isCorrect }], feedback }. Read
+  // both shapes so every published kernel renders and grades correctly.
+  const thoughtCheckPrompt = transferChallenge?.thoughtCheck?.prompt || transferChallenge?.thoughtCheck?.question
+  const resolveThoughtOptionId = (opt) => opt.id ?? opt.value
+  const isThoughtOptionCorrect = (opt) => {
+    if (opt.isCorrect !== undefined) return opt.isCorrect
+    const expected = transferChallenge?.thoughtCheck?.expected
+    return expected !== undefined && resolveThoughtOptionId(opt) === expected
+  }
+
   const handleSelectThought = (opt) => {
-    setSelectedThoughtId(opt.id)
-    if (opt.isCorrect) {
-      setThoughtFeedback(thoughtCheck?.feedback || '맞아요! 필요한 정보는 덮어쓰기 전에 미리 보관해야 합니다.')
+    setSelectedThoughtId(resolveThoughtOptionId(opt))
+    if (isThoughtOptionCorrect(opt)) {
+      setThoughtFeedback(transferChallenge?.thoughtCheck?.feedback || '맞아요! 정확한 발견이에요.')
     } else {
-      setThoughtFeedback('변수에 새 값을 넣으면 이전 값은 사라집니다. 다시 생각해 보세요.')
+      setThoughtFeedback('아직 아닙니다. 전략 카드의 절차를 한 단계씩 따라가며 다시 생각해 보세요.')
     }
   }
 
@@ -73,8 +85,13 @@ export default function TransferChallengeMode({
           <div style={{ fontSize: '13px', fontWeight: 'bold', color: '#38bdf8', marginBottom: '10px' }}>
             {contextCard.title || '📋 탐사 상황 분석'}
           </div>
+          {contextCard.strategyGuide && (
+            <div style={{ fontSize: '13px', color: '#cbd5e1', lineHeight: 1.6 }}>
+              {contextCard.strategyGuide}
+            </div>
+          )}
           {contextCard.steps && Array.isArray(contextCard.steps) && (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '10px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr)', gap: '10px' }}>
               {contextCard.steps.map((step, idx) => (
                 <div key={idx} style={{ padding: '10px 14px', borderRadius: '8px', background: 'rgba(30, 41, 59, 0.7)', border: '1px solid rgba(255, 255, 255, 0.08)' }}>
                   <div style={{ fontSize: '11px', color: '#94a3b8', marginBottom: '4px' }}>{step.label}</div>
@@ -90,14 +107,16 @@ export default function TransferChallengeMode({
       {thoughtCheck && (
         <div style={{ background: 'rgba(30, 41, 59, 0.8)', borderRadius: '12px', padding: '16px 20px', marginBottom: '18px', border: '1px solid rgba(129, 140, 248, 0.3)' }}>
           <div style={{ fontSize: '14px', fontWeight: 'bold', color: '#fef08a', marginBottom: '10px' }}>
-            💡 사고 점검: {thoughtCheck.prompt}
+            💡 사고 점검: {thoughtCheckPrompt}
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
             {thoughtCheck.options.map((opt) => {
-              const isSelected = selectedThoughtId === opt.id
+              const optionId = resolveThoughtOptionId(opt)
+              const optionCorrect = isThoughtOptionCorrect(opt)
+              const isSelected = selectedThoughtId === optionId
               return (
                 <button
-                  key={opt.id}
+                  key={optionId}
                   type="button"
                   onClick={() => handleSelectThought(opt)}
                   style={{
@@ -105,10 +124,10 @@ export default function TransferChallengeMode({
                     padding: '8px 14px',
                     borderRadius: '8px',
                     border: isSelected
-                      ? (opt.isCorrect ? '2px solid #10b981' : '2px solid #ef4444')
+                      ? (optionCorrect ? '2px solid #10b981' : '2px solid #ef4444')
                       : '1px solid rgba(255, 255, 255, 0.15)',
                     background: isSelected
-                      ? (opt.isCorrect ? 'rgba(16, 185, 129, 0.2)' : 'rgba(239, 68, 68, 0.2)')
+                      ? (optionCorrect ? 'rgba(16, 185, 129, 0.2)' : 'rgba(239, 68, 68, 0.2)')
                       : 'rgba(0, 0, 0, 0.3)',
                     color: isSelected ? '#fff' : '#cbd5e1',
                     fontWeight: isSelected ? 'bold' : 'normal',
@@ -116,7 +135,7 @@ export default function TransferChallengeMode({
                     cursor: 'pointer',
                   }}
                 >
-                  {opt.isCorrect && isSelected ? '✅ ' : isSelected ? '❌ ' : '○ '}{opt.label}
+                  {optionCorrect && isSelected ? '✅ ' : isSelected ? '❌ ' : '○ '}{opt.label}
                 </button>
               )
             })}

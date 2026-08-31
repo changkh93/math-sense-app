@@ -173,6 +173,16 @@ for (const pid of [
   'AC-DICT-ONESHOT-48',
   'AC-DICT-ANAGRAM-49',
   'AC-DICT-BUG-50',
+  'AC-SIM-ROVER-51',
+  'AC-SIM-COMPASS-52',
+  'AC-SIM-CLOCK-53',
+  'AC-SIM-SWITCH-54',
+  'AC-SIM-BELT-55',
+  'AC-SORT-MIN-01',
+  'AC-SORT-BUBBLE-57',
+  'AC-SRCH-LINEAR-58',
+  'AC-SRCH-BINARY-59',
+  'AC-SRCH-PREFIX-60',
 ]) {
   const waveDefinition = getPrivateProblemDefinition(pid, 1)
   const waveContext = auth(`student_${pid.toLowerCase().replace(/-/g, '_')}`)
@@ -200,6 +210,19 @@ for (const pid of [
   assert.ok(waveIssued.transferChallenge.starterCode.includes(`def ${waveIssued.transferChallenge.entryFunction}(`))
   const waveTransferDefinition = waveDefinition.transferMasterSet.find(
     (item) => item.transferChallengeId === waveIssued.transferChallenge.transferChallengeId
+  )
+  // Student-facing scaffold contract: the issued transfer must deliver the
+  // context card and thought check exactly as authored, so the UI can render
+  // and grade them (authoritative grading itself stays server-side).
+  assert.deepEqual(
+    waveIssued.transferChallenge.contextCard,
+    waveTransferDefinition.contextCard,
+    `Issued transfer must deliver the authored contextCard for ${pid}`
+  )
+  assert.deepEqual(
+    waveIssued.transferChallenge.thoughtCheck,
+    waveTransferDefinition.thoughtCheck,
+    `Issued transfer must deliver the authored thoughtCheck for ${pid}`
   )
   const waveTransfer = await handlers.handleSubmitAlgorithmTransfer({
     attemptId: waveStarted.attemptId,
@@ -245,6 +268,29 @@ const duplicateTransfer = await handlers.handleSubmitAlgorithmTransfer({
   transferCode: solutionFor(normal.issued.transferChallenge),
 }, auth('student_alpha'))
 assert.equal(duplicateTransfer.duplicated, true)
+
+console.log('[Test 2d] Constellation 5 (51~60) representative wrong fixtures are rejected by the server judge...')
+for (const pid of [
+  'AC-SIM-ROVER-51',
+  'AC-SIM-COMPASS-52',
+  'AC-SIM-CLOCK-53',
+  'AC-SIM-SWITCH-54',
+  'AC-SIM-BELT-55',
+  'AC-SORT-MIN-01',
+  'AC-SORT-BUBBLE-57',
+  'AC-SRCH-LINEAR-58',
+  'AC-SRCH-BINARY-59',
+  'AC-SRCH-PREFIX-60',
+]) {
+  const c5Definition = getPrivateProblemDefinition(pid, 1)
+  const representativeFixture = c5Definition.intendedWrongFixtures[0]
+  assert.equal(
+    evaluateBaseSubmission(pid, 1, representativeFixture.code).resultStar,
+    false,
+    `C5 fixture ${representativeFixture.id || representativeFixture.label} of ${pid} must be rejected`
+  )
+}
+console.log('  -> [PASS] Constellation 5 representative fixture rejection verified')
 
 console.log('[Test 3] AI use withholds new mastery, then independent return restores it...')
 const aiAttempt = await completeAttempt('student_beta', 'learn', {

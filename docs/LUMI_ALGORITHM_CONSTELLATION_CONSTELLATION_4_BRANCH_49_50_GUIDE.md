@@ -409,12 +409,14 @@ Hidden Test 그룹:
 | `reordered-equivalent` | 순서만 다르고 빈도 동일 |
 | `multiplicity-different` | 문자 종류는 같고 횟수만 다름 |
 | `same-length-different` | 길이는 같지만 구성 다름 |
-| `one-side-empty` | **한쪽만 빈 문자열** (v2 신설 — 원안 `different-length`에 묻혀 있던 경계) |
+| `one-side-empty` | **한쪽만 빈 문자열 — 양 방향 모두** (v2.1 정정: 인수 순서에 비대칭인 오답이 존재하므로 `('', 'A')`와 `('A', '')`를 쌍으로 검사한다) |
 | `empty-both` | 빈 문자열 두 개 |
 | `identical-order` | 입력 자체가 동일 |
 | `different-length` | 길이부터 다름 |
 
-> 7개 그룹이면 "문제당 Hidden 5~6건" 예산을 1 초과한다. 예산을 지키려면 `one-side-empty`를 `different-length`에 포함시키고 **케이스는 반드시 포함**한다(그룹명은 하나로). 어느 쪽이든 총 Hidden 개수는 6 이내로 유지.
+> 7개 그룹이면 "문제당 Hidden 5~6건" 예산을 1 초과한다. 예산을 지키려면 `one-side-empty`를 `different-length`에 포함시키고 **양 방향 케이스를 모두 포함**한다(그룹명은 하나로). 어느 쪽이든 총 Hidden 개수는 6 이내로 유지.
+>
+> v2.1 정정: Transfer Private에도 `badges_a=['STAR'], badges_b=[] -> False`를 `badges_a=[], badges_b=['MOON'] -> False`와 쌍으로 포함한다. 저작 테스트 단언은 "빈 입력 케이스 존재"가 아니라 **양 방향 경계가 모두 존재**함을 검사한다. (성단 5 가이드 §1.1 발견 — 한 방향만 검사하면 비대칭 오답이 전체 Hidden을 통과한다.)
 
 Intended Wrong Fixtures:
 

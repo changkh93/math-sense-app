@@ -923,4 +923,105 @@ assert.equal(
 
 console.log('  -> [PASS] Constellation 4 Branch Missions (49·50) prerequisites and gate isolation verified')
 
+// [Test 17] Constellation 5 Simulation & Search (51~60) Curriculum & Gate Contracts
+console.log('[Test 17] Validating Constellation 5 Simulation & Search (51~60) and gate contracts...')
+const c5Published = ALGORITHM_EDITORIAL_CATALOG.filter(
+  (entry) => entry.constellationId === 'constellation-5' && entry.status === 'published'
+)
+assert.deepEqual(
+  c5Published.map((entry) => entry.problemId),
+  [
+    'AC-SIM-ROVER-51',
+    'AC-SIM-COMPASS-52',
+    'AC-SIM-CLOCK-53',
+    'AC-SIM-SWITCH-54',
+    'AC-SIM-BELT-55',
+    'AC-SORT-MIN-01',
+    'AC-SORT-BUBBLE-57',
+    'AC-SRCH-LINEAR-58',
+    'AC-SRCH-BINARY-59',
+    'AC-SRCH-PREFIX-60',
+  ],
+  'Constellation 5 must be complete: exactly the 10 published problems 51~60'
+)
+const c5Cores = c5Published.filter((entry) => entry.routeRole === 'core')
+const c5Branches = c5Published.filter((entry) => entry.routeRole === 'branch')
+assert.equal(c5Cores.length, 8, 'Constellation 5 must have exactly 8 Core problems (51~58)')
+assert.equal(c5Branches.length, 2, 'Constellation 5 must have exactly 2 Branch problems (59~60)')
+assert.deepEqual(
+  c5Branches.map((entry) => entry.problemId),
+  ['AC-SRCH-BINARY-59', 'AC-SRCH-PREFIX-60']
+)
+for (const entry of c5Published) {
+  assert.equal(entry.lensId, 'state-transition', 'Constellation 5 problems must all reuse the state-transition lens')
+  assert.deepEqual(
+    PUBLIC_KERNELS[entry.problemId].curriculum.prerequisites,
+    entry.prerequisites,
+    'Constellation 5 kernel and catalog prerequisites must stay synchronized'
+  )
+}
+
+// Registry anchor contract: 51, 54, 56 (v2 fix — was [56] only).
+const c5Anchors = CONSTELLATIONS.find((item) => item.id === 'constellation-5').requiredAnchors
+assert.deepEqual(
+  c5Anchors,
+  ['AC-SIM-ROVER-51', 'AC-SIM-SWITCH-54', 'AC-SORT-MIN-01'],
+  'Constellation 5 requiredAnchors must be exactly 51, 54, 56'
+)
+
+// Prerequisite lock transitions (catalog draft values replaced by final values).
+assert.equal(isMissionPrerequisitesMet('AC-SIM-ROVER-51', ['AC-SEQ-005', 'AC-PAT-003'], ALGORITHM_EDITORIAL_CATALOG), false, '51 must stay locked without AC-COND-ELIF-14')
+assert.equal(isMissionPrerequisitesMet('AC-SIM-ROVER-51', ['AC-SEQ-005', 'AC-PAT-003', 'AC-COND-ELIF-14'], ALGORITHM_EDITORIAL_CATALOG), true, '51 must unlock with all three prerequisites')
+assert.equal(isMissionPrerequisitesMet('AC-SIM-COMPASS-52', ['AC-SIM-ROVER-51'], ALGORITHM_EDITORIAL_CATALOG), false, '52 must stay locked without AC-PAT-003')
+assert.equal(isMissionPrerequisitesMet('AC-SIM-COMPASS-52', ['AC-SIM-ROVER-51', 'AC-PAT-003'], ALGORITHM_EDITORIAL_CATALOG), true)
+assert.equal(isMissionPrerequisitesMet('AC-SRCH-BINARY-59', ['AC-SRCH-LINEAR-58', 'AC-EXP-WHILE-07'], ALGORITHM_EDITORIAL_CATALOG), false, '59 must stay locked without AC-PAT-DIGIT-24')
+assert.equal(isMissionPrerequisitesMet('AC-SRCH-BINARY-59', ['AC-SRCH-LINEAR-58', 'AC-EXP-WHILE-07', 'AC-PAT-DIGIT-24'], ALGORITHM_EDITORIAL_CATALOG), true)
+assert.equal(isMissionPrerequisitesMet('AC-SRCH-PREFIX-60', ['AC-SEQ-RUNNING-35'], ALGORITHM_EDITORIAL_CATALOG), false, '60 must stay locked without AC-EXP-BOUND-05')
+assert.equal(isMissionPrerequisitesMet('AC-SRCH-PREFIX-60', ['AC-SEQ-RUNNING-35', 'AC-EXP-BOUND-05'], ALGORITHM_EDITORIAL_CATALOG), true)
+
+// Constellation 6 unlock (verified via isConstellationUnlocked directly — C6 has no
+// published missions so getConstellationAccess(6) always returns 'unavailable'):
+const c5CoreIds = c5Cores.map((entry) => entry.problemId)
+// 6. Five cores + both branches are NOT enough.
+assert.equal(
+  isConstellationUnlocked(6, [...c5CoreIds.slice(0, 5), ...c5Branches.map((entry) => entry.problemId)], ALGORITHM_EDITORIAL_CATALOG),
+  false,
+  'Constellation 6 must stay locked with only 5 of 8 Core missions even when both Branches are done'
+)
+// 7. Seven cores missing one anchor are NOT enough.
+const c5SevenCoresMissingAnchor = c5CoreIds.filter((id) => id !== 'AC-SIM-SWITCH-54')
+assert.equal(
+  isConstellationUnlocked(6, c5SevenCoresMissingAnchor, ALGORITHM_EDITORIAL_CATALOG),
+  false,
+  'Constellation 6 must stay locked when required anchor 54 is missing even with 7 Cores done'
+)
+// 8. All anchors + 6 cores unlock.
+const c5SixCoreWithAnchors = ['AC-SIM-ROVER-51', 'AC-SIM-SWITCH-54', 'AC-SORT-MIN-01', 'AC-SIM-COMPASS-52', 'AC-SIM-CLOCK-53', 'AC-SIM-BELT-55']
+assert.equal(
+  isConstellationUnlocked(6, c5SixCoreWithAnchors, ALGORITHM_EDITORIAL_CATALOG),
+  true,
+  'Constellation 6 must unlock with anchors 51·54·56 and Core 6/8'
+)
+// 9. Completing Branches after Core 8 does not change the unlock state.
+const c5AllCoresAndBranches = [...c5CoreIds, ...c5Branches.map((entry) => entry.problemId)]
+assert.equal(
+  isConstellationUnlocked(6, c5AllCoresAndBranches, ALGORITHM_EDITORIAL_CATALOG),
+  true,
+  'Constellation 6 must remain unlocked after Branch 59·60 completions'
+)
+
+// 10. Legacy 56 completion survives the prerequisite strengthening (completed-set wins).
+assert.deepEqual(
+  getMissingPrerequisites('AC-SORT-MIN-01', ['AC-SORT-MIN-01'], ALGORITHM_EDITORIAL_CATALOG),
+  [],
+  'Students who already completed 56 must keep access after its prerequisites strengthened'
+)
+assert.deepEqual(
+  getMissingPrerequisites('AC-SORT-MIN-01', ['AC-SEQ-MINMAX-32'], ALGORITHM_EDITORIAL_CATALOG),
+  ['AC-EXP-SWAP-04'],
+  'New students must still complete both strengthened prerequisites for 56'
+)
+
+console.log('  -> [PASS] Constellation 5 (51~60) prerequisites, anchors 51·54·56, and Core 6/8 unlock verified')
+
 console.log('\n=== Gate 0 Curriculum & Contract Tests Passed 100%! ===\n')

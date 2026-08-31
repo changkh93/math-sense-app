@@ -1078,20 +1078,7 @@ for (const { publicKernel, privateDef, pattern } of branch39And40) {
   assert.equal(executableCodes.some((code) => /\bwindow\b/.test(code)), false, `${publicKernel.id} executable code must not use the sandbox-reserved window identifier`)
 }
 
-// 19. Constellation 4 (41~48) Set & Dictionary Foundations Domain & Quality Contracts
-const c4ProblemIds = [
-  'AC-SET-UNIQUE-01',
-  'AC-SET-MEMBERSHIP-42',
-  'AC-SET-INTERSECT-43',
-  'AC-DICT-FREQ-44',
-  'AC-DICT-MODE-45',
-  'AC-DICT-STOCK-46',
-  'AC-DICT-TWOSUM-47',
-  'AC-DICT-ONESHOT-48',
-  'AC-DICT-ANAGRAM-49',
-  'AC-DICT-BUG-50',
-]
-for (const problemId of c4ProblemIds) {
+function assertSharedConstellationContracts(problemId) {
   const publicKernel = PUBLIC_KERNELS[problemId]
   const privateDef = getPrivateProblemDefinition(problemId, 1)
   const publicInputs = new Set(publicKernel.assessment.publicTests.map(inputKey))
@@ -1162,6 +1149,37 @@ for (const problemId of c4ProblemIds) {
     { maxCumulativeSteps: 20_000 }
   )
   assert.equal(transferWithinBudget.passed, true, `${problemId} official Transfer must pass within 20,000 steps`)
+
+  const executableCodes = [
+    publicKernel.modes.code.starterCode,
+    privateTransfer.starterCode,
+    privateDef.officialSolutionCode,
+    ...(privateDef.alternativeSolutions || []),
+    ...privateDef.intendedWrongFixtures.map((fixture) => fixture.code),
+    ...privateDef.transferMasterSet.map((challenge) => challenge.officialSolutionCode),
+  ]
+  assert.equal(
+    executableCodes.some((code) => /\bwindow\b/.test(code)),
+    false,
+    `${problemId} executable code must not use the sandbox-reserved window identifier`
+  )
+}
+
+// 19. Constellation 4 (41~48) Set & Dictionary Foundations Domain & Quality Contracts
+const c4ProblemIds = [
+  'AC-SET-UNIQUE-01',
+  'AC-SET-MEMBERSHIP-42',
+  'AC-SET-INTERSECT-43',
+  'AC-DICT-FREQ-44',
+  'AC-DICT-MODE-45',
+  'AC-DICT-STOCK-46',
+  'AC-DICT-TWOSUM-47',
+  'AC-DICT-ONESHOT-48',
+  'AC-DICT-ANAGRAM-49',
+  'AC-DICT-BUG-50',
+]
+for (const problemId of c4ProblemIds) {
+  assertSharedConstellationContracts(problemId)
 }
 
 // Discovery must establish the mental model before First Encounter reveals syntax.
@@ -1568,7 +1586,480 @@ const bugTransferOfficialResult = evaluateTransferSubmission(
 )
 assert.equal(bugTransferOfficialResult.passed, true, 'BUG-50 transfer official solution must pass fully')
 
-// Pattern Card Syntax Leak Check for 41~50
+// 21. Constellation 5 (51~60) Simulation & Search Domain & Quality Contracts
+const c5ProblemIds = [
+  'AC-SIM-ROVER-51',
+  'AC-SIM-COMPASS-52',
+  'AC-SIM-CLOCK-53',
+  'AC-SIM-SWITCH-54',
+  'AC-SIM-BELT-55',
+  'AC-SORT-MIN-01',
+  'AC-SORT-BUBBLE-57',
+  'AC-SRCH-LINEAR-58',
+  'AC-SRCH-BINARY-59',
+  'AC-SRCH-PREFIX-60',
+]
+for (const problemId of c5ProblemIds) {
+  assertSharedConstellationContracts(problemId)
+}
+
+// Independent oracles: JS simulations that never mirror the Python solutions.
+
+// 51 AC-SIM-ROVER-51 — command state machine (MOVE/TURN and STEP/FLIP share it).
+function directionCommandOracle(start, commands, moveToken, flipToken) {
+  let position = start
+  let direction = 1
+  for (const command of commands) {
+    if (command === moveToken) position += direction
+    else if (command === flipToken) direction = -direction
+  }
+  return [position, direction]
+}
+const roverPublic = PUBLIC_KERNELS['AC-SIM-ROVER-51']
+const roverPrivate = getPrivateProblemDefinition('AC-SIM-ROVER-51', 1)
+assert.ok(
+  roverPublic.thinkingPatterns.introduces.includes('pattern:command-state-machine'),
+  'AC-SIM-ROVER-51 must introduce pattern:command-state-machine'
+)
+const roverTokens = new Set(['MOVE', 'TURN'])
+for (const t of [...roverPublic.assessment.publicTests, ...roverPrivate.hiddenTests]) {
+  assert.ok(typeof t.inputs.start_pos === 'number' && t.inputs.start_pos >= -20 && t.inputs.start_pos <= 20, `ROVER-51 start_pos out of range: ${t.inputs.start_pos}`)
+  assert.ok(Array.isArray(t.inputs.commands) && t.inputs.commands.length <= 12, `ROVER-51 commands length out of range: ${t.inputs.commands.length}`)
+  for (const command of t.inputs.commands) assert.ok(roverTokens.has(command), `ROVER-51 invalid command token: ${command}`)
+  assert.deepEqual(
+    t.expected,
+    directionCommandOracle(t.inputs.start_pos, t.inputs.commands, 'MOVE', 'TURN'),
+    `ROVER-51 oracle mismatch for: ${JSON.stringify(t.inputs)}`
+  )
+}
+for (const transfer of [roverPublic.assessment.transferChallenges[0], roverPrivate.transferMasterSet[0]]) {
+  for (const t of transfer.testCases) {
+    assert.ok(Array.isArray(t.inputs.commands) && t.inputs.commands.length <= 12, `ROVER-51 transfer commands length out of range`)
+    assert.deepEqual(
+      t.expected,
+      directionCommandOracle(t.inputs.start_level, t.inputs.commands, 'STEP', 'FLIP'),
+      `ROVER-51 transfer oracle mismatch for: ${JSON.stringify(t.inputs)}`
+    )
+  }
+}
+
+// 52 AC-SIM-COMPASS-52 — cyclic wrap via additive turns only (R = +1, L = +3).
+function cyclicTurnOracle(start, commands, upToken, downToken, size, downSteps) {
+  let state = start
+  for (const command of commands) state += (command === upToken ? 1 : downSteps)
+  return ((state % size) + size) % size
+}
+const compassPublic = PUBLIC_KERNELS['AC-SIM-COMPASS-52']
+const compassPrivate = getPrivateProblemDefinition('AC-SIM-COMPASS-52', 1)
+assert.ok(
+  compassPublic.thinkingPatterns.introduces.includes('pattern:cyclic-state-wrap'),
+  'AC-SIM-COMPASS-52 must introduce pattern:cyclic-state-wrap'
+)
+const compassTokens = new Set(['R', 'L'])
+const turnTokens = new Set(['NEXT', 'PREV'])
+for (const t of [...compassPublic.assessment.publicTests, ...compassPrivate.hiddenTests]) {
+  assert.ok(Number.isInteger(t.inputs.start_direction) && t.inputs.start_direction >= 0 && t.inputs.start_direction <= 3, `COMPASS-52 start_direction out of range: ${t.inputs.start_direction}`)
+  assert.ok(Array.isArray(t.inputs.commands) && t.inputs.commands.length <= 12, `COMPASS-52 commands length out of range`)
+  for (const command of t.inputs.commands) assert.ok(compassTokens.has(command), `COMPASS-52 invalid command token: ${command}`)
+  assert.equal(
+    t.expected,
+    cyclicTurnOracle(t.inputs.start_direction, t.inputs.commands, 'R', 'L', 4, 3),
+    `COMPASS-52 oracle mismatch for: ${JSON.stringify(t.inputs)}`
+  )
+}
+for (const transfer of [compassPublic.assessment.transferChallenges[0], compassPrivate.transferMasterSet[0]]) {
+  for (const t of transfer.testCases) {
+    assert.ok(Number.isInteger(t.inputs.start_day) && t.inputs.start_day >= 0 && t.inputs.start_day <= 6, `COMPASS-52 transfer start_day out of range: ${t.inputs.start_day}`)
+    for (const move of t.inputs.moves) assert.ok(turnTokens.has(move), `COMPASS-52 transfer invalid move token: ${move}`)
+    assert.equal(
+      t.expected,
+      cyclicTurnOracle(t.inputs.start_day, t.inputs.moves, 'NEXT', 'PREV', 7, 6),
+      `COMPASS-52 transfer oracle mismatch for: ${JSON.stringify(t.inputs)}`
+    )
+  }
+}
+// Python modulo semantics must hold in the judge: negative operands follow the
+// divisor's sign ((0 - 1) % 4 -> 3), so a student's natural (direction - 1) % 4
+// left-turn solution is correct and must not be rejected.
+const negativeModuloProbe = runRestrictedPythonFunction(
+  'def probe_modulo(d):\n    return (d - 1) % 4\n',
+  'probe_modulo',
+  { d: 0 },
+  { maxSteps: 20_000 }
+)
+assert.equal(negativeModuloProbe.ok, true, 'modulo probe must run')
+assert.equal(negativeModuloProbe.result, 3, 'Judge modulo must follow Python semantics for negative operands')
+// A Python-correct subtraction-form 52 solution must pass the full Base suite...
+const compassSubtractionSolution = `def rotate_compass(start_direction, commands):
+    direction = start_direction
+    for command in commands:
+        if command == "R":
+            direction = (direction + 1) % 4
+        else:
+            direction = (direction - 1) % 4
+    return direction
+`
+const compassSubtractionResult = evaluateBaseSubmission('AC-SIM-COMPASS-52', 1, compassSubtractionSolution)
+assert.equal(
+  compassSubtractionResult.resultStar,
+  true,
+  'AC-SIM-COMPASS-52 must accept the Python-correct (direction - 1) % 4 left-turn solution'
+)
+// ...and the subtraction-form PREV weekday transfer solution must pass 3-star too.
+const weekdaySubtractionResult = evaluateTransferSubmission(
+  'AC-SIM-COMPASS-52',
+  1,
+  compassPrivate.transferMasterSet[0].transferChallengeId,
+  `def shift_weekday(start_day, moves):
+    day = start_day
+    for move in moves:
+        if move == "NEXT":
+            day = (day + 1) % 7
+        else:
+            day = (day - 1) % 7
+    return day
+`
+)
+assert.equal(
+  weekdaySubtractionResult.passed,
+  true,
+  'AC-SIM-COMPASS-52 transfer must accept the Python-correct (day - 1) % 7 PREV solution'
+)
+
+// 53 AC-SIM-CLOCK-53 — total minutes then floor-division/modulo normalization.
+function clockOracle(hour, minute, addMinutes) {
+  const total = hour * 60 + minute + addMinutes
+  return [Math.floor(total / 60) % 24, total % 60]
+}
+function missionTimerOracle(minute, second, addSeconds) {
+  const total = minute * 60 + second + addSeconds
+  return [Math.floor(total / 60) % 60, total % 60]
+}
+const clockPublic = PUBLIC_KERNELS['AC-SIM-CLOCK-53']
+const clockPrivate = getPrivateProblemDefinition('AC-SIM-CLOCK-53', 1)
+assert.ok(
+  clockPublic.thinkingPatterns.introduces.includes('pattern:unit-carry-normalization'),
+  'AC-SIM-CLOCK-53 must introduce pattern:unit-carry-normalization'
+)
+for (const t of [...clockPublic.assessment.publicTests, ...clockPrivate.hiddenTests]) {
+  assert.ok(Number.isInteger(t.inputs.hour) && t.inputs.hour >= 0 && t.inputs.hour <= 23, `CLOCK-53 hour out of range: ${t.inputs.hour}`)
+  assert.ok(Number.isInteger(t.inputs.minute) && t.inputs.minute >= 0 && t.inputs.minute <= 59, `CLOCK-53 minute out of range: ${t.inputs.minute}`)
+  assert.ok(Number.isInteger(t.inputs.add_minutes) && t.inputs.add_minutes >= 0 && t.inputs.add_minutes <= 1500, `CLOCK-53 add_minutes out of range: ${t.inputs.add_minutes}`)
+  assert.deepEqual(
+    t.expected,
+    clockOracle(t.inputs.hour, t.inputs.minute, t.inputs.add_minutes),
+    `CLOCK-53 oracle mismatch for: ${JSON.stringify(t.inputs)}`
+  )
+}
+for (const transfer of [clockPublic.assessment.transferChallenges[0], clockPrivate.transferMasterSet[0]]) {
+  for (const t of transfer.testCases) {
+    assert.ok(Number.isInteger(t.inputs.minute) && t.inputs.minute >= 0 && t.inputs.minute <= 59, `CLOCK-53 transfer minute out of range`)
+    assert.ok(Number.isInteger(t.inputs.second) && t.inputs.second >= 0 && t.inputs.second <= 59, `CLOCK-53 transfer second out of range`)
+    assert.deepEqual(
+      t.expected,
+      missionTimerOracle(t.inputs.minute, t.inputs.second, t.inputs.add_seconds),
+      `CLOCK-53 transfer oracle mismatch for: ${JSON.stringify(t.inputs)}`
+    )
+  }
+}
+
+// 54 AC-SIM-SWITCH-54 — indexed boolean toggle (and the locked-panel transfer).
+function toggleOracle(switches, commands) {
+  const result = [...switches]
+  for (const index of commands) result[index] = !result[index]
+  return result
+}
+function lightOracle(lights, commands, locked) {
+  const result = [...lights]
+  if (!locked) {
+    for (const index of commands) result[index] = !result[index]
+  }
+  return result
+}
+const switchPublic = PUBLIC_KERNELS['AC-SIM-SWITCH-54']
+const switchPrivate = getPrivateProblemDefinition('AC-SIM-SWITCH-54', 1)
+assert.ok(
+  switchPublic.thinkingPatterns.introduces.includes('pattern:indexed-toggle-update'),
+  'AC-SIM-SWITCH-54 must introduce pattern:indexed-toggle-update'
+)
+assert.ok(
+  switchPublic.pythonConcepts.requires.includes('operator:not'),
+  'AC-SIM-SWITCH-54 must declare the operator:not dependency'
+)
+for (const t of [...switchPublic.assessment.publicTests, ...switchPrivate.hiddenTests]) {
+  assert.ok(Array.isArray(t.inputs.switches) && t.inputs.switches.length >= 1 && t.inputs.switches.length <= 8, `SWITCH-54 switches length out of range: ${t.inputs.switches.length}`)
+  assert.ok(Array.isArray(t.inputs.commands) && t.inputs.commands.length <= 12, `SWITCH-54 commands length out of range`)
+  for (const value of t.inputs.switches) assert.ok(typeof value === 'boolean', `SWITCH-54 switches must be boolean: ${value}`)
+  for (const index of t.inputs.commands) {
+    assert.ok(Number.isInteger(index) && index >= 0 && index < t.inputs.switches.length, `SWITCH-54 command index out of range: ${index}`)
+  }
+  assert.deepEqual(
+    t.expected,
+    toggleOracle(t.inputs.switches, t.inputs.commands),
+    `SWITCH-54 oracle mismatch for: ${JSON.stringify(t.inputs)}`
+  )
+}
+for (const transfer of [switchPublic.assessment.transferChallenges[0], switchPrivate.transferMasterSet[0]]) {
+  for (const t of transfer.testCases) {
+    assert.deepEqual(
+      t.expected,
+      lightOracle(t.inputs.lights, t.inputs.commands, t.inputs.panel_locked),
+      `SWITCH-54 transfer oracle mismatch for: ${JSON.stringify(t.inputs)}`
+    )
+  }
+}
+
+// 55 AC-SIM-BELT-55 — fixed-length shift with head insertion and tail drop.
+function beltShiftOracle(belt, incoming) {
+  return [belt[belt.length - 1], [incoming, ...belt.slice(0, -1)]]
+}
+const beltPublic = PUBLIC_KERNELS['AC-SIM-BELT-55']
+const beltPrivate = getPrivateProblemDefinition('AC-SIM-BELT-55', 1)
+assert.ok(
+  beltPublic.thinkingPatterns.introduces.includes('pattern:fixed-length-shift'),
+  'AC-SIM-BELT-55 must introduce pattern:fixed-length-shift'
+)
+for (const t of [...beltPublic.assessment.publicTests, ...beltPrivate.hiddenTests]) {
+  assert.ok(Array.isArray(t.inputs.belt) && t.inputs.belt.length >= 1 && t.inputs.belt.length <= 8, `BELT-55 belt length out of range: ${t.inputs.belt.length}`)
+  assert.deepEqual(
+    t.expected,
+    beltShiftOracle(t.inputs.belt, t.inputs.incoming),
+    `BELT-55 oracle mismatch for: ${JSON.stringify(t.inputs)}`
+  )
+  assert.equal(t.expected[1].length, t.inputs.belt.length, `BELT-55 length invariant violated: ${JSON.stringify(t.inputs)}`)
+}
+for (const transfer of [beltPublic.assessment.transferChallenges[0], beltPrivate.transferMasterSet[0]]) {
+  for (const t of transfer.testCases) {
+    assert.deepEqual(
+      t.expected,
+      beltShiftOracle(t.inputs.buffer, t.inputs.new_signal),
+      `BELT-55 transfer oracle mismatch for: ${JSON.stringify(t.inputs)}`
+    )
+  }
+}
+
+// 56 AC-SORT-MIN-01 — first-minimum swap (modernized in place, additive-only tests).
+function minSwapOracle(cargos) {
+  const result = [...cargos]
+  let minIndex = 0
+  for (let i = 0; i < result.length; i += 1) {
+    if (result[i] < result[minIndex]) minIndex = i
+  }
+  const temp = result[0]
+  result[0] = result[minIndex]
+  result[minIndex] = temp
+  return result
+}
+function maxSwapToEndOracle(cargos) {
+  const result = [...cargos]
+  let maxIndex = 0
+  for (let i = 0; i < result.length; i += 1) {
+    if (result[i] > result[maxIndex]) maxIndex = i
+  }
+  const last = result.length - 1
+  const temp = result[last]
+  result[last] = result[maxIndex]
+  result[maxIndex] = temp
+  return result
+}
+const minPublic = PUBLIC_KERNELS['AC-SORT-MIN-01']
+const minPrivate = getPrivateProblemDefinition('AC-SORT-MIN-01', 1)
+assert.ok(
+  minPublic.thinkingPatterns.introduces.includes('pattern:select-extreme-and-swap'),
+  'AC-SORT-MIN-01 must introduce pattern:select-extreme-and-swap'
+)
+assert.deepEqual(
+  minPublic.pythonConcepts.introduces,
+  ['syntax:swap'],
+  'AC-SORT-MIN-01 must introduce only syntax:swap (no builtin:min)'
+)
+assert.equal(
+  minPublic.pythonConcepts.requires.includes('builtin:min'),
+  false,
+  'AC-SORT-MIN-01 must not depend on the removed builtin:min concept'
+)
+// §3.5 syntax leak: 56 is the First Encounter for syntax:swap, so its Observe /
+// Explore flow must not expose the tuple-swap syntax itself.
+const minExploreText = JSON.stringify(minPublic.modes.explore)
+assert.equal(
+  /\w+\[[^\]]+\]\s*,\s*\w+\[[^\]]+\]\s*=\s*\w+\[[^\]]+\]/.test(minExploreText),
+  false,
+  'AC-SORT-MIN-01 explore flow must not expose the tuple-swap syntax before its First Encounter'
+)
+// §1.3 additive-only rule: the modernization must preserve every legacy hidden test verbatim.
+const legacyHidden56 = [
+  { inputs: { cargos: [10, 5, 20, 1] }, expected: [1, 5, 20, 10], group: 'unaligned_cargos' },
+  { inputs: { cargos: [2, 5, 8] }, expected: [2, 5, 8], group: 'already_min_at_front' },
+  { inputs: { cargos: [9, 8, 7, 6, 5] }, expected: [5, 8, 7, 6, 9], group: 'reverse_cargos' },
+  { inputs: { cargos: [42] }, expected: [42], group: 'single_cargo' },
+]
+for (const legacy of legacyHidden56) {
+  assert.ok(
+    minPrivate.hiddenTests.some((t) => JSON.stringify(t) === JSON.stringify(legacy)),
+    'AC-SORT-MIN-01 hiddenTests must stay additive: legacy hidden test missing verbatim'
+  )
+}
+assert.ok(minPrivate.hiddenTests.length >= 5 && minPrivate.hiddenTests.length <= 6, `AC-SORT-MIN-01 hidden budget: ${minPrivate.hiddenTests.length}`)
+for (const t of [...minPublic.assessment.publicTests, ...minPrivate.hiddenTests]) {
+  assert.ok(Array.isArray(t.inputs.cargos) && t.inputs.cargos.length >= 1 && t.inputs.cargos.length <= 8, `SORT-MIN-01 cargos length out of range: ${t.inputs.cargos.length}`)
+  assert.deepEqual(
+    t.expected,
+    minSwapOracle(t.inputs.cargos),
+    `SORT-MIN-01 oracle mismatch for: ${JSON.stringify(t.inputs)}`
+  )
+}
+for (const transfer of [minPublic.assessment.transferChallenges[0], minPrivate.transferMasterSet[0]]) {
+  for (const t of transfer.testCases) {
+    assert.deepEqual(
+      t.expected,
+      maxSwapToEndOracle(t.inputs.cargos),
+      `SORT-MIN-01 transfer oracle mismatch for: ${JSON.stringify(t.inputs)}`
+    )
+  }
+}
+
+// 57 AC-SORT-BUBBLE-57 — one adjacent-swap pass (and the reversed-direction transfer).
+function bubblePassOracle(cargos) {
+  const result = [...cargos]
+  for (let i = 0; i + 1 < result.length; i += 1) {
+    if (result[i] > result[i + 1]) {
+      const temp = result[i]
+      result[i] = result[i + 1]
+      result[i + 1] = temp
+    }
+  }
+  return result
+}
+function bubbleSmallestToFrontOracle(cargos) {
+  const result = [...cargos]
+  for (let i = 0; i + 1 < result.length; i += 1) {
+    const j = result.length - 1 - i
+    if (result[j - 1] > result[j]) {
+      const temp = result[j - 1]
+      result[j - 1] = result[j]
+      result[j] = temp
+    }
+  }
+  return result
+}
+const bubblePublic = PUBLIC_KERNELS['AC-SORT-BUBBLE-57']
+const bubblePrivate = getPrivateProblemDefinition('AC-SORT-BUBBLE-57', 1)
+assert.ok(
+  bubblePublic.thinkingPatterns.introduces.includes('pattern:adjacent-swap-pass'),
+  'AC-SORT-BUBBLE-57 must introduce pattern:adjacent-swap-pass'
+)
+for (const t of [...bubblePublic.assessment.publicTests, ...bubblePrivate.hiddenTests]) {
+  assert.ok(Array.isArray(t.inputs.cargos) && t.inputs.cargos.length <= 8, `BUBBLE-57 cargos length out of range: ${t.inputs.cargos.length}`)
+  assert.deepEqual(
+    t.expected,
+    bubblePassOracle(t.inputs.cargos),
+    `BUBBLE-57 oracle mismatch for: ${JSON.stringify(t.inputs)}`
+  )
+}
+for (const transfer of [bubblePublic.assessment.transferChallenges[0], bubblePrivate.transferMasterSet[0]]) {
+  for (const t of transfer.testCases) {
+    assert.deepEqual(
+      t.expected,
+      bubbleSmallestToFrontOracle(t.inputs.cargos),
+      `BUBBLE-57 transfer oracle mismatch for: ${JSON.stringify(t.inputs)}`
+    )
+  }
+}
+
+// 58 AC-SRCH-LINEAR-58 — first-match indexOf with -1 sentinel.
+const linearPublic = PUBLIC_KERNELS['AC-SRCH-LINEAR-58']
+const linearPrivate = getPrivateProblemDefinition('AC-SRCH-LINEAR-58', 1)
+assert.ok(
+  linearPublic.thinkingPatterns.introduces.includes('pattern:first-match-linear-search'),
+  'AC-SRCH-LINEAR-58 must introduce pattern:first-match-linear-search'
+)
+for (const t of [...linearPublic.assessment.publicTests, ...linearPrivate.hiddenTests]) {
+  assert.ok(Array.isArray(t.inputs.cargos) && t.inputs.cargos.length <= 12, `LINEAR-58 cargos length out of range: ${t.inputs.cargos.length}`)
+  assert.equal(
+    t.expected,
+    t.inputs.cargos.indexOf(t.inputs.target),
+    `LINEAR-58 oracle mismatch for: ${JSON.stringify(t.inputs)}`
+  )
+}
+for (const transfer of [linearPublic.assessment.transferChallenges[0], linearPrivate.transferMasterSet[0]]) {
+  for (const t of transfer.testCases) {
+    assert.equal(
+      t.expected,
+      t.inputs.signals.indexOf(t.inputs.target),
+      `LINEAR-58 transfer oracle mismatch for: ${JSON.stringify(t.inputs)}`
+    )
+  }
+}
+
+// 59 AC-SRCH-BINARY-59 — strict ascending distinct input, indexOf answer.
+const binaryPublic = PUBLIC_KERNELS['AC-SRCH-BINARY-59']
+const binaryPrivate = getPrivateProblemDefinition('AC-SRCH-BINARY-59', 1)
+assert.ok(
+  binaryPublic.thinkingPatterns.introduces.includes('pattern:interval-halving-search'),
+  'AC-SRCH-BINARY-59 must introduce pattern:interval-halving-search'
+)
+for (const t of [...binaryPublic.assessment.publicTests, ...binaryPrivate.hiddenTests]) {
+  assert.ok(Array.isArray(t.inputs.sorted_planets) && t.inputs.sorted_planets.length <= 31, `BINARY-59 length out of range: ${t.inputs.sorted_planets.length}`)
+  for (let i = 1; i < t.inputs.sorted_planets.length; i += 1) {
+    assert.ok(
+      t.inputs.sorted_planets[i] > t.inputs.sorted_planets[i - 1],
+      `BINARY-59 input must be strictly ascending: ${JSON.stringify(t.inputs.sorted_planets)}`
+    )
+  }
+  assert.equal(
+    t.expected,
+    t.inputs.sorted_planets.indexOf(t.inputs.target),
+    `BINARY-59 oracle mismatch for: ${JSON.stringify(t.inputs)}`
+  )
+}
+for (const transfer of [binaryPublic.assessment.transferChallenges[0], binaryPrivate.transferMasterSet[0]]) {
+  for (const t of transfer.testCases) {
+    assert.equal(
+      t.expected,
+      t.inputs.sorted_energy.indexOf(t.inputs.target),
+      `BINARY-59 transfer oracle mismatch for: ${JSON.stringify(t.inputs)}`
+    )
+  }
+}
+
+// 60 AC-SRCH-PREFIX-60 — inclusive range sums via slice reduction.
+function rangeSumOracle(levels, queries) {
+  return queries.map(([start, end]) => levels.slice(start, end + 1).reduce((acc, value) => acc + value, 0))
+}
+const prefixPublic = PUBLIC_KERNELS['AC-SRCH-PREFIX-60']
+const prefixPrivate = getPrivateProblemDefinition('AC-SRCH-PREFIX-60', 1)
+assert.ok(
+  prefixPublic.thinkingPatterns.introduces.includes('pattern:prefix-difference-query'),
+  'AC-SRCH-PREFIX-60 must introduce pattern:prefix-difference-query'
+)
+function assertPrefixDomain(problemLabel, levels, queries) {
+  assert.ok(Array.isArray(levels) && levels.length >= 1 && levels.length <= 12, `${problemLabel} levels length out of range: ${levels.length}`)
+  for (const level of levels) assert.ok(Number.isInteger(level) && level >= 0 && level <= 50, `${problemLabel} level value out of range: ${level}`)
+  assert.ok(Array.isArray(queries) && queries.length >= 1 && queries.length <= 6, `${problemLabel} query count out of range: ${queries.length}`)
+  for (const [start, end] of queries) {
+    assert.ok(Number.isInteger(start) && Number.isInteger(end) && start >= 0 && start <= end && end < levels.length, `${problemLabel} invalid inclusive query: [${start}, ${end}]`)
+  }
+}
+for (const t of [...prefixPublic.assessment.publicTests, ...prefixPrivate.hiddenTests]) {
+  assertPrefixDomain('PREFIX-60', t.inputs.levels, t.inputs.queries)
+  assert.deepEqual(
+    t.expected,
+    rangeSumOracle(t.inputs.levels, t.inputs.queries),
+    `PREFIX-60 oracle mismatch for: ${JSON.stringify(t.inputs)}`
+  )
+}
+for (const transfer of [prefixPublic.assessment.transferChallenges[0], prefixPrivate.transferMasterSet[0]]) {
+  for (const t of transfer.testCases) {
+    assertPrefixDomain('PREFIX-60 transfer', t.inputs.energy_log, t.inputs.windows)
+    assert.deepEqual(
+      t.expected,
+      rangeSumOracle(t.inputs.energy_log, t.inputs.windows),
+      `PREFIX-60 transfer oracle mismatch for: ${JSON.stringify(t.inputs)}`
+    )
+  }
+}
+
+// Pattern Card Syntax Leak Check for 41~50 and 51~60
 for (const patternId of [
   'pattern:deduplicate-then-measure',
   'pattern:membership-query',
@@ -1580,6 +2071,16 @@ for (const patternId of [
   'pattern:remember-then-query',
   'pattern:frequency-signature-comparison',
   'pattern:first-state-divergence',
+  'pattern:command-state-machine',
+  'pattern:cyclic-state-wrap',
+  'pattern:unit-carry-normalization',
+  'pattern:indexed-toggle-update',
+  'pattern:fixed-length-shift',
+  'pattern:select-extreme-and-swap',
+  'pattern:adjacent-swap-pass',
+  'pattern:first-match-linear-search',
+  'pattern:interval-halving-search',
+  'pattern:prefix-difference-query',
 ]) {
   const pattern = PROBLEM_SOLVING_PATTERN_REGISTRY[patternId]
   assert.ok(pattern, `Pattern registry missing: ${patternId}`)
@@ -1591,5 +2092,5 @@ for (const patternId of [
   )
 }
 
-assert.equal(registeredProblemIds.length, 54, 'Total registered problems must be exactly 54')
+assert.equal(registeredProblemIds.length, 63, 'Total registered problems must be exactly 63 (54 + Constellation 5)')
 console.log(`✅ All 10 Authoring Invariants PASSED across all ${registeredProblemIds.length} registered problems!`)

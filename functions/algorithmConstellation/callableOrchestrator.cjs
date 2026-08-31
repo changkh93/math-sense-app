@@ -154,6 +154,13 @@ function publicTransferChallenge(challenge) {
     description: challenge.description,
     entryFunction: challenge.entryFunction,
     starterCode: challenge.starterCode,
+    // contextCard와 thoughtCheck은 학생용 스캐폴드다(공개 커널에도 동일 값이
+    // 존재하는 형성적 자기 점검). 숨겨진 테스트·정답 코드와 달리 클라이언트
+    // 표시 계약의 일부이므로 그대로 전달한다. thoughtCheck.expected는 Observe의
+    // expected와 같은 클라이언트 신뢰 모델이며, 3★ 채점은 코드 제출만으로
+    // 서버에서 수행된다.
+    contextCard: challenge.contextCard,
+    thoughtCheck: challenge.thoughtCheck,
   }
 }
 

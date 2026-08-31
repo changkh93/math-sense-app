@@ -52,6 +52,15 @@ import { AC_DICT_TWOSUM_47 } from './ac_dict_twosum_47.js'
 import { AC_DICT_ONESHOT_48 } from './ac_dict_oneshot_48.js'
 import { AC_DICT_ANAGRAM_49 } from './ac_dict_anagram_49.js'
 import { AC_DICT_BUG_50 } from './ac_dict_bug_50.js'
+import { AC_SIM_ROVER_51 } from './ac_sim_rover_51.js'
+import { AC_SIM_COMPASS_52 } from './ac_sim_compass_52.js'
+import { AC_SIM_CLOCK_53 } from './ac_sim_clock_53.js'
+import { AC_SIM_SWITCH_54 } from './ac_sim_switch_54.js'
+import { AC_SIM_BELT_55 } from './ac_sim_belt_55.js'
+import { AC_SORT_BUBBLE_57 } from './ac_sort_bubble_57.js'
+import { AC_SRCH_LINEAR_58 } from './ac_srch_linear_58.js'
+import { AC_SRCH_BINARY_59 } from './ac_srch_binary_59.js'
+import { AC_SRCH_PREFIX_60 } from './ac_srch_prefix_60.js'
 
 export const PUBLIC_KERNELS = Object.freeze({
   'AC-COND-001': AC_COND_001,
@@ -108,6 +117,15 @@ export const PUBLIC_KERNELS = Object.freeze({
   'AC-DICT-ONESHOT-48': AC_DICT_ONESHOT_48,
   'AC-DICT-ANAGRAM-49': AC_DICT_ANAGRAM_49,
   'AC-DICT-BUG-50': AC_DICT_BUG_50,
+  'AC-SIM-ROVER-51': AC_SIM_ROVER_51,
+  'AC-SIM-COMPASS-52': AC_SIM_COMPASS_52,
+  'AC-SIM-CLOCK-53': AC_SIM_CLOCK_53,
+  'AC-SIM-SWITCH-54': AC_SIM_SWITCH_54,
+  'AC-SIM-BELT-55': AC_SIM_BELT_55,
+  'AC-SORT-BUBBLE-57': AC_SORT_BUBBLE_57,
+  'AC-SRCH-LINEAR-58': AC_SRCH_LINEAR_58,
+  'AC-SRCH-BINARY-59': AC_SRCH_BINARY_59,
+  'AC-SRCH-PREFIX-60': AC_SRCH_PREFIX_60,
 })
 
 export function getPublicKernel(problemId) {
@@ -170,5 +188,14 @@ export {
   AC_DICT_ONESHOT_48,
   AC_DICT_ANAGRAM_49,
   AC_DICT_BUG_50,
+  AC_SIM_ROVER_51,
+  AC_SIM_COMPASS_52,
+  AC_SIM_CLOCK_53,
+  AC_SIM_SWITCH_54,
+  AC_SIM_BELT_55,
+  AC_SORT_BUBBLE_57,
+  AC_SRCH_LINEAR_58,
+  AC_SRCH_BINARY_59,
+  AC_SRCH_PREFIX_60,
 }
 
