@@ -1,4 +1,5 @@
 import React from 'react';
+import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { signOut } from 'firebase/auth';
 import { httpsCallable } from 'firebase/functions';
@@ -76,6 +77,21 @@ export default function SpaceNavbar({ currentView, onViewChange }) {
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isGuestSignupPromptOpen, isLiveMenuOpen]);
+
+  React.useEffect(() => {
+    if (!isCompactNavbar) {
+      setIsMobileMoreOpen(false);
+      return undefined;
+    }
+    if (!isMobileMoreOpen) return undefined;
+
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape') setIsMobileMoreOpen(false);
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isCompactNavbar, isMobileMoreOpen]);
 
   const isGuest = userData?.isGuest === true;
 
@@ -736,64 +752,78 @@ export default function SpaceNavbar({ currentView, onViewChange }) {
         </button>
       </div>
 
-      <AnimatePresence>
-        {isMobileMoreOpen && (
-          <Motion.div
-            className="mobile-more-sheet"
-            initial={{ opacity: 0, y: 18 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 18 }}
-            transition={{ duration: 0.18 }}
-          >
-            <div className="mobile-sheet-handle" />
-            <div className="mobile-sheet-title">
-              <span>MISSION MENU</span>
-              <button type="button" onClick={() => setIsMobileMoreOpen(false)} aria-label="더보기 닫기">✕</button>
-            </div>
-            <div className="mobile-more-grid">
-              {effectiveMoreNav.map(item => (
-                <button
-                  key={item.view}
-                  type="button"
-                  className={`${getGuestNavState(item.view)} ${currentView === item.view ? 'active' : ''}`}
-                  aria-label={isGuest && getGuestNavState(item.view) === 'guest-locked' ? `${item.label}, 회원가입 필요` : item.label}
-                  onClick={() => handleNavClick(item.view, '/')}
-                >
-                  <span>{item.icon}</span>
-                  <strong>{item.label}</strong>
-                </button>
-              ))}
-              <button type="button" onClick={() => handleNavClick('profile', '/')}>
-                <span>👤</span>
-                <strong>프로필 편집</strong>
-              </button>
-              <button
-                type="button"
-                className="danger"
-                disabled={isDeletingAccount || userData?.role === 'admin'}
-                onClick={() => {
-                  setIsMobileMoreOpen(false);
-                  handleDeleteAccount();
-                }}
+      {typeof document !== 'undefined' && createPortal(
+        <AnimatePresence>
+          {isMobileMoreOpen && (
+            <Motion.div
+              className="mobile-more-backdrop"
+              data-overlay="mobile-more-menu"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1, pointerEvents: 'auto' }}
+              exit={{ opacity: 0, pointerEvents: 'none' }}
+              transition={{ duration: 0.18 }}
+              onClick={() => setIsMobileMoreOpen(false)}
+            >
+              <Motion.div
+                className="mobile-more-sheet"
+                initial={{ opacity: 0, y: 18 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: 18, pointerEvents: 'none' }}
+                transition={{ duration: 0.18 }}
+                onClick={(event) => event.stopPropagation()}
               >
-                <span>⚠️</span>
-                <strong>{isDeletingAccount ? '탈퇴 처리 중' : '계정탈퇴'}</strong>
-              </button>
-              <button
-                type="button"
-                className="logout"
-                onClick={() => {
-                  setIsMobileMoreOpen(false);
-                  handleLogout();
-                }}
-              >
-                <span>🚪</span>
-                <strong>로그아웃</strong>
-              </button>
-            </div>
-          </Motion.div>
-        )}
-      </AnimatePresence>
+                <div className="mobile-sheet-handle" />
+                <div className="mobile-sheet-title">
+                  <span>MISSION MENU</span>
+                  <button type="button" onClick={() => setIsMobileMoreOpen(false)} aria-label="더보기 닫기">✕</button>
+                </div>
+                <div className="mobile-more-grid">
+                  {effectiveMoreNav.map(item => (
+                    <button
+                      key={item.view}
+                      type="button"
+                      className={`${getGuestNavState(item.view)} ${currentView === item.view ? 'active' : ''}`}
+                      aria-label={isGuest && getGuestNavState(item.view) === 'guest-locked' ? `${item.label}, 회원가입 필요` : item.label}
+                      onClick={() => handleNavClick(item.view, '/')}
+                    >
+                      <span>{item.icon}</span>
+                      <strong>{item.label}</strong>
+                    </button>
+                  ))}
+                  <button type="button" onClick={() => handleNavClick('profile', '/')}>
+                    <span>👤</span>
+                    <strong>프로필 편집</strong>
+                  </button>
+                  <button
+                    type="button"
+                    className="danger"
+                    disabled={isDeletingAccount || userData?.role === 'admin'}
+                    onClick={() => {
+                      setIsMobileMoreOpen(false);
+                      handleDeleteAccount();
+                    }}
+                  >
+                    <span>⚠️</span>
+                    <strong>{isDeletingAccount ? '탈퇴 처리 중' : '계정탈퇴'}</strong>
+                  </button>
+                  <button
+                    type="button"
+                    className="logout"
+                    onClick={() => {
+                      setIsMobileMoreOpen(false);
+                      handleLogout();
+                    }}
+                  >
+                    <span>🚪</span>
+                    <strong>로그아웃</strong>
+                  </button>
+                </div>
+              </Motion.div>
+            </Motion.div>
+          )}
+        </AnimatePresence>,
+        document.body
+      )}
 
       <AnimatePresence>
         {isProfileMenuOpen && (

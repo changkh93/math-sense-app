@@ -193,6 +193,11 @@ for (const pid of [
     intent: 'learn',
     requestId: `request_${pid}_transfer_contract_01`,
   }, waveContext)
+  assert.match(
+    waveStarted.replayDescriptor.privateDefinitionChecksum,
+    /^sha256:[A-Za-z0-9_:-]+$/,
+    `${pid} must expose a Firestore-safe private definition checksum`
+  )
   const waveBase = await handlers.handleSubmitAlgorithmBase({
     attemptId: waveStarted.attemptId,
     submissionId: `base_${pid}_transfer_contract_01`,

@@ -17,6 +17,7 @@
 
 .mobile-nav-top,
 .mobile-bottom-nav,
+.mobile-more-backdrop,
 .mobile-more-sheet,
 .mobile-profile-sheet,
 .mobile-streak-btn,
@@ -488,6 +489,16 @@
 }
 
 @media (max-width: 768px) {
+  .mobile-more-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 40000;
+    display: block;
+    background: rgba(0, 0, 0, 0.28);
+    isolation: isolate;
+    pointer-events: auto;
+  }
+
   .guest-signup-actions {
     flex-direction: column;
   }
@@ -790,12 +801,15 @@
   }
 
   .mobile-more-sheet {
+    z-index: 40001;
     left: 0.75rem;
     right: 0.75rem;
     bottom: calc(4.85rem + env(safe-area-inset-bottom, 0px));
     top: calc(4.75rem + env(safe-area-inset-top, 0px));
     overflow-y: auto;
     overscroll-behavior: contain;
+    pointer-events: auto;
+    touch-action: manipulation;
   }
 
   .mobile-profile-sheet {

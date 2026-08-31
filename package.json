@@ -19,6 +19,8 @@
     "test:pdf-url": "node scripts/test-pdf-url-utils.mjs",
     "test:google-auth": "node scripts/test-google-auth-flow.mjs",
     "test:access-control": "node --test functions/accessControl.test.cjs",
+    "test:access-claim-sync": "node scripts/test-access-claim-sync.mjs",
+    "test:overlay-interaction": "node scripts/test-overlay-interaction-contract.mjs",
     "migrate:access-control": "node scripts/migrate-access-control.mjs",
     "test:referral": "node scripts/test-referral-billing-core.cjs",
     "test:learning-summary": "node scripts/test-learning-summary-utils.mjs",

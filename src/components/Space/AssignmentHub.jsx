@@ -271,11 +271,11 @@ const getAssignmentMissingPenaltyMap = (assignments = [], attendanceRecords = []
  */
 export default function AssignmentHub({ clusterId, regionId, initialDateStr, onClose, onNavigateToUnit }) {
   const { user, userData } = useAuth();
-  const [isMobile, setIsMobile] = useState(() => typeof window !== 'undefined' ? window.innerWidth < 768 : false);
+  const [isMobile, setIsMobile] = useState(() => typeof window !== 'undefined' ? window.innerWidth <= 768 : false);
   const [isCalendarExpanded, setIsCalendarExpanded] = useState(false);
 
   useEffect(() => {
-    const checkMobile = () => setIsMobile(window.innerWidth < 768);
+    const checkMobile = () => setIsMobile(window.innerWidth <= 768);
     checkMobile();
     window.addEventListener('resize', checkMobile);
     return () => window.removeEventListener('resize', checkMobile);

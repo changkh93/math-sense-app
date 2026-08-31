@@ -1021,7 +1021,7 @@ export default function MissionHub({
 }) {
   const { user } = useAuth()
   const userId = user?.uid
-  const [isMobile, setIsMobile] = useState(window.innerWidth < 768)
+  const [isMobile, setIsMobile] = useState(window.innerWidth <= 768)
   const [videoError, setVideoError] = useState(false)
   const {
     data: codeExercises = [],
@@ -1034,7 +1034,7 @@ export default function MissionHub({
   } = usePythonMissionSet(activeUnit, clusterId)
 
   useEffect(() => {
-    const handleResize = () => setIsMobile(window.innerWidth < 768)
+    const handleResize = () => setIsMobile(window.innerWidth <= 768)
     window.addEventListener('resize', handleResize)
     return () => window.removeEventListener('resize', handleResize)
   }, [])

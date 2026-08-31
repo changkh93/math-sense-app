@@ -83,6 +83,7 @@ export default function AlgorithmMissionShell({
   const [focusLockPending, setFocusLockPending] = useState(false)
   const [aiResearchActive, setAiResearchActive] = useState(intent === 'ai_research')
   const [studentErrorMessage, setStudentErrorMessage] = useState(null)
+  const [startRetryNonce, setStartRetryNonce] = useState(0)
   const lastIntegrityEventAt = useRef(0)
   const recordedScaffoldLevels = useRef(new Set())
   const neededConcepts = useMemo(() => {
@@ -186,7 +187,12 @@ export default function AlgorithmMissionShell({
     return () => {
       isMounted = false
     }
-  }, [activeRequestId, initialShell, intent, kernel.id, kernel.version, runtimeGateway])
+  }, [activeRequestId, initialShell, intent, kernel.id, kernel.version, runtimeGateway, startRetryNonce])
+
+  const retryStartAttempt = () => {
+    setStudentErrorMessage(null)
+    setStartRetryNonce((value) => value + 1)
+  }
 
   // Debounced draft auto-save effect
   useEffect(() => {
@@ -643,21 +649,32 @@ export default function AlgorithmMissionShell({
               {studentErrorMessage.description}
             </div>
           </div>
-          <button
-            type="button"
-            onClick={() => setStudentErrorMessage(null)}
-            style={{
-              padding: '6px 12px',
-              background: 'transparent',
-              border: '1px solid rgba(255, 255, 255, 0.3)',
-              borderRadius: '6px',
-              color: '#fff',
-              cursor: 'pointer',
-              fontSize: '12px',
-            }}
-          >
-            확인
-          </button>
+          <div style={{ display: 'flex', gap: '8px' }}>
+            {studentErrorMessage.title === '탐사 시작 오류' && (
+              <button
+                type="button"
+                onClick={retryStartAttempt}
+                style={{ padding: '6px 12px', background: '#0ea5e9', border: 0, borderRadius: '6px', color: '#fff', cursor: 'pointer', fontSize: '12px', fontWeight: 700 }}
+              >
+                다시 연결
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => setStudentErrorMessage(null)}
+              style={{
+                padding: '6px 12px',
+                background: 'transparent',
+                border: '1px solid rgba(255, 255, 255, 0.3)',
+                borderRadius: '6px',
+                color: '#fff',
+                cursor: 'pointer',
+                fontSize: '12px',
+              }}
+            >
+              닫기
+            </button>
+          </div>
         </div>
       )}
 

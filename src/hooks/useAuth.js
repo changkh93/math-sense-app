@@ -2,6 +2,11 @@ import { useState, useEffect, useRef } from 'react';
 import { onAuthStateChanged, onIdTokenChanged, signOut } from 'firebase/auth';
 import { collection, doc, getDoc, getDocs, onSnapshot, query, where } from 'firebase/firestore';
 import { auth, db } from '../firebase';
+import {
+  areAccessClaimsCurrent,
+  getAccessSyncRevision,
+  isAccessClaimSyncReady
+} from '../utils/accessClaimSync';
 
 const AUTH_BOOTSTRAP_TIMEOUT_MS = 8000;
 const USER_DOCUMENT_TIMEOUT_MS = 10000;
@@ -77,7 +82,7 @@ export function useAuth() {
   const [userData, setUserData] = useState(null);
   const [accessClaims, setAccessClaims] = useState(null);
   const [loading, setLoading] = useState(true);
-  const accessRevisionRef = useRef({ initialized: false, value: null });
+  const accessRefreshAttemptRef = useRef(null);
 
   useEffect(() => {
     let unsubscribeSnapshot = null;
@@ -147,7 +152,7 @@ export function useAuth() {
         unsubscribeSnapshot();
         unsubscribeSnapshot = null;
       }
-      accessRevisionRef.current = { initialized: false, value: null };
+      accessRefreshAttemptRef.current = null;
 
       if (firebaseUser?.isAnonymous) {
         // Anonymous Firebase Auth = crew guest. The guest entry screen
@@ -206,21 +211,6 @@ export function useAuth() {
             signOut(auth);
             return;
           }
-
-          const nextAccessRevision = data?.accessUpdatedAt?.toMillis?.()
-            ?? data?.accessUpdatedAt?.seconds
-            ?? data?.accessUpdatedAt
-            ?? null;
-          const previousRevision = accessRevisionRef.current;
-          if (previousRevision.initialized && previousRevision.value !== nextAccessRevision) {
-            // The profile listener already exists for normal user data, so this
-            // makes rare admin access changes take effect immediately without
-            // adding another Firestore subscription or polling loop.
-            firebaseUser.getIdToken(true).catch((error) => {
-              console.warn('useAuth: Failed to refresh token after access change:', error);
-            });
-          }
-          accessRevisionRef.current = { initialized: true, value: nextAccessRevision };
 
           setUserData({
             crystals: 0,
@@ -435,6 +425,27 @@ export function useAuth() {
       unsubscribeAuth();
     };
   }, []);
+
+  useEffect(() => {
+    if (!user || !userData || !accessClaims || accessClaims.version < 1) return;
+    if (areAccessClaimsCurrent(userData, accessClaims)) {
+      accessRefreshAttemptRef.current = null;
+      return;
+    }
+
+    // accessClaimsSyncedAt is written only after the Admin SDK has finished
+    // updating custom claims. Waiting for that revision avoids refreshing in
+    // the short window between the access-document write and claim sync.
+    if (!isAccessClaimSyncReady(userData)) return;
+    const syncRevision = getAccessSyncRevision(userData);
+    const attemptKey = `${user.uid}:${syncRevision}`;
+    if (accessRefreshAttemptRef.current === attemptKey) return;
+    accessRefreshAttemptRef.current = attemptKey;
+
+    user.getIdToken(true).catch((error) => {
+      console.warn('useAuth: Failed to refresh token after claim sync:', error);
+    });
+  }, [accessClaims, user, userData]);
 
   return { user, userData, accessClaims, loading };
 }

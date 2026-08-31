@@ -3,6 +3,8 @@
  * Aggregates all private problem files.
  */
 
+const crypto = require('crypto')
+
 const acCond001 = require('./ac_cond_001.private.cjs')
 const acCond002 = require('./ac_cond_002.private.cjs')
 const acPat003 = require('./ac_pat_003.private.cjs')
@@ -76,7 +78,7 @@ const acEnumBest68 = require('./ac_enum_best_68.private.cjs')
 const acEnumPrune69 = require('./ac_enum_prune_69.private.cjs')
 const acEnumLock70 = require('./ac_enum_lock_70.private.cjs')
 
-const PRIVATE_PROBLEMS = {
+const RAW_PRIVATE_PROBLEMS = {
   'AC-COND-001@v1': acCond001,
   'AC-COND-002@v1': acCond002,
   'AC-PAT-003@v1': acPat003,
@@ -151,6 +153,27 @@ const PRIVATE_PROBLEMS = {
   'AC-ENUM-PRUNE-69@v1': acEnumPrune69,
   'AC-ENUM-LOCK-70@v1': acEnumLock70,
 }
+
+// Every attempt stores this value in Firestore and exposes it in the replay
+// descriptor. Earlier hand-authored definitions carried a checksum while newer
+// generated definitions did not, which made Firestore reject the entire session
+// document because `undefined` is not serializable. Preserve explicit legacy
+// checksums and derive a stable checksum for every other registered definition.
+function ensureDefinitionChecksum(definition) {
+  if (typeof definition?.checksum === 'string' && definition.checksum.length > 0) {
+    return definition
+  }
+  const serialized = JSON.stringify(definition)
+  const checksum = `sha256:${crypto.createHash('sha256').update(serialized).digest('hex')}`
+  return Object.freeze({ ...definition, checksum })
+}
+
+const PRIVATE_PROBLEMS = Object.freeze(Object.fromEntries(
+  Object.entries(RAW_PRIVATE_PROBLEMS).map(([key, definition]) => [
+    key,
+    ensureDefinitionChecksum(definition),
+  ])
+))
 
 function getPrivateProblemDefinition(problemId, version = 1) {
   const key = `${problemId}@v${version}`

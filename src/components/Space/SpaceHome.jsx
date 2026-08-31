@@ -1,4 +1,5 @@
 import { lazy, useState, useEffect, Suspense, useMemo, useRef, useCallback } from 'react'
+import { createPortal } from 'react-dom'
 import { useQueries } from '@tanstack/react-query'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { auth, googleProvider, db, functions } from '../../firebase'
@@ -781,7 +782,7 @@ function SpaceHome() {
   
   // --- 2D Mode Setup ---
   const [is2DMode, setIs2DMode] = useState(() => {
-    return window.innerWidth < 768 || localStorage.getItem('metasense_2d_mode') === 'true';
+    return window.innerWidth <= 768 || localStorage.getItem('metasense_2d_mode') === 'true';
   });
 
   useEffect(() => {
@@ -1238,7 +1239,23 @@ function SpaceHome() {
   } = useRegions(selectedClusterId, {
     enabled: canLoadLearningMap
   })
-  const { data: chapters, isLoading: loadingChapters } = useChapters(selectedRegionId)
+  const {
+    data: chapters,
+    isLoading: loadingChapters,
+    isError: errorChapters,
+    refetch: refetchChapters
+  } = useChapters(selectedRegionId)
+  const chapterClaimRetryRef = useRef(null)
+  const chapterClaimKey = `${accessClaims?.version || 0}:${(accessClaims?.regions || []).slice().sort().join(',')}`
+
+  useEffect(() => {
+    if (!errorChapters || !selectedRegionId || !accessClaims?.regions?.includes(selectedRegionId)) return
+    const retryKey = `${selectedRegionId}:${chapterClaimKey}`
+    if (chapterClaimRetryRef.current === retryKey) return
+    chapterClaimRetryRef.current = retryKey
+    refetchChapters()
+  }, [accessClaims, chapterClaimKey, errorChapters, refetchChapters, selectedRegionId])
+
   const { data: units, isLoading: loadingUnits } = useUnits(selectedChapterDocId)
   
   // Singular hooks to resolve hierarchy for deep links
@@ -1544,11 +1561,11 @@ function SpaceHome() {
 
   // Interaction & UI State
   const [isBoosting, setIsBoosting] = useState(false)
-  const [isMobile, setIsMobile] = useState(window.innerWidth < 768)
+  const [isMobile, setIsMobile] = useState(window.innerWidth <= 768)
 
   useEffect(() => {
     const handleResize = () => {
-      const nextIsMobile = window.innerWidth < 768
+      const nextIsMobile = window.innerWidth <= 768
       setIsMobile(nextIsMobile)
       if (nextIsMobile) {
         setIs2DMode(true)
@@ -5009,6 +5026,23 @@ function SpaceHome() {
                   }}>
                     {loadingChapters ? (
                       <div className="font-tech" style={{ color: 'var(--text-muted)' }}>SCANNING...</div>
+                    ) : errorChapters ? (
+                      <div className="glass-card" style={{ padding: isMobile ? '1rem' : '1.5rem', textAlign: 'center' }}>
+                        <p className="font-tech" style={{ color: '#ff8f8f', marginBottom: '1rem' }}>
+                          📡 미션 데이터를 불러오지 못했습니다. 권한 동기화 후 다시 시도해 주세요.
+                        </p>
+                        <button
+                          className="hud-btn secondary glass"
+                          onClick={() => refetchChapters()}
+                          style={{ padding: '0.65rem 1.5rem' }}
+                        >
+                          ↻ RETRY SCAN
+                        </button>
+                      </div>
+                    ) : chapters?.length === 0 ? (
+                      <div className="font-tech" style={{ color: 'var(--text-muted)', textAlign: 'center' }}>
+                        등록된 미션이 없습니다.
+                      </div>
                     ) : chapters?.map(chapter => (
                       <Motion.div
                         key={chapter.docId}
@@ -5343,25 +5377,30 @@ function SpaceHome() {
       </main>
 
       {/* 우주 테마 학습 완료 모달 */}
-      <AnimatePresence>
-        {completionResult && (
+      {typeof document !== 'undefined' && createPortal(
+        <AnimatePresence>
+          {completionResult && (
           <Motion.div 
             className="modal-overlay space-hud"
+            data-overlay="completion-result"
             initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
+            animate={{ opacity: 1, pointerEvents: 'auto' }}
+            exit={{ opacity: 0, pointerEvents: 'none' }}
+            transition={{ duration: 0.16 }}
             style={{ 
               position: 'fixed',
               top: 0,
               left: 0,
               width: '100vw',
               height: '100vh',
-              zIndex: 3000,
+              zIndex: 50000,
               background: 'rgba(0, 0, 0, 0.7)',
               backdropFilter: 'blur(5px)',
               display: 'flex',
               alignItems: 'center',
-              justifyContent: 'center'
+              justifyContent: 'center',
+              isolation: 'isolate',
+              pointerEvents: 'auto'
             }}
           >
             <Motion.div 
@@ -5482,8 +5521,10 @@ function SpaceHome() {
               <div className="hud-line mt-4"></div>
             </Motion.div>
           </Motion.div>
-        )}
-      </AnimatePresence>
+          )}
+        </AnimatePresence>,
+        document.body
+      )}
 
       {/* RewardPotentialModal moved to MissionHub - shown only before Field Test */}
 
