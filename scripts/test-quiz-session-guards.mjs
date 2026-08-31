@@ -1,9 +1,14 @@
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
 import {
   canSubmitQuizSession,
+  getValidQuizCheckpoint,
   getEverWrongQuizQuestions,
   getUnansweredQuizQuestions,
   hasCompleteQuizQuestionSet,
+  isMatchingQuizSessionOwner,
+  QUIZ_CHECKPOINT_MAX_AGE_MS,
+  validateQuizCompletionSnapshot,
 } from '../src/utils/quizSessionGuards.js'
 
 const questions = [
@@ -79,5 +84,80 @@ assert.deepEqual(
   ['q2', 'q3'],
   '나중에 정답으로 고쳤더라도 세션 중 한 번 틀린 문항은 다크매터 대상으로 유지해야 합니다.'
 )
+
+const ownership = { sessionId: 'session-a', clientInstanceId: 'tab-a' }
+assert.equal(isMatchingQuizSessionOwner(ownership, ownership), true)
+assert.equal(
+  isMatchingQuizSessionOwner(ownership, { sessionId: 'session-a', clientInstanceId: 'tab-b' }),
+  false,
+  '같은 퀴즈 세션이어도 다른 탭의 저장은 거부해야 합니다.'
+)
+
+const nowMs = 1_000_000
+const checkpoint = { ...ownership, savedAt: nowMs - 1000, userAnswers: { q1: { isCorrect: true } } }
+assert.equal(getValidQuizCheckpoint(checkpoint, { ...ownership, nowMs }), checkpoint)
+assert.equal(
+  getValidQuizCheckpoint(checkpoint, { sessionId: 'session-a', clientInstanceId: 'tab-b', nowMs }),
+  null,
+  '다른 탭에서 만든 체크포인트를 병합하면 안 됩니다.'
+)
+assert.equal(
+  getValidQuizCheckpoint(
+    { ...checkpoint, savedAt: nowMs - QUIZ_CHECKPOINT_MAX_AGE_MS - 1 },
+    { ...ownership, nowMs }
+  ),
+  null,
+  '만료된 체크포인트를 복구하면 안 됩니다.'
+)
+
+const completionSession = {
+  ...ownership,
+  userAnswers: {
+    q1: { isCorrect: true },
+    q2: { isCorrect: false },
+    q3: { isCorrect: true },
+  },
+}
+assert.equal(validateQuizCompletionSnapshot({
+  session: completionSession,
+  ...ownership,
+  questionIds: ['q1', 'q2', 'q3'],
+  totalCount: 3,
+  correctCount: 2,
+  score: 67,
+}).ok, true)
+assert.equal(validateQuizCompletionSnapshot({
+  session: completionSession,
+  sessionId: 'session-a',
+  clientInstanceId: 'tab-b',
+  questionIds: ['q1', 'q2', 'q3'],
+  totalCount: 3,
+  correctCount: 2,
+  score: 67,
+}).reason, 'session_owner_mismatch')
+assert.equal(validateQuizCompletionSnapshot({
+  session: completionSession,
+  ...ownership,
+  questionIds: ['q1', 'q2', 'q3', 'q4'],
+  totalCount: 4,
+  correctCount: 4,
+  score: 100,
+}).reason, 'answer_count_mismatch')
+assert.equal(validateQuizCompletionSnapshot({
+  session: completionSession,
+  ...ownership,
+  questionIds: ['q1', 'q2', 'q3'],
+  totalCount: 3,
+  correctCount: 3,
+  score: 100,
+}).reason, 'score_mismatch')
+
+const quizViewSource = readFileSync(new URL('../src/components/Space/SpaceQuizView.jsx', import.meta.url), 'utf8')
+const spaceHomeSource = readFileSync(new URL('../src/components/Space/SpaceHome.jsx', import.meta.url), 'utf8')
+assert.match(quizViewSource, /clientInstanceId:\s*quizClientInstanceIdRef\.current/)
+assert.match(quizViewSource, /sessionStorage\.setItem\(/)
+assert.doesNotMatch(quizViewSource, /localStorage\.setItem\(\s*makePendingAnswerCheckpointKey/)
+assert.match(quizViewSource, /QUIZ_SESSION_OWNERSHIP_LOST/)
+assert.match(spaceHomeSource, /validateQuizCompletionSnapshot\(\{/)
 
 console.log('quiz session guard tests passed')

@@ -18,9 +18,11 @@ import { httpsCallable } from 'firebase/functions'
 import { useCreateMistakeCardFromQuiz } from '../../hooks/useMistakeNotebook'
 import {
   canSubmitQuizSession,
+  getValidQuizCheckpoint,
   getEverWrongQuizQuestions,
   getUnansweredQuizQuestions,
   hasCompleteQuizQuestionSet,
+  isMatchingQuizSessionOwner,
 } from '../../utils/quizSessionGuards'
 import { createSustainedBlurGuard } from '../../utils/quizFocusGuard'
 
@@ -40,6 +42,28 @@ const createQuizSessionId = () => {
   }
   return `quiz_${Date.now()}_${Math.random().toString(36).slice(2, 12)}`
 }
+
+const getQuizClientInstanceId = () => {
+  const storageKey = 'metasense_quiz_client_instance'
+  try {
+    const existing = sessionStorage.getItem(storageKey)
+    if (existing) return existing
+    const created = createQuizSessionId()
+    sessionStorage.setItem(storageKey, created)
+    return created
+  } catch {
+    return createQuizSessionId()
+  }
+}
+
+const getQuizSessionStateFingerprint = (session = {}) => JSON.stringify({
+  sessionId: session?.sessionId || '',
+  currentIdx: Number(session?.currentIdx || 0),
+  isResultMode: session?.isResultMode === true,
+  answers: Object.entries(session?.userAnswers || {})
+    .sort(([left], [right]) => left.localeCompare(right))
+    .map(([questionId, answer]) => [questionId, answer?.isCorrect === true, answer?.reactionId || '']),
+})
 
 const QUIZ_REACTION_CHOICES = [
   { id: 'understood', label: '확실히 이해했어요', tone: '#22c55e', review: false },
@@ -73,11 +97,15 @@ const isCaptureShortcut = (event) => {
 const makeQuizQuestionStatId = (unitId, questionId) => encodeURIComponent(`${unitId || 'unknown'}__${questionId || 'unknown'}`)
 const makePendingAnswerCheckpointKey = (uid, unitId) => `metasense_pending_quiz_answer_${uid}_${unitId}`
 
-const readPendingAnswerCheckpoint = (uid, unitId) => {
+const readPendingAnswerCheckpoint = (uid, unitId, ownership) => {
   if (!uid || !unitId) return null
   try {
-    const raw = localStorage.getItem(makePendingAnswerCheckpointKey(uid, unitId))
-    return raw ? JSON.parse(raw) : null
+    const key = makePendingAnswerCheckpointKey(uid, unitId)
+    const raw = sessionStorage.getItem(key)
+    const checkpoint = raw ? JSON.parse(raw) : null
+    const validCheckpoint = getValidQuizCheckpoint(checkpoint, ownership)
+    if (!validCheckpoint && raw) sessionStorage.removeItem(key)
+    return validCheckpoint
   } catch (error) {
     console.warn('Failed to read pending quiz answer checkpoint:', error)
     return null
@@ -86,7 +114,10 @@ const readPendingAnswerCheckpoint = (uid, unitId) => {
 
 const clearPendingAnswerCheckpoint = (uid, unitId) => {
   if (!uid || !unitId) return
-  localStorage.removeItem(makePendingAnswerCheckpointKey(uid, unitId))
+  const key = makePendingAnswerCheckpointKey(uid, unitId)
+  sessionStorage.removeItem(key)
+  // Remove legacy cross-tab checkpoints so they cannot contaminate a new session.
+  localStorage.removeItem(key)
 }
 
 const getOptionKey = (question, option) => {
@@ -223,6 +254,7 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
   const [retryCount, setRetryCount] = useState(0)
   const [everWrongSet, setEverWrongSet] = useState(new Set())
   const [quizSessionId, setQuizSessionId] = useState('')
+  const quizClientInstanceIdRef = useRef(getQuizClientInstanceId())
   const [isMobile, setIsMobile] = useState(() => window.innerWidth <= 768)
   const isDarkMatter = quizData?.unitId === 'dark_matter_zone'
   const [isAiExplanationOpen, setIsAiExplanationOpen] = useState(false)
@@ -258,6 +290,7 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
   const integritySaveSucceededRef = useRef(false)
   const darkMatterSyncPromiseRef = useRef(null)
   const darkMatterSyncedSessionRef = useRef('')
+  const sessionOwnershipLostRef = useRef(false)
   const currentQuestion = currentQuestions[currentIdx]
 
   // Keep the latest resumable state available to focus-violation callbacks without
@@ -275,6 +308,7 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
       firstPassScore: firstPassScore !== null ? firstPassScore : null,
       everWrong: pendingResult?.everWrongIds || Array.from(everWrongSet),
       sessionId: quizSessionId,
+      clientInstanceId: quizClientInstanceIdRef.current,
       reviewMarks: Array.from(reviewMarks),
       deferredQuestionIds: Array.from(deferredQuestionIds),
       isDeferredRound,
@@ -320,8 +354,7 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
 
           let targetEverWrong = []
           let targetSessionId = createQuizSessionId()
-          let persistedQuizSession = null
-
+          let loadedServerSessionFingerprint = getQuizSessionStateFingerprint()
           if (user?.uid && quizData.unitId) {
             const progressRef = doc(db, 'users', user.uid, 'learning_progress', quizData.unitId)
             const snap = await getDoc(progressRef)
@@ -329,7 +362,7 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
               const data = snap.data()
               if (data.quizSession) {
                 const session = data.quizSession
-                persistedQuizSession = session
+                loadedServerSessionFingerprint = getQuizSessionStateFingerprint(session)
                 targetSessionId = session.sessionId || targetSessionId
                 // 문항 수가 달라졌더라도 최대한 기존 진행도를 살려서 로드합니다.
                 targetCurrentIdx = session.currentIdx || 0
@@ -373,7 +406,10 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
           // A graded answer is checkpointed synchronously before the Firestore write.
           // If a refresh interrupts that write, prefer the local checkpoint so the
           // student cannot answer the same question again after seeing the statistics.
-          const pendingCheckpoint = readPendingAnswerCheckpoint(user?.uid, quizData.unitId)
+          const pendingCheckpoint = readPendingAnswerCheckpoint(user?.uid, quizData.unitId, {
+            sessionId: targetSessionId,
+            clientInstanceId: quizClientInstanceIdRef.current,
+          })
           const checkpointQuestionId = pendingCheckpoint?.questionId
           const checkpointAnswer = pendingCheckpoint?.userAnswers?.[checkpointQuestionId]
           if (
@@ -433,13 +469,37 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
           setIsDeferredRound(targetIsDeferredRound)
           setIsResultMode(targetIsResultMode)
 
-          if (user?.uid && quizData.unitId && persistedQuizSession && !persistedQuizSession.sessionId) {
+          if (user?.uid && quizData.unitId) {
             const progressRef = doc(db, 'users', user.uid, 'learning_progress', quizData.unitId)
-            await setDoc(progressRef, {
-              quizSession: { ...persistedQuizSession, sessionId: targetSessionId }
-            }, { merge: true })
+            await runTransaction(db, async (transaction) => {
+              const latestSnap = await transaction.get(progressRef)
+              const latestData = latestSnap.exists() ? latestSnap.data() : {}
+              const latestSession = latestData.quizSession || {}
+              if (latestSession.sessionId && latestSession.sessionId !== targetSessionId) {
+                throw new Error('QUIZ_SESSION_REPLACED_DURING_INIT')
+              }
+              if (getQuizSessionStateFingerprint(latestSession) !== loadedServerSessionFingerprint) {
+                throw new Error('QUIZ_SESSION_CHANGED_DURING_INIT')
+              }
+              transaction.set(progressRef, {
+                quizSession: {
+                  ...latestSession,
+                  sessionId: targetSessionId,
+                  clientInstanceId: quizClientInstanceIdRef.current,
+                  originalTotal: selected.length,
+                },
+                unitTitle: quizData?.title || '탐사 퀴즈',
+                unitId: quizData.unitId,
+                updatedAt: serverTimestamp(),
+              }, { merge: true })
+            })
+            sessionOwnershipLostRef.current = false
+            const restoredAnswerCount = Object.keys(targetUserAnswers).length
+            if (restoredAnswerCount > 0) {
+              setSessionGuardMessage(`이전 진행 ${restoredAnswerCount}/${selected.length}문항을 복구했습니다. 현재 탭에서 이어서 진행합니다.`)
+            }
           }
-          
+
           initializedRef.current = guardKey;
 
           if (hasRadar) {
@@ -451,6 +511,10 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
           }
         } catch (error) {
           console.error("Failed to init quiz session", error)
+          if (['QUIZ_SESSION_REPLACED_DURING_INIT', 'QUIZ_SESSION_CHANGED_DURING_INIT'].includes(error?.message)) {
+            sessionOwnershipLostRef.current = true
+            setSessionGuardMessage('다른 탭에서 Field Test 진행 상태가 변경되어 현재 탭의 세션을 열지 않았습니다.')
+          }
         } finally {
           setIsLoadingSession(false)
         }
@@ -591,7 +655,7 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
     computedFirstPass,
     willBeResultMode
   }) => {
-    if (user?.uid && quizData?.unitId && !reSolveMode) {
+    if (user?.uid && quizData?.unitId) {
       try {
         const progressRef = doc(db, 'users', user.uid, 'learning_progress', quizData.unitId)
         const sessionObj = {
@@ -605,20 +669,35 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
           firstPassScore: computedFirstPass !== null ? computedFirstPass : firstPassScore,
           everWrong: Array.from(nextEverWrongSet),
           sessionId: quizSessionId,
+          clientInstanceId: quizClientInstanceIdRef.current,
           reviewMarks: nextReviewMarkIds || Array.from(reviewMarks),
           deferredQuestionIds: nextDeferredQuestionIds || Array.from(deferredQuestionIds),
           isDeferredRound: nextIsDeferredRound ?? isDeferredRound,
           isResultMode: willBeResultMode === true,
         }
-        await setDoc(progressRef, {
-          quizSession: JSON.parse(JSON.stringify(sessionObj)),
-          unitTitle: quizData?.title || "탐사 퀴즈",
-          unitId: quizData.unitId || "",
-          updatedAt: serverTimestamp()
-        }, { merge: true })
+        await runTransaction(db, async (transaction) => {
+          const progressSnap = await transaction.get(progressRef)
+          const serverSession = progressSnap.exists() ? progressSnap.data()?.quizSession : null
+          if (!isMatchingQuizSessionOwner(serverSession, {
+            sessionId: quizSessionId,
+            clientInstanceId: quizClientInstanceIdRef.current,
+          })) {
+            throw new Error('QUIZ_SESSION_OWNERSHIP_LOST')
+          }
+          transaction.set(progressRef, {
+            quizSession: JSON.parse(JSON.stringify(sessionObj)),
+            unitTitle: quizData?.title || "탐사 퀴즈",
+            unitId: quizData.unitId || "",
+            updatedAt: serverTimestamp()
+          }, { merge: true })
+        })
         return true
       } catch (e) {
         console.error("Auto save failed", e)
+        if (e?.message === 'QUIZ_SESSION_OWNERSHIP_LOST') {
+          sessionOwnershipLostRef.current = true
+          setSessionGuardMessage('다른 탭에서 같은 Field Test가 열렸습니다. 현재 탭에서는 저장과 제출을 중단했습니다.')
+        }
         return false
       }
     }
@@ -638,15 +717,16 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
       shieldsUsed: pending.shieldsUsed,
       everWrong: pending.everWrongIds,
       sessionId: quizSessionId,
+      clientInstanceId: quizClientInstanceIdRef.current,
       reviewMarks: Array.from(reviewMarks),
       deferredQuestionIds: Array.from(deferredQuestionIds),
       isDeferredRound,
       savedAt: Date.now(),
     }
 
-    // localStorage is synchronous, so even an immediate refresh preserves the lock.
+    // sessionStorage is synchronous and isolated per tab, preventing cross-tab contamination.
     try {
-      localStorage.setItem(
+      sessionStorage.setItem(
         makePendingAnswerCheckpointKey(user.uid, quizData.unitId),
         JSON.stringify(checkpoint)
       )
@@ -708,18 +788,32 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
 
     try {
       const progressRef = doc(db, 'users', user.uid, 'learning_progress', quizData.unitId)
-      await setDoc(progressRef, {
-        ...(snapshot?.shouldPersist ? {
-          quizSession: JSON.parse(JSON.stringify(snapshot.session)),
-          unitTitle: quizData?.title || '탐사 퀴즈',
-          unitId: quizData.unitId,
-        } : {}),
-        updatedAt: serverTimestamp(),
-        ...additionalUpdates,
-      }, { merge: true })
+      await runTransaction(db, async (transaction) => {
+        const progressSnap = await transaction.get(progressRef)
+        const serverSession = progressSnap.exists() ? progressSnap.data()?.quizSession : null
+        if (!isMatchingQuizSessionOwner(serverSession, {
+          sessionId: snapshot?.session?.sessionId,
+          clientInstanceId: quizClientInstanceIdRef.current,
+        })) {
+          throw new Error('QUIZ_SESSION_OWNERSHIP_LOST')
+        }
+        transaction.set(progressRef, {
+          ...(snapshot?.shouldPersist ? {
+            quizSession: JSON.parse(JSON.stringify(snapshot.session)),
+            unitTitle: quizData?.title || '탐사 퀴즈',
+            unitId: quizData.unitId,
+          } : {}),
+          updatedAt: serverTimestamp(),
+          ...additionalUpdates,
+        }, { merge: true })
+      })
       return true
     } catch (error) {
       console.error('Quiz exit save failed:', error)
+      if (error?.message === 'QUIZ_SESSION_OWNERSHIP_LOST') {
+        sessionOwnershipLostRef.current = true
+        setSessionGuardMessage('다른 탭에서 같은 Field Test가 열렸습니다. 현재 탭에서는 저장과 제출을 중단했습니다.')
+      }
       return false
     }
   }, [quizData?.title, quizData?.unitId, user?.uid])
@@ -986,7 +1080,7 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
       setReactionError('')
       setSessionGuardMessage(message)
 
-      await saveProgressSession({
+      const saved = await saveProgressSession({
         nextIdxForSave: 0,
         nextUserAnswers: answers,
         nextCombo: comboCount,
@@ -999,6 +1093,7 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
         computedFirstPass: firstPassScore,
         willBeResultMode: false
       })
+      if (!saved) return false
       await recordQuizSessionGuardAudit(auditEvent, {
         unansweredQuestionIds: unansweredQuestions.map(question => question.id),
       })
@@ -1049,7 +1144,7 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
       }
     }
 
-    await saveProgressSession({
+    const saved = await saveProgressSession({
       nextIdxForSave,
       nextUserAnswers: pending.userAnswers,
       nextCombo: pending.combo,
@@ -1062,6 +1157,11 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
       computedFirstPass,
       willBeResultMode
     })
+
+    if (!saved) {
+      setReactionError('현재 탭의 세션 소유권을 확인하지 못해 다음 문제로 이동하지 않았습니다.')
+      return
+    }
 
     setShowFeedback(null)
     setIsRebooting(false)
@@ -1388,7 +1488,7 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
       setSelectedMultiOptions(new Set())
       setReactionError('')
 
-      await saveProgressSession({
+      const saved = await saveProgressSession({
         nextIdxForSave,
         nextUserAnswers: userAnswers,
         nextCombo: comboCount,
@@ -1401,6 +1501,8 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
         computedFirstPass: firstPassScore,
         willBeResultMode: false
       })
+
+      if (!saved) return
 
       if (hasNextInCurrentRound) {
         setCurrentIdx(nextIdxForSave)
@@ -1598,6 +1700,10 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
 
   const handleFinish = async () => {
     if (isSubmitting) return
+    if (sessionOwnershipLostRef.current) {
+      setSessionGuardMessage('다른 탭이 이 Field Test를 이어서 진행 중이므로 현재 탭에서는 제출할 수 없습니다.')
+      return
+    }
 
     const hasCompleteQuestionSet = hasCompleteQuizQuestionSet(allSessionQuestions, originalTotal)
     if (!hasCompleteQuestionSet) {
@@ -1670,6 +1776,9 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
 
       const completion = await onComplete({
         unitId: quizData?.unitId || quizData?.id || "",
+        quizSessionId,
+        quizClientInstanceId: quizClientInstanceIdRef.current,
+        answeredQuestionIds: allSessionQuestions.map(question => question.id),
         unitTitle: quizData?.title || "탐사 퀴즈",
         chapterId: quizData?.chapterId || "",
         regionId: region?.id || "",
@@ -1723,6 +1832,10 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
       }
     } catch (err) {
       console.error("Finish failed:", err)
+      if (err?.code === 'quiz-session-verification-failed' || /퀴즈 세션 검증/.test(String(err?.message || ''))) {
+        sessionOwnershipLostRef.current = true
+        setSessionGuardMessage('서버의 풀이 기록과 현재 탭의 답안이 일치하지 않아 완료 처리를 중단했습니다. 다른 탭을 닫고 다시 입장해 주세요.')
+      }
       setIsSubmitting(false)
     }
   }

@@ -50,6 +50,7 @@ import {
   startGoogleRedirect,
 } from '../../utils/googleAuthFlow'
 import { hasPythonMissionSetForUnit, isMissionLabRequired, PYTHON_PROTOCOL_ENTRY_UNITS } from '../PythonWorld/pythonMissionCatalog'
+import { validateQuizCompletionSnapshot } from '../../utils/quizSessionGuards'
 
 import soundManager from '../../utils/SoundManager'
 import SpaceNavbar from './SpaceNavbar'
@@ -774,10 +775,10 @@ function SpaceHome() {
     }
   }, [authLoading, navigate, user, userData?.role])
   
-  // Selection State (Persist ID in session)
-  const [selectedClusterId, setSelectedClusterId] = useState(() => {
-    return sessionStorage.getItem('metasense_cluster_id') || null;
-  });
+  // A new NAV landing always starts at Multi-Verse. Learning coordinates are
+  // persisted only after an explicit selection so in-app navigation can keep
+  // its context without silently reopening the last (often elementary) cluster.
+  const [selectedClusterId, setSelectedClusterId] = useState(null);
   const [assignmentHubInitialDate, setAssignmentHubInitialDate] = useState(null);
   
   // --- 2D Mode Setup ---
@@ -801,17 +802,11 @@ function SpaceHome() {
     });
   }, []);
 
-  const [selectedRegionId, internalSetSelectedRegionId] = useState(() => {
-    return sessionStorage.getItem('metasense_region_id') || null;
-  });
+  const [selectedRegionId, internalSetSelectedRegionId] = useState(null);
 
-  const [selectedChapterDocId, internalSetSelectedChapterDocId] = useState(() => {
-    return sessionStorage.getItem('metasense_chapter_id') || null;
-  });
+  const [selectedChapterDocId, internalSetSelectedChapterDocId] = useState(null);
 
-  const [selectedUnitDocId, internalSetSelectedUnitDocId] = useState(() => {
-    return sessionStorage.getItem('metasense_unit_id') || null;
-  });
+  const [selectedUnitDocId, internalSetSelectedUnitDocId] = useState(null);
 
   // Specialized setters to persist
   const updateSelectedClusterId = useCallback((id) => {
@@ -1216,10 +1211,6 @@ function SpaceHome() {
       }
     }
 
-    // 2. Only auto-select if we have exactly one cluster AND it's not loading
-    if (activeClusters.length === 1 && !selectedClusterId) {
-      updateSelectedClusterId(activeClusters[0].docId || activeClusters[0].id);
-    }
   }, [
     activeClusters,
     clearMissionSelection,
@@ -2171,6 +2162,23 @@ function SpaceHome() {
         if (!freshSnap.exists()) throw new Error('User document not found')
         const freshUserData = freshSnap.data()
         const freshProgressData = freshProgressSnap.exists() ? freshProgressSnap.data() : {}
+
+        if (result.quizSessionId) {
+          const completionValidation = validateQuizCompletionSnapshot({
+            session: freshProgressData.quizSession,
+            sessionId: result.quizSessionId,
+            clientInstanceId: result.quizClientInstanceId,
+            questionIds: result.answeredQuestionIds,
+            totalCount: Number(result.totalCount || 0),
+            correctCount: Number(result.correctCount || 0),
+            score: Number(result.score || 0),
+          })
+          if (!completionValidation.ok) {
+            const validationError = new Error(`퀴즈 세션 검증에 실패했습니다: ${completionValidation.reason}`)
+            validationError.code = 'quiz-session-verification-failed'
+            throw validationError
+          }
+        }
 
         // --- Server-side Reward Calculation (Prevent duplicate payout) ---
         const serverPreviousBest = isWorkbookResult

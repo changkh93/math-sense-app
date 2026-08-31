@@ -21,6 +21,7 @@
     "test:access-control": "node --test functions/accessControl.test.cjs",
     "test:access-claim-sync": "node scripts/test-access-claim-sync.mjs",
     "test:overlay-interaction": "node scripts/test-overlay-interaction-contract.mjs",
+    "test:space-landing": "node scripts/test-space-landing-contract.mjs",
     "migrate:access-control": "node scripts/migrate-access-control.mjs",
     "test:referral": "node scripts/test-referral-billing-core.cjs",
     "test:learning-summary": "node scripts/test-learning-summary-utils.mjs",
