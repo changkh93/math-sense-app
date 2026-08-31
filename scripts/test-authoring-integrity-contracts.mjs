@@ -2092,5 +2092,5 @@ for (const patternId of [
   )
 }
 
-assert.equal(registeredProblemIds.length, 63, 'Total registered problems must be exactly 63 (54 + Constellation 5)')
+assert.equal(registeredProblemIds.length, 72, 'Total registered problems must be exactly 72 (54 + Constellation 5 + Constellation 6)')
 console.log(`✅ All 10 Authoring Invariants PASSED across all ${registeredProblemIds.length} registered problems!`)

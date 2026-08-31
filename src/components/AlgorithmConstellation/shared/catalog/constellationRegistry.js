@@ -103,7 +103,7 @@ export const CONSTELLATIONS = Object.freeze([
     branchCount: 2,
     capstoneCount: 0,
     totalCount: 10,
-    requiredAnchors: ['AC-ENUM-PAIR-01'],
+    requiredAnchors: ['AC-ENUM-PAIR-01', 'AC-ENUM-SUBSET-65'],
     minimumCoreToUnlockNext: 6,
   },
   {

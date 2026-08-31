@@ -61,6 +61,15 @@ import { AC_SORT_BUBBLE_57 } from './ac_sort_bubble_57.js'
 import { AC_SRCH_LINEAR_58 } from './ac_srch_linear_58.js'
 import { AC_SRCH_BINARY_59 } from './ac_srch_binary_59.js'
 import { AC_SRCH_PREFIX_60 } from './ac_srch_prefix_60.js'
+import { AC_ENUM_TARGET_62 } from './ac_enum_target_62.js'
+import { AC_ENUM_TRIPLE_63 } from './ac_enum_triple_63.js'
+import { AC_ENUM_COMB_64 } from './ac_enum_comb_64.js'
+import { AC_ENUM_SUBSET_65 } from './ac_enum_subset_65.js'
+import { AC_ENUM_KEYPAD_66 } from './ac_enum_keypad_66.js'
+import { AC_ENUM_FILTER_67 } from './ac_enum_filter_67.js'
+import { AC_ENUM_BEST_68 } from './ac_enum_best_68.js'
+import { AC_ENUM_PRUNE_69 } from './ac_enum_prune_69.js'
+import { AC_ENUM_LOCK_70 } from './ac_enum_lock_70.js'
 
 export const PUBLIC_KERNELS = Object.freeze({
   'AC-COND-001': AC_COND_001,
@@ -126,6 +135,16 @@ export const PUBLIC_KERNELS = Object.freeze({
   'AC-SRCH-LINEAR-58': AC_SRCH_LINEAR_58,
   'AC-SRCH-BINARY-59': AC_SRCH_BINARY_59,
   'AC-SRCH-PREFIX-60': AC_SRCH_PREFIX_60,
+  'AC-ENUM-PAIR-01': AC_ENUM_PAIR_01,
+  'AC-ENUM-TARGET-62': AC_ENUM_TARGET_62,
+  'AC-ENUM-TRIPLE-63': AC_ENUM_TRIPLE_63,
+  'AC-ENUM-COMB-64': AC_ENUM_COMB_64,
+  'AC-ENUM-SUBSET-65': AC_ENUM_SUBSET_65,
+  'AC-ENUM-KEYPAD-66': AC_ENUM_KEYPAD_66,
+  'AC-ENUM-FILTER-67': AC_ENUM_FILTER_67,
+  'AC-ENUM-BEST-68': AC_ENUM_BEST_68,
+  'AC-ENUM-PRUNE-69': AC_ENUM_PRUNE_69,
+  'AC-ENUM-LOCK-70': AC_ENUM_LOCK_70,
 })
 
 export function getPublicKernel(problemId) {
@@ -197,5 +216,14 @@ export {
   AC_SRCH_LINEAR_58,
   AC_SRCH_BINARY_59,
   AC_SRCH_PREFIX_60,
+  AC_ENUM_TARGET_62,
+  AC_ENUM_TRIPLE_63,
+  AC_ENUM_COMB_64,
+  AC_ENUM_SUBSET_65,
+  AC_ENUM_KEYPAD_66,
+  AC_ENUM_FILTER_67,
+  AC_ENUM_BEST_68,
+  AC_ENUM_PRUNE_69,
+  AC_ENUM_LOCK_70,
 }
 

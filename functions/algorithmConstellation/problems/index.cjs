@@ -66,6 +66,15 @@ const acSortBubble57 = require('./ac_sort_bubble_57.private.cjs')
 const acSrchLinear58 = require('./ac_srch_linear_58.private.cjs')
 const acSrchBinary59 = require('./ac_srch_binary_59.private.cjs')
 const acSrchPrefix60 = require('./ac_srch_prefix_60.private.cjs')
+const acEnumTarget62 = require('./ac_enum_target_62.private.cjs')
+const acEnumTriple63 = require('./ac_enum_triple_63.private.cjs')
+const acEnumComb64 = require('./ac_enum_comb_64.private.cjs')
+const acEnumSubset65 = require('./ac_enum_subset_65.private.cjs')
+const acEnumKeypad66 = require('./ac_enum_keypad_66.private.cjs')
+const acEnumFilter67 = require('./ac_enum_filter_67.private.cjs')
+const acEnumBest68 = require('./ac_enum_best_68.private.cjs')
+const acEnumPrune69 = require('./ac_enum_prune_69.private.cjs')
+const acEnumLock70 = require('./ac_enum_lock_70.private.cjs')
 
 const PRIVATE_PROBLEMS = {
   'AC-COND-001@v1': acCond001,
@@ -131,6 +140,16 @@ const PRIVATE_PROBLEMS = {
   'AC-SRCH-LINEAR-58@v1': acSrchLinear58,
   'AC-SRCH-BINARY-59@v1': acSrchBinary59,
   'AC-SRCH-PREFIX-60@v1': acSrchPrefix60,
+  'AC-ENUM-PAIR-01@v1': acEnumPair01,
+  'AC-ENUM-TARGET-62@v1': acEnumTarget62,
+  'AC-ENUM-TRIPLE-63@v1': acEnumTriple63,
+  'AC-ENUM-COMB-64@v1': acEnumComb64,
+  'AC-ENUM-SUBSET-65@v1': acEnumSubset65,
+  'AC-ENUM-KEYPAD-66@v1': acEnumKeypad66,
+  'AC-ENUM-FILTER-67@v1': acEnumFilter67,
+  'AC-ENUM-BEST-68@v1': acEnumBest68,
+  'AC-ENUM-PRUNE-69@v1': acEnumPrune69,
+  'AC-ENUM-LOCK-70@v1': acEnumLock70,
 }
 
 function getPrivateProblemDefinition(problemId, version = 1) {
