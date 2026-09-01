@@ -137,3 +137,26 @@ export const getVideoResumeRecovery = ({
     shouldRestart: playbackEnd > start && position >= Math.max(start, playbackEnd - tolerance),
   }
 }
+
+// Merges a session's cumulative fields with the last known server values.
+// totalTimeSpent and stampedSeconds are monotonic across sessions, so writes
+// must never lower them — a session that (wrongly) restored from zero would
+// otherwise overwrite the student's whole watch history at the next save.
+export const mergeCumulativeVideoProgress = (serverTx = {}, {
+  totalTimeSpent = 0,
+  stampedSeconds = [],
+  duration = 0,
+  contentStart = 0,
+  contentEnd = 0,
+} = {}) => {
+  const serverStamps = Array.isArray(serverTx.stampedSeconds) ? serverTx.stampedSeconds : []
+  return {
+    totalTimeSpent: Math.max(Number(serverTx.totalTimeSpent) || 0, Number(totalTimeSpent) || 0),
+    stampedSeconds: sanitizeVideoStamps({
+      stampedSeconds: [...serverStamps, ...(Array.isArray(stampedSeconds) ? stampedSeconds : [])],
+      duration,
+      contentStart,
+      contentEnd,
+    }),
+  }
+}

@@ -17,6 +17,7 @@ import {
   getVideoPlaybackRange,
   getVideoResumeRecovery,
   isVideoPositionInRange,
+  mergeCumulativeVideoProgress,
   sanitizeVideoPosition,
   sanitizeVideoStamps,
 } from '../../utils/videoPlaybackUtils'
@@ -152,6 +153,13 @@ const getNormalizedVideoRange = (start = 0, end = 0) => {
 
 const VIDEO_CACHE_MAX_FUTURE_SKEW_MS = 5 * 60 * 1000
 
+// Learning-progress listener retry policy. While the listener is failing we
+// keep loadingProgress=true, which gates the one-shot restore and the
+// auto-save: restoring/saving against an unknown document is what used to
+// reset cumulative watch history to zero.
+const LEARNING_PROGRESS_LISTEN_MAX_ATTEMPTS = 3
+const LEARNING_PROGRESS_RETRY_BASE_MS = 2000
+
 const getVideoProgressCacheKey = ({ userId, unitId, transmissionId }) => (
   `video_progress_${userId}_${unitId}_${transmissionId}`
 )
@@ -201,11 +209,13 @@ const readVideoProgressCache = ({ userId, unitId, transmission, duration = 0 }) 
       contentStart: expectedMetadata.contentStart,
       contentEnd: expectedMetadata.contentEnd,
     })
+    const totalTimeSpent = Number.parseFloat(localStorage.getItem(cacheKey + '_total') || '') || 0
 
     return {
       cacheKey,
       position: positionIsValid ? Math.floor(rawPosition) : expectedMetadata.contentStart,
       stamps,
+      totalTimeSpent,
       updatedAt,
       hasData: metadataMatches && timestampIsValid && (positionIsValid || stamps.length > 0),
     }
@@ -214,13 +224,14 @@ const readVideoProgressCache = ({ userId, unitId, transmission, duration = 0 }) 
       cacheKey,
       position: expectedMetadata.contentStart,
       stamps: [],
+      totalTimeSpent: 0,
       updatedAt: 0,
       hasData: false,
     }
   }
 }
 
-const writeVideoProgressCache = ({ userId, unitId, transmission, position, stampedSeconds, duration = 0 }) => {
+const writeVideoProgressCache = ({ userId, unitId, transmission, position, stampedSeconds, duration = 0, totalTimeSpent = 0 }) => {
   if (!userId || !unitId || !transmission) return { position: 0, stamps: [] }
 
   const transmissionId = transmission.id || 'default'
@@ -242,6 +253,7 @@ const writeVideoProgressCache = ({ userId, unitId, transmission, position, stamp
   try {
     localStorage.setItem(cacheKey + '_pos', String(safePosition))
     localStorage.setItem(cacheKey + '_stamps', JSON.stringify(safeStamps))
+    localStorage.setItem(cacheKey + '_total', String(Math.max(0, Number(totalTimeSpent) || 0)))
     localStorage.setItem(cacheKey + '_updatedAt', String(Date.now()))
     localStorage.setItem(cacheKey + '_meta', JSON.stringify(metadata))
   } catch (error) {
@@ -1315,44 +1327,82 @@ export default function MissionHub({
   const rewardLimitNoticeTimeoutRef = useRef(null)
 
   // ─── Learning Progress (Firestore) ───
-  const [learningProgress, setLearningProgress] = useState(null)
+  const [learningProgress, setLearningProgressState] = useState(null)
   const [loadingProgress, setLoadingProgress] = useState(true)
   const initialProgressRef = useRef(null) // Immutable snapshot from initial getDoc (not affected by auto-save)
-  
+  const learningProgressRef = useRef(null) // Latest doc for save-time clamps (avoids stale interval closures)
+
+  // Single entry point for local learningProgress updates so the ref used by
+  // the auto-save / exit-save clamps never goes stale between snapshots.
+  const applyLearningProgress = useCallback((updater) => {
+    setLearningProgressState((prev) => {
+      const next = typeof updater === 'function' ? updater(prev) : updater
+      learningProgressRef.current = next
+      return next
+    })
+  }, [])
+
   // Load learning progress from Firestore with real-time sync
   useEffect(() => {
     if (!userId || !unitId) {
-      setLoadingProgress(false)
+      // Keep "loading" while auth/unit is unresolved: restore effects and the
+      // auto-save must never run against an empty document.
+      setLoadingProgress(true)
       return
     }
 
     const progressRef = doc(db, 'users', userId, 'learning_progress', unitId)
-    
-    // Switch to onSnapshot for real-time reactivity (fixes stale state issues)
-    const unsubscribe = onSnapshot(progressRef, (snap) => {
-      if (snap.exists()) {
-        const data = snap.data()
-        setLearningProgress(data)
-        
-        // Only set initial snapshot once for restoration effect
-        if (!initialProgressRef.current) {
-          initialProgressRef.current = data
-        }
+    let unsubscribe = null
+    let retryTimer = null
+    let attempts = 0
+    let cancelled = false
 
-        // Restore global completion states (Data Log)
-        if (data.logRead) {
-          logRewardClaimedRef.current = true
-          setLogRewardClaimed(true)
-        }
-      }
-      setLoadingProgress(false)
-    }, (err) => {
-      console.warn("Failed to sync learning progress", err)
-      setLoadingProgress(false)
-    })
+    const subscribe = () => {
+      if (cancelled) return
+      attempts += 1
+      // Switch to onSnapshot for real-time reactivity (fixes stale state issues)
+      unsubscribe = onSnapshot(progressRef, (snap) => {
+        if (cancelled) return
+        if (snap.exists()) {
+          const data = snap.data()
+          applyLearningProgress(data)
 
-    return () => unsubscribe()
-  }, [userId, unitId])
+          // Only set initial snapshot once for restoration effect
+          if (!initialProgressRef.current) {
+            initialProgressRef.current = data
+          }
+
+          // Restore global completion states (Data Log)
+          if (data.logRead) {
+            logRewardClaimedRef.current = true
+            setLogRewardClaimed(true)
+          }
+        }
+        // exists() === false is also a definitive server answer ("no record yet"),
+        // so unblocking the restore is safe here. Transient failures are not:
+        // they keep loadingProgress true so restore/save stay gated.
+        setLoadingProgress(false)
+      }, (err) => {
+        if (cancelled) return
+        console.warn("Failed to sync learning progress", err)
+        if (attempts < LEARNING_PROGRESS_LISTEN_MAX_ATTEMPTS) {
+          retryTimer = setTimeout(subscribe, LEARNING_PROGRESS_RETRY_BASE_MS * attempts)
+          return
+        }
+        // Give up for this session: unblock with no data. Cumulative fields are
+        // clamped (max/union) on every write path, so this cannot erase history.
+        setLoadingProgress(false)
+      })
+    }
+
+    subscribe()
+
+    return () => {
+      cancelled = true
+      if (retryTimer) clearTimeout(retryTimer)
+      if (unsubscribe) unsubscribe()
+    }
+  }, [userId, unitId, applyLearningProgress])
 
   // --- Per-Transmission State Restoration ---
   // Ensure that videoCompleted state is local to the currently selected transmission
@@ -1630,7 +1680,12 @@ export default function MissionHub({
         latestPos = serverPos
       }
       
-      totalTimeSpentRef.current = serverData?.totalTimeSpent || 0
+      // Cumulative watch time: take the higher of the server record and the
+      // offline cache so a cache-only restore cannot silently drop history.
+      totalTimeSpentRef.current = Math.max(
+        Number(serverData?.totalTimeSpent) || 0,
+        Number(localData.totalTimeSpent) || 0,
+      )
       lastSyncedTimeSpentRef.current = totalTimeSpentRef.current
       setCreditedWatchSeconds(Math.floor(totalTimeSpentRef.current))
       const todayKST = getTodayKSTDate()
@@ -1713,35 +1768,52 @@ export default function MissionHub({
       try {
         if (!videoWriterEnabledRef.current) return
         const knownDuration = videoDurationRef.current > 0 ? videoDurationRef.current : 0
+        // Stamp-less ticks must not touch the cache: writing position without
+        // stamps is what poisons the offline restore fallback.
+        const rawStamps = Array.from(stampedSetRef.current)
+        if (rawStamps.length === 0) return
         const cached = writeVideoProgressCache({
           userId,
           unitId,
           transmission: selectedTx,
           position: lastVideoTimeRef.current,
-          stampedSeconds: Array.from(stampedSetRef.current),
+          stampedSeconds: rawStamps,
           duration: knownDuration,
+          totalTimeSpent: totalTimeSpentRef.current,
         })
         const pos = cached.position
-        const stamps = cached.stamps
-        if (stamps.length > 0) {
+        if (cached.stamps.length > 0) {
+          // Cumulative fields can only grow: merge with the last known server
+          // record so even a mis-restored session heals instead of overwriting.
+          const merged = mergeCumulativeVideoProgress(
+            learningProgressRef.current?.videoProgress?.[txId] || {},
+            {
+              totalTimeSpent: totalTimeSpentRef.current,
+              stampedSeconds: cached.stamps,
+              duration: knownDuration,
+              contentStart: selectedTx.start,
+              contentEnd: selectedTx.end,
+            }
+          )
           lastVideoTimeRef.current = pos
-          stampedSetRef.current = new Set(stamps)
+          stampedSetRef.current = new Set(merged.stampedSeconds)
+          setStampCount(merged.stampedSeconds.length)
           const playbackRange = getVideoPlaybackRange({
             duration: knownDuration,
             contentStart: selectedTx.start,
             contentEnd: selectedTx.end,
           })
-          
+
           // Offline-first caching (10초 주기 일괄 저장으로 성능 최적화)
           const progressRef = doc(db, 'users', userId, 'learning_progress', unitId)
-          
+
           const updateData = {
             [`videoProgress.${txId}.lastPosition`]: pos,
-            [`videoProgress.${txId}.totalTimeSpent`]: totalTimeSpentRef.current,
+            [`videoProgress.${txId}.totalTimeSpent`]: merged.totalTimeSpent,
             [`videoProgress.${txId}.todayTimeSpent`]: dailyTimeSpentRef.current,
             [`videoProgress.${txId}.todayTimeSpentDate`]: dailyTimeSpentDateRef.current,
             [`videoProgress.${txId}.updatedAt`]: serverTimestamp(),
-            [`videoProgress.${txId}.stampedSeconds`]: stamps,
+            [`videoProgress.${txId}.stampedSeconds`]: merged.stampedSeconds,
             [`videoProgress.${txId}.transmissionTitle`]: selectedTx?.title || activeUnit?.title || 'Main Video',
             [`videoProgress.${txId}.videoId`]: getYouTubeVideoId(selectedTx?.videoId),
             [`videoProgress.${txId}.contentStart`]: playbackRange.start,
@@ -1751,24 +1823,24 @@ export default function MissionHub({
             unitTitle: activeUnit?.title || '',
             updatedAt: serverTimestamp()
           }
-          
+
           setSaveStatus('saving')
           await setDoc(progressRef, updateData, { merge: true })
           setSaveStatus('saved')
           setTimeout(() => setSaveStatus(null), 2000)
 
           // Local state sync (careful: this might trigger parent re-renders, but since the player is memoized it won't flicker)
-          setLearningProgress(prev => ({
+          applyLearningProgress(prev => ({
             ...prev,
             videoProgress: {
               ...(prev?.videoProgress || {}),
               [txId]: {
                 ...(prev?.videoProgress?.[txId] || {}),
                 lastPosition: pos,
-                totalTimeSpent: totalTimeSpentRef.current,
+                totalTimeSpent: merged.totalTimeSpent,
                 todayTimeSpent: dailyTimeSpentRef.current,
                 todayTimeSpentDate: dailyTimeSpentDateRef.current,
-                stampedSeconds: stamps,
+                stampedSeconds: merged.stampedSeconds,
                 trackingDiagnostics: getTrackingDiagnostics()
               }
             }
@@ -1781,17 +1853,31 @@ export default function MissionHub({
 
     const handleUnloadSave = () => {
       if (!idTokenRef.current || !videoWriterEnabledRef.current) return
+      const rawStamps = Array.from(stampedSetRef.current)
+      if (rawStamps.length === 0) return
       const cached = writeVideoProgressCache({
         userId,
         unitId,
         transmission: selectedTx,
         position: lastVideoTimeRef.current,
-        stampedSeconds: Array.from(stampedSetRef.current),
+        stampedSeconds: rawStamps,
         duration: videoDurationRef.current,
+        totalTimeSpent: totalTimeSpentRef.current,
       })
       const finalPos = cached.position
       const stamps = cached.stamps
       if (stamps.length === 0) return
+
+      const merged = mergeCumulativeVideoProgress(
+        learningProgressRef.current?.videoProgress?.[txId] || {},
+        {
+          totalTimeSpent: totalTimeSpentRef.current,
+          stampedSeconds: stamps,
+          duration: videoDurationRef.current,
+          contentStart: selectedTx.start,
+          contentEnd: selectedTx.end,
+        }
+      )
 
       const payload = JSON.stringify({
         idToken: idTokenRef.current,
@@ -1800,10 +1886,10 @@ export default function MissionHub({
         txId,
         progressData: {
           lastPosition: finalPos,
-          totalTimeSpent: totalTimeSpentRef.current,
+          totalTimeSpent: merged.totalTimeSpent,
           todayTimeSpent: dailyTimeSpentRef.current,
           todayTimeSpentDate: dailyTimeSpentDateRef.current,
-          stampedSeconds: stamps,
+          stampedSeconds: merged.stampedSeconds,
           videoId: getYouTubeVideoId(selectedTx?.videoId),
           contentStart: Math.max(0, Math.floor(Number(selectedTx?.start) || 0)),
           contentEnd: Math.max(0, Math.floor(Number(selectedTx?.end) || 0)) || null,
@@ -1812,7 +1898,7 @@ export default function MissionHub({
           trackingDiagnostics: getTrackingDiagnostics()
         }
       })
-      
+
       if (navigator.sendBeacon) {
         navigator.sendBeacon(getFunctionUrl('syncVideoProgress'), payload)
       }
@@ -1826,7 +1912,7 @@ export default function MissionHub({
       window.removeEventListener('beforeunload', handleUnloadSave)
       window.removeEventListener('popstate', handleUnloadSave)
     }
-  }, [userId, selectedTx, loadingProgress, unitId, getTrackingDiagnostics])
+  }, [userId, selectedTx, loadingProgress, unitId, applyLearningProgress, getTrackingDiagnostics])
 
   // ─── Silent Toast helper ───
   const showSilentToast = useCallback((amount) => {
@@ -1950,16 +2036,22 @@ export default function MissionHub({
       contentStart: restartPosition,
       contentEnd: configuredEnd,
     })
-    const sanitizedStamps = sanitizeVideoStamps({
-      stampedSeconds: Array.from(stampedSetRef.current),
-      duration: knownDuration,
-      contentStart: restartPosition,
-      contentEnd: configuredEnd,
-    })
+    // A restart only rewinds the playhead — cumulative watch time and earned
+    // stamps must survive (and merge with the server record) untouched.
+    const merged = mergeCumulativeVideoProgress(
+      learningProgressRef.current?.videoProgress?.[txId] || {},
+      {
+        totalTimeSpent: totalTimeSpentRef.current,
+        stampedSeconds: Array.from(stampedSetRef.current),
+        duration: knownDuration,
+        contentStart: restartPosition,
+        contentEnd: configuredEnd,
+      }
+    )
 
-    stampedSetRef.current = new Set(sanitizedStamps)
-    newStampCountRef.current = Math.min(newStampCountRef.current, sanitizedStamps.length)
-    setStampCount(sanitizedStamps.length)
+    stampedSetRef.current = new Set(merged.stampedSeconds)
+    newStampCountRef.current = Math.min(newStampCountRef.current, merged.stampedSeconds.length)
+    setStampCount(merged.stampedSeconds.length)
     lastVideoTimeRef.current = restartPosition
     lastPollTimeRef.current = Date.now()
     if (knownDuration > 0) videoDurationRef.current = knownDuration
@@ -1983,18 +2075,19 @@ export default function MissionHub({
       unitId,
       transmission: selectedTx,
       position: restartPosition,
-      stampedSeconds: sanitizedStamps,
+      stampedSeconds: merged.stampedSeconds,
       duration: knownDuration,
+      totalTimeSpent: merged.totalTimeSpent,
     })
 
-    setLearningProgress((previous) => ({
+    applyLearningProgress((previous) => ({
       ...previous,
       videoProgress: {
         ...(previous?.videoProgress || {}),
         [txId]: {
           ...(previous?.videoProgress?.[txId] || {}),
           lastPosition: restartPosition,
-          stampedSeconds: sanitizedStamps,
+          stampedSeconds: merged.stampedSeconds,
           trackingDiagnostics: getTrackingDiagnostics(),
         },
       },
@@ -2006,8 +2099,8 @@ export default function MissionHub({
         videoProgress: {
           [txId]: {
             lastPosition: restartPosition,
-            stampedSeconds: sanitizedStamps,
-            totalTimeSpent: totalTimeSpentRef.current,
+            stampedSeconds: merged.stampedSeconds,
+            totalTimeSpent: merged.totalTimeSpent,
             todayTimeSpent: dailyTimeSpentRef.current,
             todayTimeSpentDate: dailyTimeSpentDateRef.current,
             transmissionTitle: selectedTx?.title || activeUnit?.title || 'Main Video',
@@ -2037,7 +2130,7 @@ export default function MissionHub({
 
     videoPlayerRef.current?.seekTo?.(restartPosition)
     if (shouldPlay) videoPlayerRef.current?.playVideo?.()
-  }, [activeUnit?.title, getTrackingDiagnostics, logActivity, selectedTx, setIsAtEnd, unitId, userId])
+  }, [activeUnit?.title, applyLearningProgress, getTrackingDiagnostics, logActivity, selectedTx, setIsAtEnd, unitId, userId])
 
   const handleInvalidVideoResume = useCallback((details) => {
     restartVideoFromBeginning({
@@ -2198,14 +2291,23 @@ export default function MissionHub({
            const pos = Math.floor(lastVideoTimeRef.current || 0)
            if (pos > 0) {
              const txId = selectedTx.id || 'default'
+             const merged = mergeCumulativeVideoProgress(
+               learningProgressRef.current?.videoProgress?.[txId] || {},
+               {
+                 totalTimeSpent: totalTimeSpentRef.current,
+                 stampedSeconds: Array.from(stampedSetRef.current),
+                 contentStart: selectedTx.start,
+                 contentEnd: selectedTx.end,
+               }
+             )
              const progressRef = doc(db, 'users', userId, 'learning_progress', unitId)
              setDoc(progressRef, {
                [`videoProgress.${txId}.lastPosition`]: pos,
-               [`videoProgress.${txId}.totalTimeSpent`]: totalTimeSpentRef.current,
+               [`videoProgress.${txId}.totalTimeSpent`]: merged.totalTimeSpent,
                [`videoProgress.${txId}.todayTimeSpent`]: dailyTimeSpentRef.current,
                [`videoProgress.${txId}.todayTimeSpentDate`]: dailyTimeSpentDateRef.current,
                [`videoProgress.${txId}.updatedAt`]: serverTimestamp(),
-               [`videoProgress.${txId}.stampedSeconds`]: Array.from(stampedSetRef.current),
+               [`videoProgress.${txId}.stampedSeconds`]: merged.stampedSeconds,
                [`videoProgress.${txId}.trackingDiagnostics`]: getTrackingDiagnostics()
              }, { merge: true }).catch(err => console.warn("Background save failed:", err))
            }
@@ -2668,31 +2770,43 @@ export default function MissionHub({
         contentStart: selectedTx.start,
         contentEnd: selectedTx.end,
       })
+      // Cumulative fields are monotonic: merge with the server record so an
+      // exit save can never lower a student's stored watch history.
+      const merged = mergeCumulativeVideoProgress(
+        learningProgressRef.current?.videoProgress?.[txId] || {},
+        {
+          totalTimeSpent: totalTimeSpentRef.current,
+          stampedSeconds: stamps,
+          duration: knownDuration,
+          contentStart: selectedTx.start,
+          contentEnd: selectedTx.end,
+        }
+      )
       const completion = getVideoCompletionMetrics({
-        stampedSeconds: stamps,
+        stampedSeconds: merged.stampedSeconds,
         duration: knownDuration,
         contentStart: selectedTx.start,
         contentEnd: selectedTx.end,
       })
       const hasCompletedCoverage = videoCompleted || completion.completed
       lastVideoTimeRef.current = savedPosition
-      stampedSetRef.current = new Set(stamps)
-      
+      stampedSetRef.current = new Set(merged.stampedSeconds)
+
       let isManualComplete = false
       // Remove 20% hurdle. If they reached the end or encountered an error but didn't complete, allow manual completion without bonus
       if ((isAtEnd || videoError || videoTrackingUnavailable) && !hasCompletedCoverage) {
          isManualComplete = true
       }
-      
+
       const progressRef = doc(db, 'users', userId, 'learning_progress', unitId)
       const updateData = {
         videoProgress: {
           [txId]: {
             lastPosition: savedPosition,
-            stampedSeconds: stamps,
-            rewardedStampCount: Math.max(0, stamps.length - Math.min(stamps.length, newStampCountRef.current)),
+            stampedSeconds: merged.stampedSeconds,
+            rewardedStampCount: Math.max(0, merged.stampedSeconds.length - Math.min(merged.stampedSeconds.length, newStampCountRef.current)),
             totalRewardedCrystals: totalRewardedCrystalsRef.current,
-            totalTimeSpent: totalTimeSpentRef.current,
+            totalTimeSpent: merged.totalTimeSpent,
             todayTimeSpent: dailyTimeSpentRef.current,
             todayTimeSpentDate: dailyTimeSpentDateRef.current,
             transmissionTitle: selectedTx?.title || 'Main Video',
@@ -2743,7 +2857,7 @@ export default function MissionHub({
             '영상 교신 완료',
             rewardAmount,
             {
-              ...getVideoLearningMetadata(txId, savedPosition, stamps),
+              ...getVideoLearningMetadata(txId, savedPosition, merged.stampedSeconds),
               ...completionAttentionMeta
             }
           )
@@ -2752,11 +2866,11 @@ export default function MissionHub({
         if (newStampCountRef.current >= 180 && !rewardLockRef.current) {
           const minutes = Math.floor(stampedSetRef.current.size / 60)
           exitRewardOutcome = await onNonQuizActivityComplete(`영상 교신 수신 (${minutes}분 누적)`, 10, {
-            ...getVideoLearningMetadata(txId, savedPosition, stamps)
+            ...getVideoLearningMetadata(txId, savedPosition, merged.stampedSeconds)
           })
         } else {
           exitRewardOutcome = await onNonQuizActivityComplete('영상 학습 기록 동기화', 0, {
-            ...getVideoLearningMetadata(txId, savedPosition, stamps)
+            ...getVideoLearningMetadata(txId, savedPosition, merged.stampedSeconds)
           })
         }
       }
@@ -2776,19 +2890,20 @@ export default function MissionHub({
         unitId,
         transmission: selectedTx,
         position: savedPosition,
-        stampedSeconds: stamps,
+        stampedSeconds: merged.stampedSeconds,
         duration: knownDuration,
+        totalTimeSpent: merged.totalTimeSpent,
       })
 
       // Update local state
-      setLearningProgress(prev => {
+      applyLearningProgress(prev => {
         const updatedVideoProgress = {
             ...(prev?.videoProgress?.[txId] || {}),
             lastPosition: savedPosition,
-            totalTimeSpent: totalTimeSpentRef.current,
+            totalTimeSpent: merged.totalTimeSpent,
             todayTimeSpent: dailyTimeSpentRef.current,
             todayTimeSpentDate: dailyTimeSpentDateRef.current,
-            stampedSeconds: stamps,
+            stampedSeconds: merged.stampedSeconds,
             trackingDiagnostics: getTrackingDiagnostics()
         };
         if (hasCompletedCoverage || isManualComplete) {

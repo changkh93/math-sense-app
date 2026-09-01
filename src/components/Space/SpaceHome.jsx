@@ -746,6 +746,11 @@ function SpaceHome() {
     setSignupPrompt(payload)
   }, [])
 
+  const clearSignupPrompt = useCallback(() => {
+    window.sessionStorage.removeItem(LOGIN_NOTICE_KEY)
+    setSignupPrompt(null)
+  }, [])
+
   useEffect(() => {
     if (!user) {
       setLoginPanelOpen(false)
@@ -1627,16 +1632,20 @@ function SpaceHome() {
   const routeAfterAuth = useCallback(async (uid) => {
     const parentSnap = await getDoc(doc(db, 'parents', uid))
     if (isActiveMemberDoc(parentSnap)) {
+      clearSignupPrompt()
       navigate('/parent/dashboard')
       return true
     }
     const userSnap = await getDoc(doc(db, 'users', uid))
-    if (isActiveMemberDoc(userSnap)) return true
+    if (isActiveMemberDoc(userSnap)) {
+      clearSignupPrompt()
+      return true
+    }
 
     persistSignupPrompt({ reason: 'missing-membership', email: auth.currentUser?.email || '' })
     await signOut(auth)
     return false
-  }, [navigate, persistSignupPrompt])
+  }, [clearSignupPrompt, navigate, persistSignupPrompt])
 
   useEffect(() => {
     let active = true
@@ -2989,10 +2998,25 @@ function SpaceHome() {
                updatedAt: serverTimestamp()
              }, { merge: true })
           } else if (activityType.includes('수신') && stampedSeconds) {
+             // Cumulative watch fields are monotonic — clamp against the fresh
+             // server record so a client that restored from zero cannot erase
+             // previously stored history.
+             const existingVideoProg = freshProgressData.videoProgress?.[transmissionId] || {}
+             const existingStamps = Array.isArray(existingVideoProg.stampedSeconds)
+               ? existingVideoProg.stampedSeconds
+               : []
+             const mergedStamps = Array.from(new Set([...existingStamps, ...stampedSeconds]))
+               .sort((a, b) => a - b)
              transaction.set(progressDocRef, {
-               [`${baseKey}.rewardedStampCount`]: stampedSeconds.length,
-               [`${baseKey}.stampedSeconds`]: stampedSeconds,
-               [`${baseKey}.totalTimeSpent`]: totalTimeSpent,
+               [`${baseKey}.rewardedStampCount`]: Math.max(
+                 Number(existingVideoProg.rewardedStampCount) || 0,
+                 stampedSeconds.length
+               ),
+               [`${baseKey}.stampedSeconds`]: mergedStamps,
+               [`${baseKey}.totalTimeSpent`]: Math.max(
+                 Number(existingVideoProg.totalTimeSpent) || 0,
+                 Number(totalTimeSpent) || 0
+               ),
                [`${baseKey}.todayTimeSpent`]: todayTimeSpent,
                [`${baseKey}.todayTimeSpentDate`]: todayTimeSpentDate || todayKST,
                [`${baseKey}.updatedAt`]: serverTimestamp(),

@@ -5406,6 +5406,32 @@ exports.syncVideoProgress = regionalFunctions.https.onRequest((req, res) => {
       // 기존에는 learning_progress 에만 completed:true 를 쓰고 history(type:'video')는 쓰지 않아
       // 탭 닫기/이탈 시 단원 완료 표시가 영영 켜지지 않는 버그가 있었다.
       await db.runTransaction(async (transaction) => {
+        // 누적 필드(totalTimeSpent / stampedSeconds)는 단조 증가값이다. 클라이언트가
+        // 어떤 이유로 0에서 재시작한 세션을 보내도 기존 기록이 지워지지 않도록
+        // 서버 저장값과의 max/union 으로 clamp 한다. todayTimeSpent는 일별 리셋이
+        // 정상 동작이므로 대상에서 제외한다.
+        const progressSnap = await transaction.get(progressRef);
+        const existingTx = progressSnap.exists
+          ? (progressSnap.get("videoProgress") || {})[txId] || {}
+          : {};
+
+        if (updateData[`videoProgress.${txId}.totalTimeSpent`] !== undefined) {
+          updateData[`videoProgress.${txId}.totalTimeSpent`] = Math.max(
+            Number(existingTx.totalTimeSpent) || 0,
+            Number(updateData[`videoProgress.${txId}.totalTimeSpent`]) || 0
+          );
+        }
+
+        const incomingStamps = updateData[`videoProgress.${txId}.stampedSeconds`];
+        if (Array.isArray(incomingStamps)) {
+          const existingStamps = Array.isArray(existingTx.stampedSeconds)
+            ? existingTx.stampedSeconds
+            : [];
+          updateData[`videoProgress.${txId}.stampedSeconds`] = Array.from(
+            new Set([...existingStamps, ...incomingStamps])
+          ).sort((a, b) => a - b);
+        }
+
         transaction.set(progressRef, updateData, { merge: true });
 
         // 영상 시청이 완료(completed === true)된 경우에만 history(type:'video')를 기록한다.

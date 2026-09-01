@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
 import {
   consumeGoogleRedirect,
   getGoogleAuthErrorMessage,
@@ -74,6 +75,23 @@ assert.match(
 assert.match(
   getGoogleAuthErrorMessage({ code: 'auth/unauthorized-domain' }),
   /등록되지 않았습니다/,
+)
+
+const spaceHomeSource = readFileSync(new URL('../src/components/Space/SpaceHome.jsx', import.meta.url), 'utf8')
+assert.match(
+  spaceHomeSource,
+  /const clearSignupPrompt = useCallback\(\(\) => \{\s*window\.sessionStorage\.removeItem\(LOGIN_NOTICE_KEY\)\s*setSignupPrompt\(null\)/,
+  'successful login must have a single cleanup path for stale signup notices',
+)
+assert.match(
+  spaceHomeSource,
+  /if \(isActiveMemberDoc\(parentSnap\)\) \{\s*clearSignupPrompt\(\)\s*navigate\('\/parent\/dashboard'\)/,
+  'parent login must clear a stale signup notice before routing',
+)
+assert.match(
+  spaceHomeSource,
+  /if \(isActiveMemberDoc\(userSnap\)\) \{\s*clearSignupPrompt\(\)\s*return true/,
+  'student login must clear a stale signup notice before continuing',
 )
 
 console.log('google auth flow tests passed')
