@@ -20,16 +20,12 @@ import FirstEncounterCard from '../scaffold/FirstEncounterCard.jsx'
 import { getConceptsNeededForProblem } from '../../shared/python/pythonConceptRegistry.js'
 import { getPatternsNeededForProblem } from '../../shared/patterns/problemSolvingPatternRegistry.js'
 
-function normalizeCallableErrorCode(error) {
-  return String(error?.code || '')
-    .replace(/^functions\//, '')
-    .replaceAll('-', '_')
-    .toUpperCase()
-}
-
-// Attempts in these states are read-only on the server; every submission would
-// fail with FAILED_PRECONDITION until a fresh attempt (new requestId) is started.
-const TERMINAL_ATTEMPT_STATES = new Set(['FINALIZED', 'EXPIRED', 'ABANDONED', 'INTEGRITY_TERMINATED'])
+import {
+  isAttemptSessionUsable,
+  isAttemptDeadError,
+  isTransferTokenError,
+  normalizeCallableErrorCode,
+} from './attemptRecovery.js'
 
 // The client-bundle mock judge ships public answer keys, so it must never grade
 // a signed-in student in production (gateway contract: "Zero automatic mock
@@ -138,13 +134,33 @@ export default function AlgorithmMissionShell({
     let isMounted = true
     async function initSession() {
       try {
-        const session = await runtimeGateway.startAttempt({
+        let session = await runtimeGateway.startAttempt({
           problemId: kernel.id,
           problemVersion: kernel.version,
           shell: initialShell,
           intent,
           requestId: activeRequestId,
         })
+        if (isMounted && fsmState !== MISSION_STATES.COMPLETE && !isAttemptSessionUsable(session)) {
+          // A draft resume can return the same expired (or finalized) attempt
+          // for its persisted requestId. Rotate to a fresh attempt so the
+          // student is never trapped with an unsubmitable session.
+          const isPostBaseStage = [
+            MISSION_STATES.RUN_SUCCESS,
+            MISSION_STATES.UNDERSTANDING_CHECK,
+            MISSION_STATES.TRANSFER_CHALLENGE,
+          ].includes(fsmState)
+          session = await rotateToFreshAttempt(
+            isPostBaseStage ? { fsmState: MISSION_STATES.CODE } : undefined,
+          )
+          if (isPostBaseStage) {
+            fsm.transition(MISSION_STATES.CODE)
+            setStudentErrorMessage({
+              title: '세션이 만료되어 새로 시작했어요',
+              description: '오랜 시간이 지나 이전 탐사 기록이 만료되었어요. 작성한 코드는 그대로 보존되어 있으니 최종 확인부터 다시 진행해 주세요.',
+            })
+          }
+        }
         if (isMounted) {
           setAttemptSession(session)
           setCurrentProgress(session.progress || {})
@@ -187,6 +203,10 @@ export default function AlgorithmMissionShell({
     return () => {
       isMounted = false
     }
+    // fsm/fsmState are intentionally read at mount only: re-running the attempt
+    // start on every stage change would churn sessions. rotateToFreshAttempt
+    // re-triggers this effect itself via activeRequestId when it rotates.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeRequestId, initialShell, intent, kernel.id, kernel.version, runtimeGateway, startRetryNonce])
 
   const retryStartAttempt = () => {
@@ -332,10 +352,11 @@ export default function AlgorithmMissionShell({
     requestId,
   })
 
-  // A finished attempt can never accept submissions again. Rotating the
-  // requestId starts a fresh authoritative attempt so "다시 풀기 (복습)" works
-  // instead of silently degrading every submit to the client mock.
-  const rotateFinishedAttempt = async () => {
+  // A finished or expired attempt can never accept submissions again. Rotating
+  // the requestId starts a fresh authoritative attempt so "다시 풀기 (복습)" and
+  // expired-session recovery both work instead of dead-ending every submit on
+  // FAILED_PRECONDITION (or silently degrading to the client mock).
+  const rotateToFreshAttempt = async ({ fsmState: fsmStateOverride } = {}) => {
     const rotatedRequestId = `start_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`
     saveAlgorithmDraft({
       problemId: kernel.id,
@@ -344,13 +365,16 @@ export default function AlgorithmMissionShell({
       requestId: rotatedRequestId,
       attemptId: null,
       code: currentCode,
-      fsmState,
+      fsmState: fsmStateOverride || fsmState,
       shell,
       observeCompleted,
       exploreCompleted,
       stars: completionResult?.stars || currentProgress?.bestStars || 0,
       completionResult,
     })
+    // Assistance evidence is journaled per attempt; a fresh attempt must be
+    // able to record scaffolding events under its own id.
+    recordedScaffoldLevels.current = new Set()
     setActiveRequestId(rotatedRequestId)
     const session = await startAttemptOn(runtimeGateway, rotatedRequestId)
     setAttemptSession(session)
@@ -358,10 +382,24 @@ export default function AlgorithmMissionShell({
     return session
   }
 
+  // Post-base stages cannot resume on a fresh attempt (the server requires
+  // base → understanding → transfer in order), so an attempt that expired
+  // mid-mission sends the student back to the code stage with their code
+  // preserved instead of trapping them in an unsubmitable state.
+  const recoverExpiredAttemptToCodeStage = async () => {
+    await rotateToFreshAttempt({ fsmState: MISSION_STATES.CODE })
+    fsm.transition(MISSION_STATES.CODE)
+    setStudentErrorMessage({
+      title: '세션이 만료되어 새로 시작했어요',
+      description: '오랜 시간이 지나 탐사 세션이 만료되었어요. 작성한 코드는 그대로 보존되어 있으니 최종 확인부터 다시 진행해 주세요.',
+    })
+    return { passed: false }
+  }
+
   const getOrInitAttemptSession = async () => {
     if (attemptSession?.attemptId) {
-      if (!TERMINAL_ATTEMPT_STATES.has(attemptSession.state)) return attemptSession
-      return rotateFinishedAttempt()
+      if (isAttemptSessionUsable(attemptSession)) return attemptSession
+      return rotateToFreshAttempt()
     }
     if (!isMockFallbackAllowed()) {
       throw new Error('채점소와 아직 연결되지 않았어요. 잠시 후 다시 시도해 주세요.')
@@ -387,23 +425,36 @@ export default function AlgorithmMissionShell({
           code,
         })
       } catch (err) {
-        if (!isMockFallbackAllowed()) throw err
-        console.warn('Primary submitBase failed, falling back to preview grading:', err)
-        const fallback = createAlgorithmConstellationMockGateway()
-        const fbSession = await fallback.startAttempt({
-          problemId: kernel.id,
-          problemVersion: kernel.version,
-          shell: initialShell,
-          intent,
-          requestId: activeRequestId,
-        })
-        setRuntimeGateway(fallback)
-        setAttemptSession(fbSession)
-        res = await fallback.submitBase({
-          attemptId: fbSession.attemptId,
-          submissionId: `sub_base_${Date.now()}`,
-          code,
-        })
+        if (isAttemptDeadError(err)) {
+          // The attempt expired between the pre-check and this submit (e.g.
+          // the tab sat idle past the session TTL). Rotate to a fresh attempt
+          // and submit the preserved code once more instead of dead-ending.
+          const freshSession = await rotateToFreshAttempt()
+          res = await runtimeGateway.submitBase({
+            attemptId: freshSession.attemptId,
+            submissionId: `sub_base_${Date.now()}`,
+            code,
+          })
+        } else if (!isMockFallbackAllowed()) {
+          throw err
+        } else {
+          console.warn('Primary submitBase failed, falling back to preview grading:', err)
+          const fallback = createAlgorithmConstellationMockGateway()
+          const fbSession = await fallback.startAttempt({
+            problemId: kernel.id,
+            problemVersion: kernel.version,
+            shell: initialShell,
+            intent,
+            requestId: activeRequestId,
+          })
+          setRuntimeGateway(fallback)
+          setAttemptSession(fbSession)
+          res = await fallback.submitBase({
+            attemptId: fbSession.attemptId,
+            submissionId: `sub_base_${Date.now()}`,
+            code,
+          })
+        }
       }
 
       onFeedback?.(res)
@@ -433,6 +484,7 @@ export default function AlgorithmMissionShell({
           answers,
         })
       } catch (err) {
+        if (isAttemptDeadError(err)) return recoverExpiredAttemptToCodeStage()
         if (!isMockFallbackAllowed()) throw err
         console.warn('Primary submitUnderstanding failed, falling back to preview grading:', err)
         const fallback = createAlgorithmConstellationMockGateway()
@@ -462,6 +514,10 @@ export default function AlgorithmMissionShell({
           attemptId: session.attemptId,
         })
       } catch (err) {
+        if (isAttemptDeadError(err)) {
+          await recoverExpiredAttemptToCodeStage()
+          return
+        }
         if (!isMockFallbackAllowed()) throw err
         console.warn('Primary issueTransfer failed, falling back to preview grading:', err)
         const fallback = createAlgorithmConstellationMockGateway()
@@ -488,14 +544,31 @@ export default function AlgorithmMissionShell({
           transferCode,
         })
       } catch (err) {
-        if (!isMockFallbackAllowed()) throw err
-        console.warn('Primary submitTransfer failed, falling back to preview grading:', err)
-        const fallback = createAlgorithmConstellationMockGateway()
-        res = await fallback.submitTransfer({
-          attemptId: session.attemptId,
-          challengeToken,
-          transferCode,
-        })
+        if (isTransferTokenError(err) && isAttemptSessionUsable(session)) {
+          // The 1h challenge token went stale while the 2h attempt is still
+          // alive (long idle on the transfer stage). Re-issue the challenge and
+          // retry once with the fresh token instead of trapping the student.
+          const reissued = await runtimeGateway.issueTransfer({ attemptId: session.attemptId })
+          setTransferData(reissued)
+          res = await runtimeGateway.submitTransfer({
+            attemptId: session.attemptId,
+            challengeToken: reissued.challengeToken,
+            transferCode,
+          })
+        } else if (isAttemptDeadError(err)) {
+          await recoverExpiredAttemptToCodeStage()
+          return { passed: false, error: '탐사 세션이 만료되어 새 시도로 전환했어요. 코드 단계에서 최종 확인부터 다시 진행해 주세요.' }
+        } else if (!isMockFallbackAllowed()) {
+          throw err
+        } else {
+          console.warn('Primary submitTransfer failed, falling back to preview grading:', err)
+          const fallback = createAlgorithmConstellationMockGateway()
+          res = await fallback.submitTransfer({
+            attemptId: session.attemptId,
+            challengeToken,
+            transferCode,
+          })
+        }
       }
       if (res?.passed) {
         const nextProgress = {
@@ -827,7 +900,14 @@ export default function AlgorithmMissionShell({
           />
         ) : (
           <div role="alert" style={{ padding: '20px', borderRadius: '12px', background: 'rgba(239, 68, 68, 0.12)', border: '1px solid #ef4444' }}>
-            이해 확인 문제를 안전하게 불러오지 못했어요. 코드는 보존되어 있으니 이전 단계에서 다시 제출해 주세요.
+            <div>이해 확인 문제를 안전하게 불러오지 못했어요. 코드는 보존되어 있으니 코드 단계에서 최종 확인을 다시 통과해 주세요.</div>
+            <button
+              type="button"
+              onClick={() => handleTransition(MISSION_STATES.CODE)}
+              style={{ marginTop: '12px', padding: '8px 16px', background: '#0ea5e9', border: 'none', borderRadius: '8px', color: '#fff', fontWeight: 'bold', cursor: 'pointer' }}
+            >
+              코드 단계로 돌아가기 (코드는 보존되어 있어요)
+            </button>
           </div>
         )
       )}
@@ -843,7 +923,23 @@ export default function AlgorithmMissionShell({
           />
         ) : (
           <div role="alert" style={{ padding: '20px', borderRadius: '12px', background: 'rgba(239, 68, 68, 0.12)', border: '1px solid #ef4444' }}>
-            전이 항로를 안전하게 발급하지 못했어요. 작성한 코드는 보존되어 있으니 이해 확인 단계에서 다시 시도해 주세요.
+            <div>전이 항로를 안전하게 발급하지 못했어요. 작성한 코드는 보존되어 있어요.</div>
+            <div style={{ display: 'flex', gap: '8px', marginTop: '12px', flexWrap: 'wrap' }}>
+              <button
+                type="button"
+                onClick={() => handleProceedToTransfer()}
+                style={{ padding: '8px 16px', background: '#0ea5e9', border: 'none', borderRadius: '8px', color: '#fff', fontWeight: 'bold', cursor: 'pointer' }}
+              >
+                전이 문제 다시 발급받기
+              </button>
+              <button
+                type="button"
+                onClick={() => handleTransition(MISSION_STATES.CODE)}
+                style={{ padding: '8px 16px', background: 'transparent', border: '1px solid rgba(255, 255, 255, 0.3)', borderRadius: '8px', color: '#e2e8f0', fontWeight: '600', cursor: 'pointer' }}
+              >
+                코드 단계로 돌아가기
+              </button>
+            </div>
           </div>
         )
       )}

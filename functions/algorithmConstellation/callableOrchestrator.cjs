@@ -17,6 +17,14 @@ const MAX_CODE_LENGTH = 8_000
 const SESSION_DURATION_MS = 2 * 60 * 60 * 1000
 const RETURN_DELAY_MS = 24 * 60 * 60 * 1000
 
+// Sliding session expiry: every accepted mutation re-arms the 2h window, so
+// the cap bounds inactivity, not the total length of a mission. Without this,
+// an actively-working student hard-fails at exactly SESSION_DURATION_MS and
+// every later submission returns "시도 시간이 만료되었습니다.".
+function extendSessionExpiry(session, currentTime) {
+  return Math.max(Number(session.expiresAt) || 0, currentTime + SESSION_DURATION_MS)
+}
+
 function domainError(code, message) {
   const error = new Error(message)
   error.code = code
@@ -265,6 +273,7 @@ function createCallableOrchestrator({
       eventRecord,
       mutateSession(session) {
         assertOwnedActiveSession(session, uid, currentTime)
+        session.expiresAt = extendSessionExpiry(session, currentTime)
         if (session.intent === 'independent_return' && source !== 'integrity-focus') {
           throw domainError('FAILED_PRECONDITION', '독립 귀환에서는 도움을 사용할 수 없습니다.')
         }
@@ -324,6 +333,7 @@ function createCallableOrchestrator({
     let understandingChallenge = null
     await store.updateSession(attemptId, (latest) => {
       assertOwnedActiveSession(latest, uid, currentTime)
+      latest.expiresAt = extendSessionExpiry(latest, currentTime)
       const targetState = result.resultStar ? ATTEMPT_STATES.BASE_PASSED : ATTEMPT_STATES.BASE_SUBMITTED
       if (latest.state !== targetState) validateAttemptTransition(latest.state, targetState)
       latest.state = targetState
@@ -363,6 +373,7 @@ function createCallableOrchestrator({
     let passed = false
     await store.updateSession(attemptId, (session) => {
       assertOwnedActiveSession(session, uid, currentTime)
+      session.expiresAt = extendSessionExpiry(session, currentTime)
       if (session.state !== ATTEMPT_STATES.BASE_PASSED || session.understandingChallengeId !== challengeId) {
         throw domainError('FAILED_PRECONDITION', '서버가 발급한 이해 확인 문제가 아닙니다.')
       }
@@ -393,6 +404,7 @@ function createCallableOrchestrator({
     let tokenExpiresAt
     await store.updateSession(attemptId, (session) => {
       assertOwnedActiveSession(session, uid, currentTime)
+      session.expiresAt = extendSessionExpiry(session, currentTime)
       if (!session.starDetails.star1_result || !session.starDetails.star2_understanding) {
         throw domainError('FAILED_PRECONDITION', 'Star 1과 Star 2가 먼저 필요합니다.')
       }
@@ -458,6 +470,7 @@ function createCallableOrchestrator({
 
     const submittedSession = await store.updateSession(attemptId, (latest) => {
       assertOwnedActiveSession(latest, uid, currentTime)
+      latest.expiresAt = extendSessionExpiry(latest, currentTime)
       validateAttemptTransition(latest.state, ATTEMPT_STATES.TRANSFER_SUBMITTED)
       latest.state = ATTEMPT_STATES.TRANSFER_SUBMITTED
       latest.transferCodeHash = codeHash(transferCode)
