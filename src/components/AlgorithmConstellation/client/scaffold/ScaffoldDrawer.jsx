@@ -4,7 +4,7 @@ import { getScaffoldByLevel } from './scaffoldGraph.js'
 export default function ScaffoldDrawer({
   isOpen,
   initialLevel = 1,
-  problemId = 'AC-COND-001',
+  problemId,
   onApplySnippet,
   onSelectScaffold,
   onClose,
@@ -60,6 +60,8 @@ export default function ScaffoldDrawer({
           padding: '24px',
           color: '#fff',
           boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.5)',
+          maxHeight: 'calc(100dvh - 40px)',
+          overflowY: 'auto',
         }}
       >
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
@@ -140,7 +142,7 @@ export default function ScaffoldDrawer({
 
             {scaffold.parsonsBlocks && (
               <ol style={{ margin: '12px 0 0', paddingLeft: '28px', color: '#dbeafe', fontSize: '13px', lineHeight: '1.8' }}>
-                {scaffold.parsonsBlocks.map((block) => <li key={block}>{block}</li>)}
+                {scaffold.parsonsBlocks.map((block, index) => <li key={index} style={{ whiteSpace: 'pre-wrap' }}>{block}</li>)}
               </ol>
             )}
 
@@ -175,9 +177,14 @@ export default function ScaffoldDrawer({
             )}
 
             {scaffold.solutionExplanation && (
-              <div style={{ fontSize: '13px', lineHeight: '1.6', color: '#fef08a', background: 'rgba(234, 179, 8, 0.1)', border: '1px solid #eab308', padding: '12px', borderRadius: '8px' }}>
+              <div style={{ fontSize: '13px', lineHeight: '1.6', color: '#fef08a', background: 'rgba(234, 179, 8, 0.1)', border: '1px solid #eab308', padding: '12px', borderRadius: '8px', whiteSpace: 'pre-wrap' }}>
                 {scaffold.solutionExplanation}
               </div>
+            )}
+            {scaffold.solutionCode && (
+              <pre style={{ padding: '12px', background: '#030712', borderRadius: '8px', color: '#a7f3d0', fontSize: '13px', overflowX: 'auto' }}>
+                <code>{scaffold.solutionCode}</code>
+              </pre>
             )}
           </div>
         )}

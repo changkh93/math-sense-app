@@ -252,6 +252,7 @@ export default function CodeMode({
         setStdout(`[실행 완료] 모든 공개 장면(${testResults.length}/${testResults.length}) 통과! [최종 확인] 버튼을 눌러 채점을 진행하세요.`)
       } else {
         const diagnosis = matchRuleBasedMisconception({
+          problemId: kernel.id || kernel.problemId,
           testResults,
           syntaxError: null,
         })

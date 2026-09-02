@@ -1,6 +1,6 @@
 /**
- * Deterministic misconception candidates for AC-COND-001.
- * A diagnosis is only made as strongly as the available four-scene evidence allows.
+ * General return diagnostics plus explicitly scoped mission-specific rules.
+ * Variable names alone do not identify a mission's intended behavior.
  */
 
 function candidate({ misconceptionCode, title, description, guidance, diagnosticMission, confidence }) {
@@ -15,7 +15,7 @@ function candidate({ misconceptionCode, title, description, guidance, diagnostic
   }
 }
 
-export function matchRuleBasedMisconception({ testResults = [], syntaxError = null } = {}) {
+export function matchRuleBasedMisconception({ problemId = null, testResults = [], syntaxError = null } = {}) {
   if (syntaxError) {
     return {
       category: 'PROTOCOL_SYNTAX',
@@ -32,18 +32,24 @@ export function matchRuleBasedMisconception({ testResults = [], syntaxError = nu
   }
 
   if (!Array.isArray(testResults) || testResults.length === 0) return null
+  const failures = testResults.filter((test) => test?.passed === false)
+  if (failures.length === 0) return null
 
-  // 1. Incomplete solution / missing return (e.g. pass returning None / null)
-  const hasMissingReturn = testResults.every(
-    (t) => t.actual === null || t.actual === undefined
+  // A failed execution is not evidence that the student's function returned None.
+  if (failures.some((test) => test.error)) return null
+
+  // Diagnose actual None results, including a return missing on just one branch.
+  // Absent result data (undefined) is not an observed Python return value.
+  const hasMissingReturn = failures.some(
+    (test) => test.actual === null && test.expected !== null && test.expected !== undefined
   )
   if (hasMissingReturn) {
     return {
       category: 'INCOMPLETE_SOLUTION',
       misconceptionCode: 'MISSING-RETURN-01',
       title: '아직 코드가 완성되지 않았어요',
-      description: '함수가 아직 결과를 돌려주지(return) 않고 있습니다.',
-      guidance: 'pass는 아직 할 일을 정하지 않았다는 뜻입니다. 앞서 발견한 규칙을 return 문과 함께 작성해 보세요.',
+      description: '결과가 필요한 입력에서 None이 반환되었습니다.',
+      guidance: 'return이 없는 실행 경로가 있는지, return에 넣은 값이 None인지 확인해 보세요. 계산한 결과를 필요한 모든 경우에 반환해야 합니다.',
       confidence: 1,
       diagnosticMission: {
         type: 'missing_return_guide',
@@ -51,7 +57,7 @@ export function matchRuleBasedMisconception({ testResults = [], syntaxError = nu
       },
     }
   }
-  const isPatternTest = testResults.some((t) => typeof t?.inputs?.time === 'number')
+  const isPatternTest = problemId === 'AC-PAT-003'
   if (isPatternTest) {
     const resultsByTime = new Map()
     for (const test of testResults) {
@@ -118,6 +124,8 @@ export function matchRuleBasedMisconception({ testResults = [], syntaxError = nu
       }
     }
   }
+
+  if (problemId !== 'AC-COND-001') return null
 
   const resultsByInput = new Map()
   for (const test of testResults) {

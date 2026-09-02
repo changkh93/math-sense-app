@@ -4,6 +4,7 @@
  */
 
 import { getPublicKernel } from '../../shared/problems/index.js'
+import { CONSTELLATION_0_SCAFFOLDS } from './constellation0Scaffolds.js'
 
 export const SCAFFOLD_LEVELS = Object.freeze({
   S0: 0, // Independent
@@ -64,7 +65,8 @@ export const AC_COND_001_SCAFFOLD_CONTENT = {
     level: 6,
     title: 'Rescue · 해설 및 복구 연구실',
     description: '완전한 정답을 단계별로 탐구하고, 24시간 뒤 새 문제로 독립 귀환을 준비합니다.',
-    solutionExplanation: '두 조건이 모두 참이어야 할 때는 Python의 `and` 논리 연산자를 사용합니다. `def check_gate(s1, s2): return s1 and s2` 처럼 작성하면 간결하게 해결할 수 있습니다.',
+    solutionExplanation: '두 조건이 모두 참이어야 할 때는 Python의 and 논리 연산자를 사용합니다.',
+    solutionCode: 'def check_gate(s1, s2):\n    return s1 and s2\n',
     source: 'solution-review',
     answerExposure: 'full',
   },
@@ -118,7 +120,8 @@ export const AC_COND_002_SCAFFOLD_CONTENT = {
     level: 6,
     title: 'Rescue · 해설 및 복구 연구실',
     description: '완전한 정답을 단계별로 탐구하고, 24시간 뒤 새 문제로 독립 귀환을 준비합니다.',
-    solutionExplanation: '둘 중 하나만 참이어도 되는 대안 조건은 Python의 `or` 연산자를 사용합니다. `def can_board(has_card, emergency_approved): return has_card or emergency_approved` 처럼 작성하면 해결할 수 있습니다.',
+    solutionExplanation: '둘 중 하나만 참이어도 되는 대안 조건은 Python의 or 연산자를 사용합니다.',
+    solutionCode: 'def can_board(has_card, emergency_approved):\n    return has_card or emergency_approved\n',
     source: 'solution-review',
     answerExposure: 'full',
   },
@@ -173,7 +176,8 @@ export const AC_PAT_003_SCAFFOLD_CONTENT = {
     level: 6,
     title: 'Rescue · 해설 및 복구 연구실',
     description: '완전한 정답을 단계별로 탐구하고, 24시간 뒤 새 문제로 독립 귀환을 준비합니다.',
-    solutionExplanation: '3초 주기는 `time % 3 == 0` 수식으로 표현합니다. `def check_bridge(time): return time % 3 == 0` 처럼 작성하면 모든 시간에 대해 정확히 다리 개폐를 판정할 수 있습니다.',
+    solutionExplanation: '3초 주기는 time % 3 == 0으로 표현합니다. 시간을 3으로 나눈 나머지가 0이면 다리가 열립니다.',
+    solutionCode: 'def check_bridge(time):\n    return time % 3 == 0\n',
     source: 'solution-review',
     answerExposure: 'full',
   },
@@ -228,7 +232,8 @@ export const AC_PAT_004_SCAFFOLD_CONTENT = {
     level: 6,
     title: 'Rescue · 해설 및 복구 연구실',
     description: '완전한 정답을 단계별로 탐구하고, 24시간 뒤 새 문제로 독립 귀환을 준비합니다.',
-    solutionExplanation: '4초 주기 중 0초, 1초 구간은 `time % 4 < 2`로 표현합니다. `def beacon_light(time): return time % 4 < 2` 처럼 작성하면 등대의 발광 구간을 판정할 수 있습니다.',
+    solutionExplanation: '4초 주기 중 0초, 1초 구간은 time % 4 < 2로 표현합니다. 나머지가 0 또는 1일 때만 빛납니다.',
+    solutionCode: 'def beacon_light(time):\n    return time % 4 < 2\n',
     source: 'solution-review',
     answerExposure: 'full',
   },
@@ -285,7 +290,8 @@ export const AC_SEQ_005_SCAFFOLD_CONTENT = {
     level: 6,
     title: 'Rescue · 해설 및 복구 연구실',
     description: '완전한 정답을 단계별로 탐구하고, 24시간 뒤 새 문제로 독립 귀환을 준비합니다.',
-    solutionExplanation: '리스트 순회와 조건 누적은 for + if 패턴을 사용합니다. `def collect_energy(capsules): total = 0; for e in capsules: if e > 0: total += e; return total`로 작성할 수 있습니다.',
+    solutionExplanation: 'for로 캡슐을 하나씩 확인하고, if로 양수만 골라 누적합니다. return은 모든 캡슐을 확인한 뒤 실행합니다.',
+    solutionCode: 'def collect_energy(capsules):\n    total = 0\n    for e in capsules:\n        if e > 0:\n            total += e\n    return total\n',
     source: 'solution-review',
     answerExposure: 'full',
   },
@@ -342,7 +348,8 @@ export const AC_NAV_005_SCAFFOLD_CONTENT = {
     level: 6,
     title: 'Rescue · 해설 및 복구 연구실',
     description: '완전한 정답을 단계별로 탐구하고, 24시간 뒤 새 문제로 독립 귀환을 준비합니다.',
-    solutionExplanation: 'FIFO 대기열은 `from collections import deque`와 `popleft()`를 사용합니다. `def process_signals(signals): q = deque(signals); res = []; while q: res.append(q.popleft()); return res`로 작성할 수 있습니다.',
+    solutionExplanation: 'deque에 신호를 넣고 popleft()로 먼저 들어온 신호부터 꺼냅니다. 큐가 빌 때까지 처리한 뒤 결과를 반환합니다.',
+    solutionCode: 'from collections import deque\n\ndef process_signals(signals):\n    q = deque(signals)\n    result = []\n    while q:\n        result.append(q.popleft())\n    return result\n',
     source: 'solution-review',
     answerExposure: 'full',
   },
@@ -377,7 +384,7 @@ export const AC_NAV_006_SCAFFOLD_CONTENT = {
     level: 4,
     title: 'S4 · 항로 절차 카드',
     description: '단계별 논리 흐름을 확인하세요.',
-    content: `[절차 카드]\n1. queue = deque([(sr, sc, 0)]), visited = {(sr, sc)} 로 시작한다.\n2. queue.popleft() 로 현재 좌표 (r, c)와 거리 dist를 꺼낸다.\n3. (r, c) == target 이면 dist를 즉시 반환한다.\n4. 상하좌우 유효한 다음 칸을 visited에 넣고 queue에 (nr, nc, dist + 1)을 넣는다.\n5. 큐가 빌 때까지 도달하지 못하면 -1을 반환한다.`,
+    content: `[절차 카드]\n1. start에서 sr, sc를 꺼내고 queue = deque([(sr, sc, 0)]), visited = {(sr, sc)} 로 시작한다.\n2. queue.popleft() 로 현재 좌표 (r, c)와 거리 dist를 꺼낸다.\n3. r == target[0] and c == target[1] 이면 dist를 즉시 반환한다.\n4. 상하좌우 유효한 다음 칸을 visited에 넣고 queue에 (nr, nc, dist + 1)을 넣는다.\n5. 큐가 빌 때까지 도달하지 못하면 -1을 반환한다.`,
     source: 'hint',
     answerExposure: 'partial',
   },
@@ -386,10 +393,12 @@ export const AC_NAV_006_SCAFFOLD_CONTENT = {
     title: 'S5 · 부분 절차 배열 (Parsons)',
     description: '필요한 절차 블록을 순서대로 배열해 보세요.',
     parsonsBlocks: [
+      'sr, sc = start',
       'queue = deque([(sr, sc, 0)]); visited = {(sr, sc)}',
       'while queue:',
       '    r, c, dist = queue.popleft()',
-      '    if (r, c) == target: return dist',
+      '    if r == target[0] and c == target[1]:',
+      '        return dist',
       '    # 유효한 이웃 칸을 visited에 넣고 queue에 append',
       'return -1',
     ],
@@ -406,606 +415,71 @@ export const AC_NAV_006_SCAFFOLD_CONTENT = {
   },
 }
 
-export const AC_EXP_LOOP_06_SCAFFOLD_CONTENT = {
-  S1: {
-    level: 1,
-    title: 'S1 · 반복 및 누적 스캔',
-    description: '반복 횟수와 매 회차 더해지는 에너지에 주목해 보세요.',
-    content: 'times 만큼 반복하며 step_energy 씩 누적해야 합니다. 0부터 시작하는 누적 변수(energy = 0)와 정해진 횟수 반복(range(times))에 주목해 보세요.',
-    source: 'hint',
-    answerExposure: 'none',
-  },
-  S2: {
-    level: 2,
-    title: 'S2 · 회차별 상태 렌즈',
-    description: 'for문이 돌 때마다의 상태 변화를 확인하세요.',
-    content: 'times=4, step_energy=2일 때:\n• 1회차: energy = 0 + 2 = 2\n• 2회차: energy = 2 + 2 = 4\n• 3회차: energy = 4 + 2 = 6\n• 4회차: energy = 6 + 2 = 8',
-    source: 'hint',
-    answerExposure: 'partial',
-  },
-  S3: {
-    level: 3,
-    title: 'S3 · 방향 유도 질문',
-    description: '반복문 코드를 작성하는 질문입니다.',
-    content: '질문: "Python에서 정수 times번만큼 반복하려면 `for i in range(times):`를 어떻게 써야 할까요? (정수는 바로 for문에 쓸 수 없고 range() 함수를 거쳐야 합니다)"',
-    source: 'hint',
-    answerExposure: 'partial',
-  },
-  S4: {
-    level: 4,
-    title: 'S4 · 항로 절차 카드',
-    description: '단계별 논리 흐름을 확인하세요.',
-    content: `[절차 카드]\n1. energy = 0 으로 누적 변수를 준비한다.\n2. for i in range(times): 로 times번 반복한다.\n3. 루프 본문에서 energy = energy + step_energy 로 값을 더한다.\n4. 반복이 끝나면 energy를 반환한다.`,
-    source: 'hint',
-    answerExposure: 'partial',
-  },
-  S5: {
-    level: 5,
-    title: 'S5 · 부분 절차 배열 (Parsons)',
-    description: '필요한 절차 블록을 순서대로 배열해 보세요.',
-    parsonsBlocks: [
-      'energy = 0',
-      'for i in range(times):',
-      '    energy = energy + step_energy',
-      'return energy',
-    ],
-    source: 'parsons',
-    answerExposure: 'partial',
-  },
-  RESCUE: {
-    level: 6,
-    title: 'Rescue · 해설 및 복구 연구실',
-    description: '완전한 정답을 단계별로 탐구하고, 24시간 뒤 새 문제로 독립 귀환을 준비합니다.',
-    solutionExplanation: '정해진 횟수 반복과 상태 누적은 for + range 패턴을 사용합니다. 정수(times)는 바로 for문에 넣을 수 없으며, `for i in range(times):` 형태로 작성해야 0부터 times-1까지 순서대로 반복하며 energy에 step_energy를 누적할 수 있습니다.',
-    source: 'solution-review',
-    answerExposure: 'full',
-  },
-}
-
-export const AC_EXP_STEP_03_SCAFFOLD_CONTENT = {
-  S1: {
-    level: 1,
-    title: 'S1 · 3단계 절차 스캔',
-    description: '충전, 부스트 증폭, 방어막의 3단계 흐름을 확인하세요.',
-    content: '1단계 충전(charge) ➔ 2단계 증폭(boost) ➔ 3단계 방어막(shield) 순서로 에너지가 전이됩니다. 빠진 2단계 연산에 주목하세요.',
-    source: 'hint',
-    answerExposure: 'none',
-  },
-  S2: {
-    level: 2,
-    title: 'S2 · 상태 전이 렌즈',
-    description: '초기값 2에서 단계별 전이 결과를 확인하세요.',
-    content: '• 1단계(충전): 2 + 3 = 5\n• 2단계(증폭): 5 * 4 = 20 (빠진 명령)\n• 3단계(방어막): 20 - 5 = 15',
-    source: 'hint',
-    answerExposure: 'partial',
-  },
-  S3: {
-    level: 3,
-    title: 'S3 · 방향 유도 질문',
-    description: '앞 단계 결과를 다음 단계로 연결하는 질문입니다.',
-    content: '질문: "1단계 충전 결과가 담긴 energy 변수에 boost를 곱하여 갱신하려면 어떤 대입 연산문을 써야 할까요?"',
-    source: 'hint',
-    answerExposure: 'partial',
-  },
-  S4: {
-    level: 4,
-    title: 'S4 · 항로 절차 카드',
-    description: '단계별 논리 흐름을 확인하세요.',
-    content: `[절차 카드]\n1. energy = initial_energy\n2. energy = energy + charge\n3. energy = energy * boost  # 빠진 증폭 명령\n4. energy = energy - shield\n5. return energy`,
-    source: 'hint',
-    answerExposure: 'partial',
-  },
-  S5: {
-    level: 5,
-    title: 'S5 · 부분 절차 배열 (Parsons)',
-    description: '필요한 절차 블록을 순서대로 배열해 보세요.',
-    parsonsBlocks: [
-      'energy = initial_energy',
-      'energy = energy + charge',
-      'energy = energy * boost',
-      'energy = energy - shield',
-      'return energy',
-    ],
-    source: 'parsons',
-    answerExposure: 'partial',
-  },
-  RESCUE: {
-    level: 6,
-    title: 'Rescue · 해설 및 복구 연구실',
-    description: '완전한 정답을 단계별로 탐구하고, 24시간 뒤 새 문제로 독립 귀환을 준비합니다.',
-    solutionExplanation: '연속된 절차는 앞 단계의 계산 결과(energy)를 다음 단계 연산의 입력으로 계속 이어받아 갱신합니다. 빠진 2단계에는 `energy = energy * boost`를 채워 넣어야 합니다.',
-    source: 'solution-review',
-    answerExposure: 'full',
-  },
-}
-
-export const AC_EXP_BOUND_05_SCAFFOLD_CONTENT = {
-  S1: {
-    level: 1,
-    title: 'S1 · 경계선 포함 스캔',
-    description: '경계선 위의 지점(pos = limit = 10)의 안전 여부에 주목하세요.',
-    content: '🛰️ 탐사 규정: 탐사선이 경계선(limit)에 닿은 위치(10)까지 안전(True)으로 판정해야 합니다.',
-    source: 'hint',
-    answerExposure: 'none',
-  },
-  S2: {
-    level: 2,
-    title: 'S2 · 비교 연산자 렌즈 (< vs <=)',
-    description: '경계값(10)에서의 두 연산자 차이를 확인하세요.',
-    content: '• 10 < 10 ➔ False (경계선 제외)\n• 10 <= 10 ➔ True (경계선 포함)',
-    source: 'hint',
-    answerExposure: 'partial',
-  },
-  S3: {
-    level: 3,
-    title: 'S3 · 방향 유도 질문',
-    description: '경계 포함 조건을 코드로 작성하는 질문입니다.',
-    content: '질문: "current_pos가 limit 이하(작거나 같음)인지 검사하는 Python 비교 연산자 기호는 무엇일까요?"',
-    source: 'hint',
-    answerExposure: 'partial',
-  },
-  S4: {
-    level: 4,
-    title: 'S4 · 항로 절차 카드',
-    description: '단계별 논리 흐름을 확인하세요.',
-    content: `[절차 카드]\n1. current_pos와 limit의 크기를 비교한다.\n2. current_pos <= limit 비교식을 작성한다.\n3. 비교식의 참/거짓(True/False) 결과를 반환한다.`,
-    source: 'hint',
-    answerExposure: 'partial',
-  },
-  S5: {
-    level: 5,
-    title: 'S5 · 부분 절차 배열 (Parsons)',
-    description: '필요한 절차 블록을 순서대로 배열해 보세요.',
-    parsonsBlocks: [
-      'return current_pos <= limit',
-    ],
-    source: 'parsons',
-    answerExposure: 'partial',
-  },
-  RESCUE: {
-    level: 6,
-    title: 'Rescue · 해설 및 복구 연구실',
-    description: '완전한 정답을 단계별로 탐구하고, 24시간 뒤 새 문제로 독립 귀환을 준비합니다.',
-    solutionExplanation: '경계값을 안전 구역에 포함하려면 이하(<=) 연산자를 사용합니다. `def check_within_boundary(current_pos, limit): return current_pos <= limit` 처럼 작성하면 경계선 위의 위치(10)까지 정확히 True로 판정합니다.',
-    source: 'solution-review',
-    answerExposure: 'full',
-  },
-}
-
-export const AC_EXP_SEQ_01_SCAFFOLD_CONTENT = {
-  S1: {
-    level: 1,
-    title: 'S1 · 순차 누적 스캔',
-    description: '초기 에너지와 세 번의 추가 에너지에 주목하세요.',
-    content: 'initial_energy 변수에 first, second, third를 순서대로 더해 최종 에너지를 계산해야 합니다.',
-    source: 'hint',
-    answerExposure: 'none',
-  },
-  S2: {
-    level: 2,
-    title: 'S2 · 단계별 누적 렌즈',
-    description: '초기값에서 3단계로 누적되는 과정을 확인하세요.',
-    content: '1. energy = initial_energy\n2. energy = energy + first\n3. energy = energy + second\n4. energy = energy + third',
-    source: 'hint',
-    answerExposure: 'partial',
-  },
-  S3: {
-    level: 3,
-    title: 'S3 · 방향 유도 질문',
-    description: '순차 계산을 코드로 작성하는 질문입니다.',
-    content: '질문: "변수에 값을 차례로 더해 누적하는 산술 연산자(+)를 어떻게 연결할 수 있을까요?"',
-    source: 'hint',
-    answerExposure: 'partial',
-  },
-  S4: {
-    level: 4,
-    title: 'S4 · 항로 절차 카드',
-    description: '단계별 논리 흐름을 확인하세요.',
-    content: `[절차 카드]\n1. energy = initial_energy 로 시작한다.\n2. first, second, third를 순서대로 더한다.\n3. 최종 energy 값을 반환한다.`,
-    source: 'hint',
-    answerExposure: 'partial',
-  },
-  S5: {
-    level: 5,
-    title: 'S5 · 부분 절차 배열 (Parsons)',
-    description: '필요한 절차 블록을 순서대로 배열해 보세요.',
-    parsonsBlocks: [
-      'energy = initial_energy',
-      'energy = energy + first + second + third',
-      'return energy',
-    ],
-    source: 'parsons',
-    answerExposure: 'partial',
-  },
-  RESCUE: {
-    level: 6,
-    title: 'Rescue · 해설 및 복구 연구실',
-    description: '완전한 정답을 단계별로 탐구하고, 24시간 뒤 새 문제로 독립 귀환을 준비합니다.',
-    solutionExplanation: '순차 실행은 명령문이 위에서 아래로 차례대로 실행됩니다. `def sequence_energy(initial_energy, first, second, third): return initial_energy + first + second + third` 처럼 작성하면 됩니다.',
-    source: 'solution-review',
-    answerExposure: 'full',
-  },
-}
-
-export const AC_EXP_VAR_02_SCAFFOLD_CONTENT = {
-  S1: {
-    level: 1,
-    title: 'S1 · 변수 갱신 스캔',
-    description: '변수 a, b의 값을 더해 c에 저장하는 흐름에 주목하세요.',
-    content: '두 변수 a와 b의 합을 구하여 c 변수에 저장하고, 계산된 c를 반환해야 합니다.',
-    source: 'hint',
-    answerExposure: 'none',
-  },
-  S2: {
-    level: 2,
-    title: 'S2 · 대입 연산자(=) 렌즈',
-    description: '우변의 계산 결과를 좌변 변수에 담는 원리를 확인하세요.',
-    content: '`c = a + b`를 실행하면 우변(a + b)이 먼저 계산된 후 좌변의 변수 c에 저장됩니다.',
-    source: 'hint',
-    answerExposure: 'partial',
-  },
-  S3: {
-    level: 3,
-    title: 'S3 · 방향 유도 질문',
-    description: '변수 정의를 코드로 작성하는 질문입니다.',
-    content: '질문: "Python에서 두 값의 합을 새로운 변수 c에 할당하는 대입문은 어떻게 작성하나요?"',
-    source: 'hint',
-    answerExposure: 'partial',
-  },
-  S4: {
-    level: 4,
-    title: 'S4 · 항로 절차 카드',
-    description: '단계별 논리 흐름을 확인하세요.',
-    content: `[절차 카드]\n1. a와 b를 더한다 (a + b).\n2. 더한 결과를 변수 c에 대입한다 (c = a + b).\n3. c를 반환한다 (return c).`,
-    source: 'hint',
-    answerExposure: 'partial',
-  },
-  S5: {
-    level: 5,
-    title: 'S5 · 부분 절차 배열 (Parsons)',
-    description: '필요한 절차 블록을 순서대로 배열해 보세요.',
-    parsonsBlocks: [
-      'c = a + b',
-      'return c',
-    ],
-    source: 'parsons',
-    answerExposure: 'partial',
-  },
-  RESCUE: {
-    level: 6,
-    title: 'Rescue · 해설 및 복구 연구실',
-    description: '완전한 정답을 단계별로 탐구하고, 24시간 뒤 새 문제로 독립 귀환을 준비합니다.',
-    solutionExplanation: '변수 할당은 `c = a + b` 문법을 사용합니다. `def compute_sum(a, b): c = a + b; return c` 로 작성하면 두 입력의 합을 계산하여 반환할 수 있습니다.',
-    source: 'solution-review',
-    answerExposure: 'full',
-  },
-}
-
-export const AC_EXP_SWAP_04_SCAFFOLD_CONTENT = {
-  S1: {
-    level: 1,
-    title: 'S1 · 교환(Swap) 스캔',
-    description: '두 화물 상자(box_a, box_b)의 위치를 맞바꾸는 작업에 주목하세요.',
-    content: 'box_a의 내용물과 box_b의 내용물을 서로 맞바꿔서 [box_b, box_a] 형태로 반환해야 합니다.',
-    source: 'hint',
-    answerExposure: 'none',
-  },
-  S2: {
-    level: 2,
-    title: 'S2 · 임시 변수 / 튜플 스왑 렌즈',
-    description: '덮어쓰기 전에 값을 보관하거나 동시 대입하는 원리를 확인하세요.',
-    content: '• 방법 A (임시 변수): temp = box_a; box_a = box_b; box_b = temp\n• 방법 B (동시 교환): box_a, box_b = box_b, box_a',
-    source: 'hint',
-    answerExposure: 'partial',
-  },
-  S3: {
-    level: 3,
-    title: 'S3 · 방향 유도 질문',
-    description: '두 변수의 값을 안전하게 교환하는 질문입니다.',
-    content: '질문: "Python에서 두 변수의 값을 한 번에 맞바꾸려면 `box_a, box_b = box_b, box_a` 문법을 어떻게 쓸 수 있을까요?"',
-    source: 'hint',
-    answerExposure: 'partial',
-  },
-  S4: {
-    level: 4,
-    title: 'S4 · 항로 절차 카드',
-    description: '단계별 논리 흐름을 확인하세요.',
-    content: `[절차 카드]\n1. box_a와 box_b의 값을 맞바꾼다 (box_a, box_b = box_b, box_a).\n2. 교환된 결과를 리스트 [box_a, box_b]로 묶어 반환한다.`,
-    source: 'hint',
-    answerExposure: 'partial',
-  },
-  S5: {
-    level: 5,
-    title: 'S5 · 부분 절차 배열 (Parsons)',
-    description: '필요한 절차 블록을 순서대로 배열해 보세요.',
-    parsonsBlocks: [
-      'box_a, box_b = box_b, box_a',
-      'return [box_a, box_b]',
-    ],
-    source: 'parsons',
-    answerExposure: 'partial',
-  },
-  RESCUE: {
-    level: 6,
-    title: 'Rescue · 해설 및 복구 연구실',
-    description: '완전한 정답을 단계별로 탐구하고, 24시간 뒤 새 문제로 독립 귀환을 준비합니다.',
-    solutionExplanation: 'Python의 다중 대입(Tuple Swap)을 사용하면 임시 변수 없이도 안전하게 두 값을 바꿀 수 있습니다. `def swap_cargo(box_a, box_b): box_a, box_b = box_b, box_a; return [box_a, box_b]` 처럼 작성합니다.',
-    source: 'solution-review',
-    answerExposure: 'full',
-  },
-}
-
-export const AC_EXP_WHILE_07_SCAFFOLD_CONTENT = {
-  S1: {
-    level: 1,
-    title: 'S1 · 종료 조건 스캔',
-    description: '안전 구역(safe_zone)을 넘지 않고 멈추는 조건에 주목하세요.',
-    content: '로버가 한 걸음 더 갔을 때(current_pos + stride) 안전선(safe_zone) 이하인 동안에만 전진해야 합니다.',
-    source: 'hint',
-    answerExposure: 'none',
-  },
-  S2: {
-    level: 2,
-    title: 'S2 · 조건부 반복(while) 렌즈',
-    description: 'while문의 조건 평가와 전진 동작을 확인하세요.',
-    content: '`while current_pos + stride <= safe_zone:` 조건을 검사하여, 다음 걸음이 안전할 때만 `current_pos = current_pos + stride`를 실행합니다.',
-    source: 'hint',
-    answerExposure: 'partial',
-  },
-  S3: {
-    level: 3,
-    title: 'S3 · 방향 유도 질문',
-    description: '안전선 직전 정지 조건을 작성하는 질문입니다.',
-    content: '질문: "다음 위치(current_pos + stride)가 safe_zone을 넘지 않아야(<=) 전진할 수 있는 while 조건을 어떻게 작성할까요?"',
-    source: 'hint',
-    answerExposure: 'partial',
-  },
-  S4: {
-    level: 4,
-    title: 'S4 · 항로 절차 카드',
-    description: '단계별 논리 흐름을 확인하세요.',
-    content: `[절차 카드]\n1. while current_pos + stride <= safe_zone: 조건으로 전진 가능 여부를 확인한다.\n2. 가능하면 current_pos = current_pos + stride 로 전진한다.\n3. 더 이상 안전하게 전진할 수 없으면 루프를 종료하고 current_pos를 반환한다.`,
-    source: 'hint',
-    answerExposure: 'partial',
-  },
-  S5: {
-    level: 5,
-    title: 'S5 · 부분 절차 배열 (Parsons)',
-    description: '필요한 절차 블록을 순서대로 배열해 보세요.',
-    parsonsBlocks: [
-      'while current_pos + stride <= safe_zone:',
-      '    current_pos = current_pos + stride',
-      'return current_pos',
-    ],
-    source: 'parsons',
-    answerExposure: 'partial',
-  },
-  RESCUE: {
-    level: 6,
-    title: 'Rescue · 해설 및 복구 연구실',
-    description: '완전한 정답을 단계별로 탐구하고, 24시간 뒤 새 문제로 독립 귀환을 준비합니다.',
-    solutionExplanation: '정해지지 않은 횟수의 안전 전진은 while문을 사용합니다. `def advance_safe(current_pos, stride, safe_zone): while current_pos + stride <= safe_zone: current_pos += stride; return current_pos` 로 작성합니다.',
-    source: 'solution-review',
-    answerExposure: 'full',
-  },
-}
-
-export const AC_EXP_EQUIV_09_SCAFFOLD_CONTENT = {
-  S1: {
-    level: 1,
-    title: 'S1 · 연산 동치성 스캔',
-    description: '분배법칙: (a + b) * c 와 a * c + b * c 가 같음을 확인하세요.',
-    content: '두 묶음 a와 b를 먼저 더한 뒤 배율 c를 곱하는 코드를 작성하세요. 괄호의 우선순위에 주목합니다.',
-    source: 'hint',
-    answerExposure: 'none',
-  },
-  S2: {
-    level: 2,
-    title: 'S2 · 괄호 연산자 우선순위 렌즈',
-    description: '덧셈을 먼저 수행하기 위한 괄호 사용법을 확인하세요.',
-    content: '`a + b * c`는 곱셈이 먼저 계산됩니다. 덧셈을 먼저 하려면 반드시 `(a + b) * c` 처럼 괄호를 씌워야 합니다.',
-    source: 'hint',
-    answerExposure: 'partial',
-  },
-  S3: {
-    level: 3,
-    title: 'S3 · 방향 유도 질문',
-    description: '수식을 코드로 작성하는 질문입니다.',
-    content: '질문: "Python에서 (a + b)를 먼저 계산한 후 c를 곱하여 결과를 반환하는 식은 어떻게 작성할까요?"',
-    source: 'hint',
-    answerExposure: 'partial',
-  },
-  S4: {
-    level: 4,
-    title: 'S4 · 항로 절차 카드',
-    description: '단계별 논리 흐름을 확인하세요.',
-    content: `[절차 카드]\n1. a와 b를 괄호로 묶어 더한다 ((a + b)).\n2. 그 합에 c를 곱한다 ((a + b) * c).\n3. 계산 결과를 반환한다.`,
-    source: 'hint',
-    answerExposure: 'partial',
-  },
-  S5: {
-    level: 5,
-    title: 'S5 · 부분 절차 배열 (Parsons)',
-    description: '필요한 절차 블록을 순서대로 배열해 보세요.',
-    parsonsBlocks: [
-      'return (a + b) * c',
-    ],
-    source: 'parsons',
-    answerExposure: 'partial',
-  },
-  RESCUE: {
-    level: 6,
-    title: 'Rescue · 해설 및 복구 연구실',
-    description: '완전한 정답을 단계별로 탐구하고, 24시간 뒤 새 문제로 독립 귀환을 준비합니다.',
-    solutionExplanation: '연산자 우선순위를 제어할 때는 괄호를 사용합니다. `def calculate_equivalent(a, b, c): return (a + b) * c` 처럼 작성하면 올바른 결과를 반환합니다.',
-    source: 'solution-review',
-    answerExposure: 'full',
-  },
-}
-
-export const AC_EXP_REVERSE_10_SCAFFOLD_CONTENT = {
-  S1: {
-    level: 1,
-    title: 'S1 · 역추론 규칙 스캔',
-    description: '입력과 출력 데이터 사이의 수학적 규칙을 찾아보세요.',
-    content: '입력값 level이 1, 2, 3일 때 출력이 5, 8, 11로 증가하는 패턴(기울기 3, 기본값 2)을 분석하세요.',
-    source: 'hint',
-    answerExposure: 'none',
-  },
-  S2: {
-    level: 2,
-    title: 'S2 · 일차함수(ax + b) 렌즈',
-    description: '증가량과 시작값을 확인하세요.',
-    content: '• level이 1 증가할 때마다 출력이 3씩 증가합니다 ➔ multiplier = 3\n• level=0 일 때의 시작값 ➔ base = 2\n• 최종 공식: level * 3 + 2',
-    source: 'hint',
-    answerExposure: 'partial',
-  },
-  S3: {
-    level: 3,
-    title: 'S3 · 방향 유도 질문',
-    description: '발견한 규칙을 코드로 표현하는 질문입니다.',
-    content: '질문: "level에 배율(3)을 곱하고 기본값(2)을 더하는 공식을 return 문에 어떻게 작성할까요?"',
-    source: 'hint',
-    answerExposure: 'partial',
-  },
-  S4: {
-    level: 4,
-    title: 'S4 · 항로 절차 카드',
-    description: '단계별 논리 흐름을 확인하세요.',
-    content: `[절차 카드]\n1. level * 3 으로 증가분을 계산한다.\n2. 기본값 2를 더한다 (level * 3 + 2).\n3. 계산 결과를 반환한다.`,
-    source: 'hint',
-    answerExposure: 'partial',
-  },
-  S5: {
-    level: 5,
-    title: 'S5 · 부분 절차 배열 (Parsons)',
-    description: '필요한 절차 블록을 순서대로 배열해 보세요.',
-    parsonsBlocks: [
-      'return level * 3 + 2',
-    ],
-    source: 'parsons',
-    answerExposure: 'partial',
-  },
-  RESCUE: {
-    level: 6,
-    title: 'Rescue · 해설 및 복구 연구실',
-    description: '완전한 정답을 단계별로 탐구하고, 24시간 뒤 새 문제로 독립 귀환을 준비합니다.',
-    solutionExplanation: '숨겨진 규칙은 `level * 3 + 2` 일차식입니다. `def deduce_energy(level): return level * 3 + 2` 로 작성하면 모든 레벨에 대한 에너지를 정확히 산출할 수 있습니다.',
-    source: 'solution-review',
-    answerExposure: 'full',
-  },
+function pythonValue(value) {
+  if (value === null) return 'None'
+  if (value === true) return 'True'
+  if (value === false) return 'False'
+  if (Array.isArray(value)) return `[${value.map(pythonValue).join(', ')}]`
+  if (typeof value === 'object') {
+    return `{${Object.entries(value).map(([key, item]) => `${JSON.stringify(key)}: ${pythonValue(item)}`).join(', ')}}`
+  }
+  return JSON.stringify(value)
 }
 
 function generateDynamicScaffold(problemId) {
   const kernel = getPublicKernel(problemId)
-  if (!kernel) {
-    return {
-      S1: { level: 1, title: 'S1 · 조건 스캔', description: '문제의 핵심 단어에 주목하세요.', content: '문제의 입력 조건과 요구 결과를 확인해 보세요.', source: 'hint', answerExposure: 'none' },
-      S2: { level: 2, title: 'S2 · 실험 렌즈', description: '대화형 실험실의 규칙을 확인하세요.', content: '실험실에서 확인한 입력과 출력 사이의 전이 규칙을 코드로 표현해 보세요.', source: 'hint', answerExposure: 'partial' },
-      S3: { level: 3, title: 'S3 · 방향 질문', description: '생각을 구체화하는 질문입니다.', content: '질문: "목표 결과를 도출하기 위해 필요한 문법이나 연산자는 무엇일까요?"', source: 'hint', answerExposure: 'partial' },
-      S4: { level: 4, title: 'S4 · 항로 절차 카드', description: '단계별 논리 흐름을 확인하세요.', content: '[절차 카드]\n1. 입력 변수 확인\n2. 규칙에 따른 상태 갱신\n3. return 문으로 반환', source: 'hint', answerExposure: 'partial' },
-      S5: { level: 5, title: 'S5 · 부분 절차 배열', description: '필요한 절차 블록을 확인하세요.', parsonsBlocks: ['입력 변수를 확인한다.', '규칙에 따라 연산한다.', '결과를 반환한다.'], source: 'parsons', answerExposure: 'partial' },
-      RESCUE: { level: 6, title: 'Rescue · 해설', description: '완전한 정답을 단계별로 탐구합니다.', solutionExplanation: '대화형 실험실에서 발견한 규칙을 바탕으로 함수 본문을 구성하세요.', source: 'solution-review', answerExposure: 'full' },
-    }
-  }
+  if (!kernel) return null
 
-  const title = kernel.identity?.studentTitle || '탐사 미션'
-  const subtitle = kernel.identity?.subtitle || '규칙을 파악하여 코드로 완성하세요.'
-  const explore = kernel.modes?.explore || {}
-  const lensConfig = explore.lensConfig || {}
-  const intro = lensConfig.introContext || {}
-  const ruleStatement = lensConfig.ruleStatement || explore.ruleStatement || subtitle
-  const entryFunction = kernel.modes?.code?.entryFunction || 'solve'
-  const variables = intro.variables || []
-  const varDesc = variables.length > 0 ? variables.map((v) => `${v.name} (${v.label || v.value})`).join(', ') : ''
-
-  const s1Content = intro.description
-    ? `🎯 목표: ${subtitle}\n\n📋 상황 안내:\n${intro.description}${varDesc ? `\n\n📌 주요 변수: ${varDesc}` : ''}`
-    : `🎯 [${title}]의 핵심 목표:\n${subtitle}${varDesc ? `\n\n📌 주요 변수: ${varDesc}` : ''}`
-
-  const frames = lensConfig.frames || explore.frames || []
-  let s2Content = ''
-  if (intro.guidance) {
-    s2Content = `🔍 대화형 실험실 가이드:\n${intro.guidance}`
-  } else if (frames.length > 0) {
-    const frameSummaries = frames.map((f, i) => `• 단계 ${i + 1} (${f.stepTitle || f.operationLabel || ''}): ${f.prompt || f.codeSnippet || ''}`)
-    s2Content = `🔍 단계별 상태 변화:\n${frameSummaries.join('\n')}`
-  } else {
-    s2Content = `🔍 실험실 관찰:\n입력 상태가 각 연산을 거칠 때 어떻게 변화하는지 확인해 보세요.`
-  }
-
-  const s3Content = lensConfig.discoveryQuestion?.prompt || explore.predictionPrompt || lensConfig.predictionPrompt
-    ? `질문: "${lensConfig.discoveryQuestion?.prompt || explore.predictionPrompt || lensConfig.predictionPrompt}"`
-    : `질문: "입력값이 들어왔을 때, 어떤 연산자나 문법(if, for, while, 연산식)을 적용해야 목표 결과(${ruleStatement})에 도달할까요?"`
-
-  const frameSteps = frames.map((f, idx) => `${idx + 1}. ${f.stepTitle || f.operationLabel || `단계 ${idx + 1}`}: ${f.prompt || f.codeSnippet || ''}`)
-  const s4Content = frameSteps.length > 0
-    ? `[절차 카드]\n${frameSteps.join('\n')}\n${frameSteps.length + 1}. 최종 결과를 return 문으로 반환한다.`
-    : `[절차 카드]\n1. 함수 '${entryFunction}'의 매개변수를 확인한다.\n2. 규칙(${ruleStatement})에 따라 계산 또는 조건 검사를 수행한다.\n3. 계산된 최종 상태를 return 문으로 반환한다.`
-
-  const parsonsBlocks = frames.length > 0
-    ? frames.map((f) => f.codeSnippet || f.operationLabel || f.stepTitle).filter(Boolean)
-    : [
-        `def ${entryFunction}(...):`,
-        `    # ${ruleStatement}`,
-        `    return 결과`,
-      ]
-
-  const rescueExplanation = `💡 [${title}]의 핵심 규칙:\n${ruleStatement}\n\n함수 '${entryFunction}'을 작성할 때 전달된 입력값을 활용하여 위 규칙을 코드로 조립하고 return으로 반환해야 합니다.`
+  const title = kernel.identity.studentTitle
+  const subtitle = kernel.identity.subtitle
+  const lens = kernel.modes.explore.lensConfig || {}
+  const rule = lens.ruleStatement || kernel.learning.objective || subtitle
+  const code = kernel.modes.code
+  const tests = kernel.assessment.publicTests || []
+  const signature = code.starterCode.match(/^def .+:$/m)?.[0]
+  const inputs = Object.keys(tests[0]?.inputs || {})
+  const examples = tests.slice(0, 3).map((test, index) => (
+    `${index + 1}. ${Object.entries(test.inputs).map(([key, value]) => `${key}=${pythonValue(value)}`).join(', ')} → ${pythonValue(test.expected)}`
+  )).join('\n')
+  const frames = lens.frames || []
+  // Frames may be independent experiments or counterexamples. They belong in
+  // observation help, never in a purported implementation/Parsons algorithm.
+  const observations = frames.slice(0, 4).map((frame, index) => (
+    `${index + 1}. ${frame.stepTitle || frame.operationLabel || '관찰'}${frame.prompt ? `: ${frame.prompt}` : ''}${frame.stateAfter ? `\n   관찰 상태: ${pythonValue(frame.stateAfter)}` : ''}`
+  )).join('\n')
+  const instructions = code.starterCode.split('\n')
+    .filter((line) => line.trim().startsWith('#'))
+    .map((line) => line.trim().replace(/^#\s*/, ''))
+    .join('\n')
+  const hint = (level, heading, content) => ({
+    level, title: heading, content, source: 'hint', answerExposure: level === 1 ? 'none' : 'partial',
+  })
 
   return {
-    S1: {
-      level: 1,
-      title: `S1 · 조건 스캔 (${title})`,
-      description: '문제에서 가장 중요한 단어와 목표에 주목해 보세요.',
-      content: s1Content,
-      source: 'hint',
-      answerExposure: 'none',
-    },
-    S2: {
-      level: 2,
-      title: `S2 · 상태 전이 렌즈`,
-      description: '대화형 실험실에서 발견한 동작 패턴을 확인하세요.',
-      content: s2Content,
-      source: 'hint',
-      answerExposure: 'partial',
-    },
-    S3: {
-      level: 3,
-      title: 'S3 · 방향 유도 질문',
-      description: '생각을 구체화하는 질문입니다.',
-      content: s3Content,
-      source: 'hint',
-      answerExposure: 'partial',
-    },
-    S4: {
-      level: 4,
-      title: 'S4 · 항로 절차 카드',
-      description: '단계별 논리 흐름을 확인하세요.',
-      content: s4Content,
-      source: 'hint',
-      answerExposure: 'partial',
-    },
+    S1: hint(1, `S1 · 조건 스캔 (${title})`, `${subtitle}\n\n함수: ${signature || code.entryFunction}\n입력: ${inputs.join(', ')}${instructions ? `\n\n작성 목표:\n${instructions}` : ''}`),
+    S2: hint(2, 'S2 · 공개 예시 비교', `이 문제의 입력과 기대 결과를 비교해 보세요.\n${examples}${observations ? `\n\n실험실 관찰 기록 (각 장면의 입력과 상태를 구분하세요):\n${observations}` : ''}`),
+    S3: hint(3, 'S3 · 방향 질문', lens.discoveryQuestion?.prompt || lens.predictionPrompt || `${inputs.join(', ')}의 값이 달라져도 같은 규칙을 적용하려면 어떤 조건과 상태를 확인해야 할까요?`),
+    S4: hint(4, 'S4 · 항로 절차 점검', `[절차 카드]\n1. ${code.entryFunction} 함수의 입력(${inputs.join(', ')})을 확인한다.\n2. 다음 규칙을 계산·조건·반복 단계로 나눈다: ${rule}\n3. 필요한 결과를 return으로 반환한다.\n4. 공개 예시마다 기대 결과와 비교한다.`),
     S5: {
-      level: 5,
-      title: 'S5 · 부분 절차 배열 (Parsons)',
-      description: '필요한 절차 블록을 순서대로 확인해 보세요.',
-      parsonsBlocks,
-      source: 'parsons',
-      answerExposure: 'partial',
+      level: 5, title: 'S5 · 구현 점검',
+      description: '아래 질문을 이용해 직접 절차를 작성하세요.',
+      parsonsBlocks: [
+        `${code.entryFunction}의 입력 중 처음 확인하거나 보관할 값은 무엇인가요?`,
+        `적용할 규칙: ${rule}`,
+        '계산·분기·반복 후 어느 위치에서 어떤 값을 반환해야 하나요?',
+      ],
+      source: 'parsons', answerExposure: 'partial',
     },
     RESCUE: {
-      level: 6,
-      title: 'Rescue · 해설 및 복구 연구실',
-      description: '핵심 규칙과 Python 구현 원리를 확인합니다.',
-      solutionExplanation: rescueExplanation,
-      source: 'solution-review',
-      answerExposure: 'full',
+      level: 6, title: 'Rescue · 규칙과 예시 다시 보기',
+      description: '이 문제에 등록된 규칙과 공개 예시를 다시 살펴보는 가이드입니다.',
+      solutionExplanation: `[${title}]\n${rule}\n\n함수: ${signature || code.entryFunction}\n${instructions}\n\n공개 예시:\n${examples}\n\n한 예시의 값을 고정해서 쓰지 말고, 함수의 입력이 바뀌어도 같은 규칙이 성립하는지 확인하세요.`,
+      source: 'solution-review', answerExposure: 'full',
     },
   }
 }
 
-export function getScaffoldByLevel(level, problemId = 'AC-COND-001') {
+export function getScaffoldByLevel(level, problemId) {
   let catalog = null
   if (problemId === 'AC-COND-001') catalog = AC_COND_001_SCAFFOLD_CONTENT
   else if (problemId === 'AC-COND-002') catalog = AC_COND_002_SCAFFOLD_CONTENT
@@ -1014,16 +488,10 @@ export function getScaffoldByLevel(level, problemId = 'AC-COND-001') {
   else if (problemId === 'AC-SEQ-005') catalog = AC_SEQ_005_SCAFFOLD_CONTENT
   else if (problemId === 'AC-NAV-005') catalog = AC_NAV_005_SCAFFOLD_CONTENT
   else if (problemId === 'AC-NAV-006') catalog = AC_NAV_006_SCAFFOLD_CONTENT
-  else if (problemId === 'AC-EXP-SEQ-01') catalog = AC_EXP_SEQ_01_SCAFFOLD_CONTENT
-  else if (problemId === 'AC-EXP-VAR-02') catalog = AC_EXP_VAR_02_SCAFFOLD_CONTENT
-  else if (problemId === 'AC-EXP-STEP-03') catalog = AC_EXP_STEP_03_SCAFFOLD_CONTENT
-  else if (problemId === 'AC-EXP-SWAP-04') catalog = AC_EXP_SWAP_04_SCAFFOLD_CONTENT
-  else if (problemId === 'AC-EXP-BOUND-05') catalog = AC_EXP_BOUND_05_SCAFFOLD_CONTENT
-  else if (problemId === 'AC-EXP-LOOP-06') catalog = AC_EXP_LOOP_06_SCAFFOLD_CONTENT
-  else if (problemId === 'AC-EXP-WHILE-07') catalog = AC_EXP_WHILE_07_SCAFFOLD_CONTENT
-  else if (problemId === 'AC-EXP-EQUIV-09') catalog = AC_EXP_EQUIV_09_SCAFFOLD_CONTENT
-  else if (problemId === 'AC-EXP-REVERSE-10') catalog = AC_EXP_REVERSE_10_SCAFFOLD_CONTENT
+  else if (CONSTELLATION_0_SCAFFOLDS[problemId]) catalog = CONSTELLATION_0_SCAFFOLDS[problemId]
   else catalog = generateDynamicScaffold(problemId)
+
+  if (!catalog) return null
 
   switch (level) {
     case 1: return catalog.S1

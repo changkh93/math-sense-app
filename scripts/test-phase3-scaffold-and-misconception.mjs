@@ -18,7 +18,7 @@ const andOrResults = [
   { inputs: { s1: true, s2: true }, actual: true, expected: true, passed: true },
   { inputs: { s1: true, s2: false }, actual: true, expected: false, passed: false },
 ]
-const diag1 = matchRuleBasedMisconception({ code: 'return s1 or s2', testResults: andOrResults })
+const diag1 = matchRuleBasedMisconception({ problemId: 'AC-COND-001', code: 'return s1 or s2', testResults: andOrResults })
 assert.equal(diag1.misconceptionCode, 'COND-AND-OR-01')
 assert(diag1.guidance.includes('나머지 한쪽만 켜진 장면'))
 
@@ -27,7 +27,7 @@ const allTrueResults = [
   { inputs: { s1: true, s2: true }, actual: false, expected: true, passed: false },
   { inputs: { s1: true, s2: false }, actual: false, expected: false, passed: true },
 ]
-const diag2 = matchRuleBasedMisconception({ code: 'return False', testResults: allTrueResults })
+const diag2 = matchRuleBasedMisconception({ problemId: 'AC-COND-001', code: 'return False', testResults: allTrueResults })
 assert.equal(diag2.misconceptionCode, 'COND-ALL-TRUE-01')
 
 const fullTruthTable = (actuals) => [
@@ -36,13 +36,13 @@ const fullTruthTable = (actuals) => [
   { id: 'ft', inputs: { s1: false, s2: true }, actual: actuals[2], expected: false, passed: actuals[2] === false },
   { id: 'ff', inputs: { s1: false, s2: false }, actual: actuals[3], expected: false, passed: actuals[3] === false },
 ]
-assert.equal(matchRuleBasedMisconception({ testResults: fullTruthTable([true, true, false, false]) }).misconceptionCode, 'COND-SINGLE-INPUT-01')
-assert.equal(matchRuleBasedMisconception({ testResults: fullTruthTable([true, true, true, true]) }).misconceptionCode, 'COND-CONSTANT-01')
-assert.equal(matchRuleBasedMisconception({ testResults: fullTruthTable([true, true, true, false]) }).misconceptionCode, 'COND-AND-OR-01')
+assert.equal(matchRuleBasedMisconception({ problemId: 'AC-COND-001', testResults: fullTruthTable([true, true, false, false]) }).misconceptionCode, 'COND-SINGLE-INPUT-01')
+assert.equal(matchRuleBasedMisconception({ problemId: 'AC-COND-001', testResults: fullTruthTable([true, true, true, true]) }).misconceptionCode, 'COND-CONSTANT-01')
+assert.equal(matchRuleBasedMisconception({ problemId: 'AC-COND-001', testResults: fullTruthTable([true, true, true, false]) }).misconceptionCode, 'COND-AND-OR-01')
 assert.equal(diag1.confidence, 0.55, 'partial evidence must not claim certainty')
 
 // 3. Syntax error -> Protocol Repair
-const diagSyntax = matchRuleBasedMisconception({ syntaxError: 'Unexpected token' })
+const diagSyntax = matchRuleBasedMisconception({ problemId: 'AC-COND-001', syntaxError: 'Unexpected token' })
 assert.equal(diagSyntax.category, 'PROTOCOL_SYNTAX')
 assert.equal(diagSyntax.misconceptionCode, 'SYNTAX-REPAIR-01')
 
@@ -75,19 +75,19 @@ console.log('  -> Stagnation detector accurately triggered on struggle patterns'
 
 // [Test 3] Scaffold Graph Content
 console.log('[Test 3] Testing Scaffold Graph Levels (S1 ~ S5 & Rescue)...')
-const s1 = getScaffoldByLevel(1)
+const s1 = getScaffoldByLevel(1, 'AC-COND-001')
 assert.equal(s1.level, 1)
 assert.equal(s1.answerExposure, 'none')
 
-const s4 = getScaffoldByLevel(4)
+const s4 = getScaffoldByLevel(4, 'AC-COND-001')
 assert.equal(s4.level, 4)
 assert(s4.content.includes('절차 카드'))
 
-const rescue = getScaffoldByLevel(6)
+const rescue = getScaffoldByLevel(6, 'AC-COND-001')
 assert.equal(rescue.level, 6)
 assert.equal(rescue.answerExposure, 'full')
 assert.equal(rescue.source, 'solution-review')
-const s5 = getScaffoldByLevel(5)
+const s5 = getScaffoldByLevel(5, 'AC-COND-001')
 assert.equal(s5.source, 'parsons')
 assert(!Object.hasOwn(s5, 'starterSnippet'), 'S5 must not ship a copy-ready solution')
 
