@@ -77,6 +77,15 @@ const acEnumFilter67 = require('./ac_enum_filter_67.private.cjs')
 const acEnumBest68 = require('./ac_enum_best_68.private.cjs')
 const acEnumPrune69 = require('./ac_enum_prune_69.private.cjs')
 const acEnumLock70 = require('./ac_enum_lock_70.private.cjs')
+const acStackBox71 = require('./ac_stack_box_71.private.cjs')
+const acStackParen72 = require('./ac_stack_paren_72.private.cjs')
+const acStackUndo73 = require('./ac_stack_undo_73.private.cjs')
+const acQueueRobot75 = require('./ac_queue_robot_75.private.cjs')
+const acQueueRobin76 = require('./ac_queue_robin_76.private.cjs')
+const acQueueCard77 = require('./ac_queue_card_77.private.cjs')
+const acDequeDock78 = require('./ac_deque_dock_78.private.cjs')
+const acStackQueue79 = require('./ac_stack_queue_79.private.cjs')
+const acQueuePop80 = require('./ac_queue_pop_80.private.cjs')
 
 const RAW_PRIVATE_PROBLEMS = {
   'AC-COND-001@v1': acCond001,
@@ -142,7 +151,6 @@ const RAW_PRIVATE_PROBLEMS = {
   'AC-SRCH-LINEAR-58@v1': acSrchLinear58,
   'AC-SRCH-BINARY-59@v1': acSrchBinary59,
   'AC-SRCH-PREFIX-60@v1': acSrchPrefix60,
-  'AC-ENUM-PAIR-01@v1': acEnumPair01,
   'AC-ENUM-TARGET-62@v1': acEnumTarget62,
   'AC-ENUM-TRIPLE-63@v1': acEnumTriple63,
   'AC-ENUM-COMB-64@v1': acEnumComb64,
@@ -152,6 +160,15 @@ const RAW_PRIVATE_PROBLEMS = {
   'AC-ENUM-BEST-68@v1': acEnumBest68,
   'AC-ENUM-PRUNE-69@v1': acEnumPrune69,
   'AC-ENUM-LOCK-70@v1': acEnumLock70,
+  'AC-STACK-BOX-71@v1': acStackBox71,
+  'AC-STACK-PAREN-72@v1': acStackParen72,
+  'AC-STACK-UNDO-73@v1': acStackUndo73,
+  'AC-QUEUE-ROBOT-75@v1': acQueueRobot75,
+  'AC-QUEUE-ROBIN-76@v1': acQueueRobin76,
+  'AC-QUEUE-CARD-77@v1': acQueueCard77,
+  'AC-DEQUE-DOCK-78@v1': acDequeDock78,
+  'AC-STACK-QUEUE-79@v1': acStackQueue79,
+  'AC-QUEUE-POP-80@v1': acQueuePop80,
 }
 
 // Every attempt stores this value in Firestore and exposes it in the replay

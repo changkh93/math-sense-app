@@ -2081,6 +2081,15 @@ for (const patternId of [
   'pattern:first-match-linear-search',
   'pattern:interval-halving-search',
   'pattern:prefix-difference-query',
+  'pattern:lifo-processing',
+  'pattern:bracket-matching',
+  'pattern:undo-last-action',
+  'pattern:fifo-processing',
+  'pattern:queue-event-simulation',
+  'pattern:round-robin',
+  'pattern:discard-and-rotate',
+  'pattern:two-ended-buffer',
+  'pattern:two-stack-fifo',
 ]) {
   const pattern = PROBLEM_SOLVING_PATTERN_REGISTRY[patternId]
   assert.ok(pattern, `Pattern registry missing: ${patternId}`)
@@ -2092,5 +2101,5 @@ for (const patternId of [
   )
 }
 
-assert.equal(registeredProblemIds.length, 72, 'Total registered problems must be exactly 72 (54 + Constellation 5 + Constellation 6)')
+assert.equal(registeredProblemIds.length, 81, 'Total registered problems must be exactly 81 (54 + Constellation 5 + Constellation 6 + Constellation 7)')
 console.log(`✅ All 10 Authoring Invariants PASSED across all ${registeredProblemIds.length} registered problems!`)

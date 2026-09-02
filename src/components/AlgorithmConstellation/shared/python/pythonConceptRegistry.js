@@ -427,6 +427,36 @@ export const PYTHON_CONCEPT_REGISTRY = Object.freeze({
     },
     protocolRepairId: 'PR-DICT-001',
   },
+  'method:pop': {
+    conceptId: 'method:pop',
+    displayName: '.pop() (맨 뒤 데이터 꺼내기)',
+    kind: 'method',
+    canonicalFirstProblemId: 'AC-STACK-BOX-71',
+    why: '목록이나 스택의 맨 위(오른쪽)에서 가장 최근에 넣은 데이터를 꺼내요. 꺼낸 값은 반환되고 원래 목록에서 사라져요.',
+    tinyExample: 'box = ["A", "B"]; top = box.pop()  # top은 "B", box는 ["A"]',
+    syntaxExample: 'top_item = stack.pop()',
+    predictionCheck: {
+      prompt: 'stack = ["X", "Y"]; item = stack.pop() 실행 후 item은 무엇일까요?',
+      options: ["'Y'", "'X'", "['X', 'Y']"],
+      expected: "'Y'",
+    },
+    protocolRepairId: 'PR-POP-001',
+  },
+  'method:appendleft': {
+    conceptId: 'method:appendleft',
+    displayName: '.appendleft() (맨 앞에 추가하기)',
+    kind: 'method',
+    canonicalFirstProblemId: 'AC-DEQUE-DOCK-78',
+    why: '양방향 대기열(deque)의 가장 앞(왼쪽)에 새로운 데이터를 추가해요.',
+    tinyExample: 'q = deque(["B"]); q.appendleft("A")  # q는 ["A", "B"]',
+    syntaxExample: 'queue.appendleft(new_item)',
+    predictionCheck: {
+      prompt: 'q = deque([2, 3]); q.appendleft(1) 실행 후 q의 첫 번째 원소는 무엇일까요?',
+      options: ['1', '2', '3'],
+      expected: '1',
+    },
+    protocolRepairId: 'PR-APPENDLEFT-001',
+  },
 })
 
 export function getConceptDetails(conceptId) {

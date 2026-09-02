@@ -15,10 +15,21 @@ export const AC_NAV_005 = deepFreeze({
   family: 'NAV',
   evidenceRecipe: { primitives: ['ordered-buffer', 'container-scan'] },
   pythonConcepts: { introduces: ['class:deque', 'method:popleft'], requires: ['method:append'] },
+  thinkingPatterns: { introduces: ['pattern:fifo-processing'], requires: [] },
+
+  curriculum: {
+    catalogOrder: 74,
+    constellationId: 'constellation-7',
+    routeRole: 'core',
+    learningRole: 'anchor',
+    recommendedBand: 'EN',
+    prerequisites: ['AC-SEQ-005'],
+  },
 
   identity: {
     systemTitle: 'Navigation - FIFO Queue and Deque Operations',
     studentTitle: '구조 신호 대기열',
+    subtitle: '먼저 들어온 신호를 먼저 처리하는 대기열(FIFO)을 조작합니다.',
     difficultyLevel: 2,
   },
 
@@ -105,6 +116,42 @@ export const AC_NAV_005 = deepFreeze({
     hiddenTestsRef: 'sec_nav_005_hidden_suite_v1',
     transferFamily: 'fifo-queue-processing',
     transferDescription: '화물 선적 대기열 처리에 적용하기',
+    understandingChallenges: [
+      {
+        challengeId: 'uc_nav_05_01',
+        title: '대기열 원소 순서 예측',
+        prompt: '대기열 queue = [A, B, C] 에서 원소를 꺼낼 때의 순서를 예측하세요.',
+        questions: [
+          { id: 'q1', text: 'queue.popleft()를 처음 실행하면 가장 앞의 A가 꺼내지나요?', expected: true },
+          { id: 'q2', text: 'queue.pop()을 실행하면 맨 뒤의 C가 꺼내지나요 (스택 방식)?', expected: true },
+        ],
+      },
+    ],
+    transferChallenges: [
+      {
+        transferChallengeId: 'AC-NAV-005-T1',
+        title: '화물 선적 대기열 처리',
+        description: '화물 목록(cargo_list)을 먼저 도착한 순서대로 차례로 선적하여 반환하세요.',
+        entryFunction: 'process_cargo',
+        starterCode: `from collections import deque\n\ndef process_cargo(cargo_list):\n    # 먼저 도착한 화물부터 순서대로 꺼내는 코드를 작성해 보세요.\n    pass\n`,
+        contextCard: {
+          title: '📦 선입선출 화물 선적',
+          strategyGuide: '먼저 도착한 화물을 맨 앞에서부터 popleft()로 꺼내어 선적 순서대로 목록에 담습니다.',
+        },
+        thoughtCheck: {
+          question: '대기열 ["C1", "C2"]에서 첫 번째로 꺼내지는 화물은 무엇일까요?',
+          options: [
+            { value: 'c1', label: 'C1 (가장 먼저 도착한 화물)' },
+            { value: 'c2', label: 'C2 (나중에 도착한 화물)' },
+          ],
+          expected: 'c1',
+        },
+        testCases: [
+          { inputs: { cargo_list: ['CargoA', 'CargoB'] }, expected: ['CargoA', 'CargoB'] },
+          { inputs: { cargo_list: ['SingleCargo'] }, expected: ['SingleCargo'] },
+        ],
+      },
+    ],
     completionEvidence: {
       resultStar: 'hidden_suite_pass',
       understandingStar: 'fresh_micro_evidence',

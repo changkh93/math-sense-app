@@ -117,7 +117,7 @@ export const CONSTELLATIONS = Object.freeze([
     branchCount: 2,
     capstoneCount: 0,
     totalCount: 10,
-    requiredAnchors: ['AC-NAV-005'],
+    requiredAnchors: ['AC-STACK-BOX-71', 'AC-NAV-005'],
     minimumCoreToUnlockNext: 6,
   },
   {

@@ -499,6 +499,12 @@ class SafePythonInterpreter {
         if (obj !== undefined && obj !== null) {
           if (Array.isArray(obj)) {
             if (methodName === 'popleft' || methodName === 'pop') {
+              if (rawArgs.length > 0) {
+                throw evaluatorError('UNSUPPORTED_SYNTAX', '현재 실행기는 위치 인자가 있는 pop을 지원하지 않으며, deque의 앞 제거(popleft)를 사용할 수 있습니다.')
+              }
+              if (obj.length === 0) {
+                throw evaluatorError('INDEX_ERROR', '꺼낼 항목이 있는지 먼저 확인해 보세요.')
+              }
               const before = this.snapshotValue(obj)
               const result = methodName === 'popleft' ? obj.shift() : obj.pop()
               this.emitTrace('container-mutation', {
@@ -508,11 +514,26 @@ class SafePythonInterpreter {
               return result
             }
             if (methodName === 'append') {
+              if (rawArgs.length !== 1) {
+                throw evaluatorError('TYPE_ERROR', 'append() takes exactly one argument')
+              }
               const before = this.snapshotValue(obj)
               obj.push(rawArgs[0])
               this.emitTrace('container-mutation', {
                 stateDiff: [{ kind: 'mutation', path: objName, before, after: this.snapshotValue(obj) }],
                 metadata: { operation: 'append', value: this.snapshotValue(rawArgs[0]) },
+              })
+              return null
+            }
+            if (methodName === 'appendleft') {
+              if (rawArgs.length !== 1) {
+                throw evaluatorError('TYPE_ERROR', 'appendleft() takes exactly one argument')
+              }
+              const before = this.snapshotValue(obj)
+              obj.unshift(rawArgs[0])
+              this.emitTrace('container-mutation', {
+                stateDiff: [{ kind: 'mutation', path: objName, before, after: this.snapshotValue(obj) }],
+                metadata: { operation: 'appendleft', value: this.snapshotValue(rawArgs[0]) },
               })
               return null
             }

@@ -183,6 +183,26 @@ for (const pid of [
   'AC-SRCH-LINEAR-58',
   'AC-SRCH-BINARY-59',
   'AC-SRCH-PREFIX-60',
+  'AC-ENUM-PAIR-01',
+  'AC-ENUM-TARGET-62',
+  'AC-ENUM-TRIPLE-63',
+  'AC-ENUM-COMB-64',
+  'AC-ENUM-SUBSET-65',
+  'AC-ENUM-KEYPAD-66',
+  'AC-ENUM-FILTER-67',
+  'AC-ENUM-BEST-68',
+  'AC-ENUM-PRUNE-69',
+  'AC-ENUM-LOCK-70',
+  'AC-STACK-BOX-71',
+  'AC-STACK-PAREN-72',
+  'AC-STACK-UNDO-73',
+  'AC-NAV-005',
+  'AC-QUEUE-ROBOT-75',
+  'AC-QUEUE-ROBIN-76',
+  'AC-QUEUE-CARD-77',
+  'AC-DEQUE-DOCK-78',
+  'AC-STACK-QUEUE-79',
+  'AC-QUEUE-POP-80',
 ]) {
   const waveDefinition = getPrivateProblemDefinition(pid, 1)
   const waveContext = auth(`student_${pid.toLowerCase().replace(/-/g, '_')}`)
@@ -296,6 +316,43 @@ for (const pid of [
   )
 }
 console.log('  -> [PASS] Constellation 5 representative fixture rejection verified')
+
+console.log('[Test 2e] Constellation 7 (71~80) representative wrong fixtures and 80 starter-failure contract...')
+for (const pid of [
+  'AC-STACK-BOX-71',
+  'AC-STACK-PAREN-72',
+  'AC-STACK-UNDO-73',
+  'AC-NAV-005',
+  'AC-QUEUE-ROBOT-75',
+  'AC-QUEUE-ROBIN-76',
+  'AC-QUEUE-CARD-77',
+  'AC-DEQUE-DOCK-78',
+  'AC-STACK-QUEUE-79',
+  'AC-QUEUE-POP-80',
+]) {
+  const c7Def = getPrivateProblemDefinition(pid, 1)
+  const repFixture = c7Def.intendedWrongFixtures[0]
+  assert.equal(
+    evaluateBaseSubmission(pid, 1, repFixture.code).resultStar,
+    false,
+    `C7 fixture ${repFixture.id} of ${pid} must be rejected`
+  )
+}
+// 80's shipped Base starter is the repair target (uses pop instead of popleft): it must be judged WRONG.
+const pop80Public = PUBLIC_KERNELS['AC-QUEUE-POP-80']
+assert.equal(
+  evaluateBaseSubmission('AC-QUEUE-POP-80', 1, pop80Public.modes.code.starterCode).resultStar,
+  false,
+  "80 Base starter must fail the judge (uses pop instead of popleft)"
+)
+// 80's shipped Transfer starter (uses popleft instead of pop): it must also be judged WRONG.
+const pop80Transfer = getPrivateProblemDefinition('AC-QUEUE-POP-80', 1).transferMasterSet[0]
+assert.equal(
+  evaluateTransferSubmission('AC-QUEUE-POP-80', 1, pop80Transfer.transferChallengeId, pop80Transfer.starterCode).passed,
+  false,
+  "80 Transfer starter must fail the judge (uses popleft instead of pop)"
+)
+console.log('  -> [PASS] Constellation 7 representative fixture rejection and 80 starter-failure contract verified')
 
 console.log('[Test 3] AI use withholds new mastery, then independent return restores it...')
 const aiAttempt = await completeAttempt('student_beta', 'learn', {

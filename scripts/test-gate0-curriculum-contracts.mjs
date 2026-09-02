@@ -122,14 +122,22 @@ for (const completed of [[], firstThreeCompleted]) {
   }
 }
 
-// C7's single published Core cannot support its six-Core gate. Even completing
-// that mission (C8's prerequisite) must not bypass the constellation gate.
+// If C7's release is incomplete (missing anchor 71), C8 stays unavailable:
+const missingC7AnchorCatalog = ALGORITHM_EDITORIAL_CATALOG.map((entry) => (
+  entry.problemId === 'AC-STACK-BOX-71' ? { ...entry, status: 'draft' } : entry
+))
+const incompleteReleaseAccess = getConstellationAccess(8, firstThreeCompleted, missingC7AnchorCatalog)
+assert.equal(incompleteReleaseAccess.accessible, false)
+assert.equal(incompleteReleaseAccess.mode, 'unavailable')
+assert.equal(incompleteReleaseAccess.reason, 'previous-release-incomplete')
+
+// With C7 fully published, C8 is gated (not unavailable):
 for (const completed of [firstThreeCompleted, ['AC-NAV-005']]) {
-  const incompleteReleaseAccess = getConstellationAccess(8, completed, ALGORITHM_EDITORIAL_CATALOG)
-  assert.equal(incompleteReleaseAccess.accessible, false)
-  assert.equal(incompleteReleaseAccess.mode, 'unavailable')
-  assert.equal(incompleteReleaseAccess.reason, 'previous-release-incomplete')
+  const access = getConstellationAccess(8, completed, ALGORITHM_EDITORIAL_CATALOG)
+  assert.equal(access.accessible, false)
+  assert.equal(access.mode, 'gated')
 }
+
 assert.equal(getConstellationAccess(8, ['AC-NAV-006'], ALGORITHM_EDITORIAL_CATALOG).mode, 'grandfathered')
 assert.equal(getConstellationAccess(8, ['AC-NAV-006'], ALGORITHM_EDITORIAL_CATALOG).accessible, true)
 
@@ -137,18 +145,19 @@ assert.equal(getConstellationAccess(8, ['AC-NAV-006'], ALGORITHM_EDITORIAL_CATAL
 const releasedC7Catalog = ALGORITHM_EDITORIAL_CATALOG.map((entry) => (
   entry.constellationId === 'constellation-7' ? { ...entry, status: 'published' } : entry
 ))
-const c7CoreIds = releasedC7Catalog
+const test3C7CoreIds = releasedC7Catalog
   .filter((entry) => entry.constellationId === 'constellation-7' && entry.routeRole === 'core')
   .map((entry) => entry.problemId)
-const c7SixWithAnchor = ['AC-NAV-005', ...c7CoreIds.filter((id) => id !== 'AC-NAV-005').slice(0, 5)]
+const c7SixWithAnchor = ['AC-STACK-BOX-71', 'AC-NAV-005', ...test3C7CoreIds.filter((id) => id !== 'AC-STACK-BOX-71' && id !== 'AC-NAV-005').slice(0, 4)]
 assert.equal(getConstellationAccess(8, c7SixWithAnchor, releasedC7Catalog).accessible, true)
 assert.equal(getConstellationAccess(8, c7SixWithAnchor, releasedC7Catalog).mode, 'gated')
 assert.equal(getConstellationAccess(8, c7SixWithAnchor.slice(0, 5), releasedC7Catalog).accessible, false)
-assert.equal(getConstellationAccess(8, c7CoreIds.filter((id) => id !== 'AC-NAV-005'), releasedC7Catalog).accessible, false)
-const missingC7AnchorCatalog = releasedC7Catalog.map((entry) => (
+assert.equal(getConstellationAccess(8, test3C7CoreIds.filter((id) => id !== 'AC-NAV-005'), releasedC7Catalog).accessible, false)
+assert.equal(getConstellationAccess(8, test3C7CoreIds.filter((id) => id !== 'AC-STACK-BOX-71'), releasedC7Catalog).accessible, false)
+const missingC7NavAnchorCatalog = releasedC7Catalog.map((entry) => (
   entry.problemId === 'AC-NAV-005' ? { ...entry, status: 'draft' } : entry
 ))
-assert.equal(getConstellationAccess(8, c7SixWithAnchor, missingC7AnchorCatalog).accessible, false)
+assert.equal(getConstellationAccess(8, c7SixWithAnchor, missingC7NavAnchorCatalog).accessible, false)
 console.log('  -> [PASS] Unlock Gating strictly verified (Required Anchors + 6/8 Core + Grandfathered Protection)')
 
 // [Test 4] Python Concept Registry & Canonical First Encounter
@@ -1064,5 +1073,162 @@ assert.deepEqual(
 )
 
 console.log('  -> [PASS] Constellation 5 (51~60) prerequisites, anchors 51·54·56, and Core 6/8 unlock verified')
+
+// [Test 18] Constellation 6 Combinatorial Search (61~70) Curriculum & Gate Contracts
+console.log('[Test 18] Validating Constellation 6 Combinatorial Search (61~70) and gate isolation...')
+const c6Published = ALGORITHM_EDITORIAL_CATALOG.filter(
+  (entry) => entry.constellationId === 'constellation-6' && entry.status === 'published'
+)
+assert.deepEqual(
+  c6Published.map((entry) => entry.problemId),
+  [
+    'AC-ENUM-PAIR-01',
+    'AC-ENUM-TARGET-62',
+    'AC-ENUM-TRIPLE-63',
+    'AC-ENUM-COMB-64',
+    'AC-ENUM-SUBSET-65',
+    'AC-ENUM-KEYPAD-66',
+    'AC-ENUM-FILTER-67',
+    'AC-ENUM-BEST-68',
+    'AC-ENUM-PRUNE-69',
+    'AC-ENUM-LOCK-70',
+  ],
+  'Constellation 6 must have exactly the 10 published problems 61~70'
+)
+const c6Cores = c6Published.filter((entry) => entry.routeRole === 'core')
+const c6Branches = c6Published.filter((entry) => entry.routeRole === 'branch')
+assert.equal(c6Cores.length, 8, 'Constellation 6 must have exactly 8 Core problems (61~68)')
+assert.equal(c6Branches.length, 2, 'Constellation 6 must have exactly 2 Branch problems (69~70)')
+assert.deepEqual(
+  c6Branches.map((entry) => entry.problemId),
+  ['AC-ENUM-PRUNE-69', 'AC-ENUM-LOCK-70']
+)
+for (const entry of c6Published) {
+  assert.equal(entry.lensId, 'state-transition', 'Constellation 6 problems must all reuse the state-transition lens')
+  assert.deepEqual(
+    PUBLIC_KERNELS[entry.problemId].curriculum.prerequisites,
+    entry.prerequisites,
+    'Constellation 6 kernel and catalog prerequisites must stay synchronized'
+  )
+}
+
+// Registry anchor contract: 61, 65
+const c6Anchors = CONSTELLATIONS.find((item) => item.id === 'constellation-6').requiredAnchors
+assert.deepEqual(
+  c6Anchors,
+  ['AC-ENUM-PAIR-01', 'AC-ENUM-SUBSET-65'],
+  'Constellation 6 requiredAnchors must be exactly 61, 65'
+)
+
+// Prerequisite lock transitions for Constellation 6
+assert.equal(isMissionPrerequisitesMet('AC-ENUM-TARGET-62', [], ALGORITHM_EDITORIAL_CATALOG), false)
+assert.equal(isMissionPrerequisitesMet('AC-ENUM-TARGET-62', ['AC-ENUM-PAIR-01'], ALGORITHM_EDITORIAL_CATALOG), true)
+assert.equal(isMissionPrerequisitesMet('AC-ENUM-SUBSET-65', ['AC-ENUM-COMB-64'], ALGORITHM_EDITORIAL_CATALOG), false)
+assert.equal(isMissionPrerequisitesMet('AC-ENUM-SUBSET-65', ['AC-ENUM-COMB-64', 'AC-PAT-DIGIT-24'], ALGORITHM_EDITORIAL_CATALOG), true)
+
+// Constellation 7 unlock gating:
+const c6CoreIds = c6Cores.map((entry) => entry.problemId)
+// 1. Five cores + both branches are NOT enough.
+assert.equal(
+  isConstellationUnlocked(7, [...c6CoreIds.slice(0, 5), ...c6Branches.map((entry) => entry.problemId)], ALGORITHM_EDITORIAL_CATALOG),
+  false,
+  'Constellation 7 must stay locked with only 5 of 8 Core missions even when both Branches are done'
+)
+// 2. Seven cores missing required anchor 65 are NOT enough.
+const c6SevenCoresMissingAnchor = c6CoreIds.filter((id) => id !== 'AC-ENUM-SUBSET-65')
+assert.equal(
+  isConstellationUnlocked(7, c6SevenCoresMissingAnchor, ALGORITHM_EDITORIAL_CATALOG),
+  false,
+  'Constellation 7 must stay locked when required anchor 65 is missing even with 7 Cores done'
+)
+// 3. All anchors + 6 cores unlock Constellation 7.
+const c6SixCoreWithAnchors = ['AC-ENUM-PAIR-01', 'AC-ENUM-SUBSET-65', 'AC-ENUM-TARGET-62', 'AC-ENUM-TRIPLE-63', 'AC-ENUM-COMB-64', 'AC-ENUM-KEYPAD-66']
+assert.equal(
+  isConstellationUnlocked(7, c6SixCoreWithAnchors, ALGORITHM_EDITORIAL_CATALOG),
+  true,
+  'Constellation 7 must unlock with anchors 61·65 and Core 6/8'
+)
+
+console.log('  -> [PASS] Constellation 6 (61~70) prerequisites, anchors 61·65, and Core 6/8 unlock verified')
+
+// [Test 19] Constellation 7 Stacks & Queues (71~80) Curriculum & Gate Contracts
+console.log('[Test 19] Validating Constellation 7 Stacks & Queues (71~80) and gate isolation...')
+const c7Published = ALGORITHM_EDITORIAL_CATALOG.filter(
+  (entry) => entry.constellationId === 'constellation-7' && entry.status === 'published'
+)
+assert.deepEqual(
+  c7Published.map((entry) => entry.problemId),
+  [
+    'AC-STACK-BOX-71',
+    'AC-STACK-PAREN-72',
+    'AC-STACK-UNDO-73',
+    'AC-NAV-005',
+    'AC-QUEUE-ROBOT-75',
+    'AC-QUEUE-ROBIN-76',
+    'AC-QUEUE-CARD-77',
+    'AC-DEQUE-DOCK-78',
+    'AC-STACK-QUEUE-79',
+    'AC-QUEUE-POP-80',
+  ],
+  'Constellation 7 must have exactly the 10 published problems 71~80'
+)
+const c7Cores = c7Published.filter((entry) => entry.routeRole === 'core')
+const c7Branches = c7Published.filter((entry) => entry.routeRole === 'branch')
+assert.equal(c7Cores.length, 8, 'Constellation 7 must have exactly 8 Core problems (71~78)')
+assert.equal(c7Branches.length, 2, 'Constellation 7 must have exactly 2 Branch problems (79~80)')
+assert.deepEqual(
+  c7Branches.map((entry) => entry.problemId),
+  ['AC-STACK-QUEUE-79', 'AC-QUEUE-POP-80']
+)
+for (const entry of c7Published) {
+  assert.deepEqual(
+    PUBLIC_KERNELS[entry.problemId].curriculum.prerequisites,
+    entry.prerequisites,
+    `Constellation 7 kernel and catalog prerequisites must stay synchronized for ${entry.problemId}`
+  )
+}
+
+// Registry anchor contract: 71, 74
+const c7Anchors = CONSTELLATIONS.find((item) => item.id === 'constellation-7').requiredAnchors
+assert.deepEqual(
+  c7Anchors,
+  ['AC-STACK-BOX-71', 'AC-NAV-005'],
+  'Constellation 7 requiredAnchors must be exactly 71, 74'
+)
+
+// Prerequisite lock transitions for Constellation 7
+assert.equal(isMissionPrerequisitesMet('AC-STACK-BOX-71', ['AC-SEQ-RUNNING-35'], ALGORITHM_EDITORIAL_CATALOG), false)
+assert.equal(isMissionPrerequisitesMet('AC-STACK-BOX-71', ['AC-SEQ-RUNNING-35', 'AC-EXP-WHILE-07'], ALGORITHM_EDITORIAL_CATALOG), true)
+assert.equal(isMissionPrerequisitesMet('AC-STACK-PAREN-72', [], ALGORITHM_EDITORIAL_CATALOG), false)
+assert.equal(isMissionPrerequisitesMet('AC-STACK-PAREN-72', ['AC-STACK-BOX-71'], ALGORITHM_EDITORIAL_CATALOG), true)
+assert.equal(isMissionPrerequisitesMet('AC-DEQUE-DOCK-78', ['AC-STACK-BOX-71'], ALGORITHM_EDITORIAL_CATALOG), false)
+assert.equal(isMissionPrerequisitesMet('AC-DEQUE-DOCK-78', ['AC-STACK-BOX-71', 'AC-QUEUE-ROBOT-75'], ALGORITHM_EDITORIAL_CATALOG), true)
+assert.equal(isMissionPrerequisitesMet('AC-QUEUE-POP-80', ['AC-STACK-BOX-71', 'AC-NAV-005'], ALGORITHM_EDITORIAL_CATALOG), false)
+assert.equal(isMissionPrerequisitesMet('AC-QUEUE-POP-80', ['AC-STACK-BOX-71', 'AC-NAV-005', 'AC-CODE-FIRST-ERROR-01'], ALGORITHM_EDITORIAL_CATALOG), true)
+
+// Constellation 8 unlock gating:
+const c7CoreIds = c7Cores.map((entry) => entry.problemId)
+// 1. Five cores + both branches are NOT enough.
+assert.equal(
+  isConstellationUnlocked(8, [...c7CoreIds.slice(0, 5), ...c7Branches.map((entry) => entry.problemId)], ALGORITHM_EDITORIAL_CATALOG),
+  false,
+  'Constellation 8 must stay locked with only 5 of 8 Core missions even when both Branches are done'
+)
+// 2. Seven cores missing required anchor 71 are NOT enough.
+const c7SevenCoresMissingAnchor = c7CoreIds.filter((id) => id !== 'AC-STACK-BOX-71')
+assert.equal(
+  isConstellationUnlocked(8, c7SevenCoresMissingAnchor, ALGORITHM_EDITORIAL_CATALOG),
+  false,
+  'Constellation 8 must stay locked when required anchor 71 is missing even with 7 Cores done'
+)
+// 3. All anchors + 6 cores unlock Constellation 8.
+const c7SixCoreWithAnchors = ['AC-STACK-BOX-71', 'AC-NAV-005', 'AC-STACK-PAREN-72', 'AC-STACK-UNDO-73', 'AC-QUEUE-ROBOT-75', 'AC-QUEUE-ROBIN-76']
+assert.equal(
+  isConstellationUnlocked(8, c7SixCoreWithAnchors, ALGORITHM_EDITORIAL_CATALOG),
+  true,
+  'Constellation 8 must unlock with anchors 71·74 and Core 6/8'
+)
+
+console.log('  -> [PASS] Constellation 7 (71~80) prerequisites, anchors 71·74, and Core 6/8 unlock verified')
 
 console.log('\n=== Gate 0 Curriculum & Contract Tests Passed 100%! ===\n')

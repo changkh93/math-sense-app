@@ -70,6 +70,15 @@ import { AC_ENUM_FILTER_67 } from './ac_enum_filter_67.js'
 import { AC_ENUM_BEST_68 } from './ac_enum_best_68.js'
 import { AC_ENUM_PRUNE_69 } from './ac_enum_prune_69.js'
 import { AC_ENUM_LOCK_70 } from './ac_enum_lock_70.js'
+import { AC_STACK_BOX_71 } from './ac_stack_box_71.js'
+import { AC_STACK_PAREN_72 } from './ac_stack_paren_72.js'
+import { AC_STACK_UNDO_73 } from './ac_stack_undo_73.js'
+import { AC_QUEUE_ROBOT_75 } from './ac_queue_robot_75.js'
+import { AC_QUEUE_ROBIN_76 } from './ac_queue_robin_76.js'
+import { AC_QUEUE_CARD_77 } from './ac_queue_card_77.js'
+import { AC_DEQUE_DOCK_78 } from './ac_deque_dock_78.js'
+import { AC_STACK_QUEUE_79 } from './ac_stack_queue_79.js'
+import { AC_QUEUE_POP_80 } from './ac_queue_pop_80.js'
 
 export const PUBLIC_KERNELS = Object.freeze({
   'AC-COND-001': AC_COND_001,
@@ -135,7 +144,6 @@ export const PUBLIC_KERNELS = Object.freeze({
   'AC-SRCH-LINEAR-58': AC_SRCH_LINEAR_58,
   'AC-SRCH-BINARY-59': AC_SRCH_BINARY_59,
   'AC-SRCH-PREFIX-60': AC_SRCH_PREFIX_60,
-  'AC-ENUM-PAIR-01': AC_ENUM_PAIR_01,
   'AC-ENUM-TARGET-62': AC_ENUM_TARGET_62,
   'AC-ENUM-TRIPLE-63': AC_ENUM_TRIPLE_63,
   'AC-ENUM-COMB-64': AC_ENUM_COMB_64,
@@ -145,6 +153,15 @@ export const PUBLIC_KERNELS = Object.freeze({
   'AC-ENUM-BEST-68': AC_ENUM_BEST_68,
   'AC-ENUM-PRUNE-69': AC_ENUM_PRUNE_69,
   'AC-ENUM-LOCK-70': AC_ENUM_LOCK_70,
+  'AC-STACK-BOX-71': AC_STACK_BOX_71,
+  'AC-STACK-PAREN-72': AC_STACK_PAREN_72,
+  'AC-STACK-UNDO-73': AC_STACK_UNDO_73,
+  'AC-QUEUE-ROBOT-75': AC_QUEUE_ROBOT_75,
+  'AC-QUEUE-ROBIN-76': AC_QUEUE_ROBIN_76,
+  'AC-QUEUE-CARD-77': AC_QUEUE_CARD_77,
+  'AC-DEQUE-DOCK-78': AC_DEQUE_DOCK_78,
+  'AC-STACK-QUEUE-79': AC_STACK_QUEUE_79,
+  'AC-QUEUE-POP-80': AC_QUEUE_POP_80,
 })
 
 export function getPublicKernel(problemId) {
@@ -225,5 +242,14 @@ export {
   AC_ENUM_BEST_68,
   AC_ENUM_PRUNE_69,
   AC_ENUM_LOCK_70,
+  AC_STACK_BOX_71,
+  AC_STACK_PAREN_72,
+  AC_STACK_UNDO_73,
+  AC_QUEUE_ROBOT_75,
+  AC_QUEUE_ROBIN_76,
+  AC_QUEUE_CARD_77,
+  AC_DEQUE_DOCK_78,
+  AC_STACK_QUEUE_79,
+  AC_QUEUE_POP_80,
 }
 

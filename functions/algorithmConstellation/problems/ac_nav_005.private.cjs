@@ -27,6 +27,9 @@ module.exports = {
       expectedFailureGroup: 'fifo_order_check',
     },
   ],
+  get intendedWrongFixtures() {
+    return this.intendedWrongSolutions
+  },
   publicTests: [
     { id: 'p1', inputs: { signals: ['A', 'B', 'C'] }, expected: ['A', 'B', 'C'] },
     { id: 'p2', inputs: { signals: ['Alpha', 'Beta'] }, expected: ['Alpha', 'Beta'] },
@@ -57,6 +60,19 @@ module.exports = {
       description: '화물 목록(cargo_list)을 먼저 도착한 순서대로 차례로 선적하여 반환하세요.',
       entryFunction: 'process_cargo',
       starterCode: `from collections import deque\n\ndef process_cargo(cargo_list):\n    # 먼저 도착한 화물부터 순서대로 꺼내는 코드를 작성해 보세요.\n    pass\n`,
+      officialSolutionCode: `from collections import deque\n\ndef process_cargo(cargo_list):\n    queue = deque(cargo_list)\n    processed = []\n    while queue:\n        cargo = queue.popleft()\n        processed.append(cargo)\n    return processed\n`,
+      contextCard: {
+        title: '📦 선입선출 화물 선적',
+        strategyGuide: '먼저 도착한 화물을 맨 앞에서부터 popleft()로 꺼내어 선적 순서대로 목록에 담습니다.',
+      },
+      thoughtCheck: {
+        question: '대기열 ["C1", "C2"]에서 첫 번째로 꺼내지는 화물은 무엇일까요?',
+        options: [
+          { value: 'c1', label: 'C1 (가장 먼저 도착한 화물)' },
+          { value: 'c2', label: 'C2 (나중에 도착한 화물)' },
+        ],
+        expected: 'c1',
+      },
       testCases: [
         { inputs: { cargo_list: ['Box1', 'Box2', 'Box3'] }, expected: ['Box1', 'Box2', 'Box3'] },
         { inputs: { cargo_list: ['Ore'] }, expected: ['Ore'] },

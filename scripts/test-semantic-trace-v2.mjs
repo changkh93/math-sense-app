@@ -166,4 +166,57 @@ assert.deepEqual(listAssignmentResult.result, [9, 2])
 
 console.log('  -> [PASS] R2 Dictionary semantics, KEY_ERROR, and security fail-closed verified')
 
+// [Test 4] Gate 7A: appendleft, pop/popleft semantics, and ordered-buffer evidence
+console.log('[Test 4] Validating Gate 7A: appendleft, pop/popleft semantics & error contracts...')
+const dequeCode = `from collections import deque
+def test_deque():
+    q = deque([10, 20])
+    q.append(30)
+    q.appendleft(5)
+    first = q.popleft()
+    last = q.pop()
+    return {
+        'items': q,
+        'first': first,
+        'last': last
+    }
+`
+const dequeRes = runRestrictedPythonFunction(dequeCode, 'test_deque')
+assert.equal(dequeRes.ok, true, `Deque execution failed: ${dequeRes.error}`)
+assert.deepEqual(dequeRes.result.items, [10, 20])
+assert.equal(dequeRes.result.first, 5)
+assert.equal(dequeRes.result.last, 30)
+
+// Evidence primitive includes appendleft
+const dequeEvidence = buildEvidenceFromTrace(
+  { primitives: ['ordered-buffer'] },
+  dequeRes.traceEvents,
+)
+assert.ok(dequeEvidence.some((item) => item.primitive === 'ordered-buffer'), 'ordered-buffer evidence must be detected for deque operations')
+
+// Empty pop / popleft must throw INDEX_ERROR
+const emptyPopRes = runRestrictedPythonFunction('def empty_pop():\n    items = []\n    return items.pop()\n', 'empty_pop')
+assert.equal(emptyPopRes.ok, false)
+assert.equal(emptyPopRes.code, 'INDEX_ERROR')
+
+const emptyPopleftRes = runRestrictedPythonFunction('from collections import deque\ndef empty_popleft():\n    q = deque([])\n    return q.popleft()\n', 'empty_popleft')
+assert.equal(emptyPopleftRes.ok, false)
+assert.equal(emptyPopleftRes.code, 'INDEX_ERROR')
+
+// Positional pop(index) must throw UNSUPPORTED_SYNTAX
+const posPopRes = runRestrictedPythonFunction('def pos_pop():\n    items = [1, 2]\n    return items.pop(0)\n', 'pos_pop')
+assert.equal(posPopRes.ok, false)
+assert.equal(posPopRes.code, 'UNSUPPORTED_SYNTAX')
+
+// Arity checks
+const badAppendRes = runRestrictedPythonFunction('def bad_append():\n    items = []\n    items.append(1, 2)\n', 'bad_append')
+assert.equal(badAppendRes.ok, false)
+assert.equal(badAppendRes.code, 'TYPE_ERROR')
+
+const badAppendleftRes = runRestrictedPythonFunction('from collections import deque\ndef bad_appendleft():\n    q = deque([])\n    q.appendleft()\n', 'bad_appendleft')
+assert.equal(badAppendleftRes.ok, false)
+assert.equal(badAppendleftRes.code, 'TYPE_ERROR')
+
+console.log('  -> [PASS] Gate 7A appendleft, pop/popleft, INDEX_ERROR, and arity contracts verified 100%')
+
 console.log('\n=== Semantic Trace v2 Tests Passed 100%! ===\n')

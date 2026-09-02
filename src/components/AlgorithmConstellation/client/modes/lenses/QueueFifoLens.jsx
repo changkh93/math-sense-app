@@ -99,8 +99,8 @@ export default function QueueFifoLens({ kernel, onDiscoveryComplete }) {
         {/* Pipeline graphic */}
         <div style={{ background: 'rgba(0, 0, 0, 0.5)', borderRadius: '12px', padding: '16px', border: '1px solid rgba(255, 255, 255, 0.1)' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-            <span style={{ fontSize: '13px', color: '#93c5fd' }}>📥 [대기열 입구 (Rear)]</span>
             <span style={{ fontSize: '13px', color: '#34d399' }}>📤 [대기열 출구 (Front - popleft)]</span>
+            <span style={{ fontSize: '13px', color: '#93c5fd' }}>📥 [대기열 입구 (Rear - append)]</span>
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minHeight: '60px', overflowX: 'auto', padding: '6px' }}>

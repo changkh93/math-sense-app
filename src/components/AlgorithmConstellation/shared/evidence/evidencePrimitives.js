@@ -120,7 +120,7 @@ export function buildEvidenceFromTrace(recipe = {}, traceScenes = [], testResult
     if (primitive === EVIDENCE_PRIMITIVES.ORDERED_BUFFER) {
       const observations = traceScenes.filter((scene) => {
         const state = stateOf(scene)
-        return ['append', 'popleft', 'pop'].includes(scene.metadata?.operation) || state.queue !== undefined || state.q !== undefined || state.stack !== undefined
+        return ['append', 'appendleft', 'popleft', 'pop'].includes(scene.metadata?.operation) || state.queue !== undefined || state.q !== undefined || state.stack !== undefined
       }).map((scene, index) => ({
         sceneRef: sceneRef(scene, index), factCode: 'BUFFER_OPERATION', values: { operation: scene.metadata?.operation || null, state: stateOf(scene) },
       }))
