@@ -20,6 +20,32 @@ function normalizeProgressType(type) {
   return ''
 }
 
+// Read-only completion fallback for history entries missing from the summary.
+// Keep this separate from history: it must not create scores, activity dates or rewards.
+export function getLearningProgressCompletion(progress = {}) {
+  return {
+    text: progress.logRead === true,
+    video: Object.values(progress.videoProgress || {}).some(
+      (tx) => tx && typeof tx === 'object' && tx.completed === true
+    ),
+    missionLab: progress.missionLab?.completed === true,
+  }
+}
+
+export function mergeUnitProgressCompletion(historyProgressMap, progressCompletionMap) {
+  const merged = { ...historyProgressMap }
+  Object.entries(progressCompletionMap).forEach(([unitId, completion]) => {
+    const completedTypes = ['text', 'video', 'missionLab'].filter((type) => completion[type] === true)
+    if (completedTypes.length === 0) return
+    merged[unitId] = {
+      quiz: false, video: false, text: false, workbook: false, codeTrace: false, missionLab: false,
+      ...merged[unitId],
+    }
+    completedTypes.forEach((type) => { merged[unitId][type] = true })
+  })
+  return merged
+}
+
 export function buildSummaryProgressHistory(summary) {
   return (summary?.units || []).flatMap((unit) => {
     const base = {

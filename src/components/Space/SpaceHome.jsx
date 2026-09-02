@@ -41,7 +41,7 @@ import { calculateGrowthUpdates } from '../../utils/rankingUtils'
 import { normalizeNotificationLink } from '../../utils/socialUtils'
 import { StreakCelebrationModal, StreakToast } from './StreakCelebration'
 import { getAttendanceDockingStatus } from '../../utils/attendanceUtils'
-import { mergeSummaryWithRecentHistory } from '../../utils/learningSummaryUtils'
+import { getLearningProgressCompletion, mergeSummaryWithRecentHistory, mergeUnitProgressCompletion } from '../../utils/learningSummaryUtils'
 import { checkWebGLSupport } from '../../utils/webglSupport'
 import {
   consumeGoogleRedirect,
@@ -645,10 +645,8 @@ function SpaceHome() {
   const [learningSummary, setLearningSummary] = useState(null)
   const [recentCompletionHistory, setRecentCompletionHistory] = useState([])
   const [loadingHistory, setLoadingHistory] = useState(true)
-  // videoCompletedFromProgress: { [unitId]: true } — learning_progress.videoProgress.{txId}.completed === true 인 단원.
-  // history의 type:'video' 문서 누락(보너스 타이머 놓침, 탭 닫기 시 sendBeacon 경로)에도 단원 완료가 표시되도록 보정하는 source of truth.
-  const [videoCompletedFromProgress, setVideoCompletedFromProgress] = useState({})
-  const [missionLabCompletedFromProgress, setMissionLabCompletedFromProgress] = useState({})
+  // history/요약에 완료 기록이 없어도 learning_progress의 실제 완료 상태를 목록에 반영한다.
+  const [completionFromProgress, setCompletionFromProgress] = useState({})
   const [currentView, setCurrentView] = useState(() => {
     const requestedView = getRequestedRootView(location)
     const savedView = sessionStorage.getItem('metasense_current_view')
@@ -1791,37 +1789,23 @@ function SpaceHome() {
     })
   }, [todayKSTForAttendance, user?.uid])
 
-  // learning_progress 서브컬렉션 전체를 구독하여 videoProgress.{txId}.completed === true 인 단원을 추출.
-  // history의 type:'video' 문서가 누락되는 경로(completion_bonus 타이머 놓침, 탭 닫기 sendBeacon)에서도
-  // 단원 완료 체크가 정확히 표시되도록 unitProgressMap.video 를 OR 보정하기 위한 source of truth.
+  // 기존 구독에서 영상·데이터 로그·Mission Lab 완료를 함께 읽는다.
+  // 과거 history가 누락된 경우에도 MissionHub와 목록/챕터 진행률의 완료 기준을 맞춘다.
   useEffect(() => {
+    setCompletionFromProgress({})
     if (!user?.uid) {
-      setVideoCompletedFromProgress({})
-      setMissionLabCompletedFromProgress({})
       return undefined
     }
     const progressQuery = collection(db, 'users', user.uid, 'learning_progress')
     return onSnapshot(progressQuery, (snapshot) => {
       const map = {}
-      const missionLabMap = {}
       snapshot.forEach((docSnap) => {
-        const unitId = docSnap.id
-        const progressData = docSnap.data() || {}
-        const videoProgress = progressData.videoProgress
-        if (videoProgress && typeof videoProgress === 'object') {
-          const hasCompletedVideo = Object.values(videoProgress).some(
-            (tx) => tx && typeof tx === 'object' && tx.completed === true
-          )
-          if (hasCompletedVideo) map[unitId] = true
-        }
-        if (progressData.missionLab?.completed === true) missionLabMap[unitId] = true
+        map[docSnap.id] = getLearningProgressCompletion(docSnap.data() || {})
       })
-      setVideoCompletedFromProgress(map)
-      setMissionLabCompletedFromProgress(missionLabMap)
+      setCompletionFromProgress(map)
     }, (error) => {
       console.warn('learning_progress subscription failed:', error)
-      setVideoCompletedFromProgress({})
-      setMissionLabCompletedFromProgress({})
+      setCompletionFromProgress({})
     })
   }, [user?.uid])
 
@@ -1890,7 +1874,7 @@ function SpaceHome() {
   const { explorationStatus, recentRegionId, bestScores, unitProgressMap } = useMemo(() => {
     const statusMap = {}
     const scores = {}
-    const progressMap = {}
+    const historyProgressMap = {}
     let lastRegionId = null
 
     if (!regions) {
@@ -1912,10 +1896,10 @@ function SpaceHome() {
       else if (h.type === 'python_mission') hType = 'missionLab'
 
       // Tracking modality completion
-      if (!progressMap[uid]) {
-        progressMap[uid] = { quiz: false, video: false, text: false, workbook: false, codeTrace: false, missionLab: false }
+      if (!historyProgressMap[uid]) {
+        historyProgressMap[uid] = { quiz: false, video: false, text: false, workbook: false, codeTrace: false, missionLab: false }
       }
-      progressMap[uid][hType] = true
+      historyProgressMap[uid][hType] = true
 
       // Tracking scores for old logic (MissionHub cards)
       // ONLY include 'quiz' and 'workbook' in bestScores to prevent video/text nominal scores (100) from leaking
@@ -1928,24 +1912,8 @@ function SpaceHome() {
       }
     })
 
-    // OR-보정: history에 type:'video' 문서가 누락되더라도(보너스 타이머 놓침, 탭 닫기 sendBeacon 경로),
-    // learning_progress.videoProgress.{txId}.completed === true 이면 video 모달리티를 완료로 인정.
-    // videoCompletedFromProgress 는 { [unitId]: true } 형태.
-    Object.entries(videoCompletedFromProgress).forEach(([unitId, completed]) => {
-      if (!completed) return
-      if (!progressMap[unitId]) {
-        progressMap[unitId] = { quiz: false, video: false, text: false, workbook: false, codeTrace: false, missionLab: false }
-      }
-      progressMap[unitId].video = true
-    })
-
-    Object.entries(missionLabCompletedFromProgress).forEach(([unitId, completed]) => {
-      if (!completed) return
-      if (!progressMap[unitId]) {
-        progressMap[unitId] = { quiz: false, video: false, text: false, workbook: false, codeTrace: false, missionLab: false }
-      }
-      progressMap[unitId].missionLab = true
-    })
+    // 완료 상태만 OR 병합한다. 이 보정으로 점수/학습 이력/보상을 생성하지 않는다.
+    const progressMap = mergeUnitProgressCompletion(historyProgressMap, completionFromProgress)
 
     if (effectiveHistory.length === 0) {
       regions?.forEach(r => statusMap[r.id] = 'not_started')
@@ -1978,7 +1946,7 @@ function SpaceHome() {
     }
 
     return { explorationStatus: statusMap, recentRegionId: lastRegionId, bestScores: scores, unitProgressMap: progressMap }
-  }, [effectiveHistory, regions, selectedClusterId, videoCompletedFromProgress, missionLabCompletedFromProgress])
+  }, [effectiveHistory, regions, selectedClusterId, completionFromProgress])
 
   // Calculate chapter progress dynamically from Firestore data
   const chapterProgress = useMemo(() => {
