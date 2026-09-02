@@ -77,6 +77,13 @@ export const validateQuizCompletionSnapshot = ({
   return { ok: true, serverCorrectCount, serverScore }
 }
 
+export const getQuizCompletionFailureState = (reason) => ({
+  ownershipLost: reason === 'session_owner_mismatch',
+  message: reason === 'session_owner_mismatch'
+    ? '다른 탭이 이 Field Test를 이어서 진행 중이므로 현재 탭에서는 제출할 수 없습니다.'
+    : '서버의 풀이 기록과 현재 답안이 일치하지 않아 완료하지 못했습니다. 새로고침 후 같은 문제 묶음에 다시 입장해 주세요. 저장된 답안은 유지됩니다.',
+})
+
 export const getEverWrongQuizQuestions = (questions = [], answers = {}, everWrongIds = []) => {
   const everWrong = everWrongIds instanceof Set ? everWrongIds : new Set(everWrongIds)
   return questions.filter(question => (

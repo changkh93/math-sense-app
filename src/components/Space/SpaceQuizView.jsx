@@ -18,6 +18,7 @@ import { httpsCallable } from 'firebase/functions'
 import { useCreateMistakeCardFromQuiz } from '../../hooks/useMistakeNotebook'
 import {
   canSubmitQuizSession,
+  getQuizCompletionFailureState,
   getValidQuizCheckpoint,
   getEverWrongQuizQuestions,
   getUnansweredQuizQuestions,
@@ -25,6 +26,7 @@ import {
   isMatchingQuizSessionOwner,
   shouldStartQuizSessionInitialization,
 } from '../../utils/quizSessionGuards'
+import { writeQuizProgressSnapshot } from '../../utils/quizSessionPersistence'
 import { createSustainedBlurGuard } from '../../utils/quizFocusGuard'
 
 // Fisher-Yates 셔플 알고리즘
@@ -434,10 +436,10 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
             checkpointAnswer &&
             !checkpointAnswer.reactionId
           ) {
-            targetUserAnswers = {
-              ...targetUserAnswers,
-              ...pendingCheckpoint.userAnswers,
-            }
+            targetUserAnswers = Object.fromEntries(
+              Object.entries({ ...targetUserAnswers, ...pendingCheckpoint.userAnswers })
+                .filter(([questionId]) => selectedIds.has(questionId))
+            )
             targetSessionCrystals = pendingCheckpoint.sessionCrystals ?? targetSessionCrystals
             targetComboCount = pendingCheckpoint.comboCount ?? targetComboCount
             targetShieldsUsed = pendingCheckpoint.shieldsUsed ?? targetShieldsUsed
@@ -488,17 +490,32 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
               if (getQuizSessionStateFingerprint(latestSession) !== loadedServerSessionFingerprint) {
                 throw new Error('QUIZ_SESSION_CHANGED_DURING_INIT')
               }
-              transaction.set(progressRef, {
+              writeQuizProgressSnapshot(transaction, progressRef, {
                 quizSession: {
                   ...latestSession,
                   sessionId: targetSessionId,
                   clientInstanceId: quizClientInstanceIdRef.current,
                   originalTotal: selected.length,
+                  // Persist the same normalized state that the UI restores.
+                  // In particular, a smaller Dark Matter batch must not retain
+                  // answers from previous batches, including on the result page.
+                  currentIdx: targetCurrentIdx,
+                  userAnswers: targetUserAnswers,
+                  sessionCrystals: targetSessionCrystals,
+                  comboCount: targetComboCount,
+                  shieldsUsed: targetShieldsUsed,
+                  retryCount: targetRetryCount,
+                  firstPassScore: targetFirstPassScore,
+                  everWrong: targetEverWrong,
+                  reviewMarks: targetReviewMarks,
+                  deferredQuestionIds: targetDeferredQuestionIds,
+                  isDeferredRound: targetIsDeferredRound,
+                  isResultMode: targetIsResultMode,
                 },
                 unitTitle: quizData?.title || '탐사 퀴즈',
                 unitId: quizData.unitId,
                 updatedAt: serverTimestamp(),
-              }, { merge: true })
+              })
             })
           }
 
@@ -717,12 +734,12 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
           })) {
             throw new Error('QUIZ_SESSION_OWNERSHIP_LOST')
           }
-          transaction.set(progressRef, {
+          writeQuizProgressSnapshot(transaction, progressRef, {
             quizSession: JSON.parse(JSON.stringify(sessionObj)),
             unitTitle: quizData?.title || "탐사 퀴즈",
             unitId: quizData.unitId || "",
             updatedAt: serverTimestamp()
-          }, { merge: true })
+          })
         })
         return true
       } catch (e) {
@@ -830,7 +847,7 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
         })) {
           throw new Error('QUIZ_SESSION_OWNERSHIP_LOST')
         }
-        transaction.set(progressRef, {
+        writeQuizProgressSnapshot(transaction, progressRef, {
           ...(snapshot?.shouldPersist ? {
             quizSession: JSON.parse(JSON.stringify(snapshot.session)),
             unitTitle: quizData?.title || '탐사 퀴즈',
@@ -838,7 +855,7 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
           } : {}),
           updatedAt: serverTimestamp(),
           ...additionalUpdates,
-        }, { merge: true })
+        })
       })
       return true
     } catch (error) {
@@ -1866,8 +1883,12 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
     } catch (err) {
       console.error("Finish failed:", err)
       if (err?.code === 'quiz-session-verification-failed' || /퀴즈 세션 검증/.test(String(err?.message || ''))) {
-        sessionOwnershipLostRef.current = true
-        setSessionGuardMessage('서버의 풀이 기록과 현재 탭의 답안이 일치하지 않아 완료 처리를 중단했습니다. 다른 탭을 닫고 다시 입장해 주세요.')
+        const failure = getQuizCompletionFailureState(err?.reason)
+        sessionOwnershipLostRef.current = failure.ownershipLost
+        setSessionGuardMessage(failure.message)
+        await recordQuizSessionGuardAudit('submission_verification_failed', {
+          reason: err?.reason || 'unknown',
+        })
       }
       setIsSubmitting(false)
     }

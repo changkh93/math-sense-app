@@ -2185,6 +2185,7 @@ function SpaceHome() {
           if (!completionValidation.ok) {
             const validationError = new Error(`퀴즈 세션 검증에 실패했습니다: ${completionValidation.reason}`)
             validationError.code = 'quiz-session-verification-failed'
+            validationError.reason = completionValidation.reason
             throw validationError
           }
         }

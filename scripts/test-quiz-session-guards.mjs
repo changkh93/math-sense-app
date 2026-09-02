@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import {
   canSubmitQuizSession,
+  getQuizCompletionFailureState,
   getValidQuizCheckpoint,
   getEverWrongQuizQuestions,
   getUnansweredQuizQuestions,
@@ -176,6 +177,18 @@ assert.equal(validateQuizCompletionSnapshot({
 
 const quizViewSource = readFileSync(new URL('../src/components/Space/SpaceQuizView.jsx', import.meta.url), 'utf8')
 const spaceHomeSource = readFileSync(new URL('../src/components/Space/SpaceHome.jsx', import.meta.url), 'utf8')
+for (const reason of ['answer_count_mismatch', 'answer_id_mismatch', 'score_mismatch', undefined]) {
+  const failure = getQuizCompletionFailureState(reason)
+  assert.equal(failure.ownershipLost, false, '답안 검증 오류를 다른 탭의 소유권 탈취로 간주하면 안 됩니다.')
+  assert.doesNotMatch(failure.message, /다른 탭/)
+}
+assert.equal(getQuizCompletionFailureState('session_owner_mismatch').ownershipLost, true)
+assert.match(spaceHomeSource, /validationError\.reason = completionValidation\.reason/)
+assert.match(quizViewSource, /getQuizCompletionFailureState\(err\?\.reason\)/)
+assert.equal((quizViewSource.match(/writeQuizProgressSnapshot\(transaction, progressRef,/g) || []).length, 3,
+  '초기화·답안 저장·퇴장 저장 모두 전체 세션 스냅샷을 교체해야 합니다.')
+assert.match(quizViewSource, /userAnswers: targetUserAnswers/,
+  '재입장할 때 화면에 복구한 필터링된 답안을 서버에도 저장해야 합니다.')
 assert.match(quizViewSource, /clientInstanceId:\s*quizClientInstanceIdRef\.current/)
 assert.match(quizViewSource, /sessionStorage\.setItem\(/)
 assert.doesNotMatch(quizViewSource, /localStorage\.setItem\(\s*makePendingAnswerCheckpointKey/)
