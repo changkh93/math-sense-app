@@ -13,6 +13,18 @@ export const canSubmitQuizSession = ({ questions = [], answers = {}, expectedTot
   getUnansweredQuizQuestions(questions, answers).length === 0
 )
 
+export const shouldStartQuizSessionInitialization = ({
+  questionCount = 0,
+  nextGuardKey = '',
+  initializedGuardKey = null,
+  initializingGuardKey = null,
+} = {}) => (
+  questionCount > 0 &&
+  Boolean(nextGuardKey) &&
+  initializedGuardKey !== nextGuardKey &&
+  initializingGuardKey !== nextGuardKey
+)
+
 export const QUIZ_CHECKPOINT_MAX_AGE_MS = 30 * 60 * 1000
 
 export const isMatchingQuizSessionOwner = (session = {}, { sessionId = '', clientInstanceId = '' } = {}) => (

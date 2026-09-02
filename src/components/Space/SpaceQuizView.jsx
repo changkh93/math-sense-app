@@ -23,6 +23,7 @@ import {
   getUnansweredQuizQuestions,
   hasCompleteQuizQuestionSet,
   isMatchingQuizSessionOwner,
+  shouldStartQuizSessionInitialization,
 } from '../../utils/quizSessionGuards'
 import { createSustainedBlurGuard } from '../../utils/quizFocusGuard'
 
@@ -278,6 +279,8 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
   const [isIntegrityTerminated, setIsIntegrityTerminated] = useState(false)
 
   const initializedRef = useRef(null) // Prevent accidental reshuffling (tracks unitId + uid)
+  const initializingRef = useRef(null) // Close the async window where the same tab could initialize twice.
+  const initializationAttemptRef = useRef(0)
   const navigationTransitionRef = useRef(false)
   const focusViolationCountRef = useRef(0)
   const lastFocusViolationAtRef = useRef(0)
@@ -292,6 +295,7 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
   const darkMatterSyncedSessionRef = useRef('')
   const sessionOwnershipLostRef = useRef(false)
   const currentQuestion = currentQuestions[currentIdx]
+  const quizQuestionSignature = quizData?.questions?.map(q => q.id).join('|') || 'no_questions'
 
   // Keep the latest resumable state available to focus-violation callbacks without
   // re-arming the protection effect every time an answer changes.
@@ -326,9 +330,21 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
   // 초기 문제 설정 및 이어풀기 세션 로드
   useEffect(() => {
     // Guard key includes user uid so that when auth loads, we re-init with Firestore data
-    const questionSignature = quizData?.questions?.map(q => q.id).join('|') || 'no_questions'
-    const guardKey = `${quizData?.unitId}__${user?.uid || 'anon'}__${questionSignature}`
-    if (quizData?.questions?.length > 0 && initializedRef.current !== guardKey) {
+    const guardKey = `${quizData?.unitId}__${user?.uid || 'anon'}__${quizQuestionSignature}`
+    if (shouldStartQuizSessionInitialization({
+      questionCount: quizData?.questions?.length || 0,
+      nextGuardKey: guardKey,
+      initializedGuardKey: initializedRef.current,
+      initializingGuardKey: initializingRef.current,
+    })) {
+      // This assignment must happen before the first await. Parent re-renders can
+      // otherwise launch another initializer for the same tab and create a second
+      // sessionId that is later mistaken for a different-tab takeover.
+      initializingRef.current = guardKey
+      const initializationAttempt = initializationAttemptRef.current + 1
+      initializationAttemptRef.current = initializationAttempt
+      const isCurrentInitialization = () => initializationAttemptRef.current === initializationAttempt
+
       const initQuizSession = async () => {
         setIsLoadingSession(true)
         try {
@@ -451,28 +467,19 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
             const firstUnansweredIdx = activeQuestions.findIndex(q => !targetUserAnswers[q.id])
             targetCurrentIdx = firstUnansweredIdx >= 0 ? firstUnansweredIdx : 0
           }
-          
-          setCurrentQuestions(activeQuestions)
-          setAllSessionQuestions(selected)
-          setOriginalTotal(selected.length)
-          setRetryCount(targetRetryCount)
-          setCurrentIdx(targetCurrentIdx)
-          setUserAnswers(targetUserAnswers)
-          setSessionCrystals(targetSessionCrystals)
-          setComboCount(targetComboCount)
-          setShieldsUsed(targetShieldsUsed)
-          setFirstPassScore(targetFirstPassScore)
-          setEverWrongSet(new Set(targetEverWrong))
-          setQuizSessionId(targetSessionId)
-          setReviewMarks(new Set(targetReviewMarks))
-          setDeferredQuestionIds(new Set(targetDeferredQuestionIds))
-          setIsDeferredRound(targetIsDeferredRound)
-          setIsResultMode(targetIsResultMode)
+
+          if (!isCurrentInitialization()) return
 
           if (user?.uid && quizData.unitId) {
             const progressRef = doc(db, 'users', user.uid, 'learning_progress', quizData.unitId)
             await runTransaction(db, async (transaction) => {
+              if (!isCurrentInitialization()) {
+                throw new Error('QUIZ_SESSION_INIT_STALE')
+              }
               const latestSnap = await transaction.get(progressRef)
+              if (!isCurrentInitialization()) {
+                throw new Error('QUIZ_SESSION_INIT_STALE')
+              }
               const latestData = latestSnap.exists() ? latestSnap.data() : {}
               const latestSession = latestData.quizSession || {}
               if (latestSession.sessionId && latestSession.sessionId !== targetSessionId) {
@@ -493,11 +500,33 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
                 updatedAt: serverTimestamp(),
               }, { merge: true })
             })
-            sessionOwnershipLostRef.current = false
-            const restoredAnswerCount = Object.keys(targetUserAnswers).length
-            if (restoredAnswerCount > 0) {
-              setSessionGuardMessage(`이전 진행 ${restoredAnswerCount}/${selected.length}문항을 복구했습니다. 현재 탭에서 이어서 진행합니다.`)
-            }
+          }
+
+          // Only the initializer that still owns this attempt may publish UI
+          // state. A newer auth/content key makes every older result stale.
+          if (!isCurrentInitialization()) return
+
+          setCurrentQuestions(activeQuestions)
+          setAllSessionQuestions(selected)
+          setOriginalTotal(selected.length)
+          setRetryCount(targetRetryCount)
+          setCurrentIdx(targetCurrentIdx)
+          setUserAnswers(targetUserAnswers)
+          setSessionCrystals(targetSessionCrystals)
+          setComboCount(targetComboCount)
+          setShieldsUsed(targetShieldsUsed)
+          setFirstPassScore(targetFirstPassScore)
+          setEverWrongSet(new Set(targetEverWrong))
+          setQuizSessionId(targetSessionId)
+          setReviewMarks(new Set(targetReviewMarks))
+          setDeferredQuestionIds(new Set(targetDeferredQuestionIds))
+          setIsDeferredRound(targetIsDeferredRound)
+          setIsResultMode(targetIsResultMode)
+          sessionOwnershipLostRef.current = false
+
+          const restoredAnswerCount = Object.keys(targetUserAnswers).length
+          if (user?.uid && restoredAnswerCount > 0) {
+            setSessionGuardMessage(`이전 진행 ${restoredAnswerCount}/${selected.length}문항을 복구했습니다. 현재 탭에서 이어서 진행합니다.`)
           }
 
           initializedRef.current = guardKey;
@@ -510,19 +539,23 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
             }
           }
         } catch (error) {
+          if (!isCurrentInitialization() || error?.message === 'QUIZ_SESSION_INIT_STALE') return
           console.error("Failed to init quiz session", error)
           if (['QUIZ_SESSION_REPLACED_DURING_INIT', 'QUIZ_SESSION_CHANGED_DURING_INIT'].includes(error?.message)) {
             sessionOwnershipLostRef.current = true
             setSessionGuardMessage('다른 탭에서 Field Test 진행 상태가 변경되어 현재 탭의 세션을 열지 않았습니다.')
           }
         } finally {
-          setIsLoadingSession(false)
+          if (isCurrentInitialization()) {
+            if (initializingRef.current === guardKey) initializingRef.current = null
+            setIsLoadingSession(false)
+          }
         }
       }
 
       initQuizSession()
     }
-  }, [quizData, hasRadar, isRadarBonus, user])
+  }, [quizData?.unitId, quizData?.title, quizData?.questions, quizQuestionSignature, hasRadar, isRadarBonus, user?.uid])
 
   // 문제 변경 시 AI 설명 패널 닫기 + 멀티 선택 초기화
   useEffect(() => {

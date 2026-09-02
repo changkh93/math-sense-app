@@ -8,6 +8,7 @@ import {
   hasCompleteQuizQuestionSet,
   isMatchingQuizSessionOwner,
   QUIZ_CHECKPOINT_MAX_AGE_MS,
+  shouldStartQuizSessionInitialization,
   validateQuizCompletionSnapshot,
 } from '../src/utils/quizSessionGuards.js'
 
@@ -74,6 +75,27 @@ assert.equal(
   false,
   '문항 데이터가 누락되면 모든 현재 문항에 답했더라도 제출할 수 없어야 합니다.'
 )
+
+const initializationGuardKey = 'dark_matter_zone__student-a__q1|q2'
+assert.equal(shouldStartQuizSessionInitialization({
+  questionCount: 2,
+  nextGuardKey: initializationGuardKey,
+}), true, '첫 초기화는 시작해야 합니다.')
+assert.equal(shouldStartQuizSessionInitialization({
+  questionCount: 2,
+  nextGuardKey: initializationGuardKey,
+  initializingGuardKey: initializationGuardKey,
+}), false, '같은 탭의 초기화가 진행 중이면 중복 세션을 시작하면 안 됩니다.')
+assert.equal(shouldStartQuizSessionInitialization({
+  questionCount: 2,
+  nextGuardKey: initializationGuardKey,
+  initializedGuardKey: initializationGuardKey,
+}), false, '이미 완료된 초기화는 다시 시작하면 안 됩니다.')
+assert.equal(shouldStartQuizSessionInitialization({
+  questionCount: 2,
+  nextGuardKey: 'dark_matter_zone__student-a__q3',
+  initializingGuardKey: initializationGuardKey,
+}), true, '사용자나 문항 구성이 바뀐 새 키는 초기화할 수 있어야 합니다.')
 
 assert.deepEqual(
   getEverWrongQuizQuestions(
@@ -158,6 +180,8 @@ assert.match(quizViewSource, /clientInstanceId:\s*quizClientInstanceIdRef\.curre
 assert.match(quizViewSource, /sessionStorage\.setItem\(/)
 assert.doesNotMatch(quizViewSource, /localStorage\.setItem\(\s*makePendingAnswerCheckpointKey/)
 assert.match(quizViewSource, /QUIZ_SESSION_OWNERSHIP_LOST/)
+assert.match(quizViewSource, /initializingRef\.current = guardKey/)
+assert.doesNotMatch(quizViewSource, /\}, \[quizData, hasRadar, isRadarBonus, user\]\)/)
 assert.match(spaceHomeSource, /validateQuizCompletionSnapshot\(\{/)
 
 console.log('quiz session guard tests passed')
