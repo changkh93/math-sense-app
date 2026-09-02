@@ -1114,7 +1114,8 @@ export class SafePythonInterpreter {
           i = forBlock.nextIndex
 
           const seq = this.evaluateExpression(seqExpr, env)
-          if (seq && (Array.isArray(seq) || typeof seq === 'string' || typeof seq[Symbol.iterator] === 'function')) {
+          const isIterable = seq !== null && seq !== undefined && (Array.isArray(seq) || typeof seq === 'string' || typeof seq[Symbol.iterator] === 'function')
+          if (isIterable) {
             const cleanVar = iterVar.trim().replace(/^\(/, '').replace(/\)$/, '')
             const isTuple = cleanVar.includes(',')
             const varNames = cleanVar.split(',').map((n) => n.trim())
@@ -1137,6 +1138,9 @@ export class SafePythonInterpreter {
               const blockRes = this.runBlock(forBlock.body, env)
               if (blockRes?.returned) return blockRes
             }
+          } else {
+            const typeName = typeof seq === 'number' ? 'int' : typeof seq === 'boolean' ? 'bool' : seq === null ? 'NoneType' : typeof seq
+            throw evaluatorError('TYPE_ERROR', `'${typeName}' object is not iterable (정수나 단일 값은 바로 반복할 수 없습니다. range(${seqExpr})를 사용해 보세요)`)
           }
           continue
         }

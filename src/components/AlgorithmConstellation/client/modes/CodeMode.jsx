@@ -172,7 +172,7 @@ export default function CodeMode({
   const requestScaffoldAccess = async (level) => {
     if (!assistanceAllowed) throw new Error('현재 탐사에서는 지원을 사용할 수 없습니다.')
     if (revealedScaffoldLevels.current.has(level)) return
-    const scaffold = getScaffoldByLevel(level, kernel.id)
+    const scaffold = getScaffoldByLevel(level, kernel.id || kernel.problemId)
     if (!scaffold) throw new Error('지원 단계를 찾을 수 없습니다.')
     await onRequestHint?.({
       level,
@@ -693,7 +693,7 @@ export default function CodeMode({
       <ScaffoldDrawer
         isOpen={isScaffoldOpen}
         initialLevel={scaffoldLevel}
-        problemId={kernel.id}
+        problemId={kernel.id || kernel.problemId}
         onApplySnippet={(snippet) => handleCodeChange(snippet)}
         onSelectScaffold={async (lvl) => {
           await requestScaffoldAccess(lvl)

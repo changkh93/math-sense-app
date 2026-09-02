@@ -404,14 +404,242 @@ export const AC_NAV_006_SCAFFOLD_CONTENT = {
   },
 }
 
+export const AC_EXP_LOOP_06_SCAFFOLD_CONTENT = {
+  S1: {
+    level: 1,
+    title: 'S1 · 반복 및 누적 스캔',
+    description: '반복 횟수와 매 회차 더해지는 에너지에 주목해 보세요.',
+    content: 'times 만큼 반복하며 step_energy 씩 누적해야 합니다. 0부터 시작하는 누적 변수(energy = 0)와 정해진 횟수 반복(range(times))에 주목해 보세요.',
+    source: 'hint',
+    answerExposure: 'none',
+  },
+  S2: {
+    level: 2,
+    title: 'S2 · 회차별 상태 렌즈',
+    description: 'for문이 돌 때마다의 상태 변화를 확인하세요.',
+    content: 'times=4, step_energy=2일 때:\n• 1회차: energy = 0 + 2 = 2\n• 2회차: energy = 2 + 2 = 4\n• 3회차: energy = 4 + 2 = 6\n• 4회차: energy = 6 + 2 = 8',
+    source: 'hint',
+    answerExposure: 'partial',
+  },
+  S3: {
+    level: 3,
+    title: 'S3 · 방향 유도 질문',
+    description: '반복문 코드를 작성하는 질문입니다.',
+    content: '질문: "Python에서 정수 times번만큼 반복하려면 `for i in range(times):`를 어떻게 써야 할까요? (정수는 바로 for문에 쓸 수 없고 range() 함수를 거쳐야 합니다)"',
+    source: 'hint',
+    answerExposure: 'partial',
+  },
+  S4: {
+    level: 4,
+    title: 'S4 · 항로 절차 카드',
+    description: '단계별 논리 흐름을 확인하세요.',
+    content: `[절차 카드]\n1. energy = 0 으로 누적 변수를 준비한다.\n2. for i in range(times): 로 times번 반복한다.\n3. 루프 본문에서 energy = energy + step_energy 로 값을 더한다.\n4. 반복이 끝나면 energy를 반환한다.`,
+    source: 'hint',
+    answerExposure: 'partial',
+  },
+  S5: {
+    level: 5,
+    title: 'S5 · 부분 절차 배열 (Parsons)',
+    description: '필요한 절차 블록을 순서대로 배열해 보세요.',
+    parsonsBlocks: [
+      'energy = 0',
+      'for i in range(times):',
+      '    energy = energy + step_energy',
+      'return energy',
+    ],
+    source: 'parsons',
+    answerExposure: 'partial',
+  },
+  RESCUE: {
+    level: 6,
+    title: 'Rescue · 해설 및 복구 연구실',
+    description: '완전한 정답을 단계별로 탐구하고, 24시간 뒤 새 문제로 독립 귀환을 준비합니다.',
+    solutionExplanation: '정해진 횟수 반복과 상태 누적은 for + range 패턴을 사용합니다. 정수(times)는 바로 for문에 넣을 수 없으며, `for i in range(times):` 형태로 작성해야 0부터 times-1까지 순서대로 반복하며 energy에 step_energy를 누적할 수 있습니다.',
+    source: 'solution-review',
+    answerExposure: 'full',
+  },
+}
+
+export const AC_EXP_STEP_03_SCAFFOLD_CONTENT = {
+  S1: {
+    level: 1,
+    title: 'S1 · 3단계 절차 스캔',
+    description: '충전, 부스트 증폭, 방어막의 3단계 흐름을 확인하세요.',
+    content: '1단계 충전(charge) ➔ 2단계 증폭(boost) ➔ 3단계 방어막(shield) 순서로 에너지가 전이됩니다. 빠진 2단계 연산에 주목하세요.',
+    source: 'hint',
+    answerExposure: 'none',
+  },
+  S2: {
+    level: 2,
+    title: 'S2 · 상태 전이 렌즈',
+    description: '초기값 2에서 단계별 전이 결과를 확인하세요.',
+    content: '• 1단계(충전): 2 + 3 = 5\n• 2단계(증폭): 5 * 4 = 20 (빠진 명령)\n• 3단계(방어막): 20 - 5 = 15',
+    source: 'hint',
+    answerExposure: 'partial',
+  },
+  S3: {
+    level: 3,
+    title: 'S3 · 방향 유도 질문',
+    description: '앞 단계 결과를 다음 단계로 연결하는 질문입니다.',
+    content: '질문: "1단계 충전 결과가 담긴 energy 변수에 boost를 곱하여 갱신하려면 어떤 대입 연산문을 써야 할까요?"',
+    source: 'hint',
+    answerExposure: 'partial',
+  },
+  S4: {
+    level: 4,
+    title: 'S4 · 항로 절차 카드',
+    description: '단계별 논리 흐름을 확인하세요.',
+    content: `[절차 카드]\n1. energy = initial_energy\n2. energy = energy + charge\n3. energy = energy * boost  # 빠진 증폭 명령\n4. energy = energy - shield\n5. return energy`,
+    source: 'hint',
+    answerExposure: 'partial',
+  },
+  S5: {
+    level: 5,
+    title: 'S5 · 부분 절차 배열 (Parsons)',
+    description: '필요한 절차 블록을 순서대로 배열해 보세요.',
+    parsonsBlocks: [
+      'energy = initial_energy',
+      'energy = energy + charge',
+      'energy = energy * boost',
+      'energy = energy - shield',
+      'return energy',
+    ],
+    source: 'parsons',
+    answerExposure: 'partial',
+  },
+  RESCUE: {
+    level: 6,
+    title: 'Rescue · 해설 및 복구 연구실',
+    description: '완전한 정답을 단계별로 탐구하고, 24시간 뒤 새 문제로 독립 귀환을 준비합니다.',
+    solutionExplanation: '연속된 절차는 앞 단계의 계산 결과(energy)를 다음 단계 연산의 입력으로 계속 이어받아 갱신합니다. 빠진 2단계에는 `energy = energy * boost`를 채워 넣어야 합니다.',
+    source: 'solution-review',
+    answerExposure: 'full',
+  },
+}
+
+export const AC_EXP_BOUND_05_SCAFFOLD_CONTENT = {
+  S1: {
+    level: 1,
+    title: 'S1 · 경계선 포함 스캔',
+    description: '경계선 위의 지점(pos = limit = 10)의 안전 여부에 주목하세요.',
+    content: '🛰️ 탐사 규정: 탐사선이 경계선(limit)에 닿은 위치(10)까지 안전(True)으로 판정해야 합니다.',
+    source: 'hint',
+    answerExposure: 'none',
+  },
+  S2: {
+    level: 2,
+    title: 'S2 · 비교 연산자 렌즈 (< vs <=)',
+    description: '경계값(10)에서의 두 연산자 차이를 확인하세요.',
+    content: '• 10 < 10 ➔ False (경계선 제외)\n• 10 <= 10 ➔ True (경계선 포함)',
+    source: 'hint',
+    answerExposure: 'partial',
+  },
+  S3: {
+    level: 3,
+    title: 'S3 · 방향 유도 질문',
+    description: '경계 포함 조건을 코드로 작성하는 질문입니다.',
+    content: '질문: "current_pos가 limit 이하(작거나 같음)인지 검사하는 Python 비교 연산자 기호는 무엇일까요?"',
+    source: 'hint',
+    answerExposure: 'partial',
+  },
+  S4: {
+    level: 4,
+    title: 'S4 · 항로 절차 카드',
+    description: '단계별 논리 흐름을 확인하세요.',
+    content: `[절차 카드]\n1. current_pos와 limit의 크기를 비교한다.\n2. current_pos <= limit 비교식을 작성한다.\n3. 비교식의 참/거짓(True/False) 결과를 반환한다.`,
+    source: 'hint',
+    answerExposure: 'partial',
+  },
+  S5: {
+    level: 5,
+    title: 'S5 · 부분 절차 배열 (Parsons)',
+    description: '필요한 절차 블록을 순서대로 배열해 보세요.',
+    parsonsBlocks: [
+      'return current_pos <= limit',
+    ],
+    source: 'parsons',
+    answerExposure: 'partial',
+  },
+  RESCUE: {
+    level: 6,
+    title: 'Rescue · 해설 및 복구 연구실',
+    description: '완전한 정답을 단계별로 탐구하고, 24시간 뒤 새 문제로 독립 귀환을 준비합니다.',
+    solutionExplanation: '경계값을 안전 구역에 포함하려면 이하(<=) 연산자를 사용합니다. `def check_within_boundary(current_pos, limit): return current_pos <= limit` 처럼 작성하면 경계선 위의 위치(10)까지 정확히 True로 판정합니다.',
+    source: 'solution-review',
+    answerExposure: 'full',
+  },
+}
+
+function generateDynamicScaffold(problemId) {
+  return {
+    S1: {
+      level: 1,
+      title: 'S1 · 조건 스캔',
+      description: '문제의 핵심 단어와 입력 매개변수에 주목해 보세요.',
+      content: '문제에서 요구하는 동작 조건과 입력 변수를 확인하고, 어떤 결과를 돌려주어야(return) 하는지 점검하세요.',
+      source: 'hint',
+      answerExposure: 'none',
+    },
+    S2: {
+      level: 2,
+      title: 'S2 · 규칙 및 상태 렌즈',
+      description: '2단계 대화형 실험실에서 확인한 상태 변화 패턴을 상기하세요.',
+      content: '실험실에서 관찰한 입력과 출력 사이의 전이 규칙을 코드로 표현해 보세요.',
+      source: 'hint',
+      answerExposure: 'partial',
+    },
+    S3: {
+      level: 3,
+      title: 'S3 · 방향 유도 질문',
+      description: '생각을 구체화하는 질문입니다.',
+      content: '질문: "입력값이 들어왔을 때, 어떤 연산자나 문법(if, for, while, 산술 연산)을 적용해야 목표 결과에 도달할까요?"',
+      source: 'hint',
+      answerExposure: 'partial',
+    },
+    S4: {
+      level: 4,
+      title: 'S4 · 항로 절차 카드',
+      description: '단계별 논리 흐름을 확인하세요.',
+      content: `[절차 카드]\n1. 입력 매개변수를 확인한다.\n2. 발견한 규칙에 따라 연산 또는 반복/조건을 수행한다.\n3. 계산된 최종 상태를 return 문으로 반환한다.`,
+      source: 'hint',
+      answerExposure: 'partial',
+    },
+    S5: {
+      level: 5,
+      title: 'S5 · 부분 절차 배열 (Parsons)',
+      description: '필요한 절차 블록을 순서대로 확인해 보세요.',
+      parsonsBlocks: [
+        '입력 매개변수를 받아 필요한 초기 상태를 설정한다.',
+        '발견한 규칙에 따라 연산을 수행하여 상태를 갱신한다.',
+        '최종 계산 결과를 return으로 반환한다.',
+      ],
+      source: 'parsons',
+      answerExposure: 'partial',
+    },
+    RESCUE: {
+      level: 6,
+      title: 'Rescue · 해설 및 복구 연구실',
+      description: '완전한 정답을 단계별로 탐구하고, 24시간 뒤 새 문제로 독립 귀환을 준비합니다.',
+      solutionExplanation: '대화형 실험실에서 확인한 규칙을 바탕으로 함수 본문을 구성하세요. 변수에 연산 결과를 대입(=)하거나 조건/반복을 적용한 후 반드시 return 문으로 결과를 반환해야 합니다.',
+      source: 'solution-review',
+      answerExposure: 'full',
+    },
+  }
+}
+
 export function getScaffoldByLevel(level, problemId = 'AC-COND-001') {
-  let catalog = AC_COND_001_SCAFFOLD_CONTENT
-  if (problemId === 'AC-PAT-003') catalog = AC_PAT_003_SCAFFOLD_CONTENT
+  let catalog = null
+  if (problemId === 'AC-COND-001') catalog = AC_COND_001_SCAFFOLD_CONTENT
   else if (problemId === 'AC-COND-002') catalog = AC_COND_002_SCAFFOLD_CONTENT
+  else if (problemId === 'AC-PAT-003') catalog = AC_PAT_003_SCAFFOLD_CONTENT
   else if (problemId === 'AC-PAT-004') catalog = AC_PAT_004_SCAFFOLD_CONTENT
   else if (problemId === 'AC-SEQ-005') catalog = AC_SEQ_005_SCAFFOLD_CONTENT
   else if (problemId === 'AC-NAV-005') catalog = AC_NAV_005_SCAFFOLD_CONTENT
   else if (problemId === 'AC-NAV-006') catalog = AC_NAV_006_SCAFFOLD_CONTENT
+  else if (problemId === 'AC-EXP-LOOP-06') catalog = AC_EXP_LOOP_06_SCAFFOLD_CONTENT
+  else if (problemId === 'AC-EXP-STEP-03') catalog = AC_EXP_STEP_03_SCAFFOLD_CONTENT
+  else if (problemId === 'AC-EXP-BOUND-05') catalog = AC_EXP_BOUND_05_SCAFFOLD_CONTENT
+  else catalog = generateDynamicScaffold(problemId)
 
   switch (level) {
     case 1: return catalog.S1

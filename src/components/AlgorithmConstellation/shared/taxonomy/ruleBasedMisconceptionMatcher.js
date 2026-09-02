@@ -35,7 +35,7 @@ export function matchRuleBasedMisconception({ testResults = [], syntaxError = nu
 
   // 1. Incomplete solution / missing return (e.g. pass returning None / null)
   const hasMissingReturn = testResults.every(
-    (t) => t.actual === null || t.actual === undefined || typeof t.actual !== 'boolean'
+    (t) => t.actual === null || t.actual === undefined
   )
   if (hasMissingReturn) {
     return {
