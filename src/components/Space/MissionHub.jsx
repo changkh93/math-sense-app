@@ -152,6 +152,7 @@ const getNormalizedVideoRange = (start = 0, end = 0) => {
 }
 
 const VIDEO_CACHE_MAX_FUTURE_SKEW_MS = 5 * 60 * 1000
+const VIDEO_CACHE_WRITE_INTERVAL_MS = 5 * 1000
 
 // Learning-progress listener retry policy. While the listener is failing we
 // keep loadingProgress=true, which gates the one-shot restore and the
@@ -1090,6 +1091,13 @@ export default function MissionHub({
   const videoPrevTxIdRef = useRef(null)
   const videoPlayerRef = useRef(null)
   const autoSaveIntervalRef = useRef(null)
+  const videoDirtySeqRef = useRef(0)
+  const lastFlushedSeqRef = useRef(0)
+  const hasSentBeaconRef = useRef(false)
+  const inFlightFlushRef = useRef(false)
+  const requestVideoFlushRef = useRef(null)
+  const videoFlushSessionKeyRef = useRef('')
+  const lastVideoCacheWriteAtRef = useRef(0)
   const lastVideoTimeRef = useRef(null)
   const lastPollTimeRef = useRef(Date.now())
   const videoCompletedRef = useRef(false)
@@ -1105,7 +1113,7 @@ export default function MissionHub({
   const isVideoProcessingRef = useRef(false)
   const lastActivityTimeRef = useRef(Date.now())
   const loadedTxIdRef = useRef(null) // Track which video was last loaded to prevent overwrite loops
-  const lastInitializedTxIdRef = useRef(null)
+  const lastInitializedVideoSessionKeyRef = useRef(null)
   const videoTrackingStatusRef = useRef({
     apiReady: false,
     apiTimedOut: false,
@@ -1628,8 +1636,14 @@ export default function MissionHub({
 
     // Session-only reward/timer state must never leak between transmissions,
     // regardless of whether the next transmission already has saved progress.
-    if (lastInitializedTxIdRef.current !== txId) {
-      lastInitializedTxIdRef.current = txId
+    const videoSessionKey = `${unitId}:${txId}`
+    if (lastInitializedVideoSessionKeyRef.current !== videoSessionKey) {
+      lastInitializedVideoSessionKeyRef.current = videoSessionKey
+      hasSentBeaconRef.current = false
+      lastFlushedSeqRef.current = 0
+      videoDirtySeqRef.current = 0
+      videoFlushSessionKeyRef.current = videoSessionKey
+      lastVideoCacheWriteAtRef.current = 0
       setShowTimeAttack(false)
       showTimeAttackRef.current = false
       setTimeAttackCombo(0)
@@ -1696,6 +1710,11 @@ export default function MissionHub({
       
       const wasPreviouslyCompleted = !!(serverData?.completed || serverData?.completionBonusGiven)
       const restoredCompleted = wasPreviouslyCompleted || restoredCompletion.completed
+      if (combinedStamps.length > serverStamps.length ||
+          totalTimeSpentRef.current > (Number(serverData?.totalTimeSpent) || 0) ||
+          (restoredCompleted && !wasPreviouslyCompleted)) {
+        videoDirtySeqRef.current += 1
+      }
       setVideoCompleted(restoredCompleted)
       videoCompletedRef.current = restoredCompleted
       setVideoCompletionBonusGiven(wasPreviouslyCompleted)
@@ -1758,20 +1777,32 @@ export default function MissionHub({
     }
   }, [videoTrackingUnavailable])
 
-  // ─── Video Progress: Part 2 - Auto-save Interval & Unload-save (Stable loop) ───
+  // ─── Video Progress: Part 2 - Dirty Flush Controller & Unload-save ───
   useEffect(() => {
     if (loadingProgress || !userId || !selectedTx) return
     const txId = selectedTx.id || 'default'
+    let disposed = false
+    let pendingFlush = false
 
-    if (autoSaveIntervalRef.current) clearInterval(autoSaveIntervalRef.current)
-    autoSaveIntervalRef.current = setInterval(async () => {
+    const flushVideoProgress = async () => {
+      if (disposed) return
+      if (inFlightFlushRef.current) {
+        pendingFlush = true
+        return
+      }
+      pendingFlush = false
+      const flushSessionKey = `${unitId}:${txId}`
       try {
         if (!videoWriterEnabledRef.current) return
+        const currentDirtySeq = videoDirtySeqRef.current
+        if (currentDirtySeq === lastFlushedSeqRef.current) return
+
+        inFlightFlushRef.current = true
+
         const knownDuration = videoDurationRef.current > 0 ? videoDurationRef.current : 0
-        // Stamp-less ticks must not touch the cache: writing position without
-        // stamps is what poisons the offline restore fallback.
         const rawStamps = Array.from(stampedSetRef.current)
         if (rawStamps.length === 0) return
+
         const cached = writeVideoProgressCache({
           userId,
           unitId,
@@ -1782,79 +1813,106 @@ export default function MissionHub({
           totalTimeSpent: totalTimeSpentRef.current,
         })
         const pos = cached.position
-        if (cached.stamps.length > 0) {
-          // Cumulative fields can only grow: merge with the last known server
-          // record so even a mis-restored session heals instead of overwriting.
-          const merged = mergeCumulativeVideoProgress(
-            learningProgressRef.current?.videoProgress?.[txId] || {},
-            {
-              totalTimeSpent: totalTimeSpentRef.current,
-              stampedSeconds: cached.stamps,
-              duration: knownDuration,
-              contentStart: selectedTx.start,
-              contentEnd: selectedTx.end,
-            }
-          )
-          lastVideoTimeRef.current = pos
-          stampedSetRef.current = new Set(merged.stampedSeconds)
-          setStampCount(merged.stampedSeconds.length)
-          const playbackRange = getVideoPlaybackRange({
+        if (cached.stamps.length === 0) return
+
+        const merged = mergeCumulativeVideoProgress(
+          learningProgressRef.current?.videoProgress?.[txId] || {},
+          {
+            totalTimeSpent: totalTimeSpentRef.current,
+            stampedSeconds: cached.stamps,
             duration: knownDuration,
             contentStart: selectedTx.start,
             contentEnd: selectedTx.end,
-          })
-
-          // Offline-first caching (10초 주기 일괄 저장으로 성능 최적화)
-          const progressRef = doc(db, 'users', userId, 'learning_progress', unitId)
-
-          const updateData = {
-            [`videoProgress.${txId}.lastPosition`]: pos,
-            [`videoProgress.${txId}.totalTimeSpent`]: merged.totalTimeSpent,
-            [`videoProgress.${txId}.todayTimeSpent`]: dailyTimeSpentRef.current,
-            [`videoProgress.${txId}.todayTimeSpentDate`]: dailyTimeSpentDateRef.current,
-            [`videoProgress.${txId}.updatedAt`]: serverTimestamp(),
-            [`videoProgress.${txId}.stampedSeconds`]: merged.stampedSeconds,
-            [`videoProgress.${txId}.transmissionTitle`]: selectedTx?.title || activeUnit?.title || 'Main Video',
-            [`videoProgress.${txId}.videoId`]: getYouTubeVideoId(selectedTx?.videoId),
-            [`videoProgress.${txId}.contentStart`]: playbackRange.start,
-            [`videoProgress.${txId}.contentEnd`]: playbackRange.end || null,
-            [`videoProgress.${txId}.segmentDuration`]: playbackRange.segmentDuration,
-            [`videoProgress.${txId}.trackingDiagnostics`]: getTrackingDiagnostics(),
-            unitTitle: activeUnit?.title || '',
-            updatedAt: serverTimestamp()
           }
+        )
+        lastVideoTimeRef.current = pos
+        stampedSetRef.current = new Set(merged.stampedSeconds)
+        setStampCount(merged.stampedSeconds.length)
+        const playbackRange = getVideoPlaybackRange({
+          duration: knownDuration,
+          contentStart: selectedTx.start,
+          contentEnd: selectedTx.end,
+        })
 
-          setSaveStatus('saving')
-          await setDoc(progressRef, updateData, { merge: true })
-          setSaveStatus('saved')
-          setTimeout(() => setSaveStatus(null), 2000)
+        // Dirty-only Firestore persistence
+        const progressRef = doc(db, 'users', userId, 'learning_progress', unitId)
 
-          // Local state sync (careful: this might trigger parent re-renders, but since the player is memoized it won't flicker)
-          applyLearningProgress(prev => ({
-            ...prev,
-            videoProgress: {
-              ...(prev?.videoProgress || {}),
-              [txId]: {
-                ...(prev?.videoProgress?.[txId] || {}),
-                lastPosition: pos,
-                totalTimeSpent: merged.totalTimeSpent,
-                todayTimeSpent: dailyTimeSpentRef.current,
-                todayTimeSpentDate: dailyTimeSpentDateRef.current,
-                stampedSeconds: merged.stampedSeconds,
-                trackingDiagnostics: getTrackingDiagnostics()
-              }
-            }
-          }))
+        const updateData = {
+          videoProgress: { [txId]: {
+            lastPosition: pos,
+            totalTimeSpent: merged.totalTimeSpent,
+            todayTimeSpent: dailyTimeSpentRef.current,
+            todayTimeSpentDate: dailyTimeSpentDateRef.current,
+            updatedAt: serverTimestamp(),
+            stampedSeconds: merged.stampedSeconds,
+            transmissionTitle: selectedTx?.title || activeUnit?.title || 'Main Video',
+            videoId: getYouTubeVideoId(selectedTx?.videoId),
+            contentStart: playbackRange.start,
+            contentEnd: playbackRange.end || null,
+            segmentDuration: playbackRange.segmentDuration,
+            trackingDiagnostics: getTrackingDiagnostics(),
+          } },
+          unitTitle: activeUnit?.title || '',
+          updatedAt: serverTimestamp()
         }
+
+        setSaveStatus('saving')
+        await setDoc(progressRef, updateData, { merge: true })
+        if (disposed || videoFlushSessionKeyRef.current !== flushSessionKey) return
+        lastFlushedSeqRef.current = Math.max(lastFlushedSeqRef.current, currentDirtySeq)
+        setSaveStatus('saved')
+        setTimeout(() => setSaveStatus(null), 2000)
+
+        // Local state sync
+        applyLearningProgress(prev => ({
+          ...prev,
+          videoProgress: {
+            ...(prev?.videoProgress || {}),
+            [txId]: {
+              ...(prev?.videoProgress?.[txId] || {}),
+              lastPosition: pos,
+              totalTimeSpent: merged.totalTimeSpent,
+              todayTimeSpent: dailyTimeSpentRef.current,
+              todayTimeSpentDate: dailyTimeSpentDateRef.current,
+              stampedSeconds: merged.stampedSeconds,
+              trackingDiagnostics: getTrackingDiagnostics()
+            }
+          }
+        }))
       } catch (err) {
-        console.warn("Auto-save failed:", err)
+        console.warn('Auto-save flush failed:', err)
+      } finally {
+        inFlightFlushRef.current = false
+        if (pendingFlush && !disposed) void flushVideoProgress()
+        else if (disposed) void requestVideoFlushRef.current?.()
       }
-    }, 10000)
+    }
+    requestVideoFlushRef.current = flushVideoProgress
+
+    if (autoSaveIntervalRef.current) clearInterval(autoSaveIntervalRef.current)
+    // 30초 주기 dirty flush
+    autoSaveIntervalRef.current = setInterval(() => {
+      flushVideoProgress('interval')
+    }, 30000)
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') {
+        flushVideoProgress('visibility_hidden')
+      } else {
+        // A cancelled navigation/BFCache return is a new opportunity to leave.
+        hasSentBeaconRef.current = false
+      }
+    }
 
     const handleUnloadSave = () => {
       if (!idTokenRef.current || !videoWriterEnabledRef.current) return
       const rawStamps = Array.from(stampedSetRef.current)
       if (rawStamps.length === 0) return
+      if (hasSentBeaconRef.current) return
+      const completionPending = videoCompletedRef.current &&
+        learningProgressRef.current?.videoProgress?.[txId]?.completionHistorySynced !== true
+      if (videoDirtySeqRef.current === lastFlushedSeqRef.current && !completionPending) return
+
       const cached = writeVideoProgressCache({
         userId,
         unitId,
@@ -1900,19 +1958,24 @@ export default function MissionHub({
       })
 
       if (navigator.sendBeacon) {
-        navigator.sendBeacon(getFunctionUrl('syncVideoProgress'), payload)
+        const queued = navigator.sendBeacon(getFunctionUrl('syncVideoProgress'), payload)
+        if (queued) hasSentBeaconRef.current = true
       }
     }
 
     window.addEventListener('beforeunload', handleUnloadSave)
     window.addEventListener('popstate', handleUnloadSave)
+    document.addEventListener('visibilitychange', handleVisibilityChange)
 
     return () => {
+      disposed = true
+      if (requestVideoFlushRef.current === flushVideoProgress) requestVideoFlushRef.current = null
       if (autoSaveIntervalRef.current) clearInterval(autoSaveIntervalRef.current)
       window.removeEventListener('beforeunload', handleUnloadSave)
       window.removeEventListener('popstate', handleUnloadSave)
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
     }
-  }, [userId, selectedTx, loadingProgress, unitId, applyLearningProgress, getTrackingDiagnostics])
+  }, [userId, selectedTx, loadingProgress, unitId, applyLearningProgress, getTrackingDiagnostics, activeUnit?.title])
 
   // ─── Silent Toast helper ───
   const showSilentToast = useCallback((amount) => {
@@ -2515,6 +2578,23 @@ export default function MissionHub({
       setStampCount(stampedSetRef.current.size)
     }
 
+    if (activePlaybackDelta > 0 || newStampsAdded) {
+      videoDirtySeqRef.current += 1
+      const nowMs = Date.now()
+      if ((nowMs - lastVideoCacheWriteAtRef.current) >= VIDEO_CACHE_WRITE_INTERVAL_MS) {
+        lastVideoCacheWriteAtRef.current = nowMs
+        writeVideoProgressCache({
+          userId,
+          unitId,
+          transmission: selectedTx,
+          position: currentTime,
+          stampedSeconds: Array.from(stampedSetRef.current),
+          duration: duration > 0 ? duration : videoDurationRef.current,
+          totalTimeSpent: totalTimeSpentRef.current,
+        })
+      }
+    }
+
     // Check completion: dynamic threshold based on duration
     if (duration > 0) {
       const completion = getVideoCompletionMetrics({
@@ -2747,6 +2827,8 @@ export default function MissionHub({
     try {
       // Get the ACTUAL current position directly from the YouTube player API
       // (lastVideoTimeRef may be stale by up to 200ms from the polling interval)
+      const savedSessionKey = videoFlushSessionKeyRef.current
+      const savedDirtySeq = videoDirtySeqRef.current
       let savedPosition = Math.floor(lastVideoTimeRef.current || 0)
       if (videoPlayerRef.current && typeof videoPlayerRef.current.getCurrentTime === 'function') {
         const livePos = videoPlayerRef.current.getCurrentTime()
@@ -2883,6 +2965,8 @@ export default function MissionHub({
       }
       
       await setDoc(progressRef, updateData, { merge: true })
+      if (videoFlushSessionKeyRef.current !== savedSessionKey) return
+      lastFlushedSeqRef.current = Math.max(lastFlushedSeqRef.current, savedDirtySeq)
       
       // localStorage도 최신 위치로 갱신 — 오프라인 복구 백업
       writeVideoProgressCache({
@@ -3518,6 +3602,9 @@ export default function MissionHub({
                       const playing = state === window.YT?.PlayerState?.PLAYING
                       isVideoPlayingRef.current = playing
                       setIsVideoPlaying(playing)
+                      if (state === window.YT?.PlayerState?.PAUSED || state === window.YT?.PlayerState?.ENDED) {
+                        void requestVideoFlushRef.current?.()
+                      }
                     }}
                     onError={(err) => {
                       setVideoError(true)

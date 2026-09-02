@@ -41,7 +41,7 @@ import { calculateGrowthUpdates } from '../../utils/rankingUtils'
 import { normalizeNotificationLink } from '../../utils/socialUtils'
 import { StreakCelebrationModal, StreakToast } from './StreakCelebration'
 import { getAttendanceDockingStatus } from '../../utils/attendanceUtils'
-import { getLearningProgressCompletion, mergeSummaryWithRecentHistory, mergeUnitProgressCompletion } from '../../utils/learningSummaryUtils'
+import { mergeSummaryWithRecentHistory, shouldCheckLearningSummaryFreshness } from '../../utils/learningSummaryUtils'
 import { checkWebGLSupport } from '../../utils/webglSupport'
 import {
   consumeGoogleRedirect,
@@ -645,8 +645,6 @@ function SpaceHome() {
   const [learningSummary, setLearningSummary] = useState(null)
   const [recentCompletionHistory, setRecentCompletionHistory] = useState([])
   const [loadingHistory, setLoadingHistory] = useState(true)
-  // history/요약에 완료 기록이 없어도 learning_progress의 실제 완료 상태를 목록에 반영한다.
-  const [completionFromProgress, setCompletionFromProgress] = useState({})
   const [currentView, setCurrentView] = useState(() => {
     const requestedView = getRequestedRootView(location)
     const savedView = sessionStorage.getItem('metasense_current_view')
@@ -1752,16 +1750,53 @@ function SpaceHome() {
     let requestedValidation = false
     const summaryRef = doc(db, 'learningSummaries', user.uid)
     return onSnapshot(summaryRef, (snapshot) => {
-      if (snapshot.exists()) {
-        setLearningSummary(snapshot.data())
+      const summaryData = snapshot.exists() ? snapshot.data() : null
+      if (summaryData) {
+        setLearningSummary(summaryData)
         setLoadingHistory(false)
       }
       if (requestedValidation) return
-      requestedValidation = true
-      httpsCallable(functions, 'getOrRebuildLearningSummary')({ validateFreshness: true }).catch((error) => {
-        console.warn('Learning summary validation failed:', error)
-        setLoadingHistory(false)
+
+      const lastCheckedKey = `last_learning_summary_checked_${user.uid}`
+      let lastCheckedMs = 0
+      try {
+        lastCheckedMs = Math.max(
+          Number(sessionStorage.getItem(lastCheckedKey) || 0),
+          Number(localStorage.getItem(lastCheckedKey) || 0)
+        )
+      } catch {
+        // Storage can be unavailable in privacy-restricted browser contexts.
+        lastCheckedMs = 0
+      }
+      const needsCheck = shouldCheckLearningSummaryFreshness({
+        summary: summaryData,
+        lastCheckedMs,
+        nowMs: Date.now(),
       })
+
+      if (!needsCheck) {
+        setLoadingHistory(false)
+        return
+      }
+
+      requestedValidation = true
+      httpsCallable(functions, 'getOrRebuildLearningSummary')({ validateFreshness: true })
+        .then(() => {
+          const nowStr = String(Date.now())
+          try {
+            sessionStorage.setItem(lastCheckedKey, nowStr)
+            localStorage.setItem(lastCheckedKey, nowStr)
+          } catch {
+            // ignore storage quota errors
+            return
+          }
+        })
+        .catch((error) => {
+          console.warn('Learning summary validation failed:', error)
+        })
+        .finally(() => {
+          setLoadingHistory(false)
+        })
     }, (error) => {
       console.warn('Learning summary subscription failed:', error)
       setLoadingHistory(false)
@@ -1788,26 +1823,6 @@ function SpaceHome() {
       setRecentCompletionHistory([])
     })
   }, [todayKSTForAttendance, user?.uid])
-
-  // 기존 구독에서 영상·데이터 로그·Mission Lab 완료를 함께 읽는다.
-  // 과거 history가 누락된 경우에도 MissionHub와 목록/챕터 진행률의 완료 기준을 맞춘다.
-  useEffect(() => {
-    setCompletionFromProgress({})
-    if (!user?.uid) {
-      return undefined
-    }
-    const progressQuery = collection(db, 'users', user.uid, 'learning_progress')
-    return onSnapshot(progressQuery, (snapshot) => {
-      const map = {}
-      snapshot.forEach((docSnap) => {
-        map[docSnap.id] = getLearningProgressCompletion(docSnap.data() || {})
-      })
-      setCompletionFromProgress(map)
-    }, (error) => {
-      console.warn('learning_progress subscription failed:', error)
-      setCompletionFromProgress({})
-    })
-  }, [user?.uid])
 
   const history = useMemo(
     () => mergeSummaryWithRecentHistory(learningSummary, recentCompletionHistory),
@@ -1912,8 +1927,7 @@ function SpaceHome() {
       }
     })
 
-    // 완료 상태만 OR 병합한다. 이 보정으로 점수/학습 이력/보상을 생성하지 않는다.
-    const progressMap = mergeUnitProgressCompletion(historyProgressMap, completionFromProgress)
+    const progressMap = historyProgressMap
 
     if (effectiveHistory.length === 0) {
       regions?.forEach(r => statusMap[r.id] = 'not_started')
@@ -1946,7 +1960,7 @@ function SpaceHome() {
     }
 
     return { explorationStatus: statusMap, recentRegionId: lastRegionId, bestScores: scores, unitProgressMap: progressMap }
-  }, [effectiveHistory, regions, selectedClusterId, completionFromProgress])
+  }, [effectiveHistory, regions, selectedClusterId])
 
   // Calculate chapter progress dynamically from Firestore data
   const chapterProgress = useMemo(() => {
@@ -2961,9 +2975,14 @@ function SpaceHome() {
           const baseKey = `videoProgress.${transmissionId}`
           if (activityType.includes('완료')) {
              transaction.set(progressDocRef, {
-               [`${baseKey}.completed`]: true,
-               [`${baseKey}.completionBonusGiven`]: true,
-               [`${baseKey}.updatedAt`]: serverTimestamp(),
+               videoProgress: { [transmissionId]: {
+                 completed: true,
+                 completionBonusGiven: true,
+                 // Set only when this transaction also records a video completion.
+                 ...((shouldLogHistory && ((!shouldLogFocusOnly && !isAttentionMiss) || attentionSource === 'completion_bonus'))
+                   ? { completionHistorySynced: true } : {}),
+                 updatedAt: serverTimestamp(),
+               } },
                updatedAt: serverTimestamp()
              }, { merge: true })
           } else if (activityType.includes('수신') && stampedSeconds) {

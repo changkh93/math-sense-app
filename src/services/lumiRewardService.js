@@ -212,6 +212,7 @@ export async function claimLumiMissionReward({
           actId: canonical.actId || canonicalMissionSetId || 'act-0-awakening',
           concepts: canonical.concepts || canonical.conceptEvidence?.mustUse || [],
           completed: true,
+          completionModalities: isUnitComplete ? { missionLab: true } : {},
           stars,
           assistanceLevel,
           rewardPolicyVersion: policyVersion,

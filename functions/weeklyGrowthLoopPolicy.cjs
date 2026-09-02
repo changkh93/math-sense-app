@@ -1,8 +1,8 @@
 const crypto = require("crypto");
+const { LEARNING_SUMMARY_SCHEMA_VERSION } = require("./learningSummaryDomain.cjs");
 
 const WEEKLY_GROWTH_LOOP_SCHEMA_VERSION = 1;
 const WEEKLY_GROWTH_LOOP_PROMPT_VERSION = 1;
-const LEARNING_SUMMARY_SCHEMA_VERSION = 2;
 const MAX_WEEKLY_GROWTH_COMMAND_ID_LENGTH = 120;
 
 const OBSERVATION_CODES = [

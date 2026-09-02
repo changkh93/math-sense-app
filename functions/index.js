@@ -259,136 +259,26 @@ function getKSTWeekMondayString(date = new Date()) {
   return getKSTDateString(new Date(kstMidnightUtcMs - (mondayOffset * 24 * 60 * 60 * 1000)));
 }
 
-const LEARNING_SUMMARY_SCHEMA_VERSION = 2;
-const LEARNING_SUMMARY_MAX_DAYS = 540;
-
-function historyTimestampMs(data = {}) {
-  const value = data.timestamp || data.completedAt || data.createdAt;
-  if (value?.toMillis) return value.toMillis();
-  if (value instanceof Date) return value.getTime();
-  const parsed = new Date(value || 0).getTime();
-  return Number.isFinite(parsed) ? parsed : 0;
-}
-
-function historyActivityType(data = {}) {
-  if (!data.type || data.type === "quiz") return "quiz";
-  if (data.type === "workbook") return "workbook";
-  if (data.type === "video") return "video";
-  if (data.type === "text") return "text";
-  if (data.type === "code_trace") return "codeTrace";
-  return "other";
-}
-
-function blankDailyLearningStats(date) {
-  return { date, quizzes: 0, scoreSum: 0, crystals: 0, perfCount: 0, videos: 0, texts: 0, workbooks: 0, codeTraces: 0 };
-}
-
-function applyHistoryToDailyStats(dailyMap, data, direction) {
-  if (!data) return;
-  const timestampMs = historyTimestampMs(data);
-  if (!timestampMs) return;
-  const date = getKSTDateString(new Date(timestampMs));
-  const stats = dailyMap.get(date) || blankDailyLearningStats(date);
-  const type = historyActivityType(data);
-  if (type === "quiz") {
-    stats.quizzes += direction;
-    stats.scoreSum += direction * Number(data.score || 0);
-    if (Number(data.score) === 100) stats.perfCount += direction;
-  } else if (type === "workbook") stats.workbooks += direction;
-  else if (type === "video") stats.videos += direction;
-  else if (type === "text") stats.texts += direction;
-  else if (type === "codeTrace") stats.codeTraces += direction;
-  stats.crystals += direction * Number(data.crystalsEarned || 0);
-
-  const activityCount = stats.quizzes + stats.videos + stats.texts + stats.workbooks + stats.codeTraces;
-  if (activityCount <= 0) dailyMap.delete(date);
-  else dailyMap.set(date, stats);
-}
-
-function buildUnitLearningSummary(unitId, rows = []) {
-  if (!unitId || rows.length === 0) return null;
-  const result = {
-    unitId,
-    clusterId: "",
-    regionId: "",
-    chapterId: "",
-    lastActivityMs: 0,
-    modalities: { quiz: false, workbook: false, video: false, text: false, codeTrace: false },
-    bestQuizScore: null,
-    bestWorkbookScore: null,
-  };
-  rows.forEach((data) => {
-    const type = historyActivityType(data);
-    if (Object.prototype.hasOwnProperty.call(result.modalities, type)) result.modalities[type] = true;
-    if (type === "quiz" && Number.isFinite(Number(data.score))) {
-      result.bestQuizScore = Math.max(result.bestQuizScore ?? -Infinity, Number(data.score));
-    }
-    if (type === "workbook" && Number.isFinite(Number(data.score))) {
-      result.bestWorkbookScore = Math.max(result.bestWorkbookScore ?? -Infinity, Number(data.score));
-    }
-    const timestampMs = historyTimestampMs(data);
-    if (timestampMs >= result.lastActivityMs) {
-      result.lastActivityMs = timestampMs;
-      result.clusterId = cleanText(data.clusterId, 120);
-      result.regionId = cleanText(data.regionId, 180);
-      result.chapterId = cleanText(data.chapterId, 180);
-    }
-  });
-  return result;
-}
-
-function buildLearningSummary(historyDocs = []) {
-  const dailyMap = new Map();
-  const unitRows = new Map();
-  const stats = {
-    quizAttempts: 0,
-    quizScoreSum: 0,
-    perfectAttempts: 0,
-    workbookAttempts: 0,
-    workbookScoreSum: 0,
-    workbookPerfectAttempts: 0,
-    darkMatterRecovered: 0,
-  };
-
-  historyDocs.forEach((row) => {
-    const data = row.data ? row.data() : row;
-    applyHistoryToDailyStats(dailyMap, data, 1);
-    if (data.unitId) {
-      if (!unitRows.has(data.unitId)) unitRows.set(data.unitId, []);
-      unitRows.get(data.unitId).push(data);
-    }
-    const type = historyActivityType(data);
-    if (type === "quiz") {
-      stats.quizAttempts += 1;
-      stats.quizScoreSum += Number(data.score || 0);
-      if (Number(data.score) === 100) stats.perfectAttempts += 1;
-    } else if (type === "workbook") {
-      stats.workbookAttempts += 1;
-      stats.workbookScoreSum += Number(data.score || 0);
-      if (Number(data.score) === 100) stats.workbookPerfectAttempts += 1;
-    }
-    if (String(data.unitId || "").includes("dark_matter") && Number(data.score || 0) >= 80) {
-      stats.darkMatterRecovered += 1;
-    }
-  });
-
-  const oldestAllowed = getKSTDateString(new Date(Date.now() - (LEARNING_SUMMARY_MAX_DAYS * 24 * 60 * 60 * 1000)));
-  const daily = Array.from(dailyMap.values()).filter((row) => row.date >= oldestAllowed).sort((a, b) => a.date.localeCompare(b.date));
-  const units = Array.from(unitRows.entries()).map(([unitId, rows]) => buildUnitLearningSummary(unitId, rows)).filter(Boolean);
-  return {
-    schemaVersion: LEARNING_SUMMARY_SCHEMA_VERSION,
-    totalHistoryCount: historyDocs.length,
-    daily,
-    units,
-    stats,
-    updatedAt: FieldValue.serverTimestamp(),
-  };
-}
+const {
+  LEARNING_SUMMARY_SCHEMA_VERSION,
+  LEARNING_SUMMARY_MAX_DAYS,
+  historyTimestampMs,
+  historyActivityType,
+  applyHistoryToDailyStats,
+  buildUnitLearningSummary,
+  buildLearningSummaryFromScratch,
+} = require("./learningSummaryDomain.cjs"); // eslint-disable-line no-undef -- Cloud Functions runs in CommonJS.
 
 async function rebuildLearningSummary(uid) {
   const db = admin.firestore();
-  const historySnap = await db.collection("users").doc(uid).collection("history").get();
-  const summary = buildLearningSummary(historySnap.docs);
+  const [historySnap, progressSnap] = await Promise.all([
+    db.collection("users").doc(uid).collection("history").get(),
+    db.collection("users").doc(uid).collection("learning_progress").get(),
+  ]);
+  const summary = {
+    ...buildLearningSummaryFromScratch(historySnap.docs, progressSnap.docs),
+    updatedAt: FieldValue.serverTimestamp(),
+  };
   await db.collection("learningSummaries").doc(uid).set(summary);
   return { ...summary, updatedAt: null };
 }
@@ -400,15 +290,25 @@ exports.getOrRebuildLearningSummary = costOptimizedDataFunctions.https.onCall(as
   const summaryRef = admin.firestore().collection("learningSummaries").doc(uid);
   const summarySnap = await summaryRef.get();
   if (summarySnap.exists && summarySnap.data()?.schemaVersion === LEARNING_SUMMARY_SCHEMA_VERSION) {
+    const summary = summarySnap.data() || {};
+    const summaryUpdatedMs = summary.updatedAt?.toMillis ? summary.updatedAt.toMillis() : 0;
+    const nowMs = Date.now();
+    // Fast-path: if summary was updated within 60s, return immediately without extra count queries
+    if (summaryUpdatedMs > 0 && (nowMs - summaryUpdatedMs) < 60 * 1000) {
+      return { ready: true, rebuilt: false, cached: true };
+    }
     const [latestHistorySnap, historyCountSnap] = await Promise.all([
       historyRef.orderBy("timestamp", "desc").limit(1).get(),
       historyRef.count().get(),
     ]);
-    const summary = summarySnap.data() || {};
-    const latestHistoryMs = latestHistorySnap.empty ? 0 : historyTimestampMs(latestHistorySnap.docs[0].data());
-    const summaryUpdatedMs = summary.updatedAt?.toMillis ? summary.updatedAt.toMillis() : 0;
-    const actualHistoryCount = Number(historyCountSnap.data().count || 0);
-    const isStale = actualHistoryCount !== Number(summary.totalHistoryCount || 0) || latestHistoryMs > summaryUpdatedMs;
+    const actualCount = historyCountSnap.data().count;
+    const latestHistoryMs = latestHistorySnap.empty
+      ? 0
+      : historyTimestampMs(latestHistorySnap.docs[0].data());
+    const isStale = (
+      (summary.totalHistoryCount ?? 0) !== actualCount ||
+      latestHistoryMs > summaryUpdatedMs
+    );
     if (!isStale) return { ready: true, rebuilt: false };
   }
   await rebuildLearningSummary(uid);
@@ -423,22 +323,27 @@ exports.syncLearningSummary = costOptimizedDataFunctions.firestore
     const after = change.after.exists ? change.after.data() : null;
     const db = admin.firestore();
     const summaryRef = db.collection("learningSummaries").doc(uid);
-    const current = await summaryRef.get();
-    if (!current.exists || current.data()?.schemaVersion !== LEARNING_SUMMARY_SCHEMA_VERSION) {
-      await rebuildLearningSummary(uid);
-      return null;
-    }
-
     const affectedUnitIds = Array.from(new Set([before?.unitId, after?.unitId].filter(Boolean)));
-    const unitSummaries = new Map();
+    const historyDocsByUnit = new Map();
+
     await Promise.all(affectedUnitIds.map(async (unitId) => {
-      const snap = await db.collection("users").doc(uid).collection("history").where("unitId", "==", unitId).get();
-      unitSummaries.set(unitId, buildUnitLearningSummary(unitId, snap.docs.map((doc) => doc.data())));
+      const historySnap = await db
+        .collection("users")
+        .doc(uid)
+        .collection("history")
+        .where("unitId", "==", unitId)
+        .get();
+      historyDocsByUnit.set(unitId, historySnap.docs.map((doc) => doc.data()));
     }));
 
+    let needsRebuild = false;
     await db.runTransaction(async (transaction) => {
+      needsRebuild = false;
       const freshSnap = await transaction.get(summaryRef);
-      if (!freshSnap.exists) return;
+      if (!freshSnap.exists || freshSnap.data()?.schemaVersion !== LEARNING_SUMMARY_SCHEMA_VERSION) {
+        needsRebuild = true;
+        return;
+      }
       const fresh = freshSnap.data() || {};
       const dailyMap = new Map((fresh.daily || []).map((row) => [row.date, { ...row }]));
       applyHistoryToDailyStats(dailyMap, before, -1);
@@ -446,7 +351,13 @@ exports.syncLearningSummary = costOptimizedDataFunctions.firestore
 
       const unitsById = new Map((fresh.units || []).map((row) => [row.unitId, row]));
       affectedUnitIds.forEach((unitId) => {
-        const next = unitSummaries.get(unitId);
+        const existingUnit = unitsById.get(unitId) || null;
+        const next = buildUnitLearningSummary(
+          unitId,
+          historyDocsByUnit.get(unitId) || [],
+          null,
+          existingUnit
+        );
         if (next) unitsById.set(unitId, next);
         else unitsById.delete(unitId);
       });
@@ -487,6 +398,7 @@ exports.syncLearningSummary = costOptimizedDataFunctions.firestore
         updatedAt: FieldValue.serverTimestamp(),
       });
     });
+    if (needsRebuild) await rebuildLearningSummary(uid);
     return null;
   });
 
@@ -5372,8 +5284,9 @@ exports.syncVideoProgress = regionalFunctions.https.onRequest((req, res) => {
         try { data = JSON.parse(data); } catch (e) {}
       }
 
-      const { idToken, userId, unitId, txId, progressData } = data;
-      if (!idToken || !userId || !unitId || !txId || !progressData) {
+      const { idToken, userId, unitId, txId, progressData } = data || {};
+      if (!idToken || !userId || typeof unitId !== 'string' || !unitId || unitId.includes('/') ||
+          typeof txId !== 'string' || !txId || !progressData || typeof progressData !== 'object' || Array.isArray(progressData)) {
         return res.status(400).send("Missing required fields");
       }
 
@@ -5383,18 +5296,10 @@ exports.syncVideoProgress = regionalFunctions.https.onRequest((req, res) => {
         return res.status(403).send("Unauthorized");
       }
 
-      // We use server Timestamp for updatedAt but the client might pass their own.
       const db = admin.firestore();
-      const updateData = {};
-      
-      // Prevent destroying existing fields like 'completed' when sending beacon
-      if (progressData && typeof progressData === 'object') {
-        for (const [key, val] of Object.entries(progressData)) {
-          updateData[`videoProgress.${txId}.${key}`] = val;
-        }
-      }
-      
-      updateData[`videoProgress.${txId}.updatedAt`] = new Date();
+      // The completion-history marker is server-owned; never accept it from a beacon.
+      const allowedFields = ['lastPosition', 'totalTimeSpent', 'todayTimeSpent', 'todayTimeSpentDate',
+        'stampedSeconds', 'videoId', 'contentStart', 'contentEnd', 'completed', 'completionBonusGiven', 'trackingDiagnostics'];
 
       const progressRef = db
         .collection('users')
@@ -5414,31 +5319,37 @@ exports.syncVideoProgress = regionalFunctions.https.onRequest((req, res) => {
         const existingTx = progressSnap.exists
           ? (progressSnap.get("videoProgress") || {})[txId] || {}
           : {};
+        const updateTx = Object.fromEntries(allowedFields
+          .filter((key) => Object.prototype.hasOwnProperty.call(progressData, key))
+          .map((key) => [key, progressData[key]]));
+        updateTx.updatedAt = new Date();
+        for (const flag of ['completed', 'completionBonusGiven']) {
+          if (existingTx[flag] === true) updateTx[flag] = true;
+        }
 
-        if (updateData[`videoProgress.${txId}.totalTimeSpent`] !== undefined) {
-          updateData[`videoProgress.${txId}.totalTimeSpent`] = Math.max(
+        if (updateTx.totalTimeSpent !== undefined) {
+          updateTx.totalTimeSpent = Math.max(
             Number(existingTx.totalTimeSpent) || 0,
-            Number(updateData[`videoProgress.${txId}.totalTimeSpent`]) || 0
+            Number(updateTx.totalTimeSpent) || 0
           );
         }
 
-        const incomingStamps = updateData[`videoProgress.${txId}.stampedSeconds`];
+        const incomingStamps = updateTx.stampedSeconds;
         if (Array.isArray(incomingStamps)) {
           const existingStamps = Array.isArray(existingTx.stampedSeconds)
             ? existingTx.stampedSeconds
             : [];
-          updateData[`videoProgress.${txId}.stampedSeconds`] = Array.from(
+          updateTx.stampedSeconds = Array.from(
             new Set([...existingStamps, ...incomingStamps])
           ).sort((a, b) => a - b);
         }
 
-        transaction.set(progressRef, updateData, { merge: true });
-
         // 영상 시청이 완료(completed === true)된 경우에만 history(type:'video')를 기록한다.
-        // 보상(crystalsEarned)은 0으로 기록하여 중복 지급을 방지하고,
-        // syncLearningSummary 트리거가 learningSummaries.modalities.video 를 자동 갱신하게 한다.
-        const isCompleted = progressData && progressData.completed === true;
-        if (isCompleted) {
+        // 이미 기록된 경우(completionHistorySynced === true) 중복 생성을 건너뛴다.
+        const isCompleted = updateTx.completed === true;
+        const alreadySynced = existingTx.completionHistorySynced === true;
+        if (isCompleted && !alreadySynced) {
+          updateTx.completionHistorySynced = true;
           const todayKST = getKSTDateString();
           const stableHistoryId = `video_daily_${todayKST}_${unitId}_${txId}`;
           const historyRef = db
@@ -5452,12 +5363,13 @@ exports.syncVideoProgress = regionalFunctions.https.onRequest((req, res) => {
             type: 'video',
             activityType: '영상 교신 완료',
             timestamp: FieldValue.serverTimestamp(),
-            crystalsEarned: 0,
+            // Omit reward fields: merge must preserve any earlier daily reward.
             completionVia: 'unload_beacon',
             videoTime: Math.max(0, Math.floor(Number(progressData.lastPosition) || 0)),
             stampedCount: Array.isArray(progressData.stampedSeconds) ? progressData.stampedSeconds.length : 0,
           }, { merge: true });
         }
+        transaction.set(progressRef, { videoProgress: { [txId]: updateTx } }, { merge: true });
       });
 
       return res.status(200).send("OK");

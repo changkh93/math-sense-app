@@ -99,6 +99,21 @@ assert.match(
   /const totalTimeSpent = Number\.parseFloat\(localStorage\.getItem\(cacheKey \+ '_total'\) \|\| ''\) \|\| 0/,
   'cache read must surface the persisted cumulative total'
 )
+assert.match(
+  missionHub,
+  /const VIDEO_CACHE_WRITE_INTERVAL_MS = 5 \* 1000/,
+  'local cache writes must be throttled to the five-second recovery cadence'
+)
+assert.match(
+  missionHub,
+  /nowMs - lastVideoCacheWriteAtRef\.current\) >= VIDEO_CACHE_WRITE_INTERVAL_MS/,
+  'time updates must not serialize the full cache on every player tick'
+)
+assert.match(
+  missionHub,
+  /const queued = navigator\.sendBeacon[\s\S]{0,160}?if \(queued\) hasSentBeaconRef\.current = true/,
+  'a rejected beacon enqueue must remain retryable'
+)
 
 // ─── Contract: every MissionHub write path clamps cumulative fields ───
 const writePaths = [
