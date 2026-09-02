@@ -51,25 +51,31 @@ module.exports = {
   understandingChallenges: [
     {
       challengeId: 'uc_exp_bound_05_1',
-      prompt: '경계값 10에 대해 < 와 <= 연산자의 차이를 예측해 보세요.',
+      title: '★★ 경계값 오류를 찾는 가장 빠른 입력',
+      type: 'single-choice',
+      prompt: '탐사 규정은 "경계선(limit=10)까지 안전(True)"인데, 동료가 return current_pos < limit 으로 코드를 작성했습니다.',
+      codeSnippet: `def check_within_boundary(current_pos, limit):
+    # 탐사 규정: limit(10)까지 안전(True)이어야 함
+    return current_pos < limit  # 실수로 < 기호를 사용함`,
       questions: [
         {
           id: 'q1',
-          text: '10 <= 10 의 평가 결과는 무엇일까요?',
+          text: '위 코드는 pos=9(안전)와 pos=11(위험)에서는 정상 작동합니다. 코드의 오류를 밝혀낼 가장 정확한 반례 입력(current_pos)은 무엇일까요?',
           options: [
-            { value: 'True', label: 'True' },
-            { value: 'False', label: 'False' },
+            { value: '10', label: '10 (경계선 위의 값: 규정은 True여야 하나 코드는 False 반환)' },
+            { value: '0', label: '0 (경계선 안쪽: 둘 다 True)' },
+            { value: '20', label: '20 (경계선 바깥: 둘 다 False)' },
           ],
-          expected: 'True',
+          expected: '10',
         },
         {
           id: 'q2',
-          text: '10 < 10 의 평가 결과는 무엇일까요?',
+          text: '경계 조건(Boundary Condition)을 검증할 때 가장 먼저 확인해야 하는 핵심 지점은 어디일까요?',
           options: [
-            { value: 'False', label: 'False' },
-            { value: 'True', label: 'True' },
+            { value: 'boundary', label: '경계선 바로 위(경계값)와 그 직전/직후 지점' },
+            { value: 'random', label: '경계선과 상관없는 임의의 큰 숫자' },
           ],
-          expected: 'False',
+          expected: 'boundary',
         },
       ],
     },

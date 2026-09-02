@@ -28,52 +28,55 @@ export const AC_EXP_BOUND_05 = createCapabilityPrototypeKernel({
   },
   modes: {
     observe: {
-      prompt: '위치 9/경계 10은 안전(True), 위치 11/경계 10은 위험(False)입니다. 위치가 정확히 10(경계선 위)일 때는 무엇이어야 할까요?',
-      expected: 'True',
-      options: ['True', 'False'],
+      prompt: '탐사 기록: 위치 9(경계 10)는 안전(True), 위치 11(경계 10)은 위험(False)입니다.\n이 두 기록만 보고 위치 10(경계선 위)의 결과를 단정할 수 있을까요?',
+      expected: '이 기록만으로는 아직 알 수 없다',
+      options: ['안전(True)이다', '위험(False)이다', '이 기록만으로는 아직 알 수 없다'],
     },
     explore: {
       lensId: 'state-transition',
       lensConfig: {
         introContext: {
           title: '🔍 경계선 판정 실험실',
-          description: '탐사선이 안전 구역 경계선(limit) 안쪽에 있는지 판정하는 연산자를 탐색합니다.',
+          description: '탐사선이 안전 구역 경계선(limit=10) 안쪽에 있는지 판정하는 규칙을 탐색합니다. 🛰️ 탐사 규정: "탐사선은 경계선에 닿는 것(위치 10)까지 안전 구역으로 인정합니다."',
           variables: [
             { name: 'limit', value: 10, label: '경계선 위치' },
           ],
-          guidance: '탐사선 위치(current_pos)가 경계선 안쪽(9), 경계선 위(10), 바깥(11)일 때의 판정 결과를 관찰해 보세요.',
+          guidance: '위치 9(안전)와 11(위험)은 두 규칙(< 와 <=) 모두 동일하지만, 오직 "경계선 위(10)"에서만 결과가 갈라집니다. 탐사 규정에 맞는 연산자를 선택해 보세요.',
         },
         initialState: { current_pos: 9, limit: 10 },
+        initialStateLabel: '경계선(limit = 10) 안전 구역 판정을 시작합니다.',
+        initialStepTitle: '🚀 시작 (pos=9)',
+        initialPrompt: '먼저 1단계: 경계선 안쪽(pos=9)의 판정을 확인해 볼까요?',
         frames: [
           {
             id: 'step_inside',
             stepTitle: '① 경계선 안쪽 (pos=9)',
             operationLabel: 'pos=9 (안쪽)',
-            codeSnippet: 'current_pos <= limit  # 9 <= 10 -> True',
-            prompt: '경계선 안쪽(9 < 10)에서는 명확하게 안전(True) 판정을 받습니다.',
+            codeSnippet: '9 < 10 (True)  /  9 <= 10 (True)',
+            prompt: '경계선 안쪽(9)에서는 < 와 <= 두 규칙 모두 안전(True)으로 판정합니다.',
             stateAfter: { current_pos: 9, limit: 10, result: true },
           },
           {
             id: 'step_boundary_choice',
-            stepTitle: '② 경계선 위 (pos=10) [연산자 선택]',
+            stepTitle: '② 경계선 위 (pos=10) [핵심 분기]',
             operationLabel: 'pos=10 (경계선 위)',
             codeSnippet: 'current_pos <= limit  # 10 <= 10 -> True',
-            prompt: '비교 연산자 (current_pos <= limit)를 사용하여 경계선 위의 위치(10)도 안전(True) 구역으로 정확히 판정되었습니다.',
-            choiceTitle: '🎯 2단계 미션: 경계선 포함 비교 연산자 선택',
-            choicePrompt: '경계선 위의 지점(pos = limit = 10)도 안전 구역에 포함(True)하려면 어떤 비교 연산자를 사용해야 할까요?',
-            choiceHint: '💡 힌트: < 기호는 미만(미포함)이고, <= 기호는 이하(경계값 포함)를 의미합니다.',
+            prompt: '비교 연산자 (current_pos <= limit)를 선택하여 경계선에 닿은 위치(10)도 탐사 규정대로 안전(True)으로 판정되었습니다!',
+            choiceTitle: '🎯 2단계 미션: 탐사 규정에 맞는 비교 연산자 선택',
+            choicePrompt: '🛰️ 탐사 규정: "경계선에 닿은 위치(10)까지 안전 구역에 포함해야 합니다." 어떤 비교 연산자를 사용해야 할까요?',
+            choiceHint: '💡 힌트: < 10 은 10을 포함하지 않아 False가 되고, <= 10 은 10을 포함하여 True가 됩니다.',
             operationOptions: [
               {
                 id: 'opt_less_equal',
                 label: 'current_pos <= limit',
                 stateAfter: { current_pos: 10, limit: 10, result: true },
-                feedback: '정답입니다! <= 연산자는 경계선 위의 값(10)까지 포함하여 True를 반환합니다.',
+                feedback: '정답입니다! <= 기호는 경계선 위의 값(10)까지 안전(True)으로 포함합니다.',
               },
               {
                 id: 'opt_strict_less',
                 label: 'current_pos < limit',
                 stateAfter: { current_pos: 10, limit: 10, result: false },
-                feedback: '아쉬워요! < 연산자는 10 < 10이 거짓(False)이 되어 경계선 위를 안전 구역에서 제외해 버립니다.',
+                feedback: '아쉬워요! < 기호를 쓰면 10 < 10 이 False가 되어 경계선 위를 위험으로 판정해 버립니다.',
               },
             ],
             expectedOptionId: 'opt_less_equal',
@@ -83,37 +86,42 @@ export const AC_EXP_BOUND_05 = createCapabilityPrototypeKernel({
             id: 'step_outside',
             stepTitle: '③ 경계선 바깥 (pos=11)',
             operationLabel: 'pos=11 (바깥)',
-            codeSnippet: 'current_pos <= limit  # 11 <= 10 -> False',
-            prompt: '경계선 바깥(11 > 10)으로 벗어나면 위험(False) 판정을 받습니다.',
+            codeSnippet: '11 < 10 (False)  /  11 <= 10 (False)',
+            prompt: '경계선 바깥(11 > 10)으로 벗어나면 두 규칙 모두 위험(False)으로 판정합니다.',
             stateAfter: { current_pos: 11, limit: 10, result: false },
           },
         ],
         predictionPrompt: '경계선보다 작을 때와 경계선과 정확히 같을 때의 참/거짓 결과를 비교해 보세요.',
         discoveryQuestion: {
-          prompt: '🔎 경계선(limit)까지 안전 구역에 포함하려면 어떤 비교 기호를 써야 할까요?',
+          prompt: '🔎 두 후보 규칙(pos < limit vs pos <= limit)의 판정 결과가 서로 달라지는 유일한 지점은 어디일까요?',
           options: [
             {
-              id: 'opt_inclusive',
-              label: '<= 기호를 써서 경계선 위의 값(limit)과 같아도 참(True)이 되게 한다.',
+              id: 'opt_boundary',
+              label: '경계선과 정확히 일치하는 경계값 (pos = limit = 10)',
               isCorrect: true,
             },
             {
-              id: 'opt_strict',
-              label: '< 기호를 써서 경계선 위의 값은 항상 거짓(False)이 되게 한다.',
+              id: 'opt_far_inside',
+              label: '경계선보다 한참 안쪽에 있는 지점 (pos = 0)',
+              isCorrect: false,
+            },
+            {
+              id: 'opt_far_outside',
+              label: '경계선보다 한참 바깥에 있는 지점 (pos = 100)',
               isCorrect: false,
             },
           ],
-          successFeedback: '맞아요! 경계값까지 포함하는 조건에는 항상 <= 또는 >= 기호를 사용해야 합니다.',
-          wrongFeedback: '< 기호는 경계 바로 앞까지만 포함합니다. 경계선 위까지 포함하려면 <= 기호를 써야 합니다.',
+          successFeedback: '정확합니다! 경계 조건의 차이는 항상 "경계선에 딱 걸친 순간(Boundary Case)"에서만 발생하므로, 경계값을 반드시 직접 검증해야 합니다.',
+          wrongFeedback: '안쪽이나 바깥쪽에서는 두 연산자의 결과가 같습니다. 오직 경계선과 값이 같아지는 순간에만 차이가 납니다.',
         },
-        rulePrompt: '경계선(limit) 포함 조건 규칙',
-        ruleStatement: '< 기호는 경계 바로 전까지만 포함하고, <= 기호는 경계선 위의 값까지 포함합니다.',
+        rulePrompt: '경계 조건(Boundary Case) 추론 규칙',
+        ruleStatement: '< 연산자는 경계 직전까지만 포함하고, <= 연산자는 경계선 위의 값까지 포함합니다. 따라서 경계 조건에서는 반드시 경계값(Boundary) 자체를 확인해야 합니다.',
       },
     },
     code: {
       entryFunction: 'check_within_boundary',
       starterCode: `def check_within_boundary(current_pos, limit):
-    # 경계선 위의 위치도 안전 구역에 포함되는 규칙을 코드로 표현하세요.
+    # 경계선 위의 위치(current_pos == limit)도 안전(True)에 포함하는 규칙을 코드로 작성하세요.
     return False
 `,
     },
@@ -127,27 +135,31 @@ export const AC_EXP_BOUND_05 = createCapabilityPrototypeKernel({
     understandingChallenges: [
       {
         challengeId: 'uc_exp_bound_05_1',
-        title: '★★ 경계값 포함 여부 판정',
+        title: '★★ 경계값 오류를 찾는 가장 빠른 입력',
         type: 'single-choice',
-        prompt: '경계값 10에 대해 < 와 <= 연산자의 차이를 예측해 보세요.',
+        prompt: '탐사 규정은 "경계선(limit=10)까지 안전(True)"인데, 동료가 return current_pos < limit 으로 코드를 작성했습니다.',
+        codeSnippet: `def check_within_boundary(current_pos, limit):
+    # 탐사 규정: limit(10)까지 안전(True)이어야 함
+    return current_pos < limit  # 실수로 < 기호를 사용함`,
         questions: [
           {
             id: 'q1',
-            text: '10 <= 10 의 평가 결과는 무엇일까요?',
+            text: '위 코드는 pos=9(안전)와 pos=11(위험)에서는 정상 작동합니다. 코드의 오류를 밝혀낼 가장 정확한 반례 입력(current_pos)은 무엇일까요?',
             options: [
-              { value: 'True', label: 'True' },
-              { value: 'False', label: 'False' },
+              { value: '10', label: '10 (경계선 위의 값: 규정은 True여야 하나 코드는 False 반환)' },
+              { value: '0', label: '0 (경계선 안쪽: 둘 다 True)' },
+              { value: '20', label: '20 (경계선 바깥: 둘 다 False)' },
             ],
-            expected: 'True',
+            expected: '10',
           },
           {
             id: 'q2',
-            text: '10 < 10 의 평가 결과는 무엇일까요?',
+            text: '경계 조건(Boundary Condition)을 검증할 때 가장 먼저 확인해야 하는 핵심 지점은 어디일까요?',
             options: [
-              { value: 'False', label: 'False' },
-              { value: 'True', label: 'True' },
+              { value: 'boundary', label: '경계선 바로 위(경계값)와 그 직전/직후 지점' },
+              { value: 'random', label: '경계선과 상관없는 임의의 큰 숫자' },
             ],
-            expected: 'False',
+            expected: 'boundary',
           },
         ],
       },
@@ -160,15 +172,15 @@ export const AC_EXP_BOUND_05 = createCapabilityPrototypeKernel({
         contextCard: {
           title: '📋 산소 안전 기준',
           steps: [
-            { label: '① 한계 이하 (<=)', text: '안전 상태 (True 반환)' },
+            { label: '① 한계 이하 (<=)', text: '한계선에 딱 걸쳐도 안전 상태 (True 반환)' },
             { label: '② 한계 초과 (>)', text: '경고 상태 (False 반환)' },
           ],
         },
         thoughtCheck: {
-          prompt: '산소량이 허용 한계(100)와 정확히 같을 때 안전(True)으로 판정하려면 어떤 연산자가 필요한가요?',
+          prompt: '산소 사용량이 최대 허용 한계(100)에 정확히 도달했을 때 안전(True)으로 판정하려면 어떤 연산자를 써야 할까요?',
           options: [
-            { id: 'opt_le', label: '<= (이하 연산자)', isCorrect: true },
-            { id: 'opt_lt', label: '< (미만 연산자)', isCorrect: false },
+            { id: 'opt_le', label: '<= (경계값 100을 안전에 포함)', isCorrect: true },
+            { id: 'opt_lt', label: '< (100을 안전에서 제외)', isCorrect: false },
           ],
           feedback: '맞아요! 한계값과 같은 순간까지 포함하려면 <= 연산자를 사용해야 합니다.',
         },
