@@ -81,5 +81,67 @@ export const AC_EXP_REVERSE_10 = createCapabilityPrototypeKernel({
       { inputs: { signal: 0 }, expected: 3 },
       { inputs: { signal: 1 }, expected: 5 },
     ],
+    understandingChallenges: [
+      {
+        challengeId: 'uc_exp_reverse_10_1',
+        title: '★★ 역추론 규칙 분석',
+        type: 'single-choice',
+        prompt: '로봇의 입출력 데이터(0->3, 1->5, 2->7, 3->9)의 규칙을 분석해 보세요.',
+        questions: [
+          {
+            id: 'q1',
+            text: '입력 signal이 1 증가할 때마다 출력값은 얼마나 늘어나나요?',
+            options: [
+              { value: '2', label: '2' },
+              { value: '1', label: '1' },
+              { value: '3', label: '3' },
+            ],
+            expected: '2',
+          },
+          {
+            id: 'q2',
+            text: '입력이 0일 때 출력이 3인 것은 규칙의 어느 부분을 보여주는 것일까요?',
+            options: [
+              { value: '시작 보정값 +3', label: '시작 보정값 +3' },
+              { value: '배율 ×2', label: '배율 ×2' },
+            ],
+            expected: '시작 보정값 +3',
+          },
+        ],
+      },
+    ],
+    transferChallenges: [
+      {
+        transferChallengeId: 'tc_exp_reverse_10_transfer_1',
+        title: '탐사 드론의 레벨별 에너지 출력',
+        description: '드론의 레벨별 출력 기록(0->1, 1->4, 2->7, 3->10)을 분석하여, 레벨(level)에 따른 에너지 출력을 계산하는 함수를 작성하세요.',
+        contextCard: {
+          title: '📋 드론 출력 기록 분석',
+          steps: [
+            { label: '① 증가 폭 확인', text: '레벨이 1 오를 때마다 출력이 3씩 증가 (× 3)' },
+            { label: '② 기본 출력 확인', text: '레벨 0일 때 기본 출력이 1 (+ 1)' },
+          ],
+        },
+        thoughtCheck: {
+          prompt: '레벨 0일 때 출력이 1이고 매 레벨마다 3씩 늘어난다면 올바른 식은 무엇일까요?',
+          options: [
+            { id: 'opt_linear', label: 'level * 3 + 1', isCorrect: true },
+            { id: 'opt_wrong', label: 'level * 1 + 3', isCorrect: false },
+          ],
+          feedback: '맞아요! 증가폭(3)이 배율이 되고, 0일 때의 값(1)이 더해지는 상수입니다.',
+        },
+        entryFunction: 'apply_drone_energy',
+        starterCode: `def apply_drone_energy(level):
+    # 관측 기록(0->1, 1->4, 2->7, 3->10)에서 찾은 규칙을 작성하세요.
+    pass
+`,
+        testCases: [
+          { inputs: { level: 0 }, expected: 1 },
+          { inputs: { level: 1 }, expected: 4 },
+          { inputs: { level: 4 }, expected: 13 },
+          { inputs: { level: 10 }, expected: 31 },
+        ],
+      },
+    ],
   },
 })

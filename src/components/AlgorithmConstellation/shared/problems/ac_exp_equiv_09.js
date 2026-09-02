@@ -79,5 +79,67 @@ export const AC_EXP_EQUIV_09 = createCapabilityPrototypeKernel({
       { inputs: { pos: 3, boost: 4 }, expected: 14 },
       { inputs: { pos: 1, boost: 0 }, expected: 2 },
     ],
+    understandingChallenges: [
+      {
+        challengeId: 'uc_exp_equiv_09_1',
+        title: '★★ 연산자 우선순위와 동치 판별',
+        type: 'single-choice',
+        prompt: 'A: (pos + boost) * 2 와 C: pos + boost * 2 의 실행 결과를 비교해 보세요.',
+        questions: [
+          {
+            id: 'q1',
+            text: 'pos=2, boost=3 일 때 A((2+3)*2)와 C(2+3*2)의 계산 결과는 각각 얼마일까요?',
+            options: [
+              { value: '10과 8', label: '10과 8' },
+              { value: '10과 10', label: '10과 10' },
+              { value: '8과 8', label: '8과 8' },
+            ],
+            expected: '10과 8',
+          },
+          {
+            id: 'q2',
+            text: 'A와 C의 결과가 달라지는 가장 작은 반례 입력(pos, boost)은 무엇일까요?',
+            options: [
+              { value: 'pos=1, boost=0 (결과 2와 1로 다름)', label: 'pos=1, boost=0 (결과 2와 1로 다름)' },
+              { value: 'pos=0, boost=5 (결과 10으로 같음)', label: 'pos=0, boost=5 (결과 10으로 같음)' },
+            ],
+            expected: 'pos=1, boost=0 (결과 2와 1로 다름)',
+          },
+        ],
+      },
+    ],
+    transferChallenges: [
+      {
+        transferChallengeId: 'tc_exp_equiv_09_transfer_1',
+        title: '세 신호 묶음의 분배 전개',
+        description: '세 신호(a, b, c)를 더한 뒤 두 배로 묶은 (a + b + c) * 2 와 항상 같은 결과를 반환하는 함수를 작성하세요.',
+        contextCard: {
+          title: '📋 분배 법칙 전개',
+          steps: [
+            { label: '① 괄호로 묶인 식', text: '(a + b + c) * 2' },
+            { label: '② 각 항에 분배한 식', text: 'a * 2 + b * 2 + c * 2' },
+          ],
+        },
+        thoughtCheck: {
+          prompt: '(a + b + c) * 2 에서 괄호를 풀 때 곱하기 2는 어떤 항들에 적용되어야 할까요?',
+          options: [
+            { id: 'opt_all', label: 'a, b, c 모든 항에 각각 곱해진다', isCorrect: true },
+            { id: 'opt_c', label: '마지막 c에만 곱해진다', isCorrect: false },
+          ],
+          feedback: '맞아요! 분배법칙에 의해 괄호 안의 모든 항에 동일한 배수가 곱해져야 동치 관계가 성립합니다.',
+        },
+        entryFunction: 'expand_three_signals',
+        starterCode: `def expand_three_signals(a, b, c):
+    # (a + b + c) * 2 와 항상 같은 결과를 반환하세요.
+    pass
+`,
+        testCases: [
+          { inputs: { a: 1, b: 2, c: 3 }, expected: 12 },
+          { inputs: { a: 0, b: 5, c: 10 }, expected: 30 },
+          { inputs: { a: 4, b: 0, c: 6 }, expected: 20 },
+          { inputs: { a: 10, b: 20, c: 30 }, expected: 120 },
+        ],
+      },
+    ],
   },
 })

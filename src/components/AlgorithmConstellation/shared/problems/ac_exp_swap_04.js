@@ -58,5 +58,57 @@ export const AC_EXP_SWAP_04 = createCapabilityPrototypeKernel({
       { inputs: { box_a: 10, box_b: 20 }, expected: [20, 10] },
       { inputs: { box_a: 1, box_b: 99 }, expected: [99, 1] },
     ],
+    understandingChallenges: [
+      {
+        challengeId: 'uc_swap_04_1',
+        title: '★★ 덮어쓰기 전 보관의 이유',
+        type: 'single-choice',
+        prompt: '임시 변수를 활용한 교환 단계를 확인해 보세요.',
+        questions: [
+          {
+            id: 'q1',
+            text: 'temp = box_a를 실행하는 가장 중요한 이유는 무엇인가요?',
+            options: [
+              { value: 'box_a의 원래 값이 덮어씌워져 사라지기 전에 보관하기 위해', label: 'box_a의 원래 값이 덮어씌워져 사라지기 전에 보관하기 위해' },
+              { value: '두 변수의 값을 더하기 위해', label: '두 변수의 값을 더하기 위해' },
+              { value: '메모리를 절약하기 위해', label: '메모리를 절약하기 위해' },
+            ],
+            expected: 'box_a의 원래 값이 덮어씌워져 사라지기 전에 보관하기 위해',
+          },
+        ],
+      },
+    ],
+    transferChallenges: [
+      {
+        transferChallengeId: 'tc_swap_04_t1',
+        title: '우주선 도킹 위치 교환',
+        description: '도킹 구역 dock_1과 dock_2의 우주선 식별 번호를 서로 맞바꾼 리스트 [dock_1, dock_2]를 반환하세요.',
+        contextCard: {
+          title: '📋 우주선 도킹 맞교환 흐름',
+          steps: [
+            { label: '① 임시 대기 구역에 보관', text: 'temp = dock_1' },
+            { label: '② 1번 구역에 2번 우주선 진입', text: 'dock_1 = dock_2' },
+            { label: '③ 2번 구역에 임시 보관된 우주선 진입', text: 'dock_2 = temp' },
+          ],
+        },
+        thoughtCheck: {
+          prompt: 'dock_1 = dock_2를 먼저 실행하기 전에 temp = dock_1을 하지 않으면 어떻게 될까요?',
+          options: [
+            { id: 'opt_lost', label: 'dock_1에 있던 원래 우주선 번호가 사라진다', isCorrect: true },
+            { id: 'opt_stay', label: '자동으로 dock_2에 들어간다', isCorrect: false },
+          ],
+          feedback: '맞아요! dock_1에 새 값을 덮어쓰면 원래 번호는 영구히 유실되므로 temp에 먼저 보관해야 합니다.',
+        },
+        entryFunction: 'exchange_docking_ships',
+        starterCode: `def exchange_docking_ships(dock_1, dock_2):
+    # 두 도킹 위치의 우주선 번호를 서로 바꾸세요.
+    pass
+`,
+        testCases: [
+          { inputs: { dock_1: 101, dock_2: 202 }, expected: [202, 101] },
+          { inputs: { dock_1: 7, dock_2: 3 }, expected: [3, 7] },
+        ],
+      },
+    ],
   },
 })

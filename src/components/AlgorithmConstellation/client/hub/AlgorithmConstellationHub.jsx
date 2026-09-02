@@ -382,7 +382,7 @@ export default function AlgorithmConstellationHub({ onBack }) {
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', marginBottom: '4px' }}>
                 <span style={{ fontSize: '18px' }}>{isUnlocked ? c.icon : access.mode === 'unavailable' ? '🛠️' : '🔒'}</span>
                 <span style={{ fontSize: '11px', color: isSelected ? c.accentColor : isUnlocked ? '#94a3b8' : '#64748b', fontWeight: 'bold' }}>
-                  {access.mode === 'early-access' ? '선공개' : isUnlocked ? `성단 ${c.number}` : access.mode === 'unavailable' ? '준비 중' : '잠김'}
+                  {isUnlocked ? `성단 ${c.number}` : access.mode === 'unavailable' ? '준비 중' : '잠김'}
                 </span>
               </div>
               <span style={{ fontSize: '14px', fontWeight: 'bold', color: isSelected ? '#ffffff' : isUnlocked ? '#cbd5e1' : '#64748b', marginBottom: '2px' }}>
@@ -391,6 +391,11 @@ export default function AlgorithmConstellationHub({ onBack }) {
               <span style={{ fontSize: '11px', color: isUnlocked ? '#94a3b8' : '#475569' }}>
                 {completedInConstellation}/{constellationCoreProblems.length} 공개 Core 완료
               </span>
+              {access.reason === 'previous-release-incomplete' && (
+                <span style={{ marginTop: '4px', fontSize: '11px', color: '#94a3b8' }}>
+                  성단 {c.number - 1}의 후속 미션 준비 중
+                </span>
+              )}
             </button>
           )
         })}

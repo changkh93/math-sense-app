@@ -108,11 +108,14 @@ export default function StateTransitionLens({ kernel, onDiscoveryComplete }) {
     }
     if (nextFrame && nextFrame.expectedOptionId) {
       if (opt.id === nextFrame.expectedOptionId) {
-        setOptionFeedback({ type: 'success', text: `정답입니다! (${opt.label})` })
+        setOptionFeedback({
+          type: 'success',
+          text: opt.feedback || `정답입니다! (${opt.label})`,
+        })
       } else {
         setOptionFeedback({
           type: 'error',
-          text: `선택한 명령 결과 상태가 목표와 다릅니다. 다시 선택해 보세요.`,
+          text: opt.feedback || `선택한 명령 결과 상태가 목표와 다릅니다. 다시 선택해 보세요.`,
         })
       }
     }
@@ -284,11 +287,19 @@ export default function StateTransitionLens({ kernel, onDiscoveryComplete }) {
 
       {/* 4. Choice Frame UI when nextFrame requires selecting an operation */}
       {nextFrame && nextFrame.operationOptions && (
-        <div style={{ padding: '16px 20px', borderRadius: '12px', background: 'rgba(56, 189, 248, 0.08)', border: '1px solid rgba(56, 189, 248, 0.3)' }}>
-          <div style={{ fontSize: '14px', fontWeight: 'bold', color: '#38bdf8', marginBottom: '10px' }}>
-            🎯 {nextFrame.prompt || '다음 단계에 알맞은 명령을 선택해 보세요.'}
+        <div style={{ padding: '18px 20px', borderRadius: '12px', background: 'rgba(56, 189, 248, 0.08)', border: '1px solid rgba(56, 189, 248, 0.35)', display: 'grid', gap: '10px' }}>
+          <div style={{ fontSize: '15px', fontWeight: 'bold', color: '#38bdf8', display: 'flex', alignItems: 'center', gap: '6px' }}>
+            {nextFrame.choiceTitle || '🎯 다음 단계 미션: 빠진 명령 선택'}
           </div>
-          <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+          <div style={{ fontSize: '14px', color: '#e2e8f0', lineHeight: '1.5' }}>
+            {nextFrame.choicePrompt || nextFrame.prompt || '다음 단계에 알맞은 명령을 선택해 보세요.'}
+          </div>
+          {nextFrame.choiceHint && (
+            <div style={{ fontSize: '13px', color: '#a5f3fc', background: 'rgba(56, 189, 248, 0.12)', padding: '8px 12px', borderRadius: '6px', borderLeft: '3px solid #38bdf8', lineHeight: '1.4' }}>
+              {nextFrame.choiceHint}
+            </div>
+          )}
+          <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', marginTop: '4px' }}>
             {nextFrame.operationOptions.map((opt) => {
               const isSelected = selectedOptionId === opt.id
               return (
@@ -297,7 +308,7 @@ export default function StateTransitionLens({ kernel, onDiscoveryComplete }) {
                   type="button"
                   onClick={() => handleSelectOption(opt)}
                   style={{
-                    padding: '8px 16px',
+                    padding: '9px 18px',
                     borderRadius: '8px',
                     border: isSelected ? '2px solid #38bdf8' : '1px solid rgba(255, 255, 255, 0.2)',
                     background: isSelected ? 'rgba(56, 189, 248, 0.25)' : 'rgba(0, 0, 0, 0.35)',
@@ -305,6 +316,7 @@ export default function StateTransitionLens({ kernel, onDiscoveryComplete }) {
                     fontWeight: 'bold',
                     fontSize: '13px',
                     cursor: 'pointer',
+                    transition: 'all 0.15s ease',
                   }}
                 >
                   {opt.label}
@@ -313,7 +325,8 @@ export default function StateTransitionLens({ kernel, onDiscoveryComplete }) {
             })}
           </div>
           {optionFeedback && (
-            <div style={{ marginTop: '10px', fontSize: '13px', color: optionFeedback.type === 'success' ? '#34d399' : '#f87171' }}>
+            <div style={{ marginTop: '4px', padding: '10px 14px', borderRadius: '8px', fontSize: '13px', background: optionFeedback.type === 'success' ? 'rgba(16, 185, 129, 0.15)' : 'rgba(239, 68, 68, 0.15)', border: optionFeedback.type === 'success' ? '1px solid rgba(16, 185, 129, 0.3)' : '1px solid rgba(239, 68, 68, 0.3)', color: optionFeedback.type === 'success' ? '#6ee7b7' : '#fca5a5', lineHeight: '1.5' }}>
+              {optionFeedback.type === 'success' ? '✅ ' : '❌ '}
               {optionFeedback.text}
             </div>
           )}

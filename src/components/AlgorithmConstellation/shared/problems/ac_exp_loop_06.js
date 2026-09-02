@@ -59,5 +59,57 @@ export const AC_EXP_LOOP_06 = createCapabilityPrototypeKernel({
       { inputs: { times: 4, step_energy: 2 }, expected: 8 },
       { inputs: { times: 3, step_energy: 5 }, expected: 15 },
     ],
+    understandingChallenges: [
+      {
+        challengeId: 'uc_loop_06_1',
+        title: '★★ 반복문 회차별 누적 추적',
+        type: 'single-choice',
+        prompt: '반복문 실행 과정의 중간 상태를 확인해 보세요.',
+        questions: [
+          {
+            id: 'q1',
+            text: 'times=4, step_energy=2일 때, for 루프가 2회차까지 실행된 직후 energy의 값은 얼마일까요?',
+            options: [
+              { value: '4', label: '4' },
+              { value: '2', label: '2' },
+              { value: '8', label: '8' },
+              { value: '0', label: '0' },
+            ],
+            expected: '4',
+          },
+        ],
+      },
+    ],
+    transferChallenges: [
+      {
+        transferChallengeId: 'tc_loop_06_t1',
+        title: '배터리 팩 순차 충전',
+        description: '배터리 팩에 기본 0에서 시작하여 cycle_count 횟수만큼 charge_rate 씩 충전한 최종 충전량을 반환하세요.',
+        contextCard: {
+          title: '📋 배터리 충전 흐름',
+          steps: [
+            { label: '① 초기화', text: 'total = 0' },
+            { label: '② 반복 충전', text: 'for i in range(cycle_count): total += charge_rate' },
+          ],
+        },
+        thoughtCheck: {
+          prompt: '매 회차마다 total에 charge_rate를 누적하려면 반복문 시작 전에 total은 얼마여야 할까요?',
+          options: [
+            { id: 'opt_zero', label: '0 (초기 기준값)', isCorrect: true },
+            { id: 'opt_rate', label: 'charge_rate', isCorrect: false },
+          ],
+          feedback: '맞아요! 누적 변수는 0으로 초기화한 뒤 루프를 시작해야 정확한 합계가 계산됩니다.',
+        },
+        entryFunction: 'charge_battery_pack',
+        starterCode: `def charge_battery_pack(cycle_count, charge_rate):
+    # cycle_count회 동안 charge_rate만큼 누적해 보세요.
+    pass
+`,
+        testCases: [
+          { inputs: { cycle_count: 5, charge_rate: 10 }, expected: 50 },
+          { inputs: { cycle_count: 0, charge_rate: 30 }, expected: 0 },
+        ],
+      },
+    ],
   },
 })

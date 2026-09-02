@@ -176,9 +176,10 @@ export function isConstellationUnlocked(constellationNumber, completedProblemIds
 
 /**
  * Release-aware access policy.
- * Strict 6/8 gating starts only after the previous constellation has published
- * every required anchor and enough Core missions to make that gate achievable.
- * Until then, released missions are explicitly available as an early route.
+ * New access requires the previous constellation to have published every
+ * required anchor and enough Core missions to make the 6/8 gate achievable.
+ * Incomplete releases stay unavailable instead of bypassing learning order.
+ * Existing completions retain access for review.
  */
 export function getConstellationAccess(constellationNumber, completedProblemIds = [], editorialCatalog = []) {
   const current = CONSTELLATIONS.find((item) => item.number === constellationNumber)
@@ -210,7 +211,12 @@ export function getConstellationAccess(constellationNumber, completedProblemIds 
     publishedPreviousCore.length >= previous.minimumCoreToUnlockNext
 
   if (!gateReady) {
-    return { accessible: true, mode: 'early-access', publishedCount: publishedCurrent.length }
+    return {
+      accessible: false,
+      mode: 'unavailable',
+      reason: 'previous-release-incomplete',
+      publishedCount: publishedCurrent.length,
+    }
   }
   return {
     accessible: isConstellationUnlocked(constellationNumber, completedProblemIds, editorialCatalog),

@@ -108,6 +108,47 @@ assert.equal(getConstellationAccess(4, [], ALGORITHM_EDITORIAL_CATALOG).mode, 'g
 assert.equal(getConstellationAccess(4, [], ALGORITHM_EDITORIAL_CATALOG).accessible, false)
 // Constellation 9 is unavailable
 assert.equal(getConstellationAccess(9, [], ALGORITHM_EDITORIAL_CATALOG).mode, 'unavailable')
+
+// A fresh student, including one who just completed #3, must not skip to C8.
+const firstThreeCompleted = ['AC-EXP-SEQ-01', 'AC-EXP-VAR-02', 'AC-EXP-STEP-03']
+for (const completed of [[], firstThreeCompleted]) {
+  assert.equal(getConstellationAccess(0, completed, ALGORITHM_EDITORIAL_CATALOG).accessible, true)
+  for (const constellation of CONSTELLATIONS.slice(1)) {
+    assert.equal(
+      getConstellationAccess(constellation.number, completed, ALGORITHM_EDITORIAL_CATALOG).accessible,
+      false,
+      `Completing only the first three missions must not open ${constellation.id}`,
+    )
+  }
+}
+
+// C7's single published Core cannot support its six-Core gate. Even completing
+// that mission (C8's prerequisite) must not bypass the constellation gate.
+for (const completed of [firstThreeCompleted, ['AC-NAV-005']]) {
+  const incompleteReleaseAccess = getConstellationAccess(8, completed, ALGORITHM_EDITORIAL_CATALOG)
+  assert.equal(incompleteReleaseAccess.accessible, false)
+  assert.equal(incompleteReleaseAccess.mode, 'unavailable')
+  assert.equal(incompleteReleaseAccess.reason, 'previous-release-incomplete')
+}
+assert.equal(getConstellationAccess(8, ['AC-NAV-006'], ALGORITHM_EDITORIAL_CATALOG).mode, 'grandfathered')
+assert.equal(getConstellationAccess(8, ['AC-NAV-006'], ALGORITHM_EDITORIAL_CATALOG).accessible, true)
+
+// Once C7 is published, C8 opens through the normal six-Core + anchor gate.
+const releasedC7Catalog = ALGORITHM_EDITORIAL_CATALOG.map((entry) => (
+  entry.constellationId === 'constellation-7' ? { ...entry, status: 'published' } : entry
+))
+const c7CoreIds = releasedC7Catalog
+  .filter((entry) => entry.constellationId === 'constellation-7' && entry.routeRole === 'core')
+  .map((entry) => entry.problemId)
+const c7SixWithAnchor = ['AC-NAV-005', ...c7CoreIds.filter((id) => id !== 'AC-NAV-005').slice(0, 5)]
+assert.equal(getConstellationAccess(8, c7SixWithAnchor, releasedC7Catalog).accessible, true)
+assert.equal(getConstellationAccess(8, c7SixWithAnchor, releasedC7Catalog).mode, 'gated')
+assert.equal(getConstellationAccess(8, c7SixWithAnchor.slice(0, 5), releasedC7Catalog).accessible, false)
+assert.equal(getConstellationAccess(8, c7CoreIds.filter((id) => id !== 'AC-NAV-005'), releasedC7Catalog).accessible, false)
+const missingC7AnchorCatalog = releasedC7Catalog.map((entry) => (
+  entry.problemId === 'AC-NAV-005' ? { ...entry, status: 'draft' } : entry
+))
+assert.equal(getConstellationAccess(8, c7SixWithAnchor, missingC7AnchorCatalog).accessible, false)
 console.log('  -> [PASS] Unlock Gating strictly verified (Required Anchors + 6/8 Core + Grandfathered Protection)')
 
 // [Test 4] Python Concept Registry & Canonical First Encounter
