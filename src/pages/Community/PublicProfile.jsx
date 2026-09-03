@@ -11,7 +11,7 @@ import StarField from '../../components/Space/StarField';
 import CometBadge from '../../components/Space/CometBadge';
 import ModularShip from '../../components/Space/ModularShip';
 import CertificateAwardsBoard from '../../components/Space/CertificateAwardsBoard';
-import { getEffectiveStreak, getKSTComponents, getTodayKST } from '../../utils/streakUtils';
+import { getEffectiveStreak, getMondayKSTKey, getTodayKST } from '../../utils/streakUtils';
 import { calculateSEI } from '../../utils/rankingUtils';
 import { getBaseTheme, getFrameSurfaceStyles, getProfileFrame, isHallSpotlightActive } from '../../utils/socialUtils';
 import { parseInlineFormatting } from '../../utils/formatUtils';
@@ -75,14 +75,6 @@ const KST_DATE_FORMATTER = new Intl.DateTimeFormat('en-CA', {
 });
 
 const HEATMAP_MONTH_LABELS = ['1월', '2월', '3월', '4월', '5월', '6월', '7월', '8월', '9월', '10월', '11월', '12월'];
-
-function getMondayKSTKey() {
-  const kstPart = getKSTComponents();
-  const mondayOffset = (kstPart.dayOfWeek + 6) % 7;
-  const mondayDate = new Date();
-  mondayDate.setDate(mondayDate.getDate() - mondayOffset);
-  return getTodayKST(mondayDate);
-}
 
 function getDisplayName(profile = {}) {
   return profile.publicDisplayName || profile.studentName || profile.name || profile.displayName || '무명 탐험가';

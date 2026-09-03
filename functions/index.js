@@ -29,6 +29,8 @@ const {
   DIRECT_MEMO_RETENTION_MS,
   computeDirectMemoDeliveryPlan,
 } = require("./directMemoPolicy");
+const crewGrowthPolicy = require("./crewGrowthEventPolicy.cjs");
+const crewGrowthService = require("./crewGrowthEventService.cjs");
 const FUNCTIONS_REGION = "asia-northeast3";
 const regionalFunctions = functions.region(FUNCTIONS_REGION);
 const accountDeletionFunctions = regionalFunctions.runWith({ timeoutSeconds: 540, memory: "1GB" });
@@ -4670,6 +4672,12 @@ exports.backfillQuizBattleStats = regionalFunctions.https.onCall(async (data, co
   return { success: true, report };
 });
 
+const crewGuestTrial = require("./crewGuestTrial.cjs")({
+  db: admin.firestore(), HttpsError: functions.https.HttpsError, FieldValue,
+});
+exports.getCrewGuestTrialOffer = costOptimizedDataFunctions.https.onCall(crewGuestTrial.preview);
+exports.submitCrewGuestTrial = costOptimizedDataFunctions.https.onCall(crewGuestTrial.submit);
+
 exports.submitPublicApplication = regionalFunctions.https.onCall(async (data) => {
   const type = cleanText(data?.type, 30);
   if (!["trial", "consultation"].includes(type)) {
@@ -8284,6 +8292,8 @@ exports.createStudyCrew = regionalFunctions.https.onCall(async (data, context) =
       );
     }
 
+    const growthLockSnap = await tx.get(crewGrowthService.getParticipantLockRef(db, uid));
+    tx.set(userRef, { crewId: crewRef.id }, { merge: true });
     // Note: pass is NOT consumed here. It is consumed when admin approves the crew.
     tx.set(crewRef, crewData);
     tx.set(nameRegistryRef, {
@@ -8294,6 +8304,7 @@ exports.createStudyCrew = regionalFunctions.https.onCall(async (data, context) =
       claimedAt: createdAt,
       updatedAt: createdAt,
     });
+    await crewGrowthService.ensureParticipantLock(db, tx, uid, crewRef.id, "crew_created", Date.now(), growthLockSnap);
   });
 
   await syncCrewToMembers(crewRef.id, {
@@ -8357,11 +8368,16 @@ exports.joinStudyCrew = regionalFunctions.https.onCall(async (data, context) => 
       updatedAt: new Date(),
     };
 
+    const growthLockSnap = await tx.get(crewGrowthService.getParticipantLockRef(db, uid));
+    tx.set(userRef, { crewId: freshCrewSnap.id }, { merge: true });
     tx.set(freshCrewSnap.ref, {
       memberIds: nextMemberIds,
       memberCount: nextMemberIds.length,
       updatedAt: updatedCrew.updatedAt,
     }, { merge: true });
+
+    await crewGrowthService.ensureParticipantLock(db, tx, uid, freshCrewSnap.id, "crew_joined", Date.now(), growthLockSnap);
+
     return updatedCrew;
   });
 
@@ -8369,8 +8385,8 @@ exports.joinStudyCrew = regionalFunctions.https.onCall(async (data, context) => 
     ...txResult,
     updatedAt: new Date().toISOString(),
   });
-  await reconcileCrewGrowthEvent(crewSnap.id).catch((err) => {
-    console.warn("Crew growth event sync after member join failed", crewSnap.id, err);
+  await crewGrowthService.reconcileCrewGrowthEventV2(db, crewSnap.id).catch((err) => {
+    console.warn("Crew growth event V2 sync after member join failed", crewSnap.id, err);
   });
 
   return { success: true, crewId: crewSnap.id, inviteCode };
@@ -8619,6 +8635,7 @@ exports.reviewStudyCrew = regionalFunctions.https.onCall(async (data, context) =
       approvedAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     });
+    await crewGrowthService.reconcileCrewGrowthEventV2(db, crewId);
     return { success: true };
   }
 
@@ -9793,6 +9810,7 @@ exports.adminRemoveStudyCrewMember = regionalFunctions.https.onCall(async (data,
       updatedAt: now,
     };
 
+    const growthLockSnap = await tx.get(crewGrowthService.getParticipantLockRef(db, targetUid));
     tx.set(crewRef, nextCrewData, { merge: true });
     if (!targetUserSnap.exists || (targetUserSnap.data() || {}).crewId === crewId) {
       tx.set(targetUserRef, {
@@ -9800,11 +9818,15 @@ exports.adminRemoveStudyCrewMember = regionalFunctions.https.onCall(async (data,
         updatedAt: now,
       }, { merge: true });
     }
+    await crewGrowthService.forfeitParticipantLock(db, tx, targetUid, crewId, "admin_removed", Date.now(), growthLockSnap);
   });
 
   await syncCrewToMembers(crewId, {
     ...nextCrewData,
     updatedAt: new Date().toISOString(),
+  });
+  await crewGrowthService.reconcileCrewGrowthEventV2(db, crewId).catch((err) => {
+    console.warn("Crew growth event V2 sync after member remove failed", crewId, err);
   });
   return { success: true };
 });
@@ -10466,8 +10488,6 @@ async function recordCrewGuestBattleActivity(battleId) {
         updatedAt: FieldValue.serverTimestamp(),
       }, { merge: true });
     });
-    const accountSnap = await accountRef.get();
-    if (accountSnap.exists && accountSnap.data()?.crewId) await reconcileCrewGrowthEvent(accountSnap.data().crewId);
   }));
 }
 
@@ -10561,63 +10581,67 @@ exports.enterCrewAsGuest = guestSecurityFunctions.https.onCall(async (data, cont
   const ipHash = guestSecurityHash(getRequestIp(context));
   const installationHash = guestSecurityHash(installationId);
   const accountRef = db.collection("crewGuestAccounts").doc(uid);
-  const [existingAccount, sameDeviceSnap, sameIpSnap] = await Promise.all([
-    accountRef.get(),
-    installationHash ? db.collection("crewGuestAccounts").where("installationHash", "==", installationHash).limit(20).get() : Promise.resolve(null),
-    ipHash ? db.collection("crewGuestAccounts").where("ipHash", "==", ipHash).limit(50).get() : Promise.resolve(null),
+  const [sameDeviceSnap, sameIpSnap] = await Promise.all([
+    installationHash ? db.collection("crewGuestAccounts").where("installationHash", "==", installationHash).limit(20).get() : null,
+    ipHash ? db.collection("crewGuestAccounts").where("ipHash", "==", ipHash).limit(50).get() : null,
   ]);
-  if (existingAccount.exists && ["suspended", "deleted"].includes(existingAccount.data()?.status)) {
-    throw new functions.https.HttpsError("permission-denied", "운영자에 의해 중지된 게스트 계정입니다.");
-  }
-  const duplicateDevice = Boolean(sameDeviceSnap?.docs.some((docSnap) => docSnap.id !== uid && docSnap.data()?.crewId === crewId && docSnap.data()?.status !== "deleted"));
-  const recentSameIpCount = sameIpSnap?.docs.filter((docSnap) => docSnap.id !== uid && docSnap.data()?.crewId === crewId && nowMs - Number(docSnap.data()?.firstJoinedAtMs || 0) <= 60 * 60 * 1000).length || 0;
-  const riskFlags = [
-    ...(duplicateDevice ? ["duplicate_device"] : []),
-    ...(recentSameIpCount >= 2 ? ["ip_burst_3_plus"] : []),
-  ];
-  const eventReviewStatus = duplicateDevice ? "excluded" : (recentSameIpCount >= 2 ? "review" : (existingAccount.data()?.eventReviewStatus || "clear"));
-
-  await Promise.all([crewSnap.ref.collection("guestSessions").doc(uid).set({
-    uid,
-    crewId: crewSnap.id,
-    alias: guestAlias,
-    isGuest: true,
-    state: "online",
-    joinedAt: FieldValue.serverTimestamp(),
-    lastSeenAt: FieldValue.serverTimestamp(),
-    referralInviteId: trackedInvite?.id || null,
-    referrerParentUid: trackedInvite?.referrerParentUid || null,
-    referrerStudentUid: trackedInvite?.referrerStudentUid || null,
-  }, { merge: true }), accountRef.set({
-    uid,
-    crewId: crewSnap.id,
-    crewName: crewData.name || "스터디 크루",
-    alias: guestAlias,
-    status: "active",
-    referralInviteId: trackedInvite?.id || null,
-    referrerParentUid: trackedInvite?.referrerParentUid || null,
-    referrerStudentUid: trackedInvite?.referrerStudentUid || null,
-    installationHash,
-    ipHash,
-    isDuplicateDevice: duplicateDevice,
-    recentSameIpCount: recentSameIpCount + 1,
-    ...(riskFlags.length ? { riskFlags: FieldValue.arrayUnion(...riskFlags) } : {}),
-    eventReviewStatus,
-    firstJoinedAt: existingAccount.exists ? (existingAccount.data()?.firstJoinedAt || FieldValue.serverTimestamp()) : FieldValue.serverTimestamp(),
-    firstJoinedAtMs: existingAccount.exists ? Number(existingAccount.data()?.firstJoinedAtMs || nowMs) : nowMs,
-    lastJoinedAt: FieldValue.serverTimestamp(),
-    lastSeenAt: FieldValue.serverTimestamp(),
-    expiresAt: Timestamp.fromMillis(nowMs + (30 * 24 * 60 * 60 * 1000)),
-    updatedAt: FieldValue.serverTimestamp(),
-  }, { merge: true })]);
+  const duplicateDevice = Boolean(sameDeviceSnap?.docs.some((snap) => snap.id !== uid && snap.data()?.status !== "deleted"));
+  const recentSameIpCount = sameIpSnap?.docs.filter((snap) => snap.id !== uid &&
+    nowMs - Number(snap.data()?.firstJoinedAtMs || 0) <= 3600000).length || 0;
+  let referralTracked = false;
+  await db.runTransaction(async (tx) => {
+    const existingSnap = await tx.get(accountRef);
+    const existing = existingSnap.data() || {};
+    if (["suspended", "deleted"].includes(existing.status)) {
+      throw new functions.https.HttpsError("permission-denied", "운영자에 의해 중지된 게스트 계정입니다.");
+    }
+    if (existing.crewId && existing.crewId !== crewId) {
+      throw new functions.https.HttpsError("failed-precondition", "게스트 체험은 처음 초대받은 크루에서 계속해 주세요.");
+    }
+    // First verified referral wins; a plain URL revisit must not erase attribution.
+    const referral = existing.referralInviteId ? {
+      referralInviteId: existing.referralInviteId,
+      referrerParentUid: existing.referrerParentUid || null,
+      referrerStudentUid: existing.referrerStudentUid || null,
+    } : {
+      referralInviteId: trackedInvite?.id || null,
+      referrerParentUid: trackedInvite?.referrerParentUid || null,
+      referrerStudentUid: trackedInvite?.referrerStudentUid || null,
+    };
+    referralTracked = Boolean(referral.referralInviteId);
+    const riskFlags = [
+      ...(duplicateDevice ? ["duplicate_device"] : []),
+      ...(!installationHash ? ["missing_installation_hash"] : []),
+      ...(recentSameIpCount >= 2 ? ["ip_burst_3_plus"] : []),
+    ];
+    const review = existing.eventReviewStatus && existing.eventReviewStatus !== "clear"
+      ? existing.eventReviewStatus : duplicateDevice ? "excluded" : (!installationHash || recentSameIpCount >= 2) ? "review" : "clear";
+    tx.set(accountRef, {
+      uid, crewId, eventCrewId: existing.eventCrewId || crewId,
+      crewName: crewData.name || "스터디 크루", alias: guestAlias, status: "active", ...referral,
+      installationHash: existing.installationHash || installationHash, ipHash,
+      isDuplicateDevice: existing.isDuplicateDevice === true || duplicateDevice,
+      recentSameIpCount: recentSameIpCount + 1, eventReviewStatus: review,
+      ...(riskFlags.length ? { riskFlags: FieldValue.arrayUnion(...riskFlags) } : {}),
+      firstJoinedAt: existing.firstJoinedAt || FieldValue.serverTimestamp(),
+      firstJoinedAtMs: existing.firstJoinedAtMs || nowMs,
+      lastJoinedAt: FieldValue.serverTimestamp(), lastSeenAt: FieldValue.serverTimestamp(),
+      expiresAt: Timestamp.fromMillis(nowMs + 30 * 24 * 60 * 60 * 1000),
+      updatedAt: FieldValue.serverTimestamp(),
+    }, { merge: true });
+    // Public presence never needs referral identity fields.
+    tx.set(crewSnap.ref.collection("guestSessions").doc(uid), {
+      uid, crewId, alias: guestAlias, isGuest: true, state: "online",
+      joinedAt: FieldValue.serverTimestamp(), lastSeenAt: FieldValue.serverTimestamp(),
+      referralInviteId: FieldValue.delete(), referrerParentUid: FieldValue.delete(), referrerStudentUid: FieldValue.delete(),
+    }, { merge: true });
+  });
+  await crewGrowthService.reconcileCrewGrowthEventV2(db, crewId).catch((err) => {
+    console.warn("Crew guest entry aggregate update failed", crewId, err);
+  });
   return {
-    crewId: crewSnap.id,
-    crewName: crewData.name || "스터디 크루",
-    crewColor: crewData.color || "#00d4ff",
-    guestAlias,
-    guestUid: uid,
-    referralTracked: Boolean(trackedInvite),
-    referralToken: trackedInvite ? inviteToken : null,
+    crewId, crewName: crewData.name || "스터디 크루", crewColor: crewData.color || "#00d4ff",
+    guestAlias, guestUid: uid, referralTracked, referralToken: trackedInvite ? inviteToken : null,
   };
 });
 
@@ -10637,31 +10661,65 @@ exports.touchCrewGuestPresence = regionalFunctions.https.onCall(async (data, con
     throw new functions.https.HttpsError("permission-denied", "현재 게스트 참여가 허용되지 않습니다.");
   }
   const guestAccountRef = db.collection("crewGuestAccounts").doc(uid);
-  const guestAccountSnap = await guestAccountRef.get();
-  if (guestAccountSnap.exists && ["suspended", "deleted"].includes(guestAccountSnap.data()?.status)) {
-    throw new functions.https.HttpsError("permission-denied", "운영자에 의해 중지된 게스트 계정입니다.");
-  }
-  await Promise.all([
-    crewRef.collection("guestSessions").doc(uid).set({
+  const nowMs = Date.now();
+  const isVisible = data?.isVisible === true;
+  const isFocused = data?.isFocused === true;
+  const heartbeatId = cleanText(data?.heartbeatId, 80);
+
+  let becameEligible = false;
+  await db.runTransaction(async (transaction) => {
+    const guestAccountSnap = await transaction.get(guestAccountRef);
+    if (guestAccountSnap.exists && ["suspended", "deleted"].includes(guestAccountSnap.data()?.status)) {
+      throw new functions.https.HttpsError("permission-denied", "운영자에 의해 중지된 게스트 계정입니다.");
+    }
+    const existingAccount = guestAccountSnap.data() || {};
+    if (!guestAccountSnap.exists || existingAccount.crewId !== crewId) {
+      throw new functions.https.HttpsError("permission-denied", "초대 링크로 크루에 먼저 입장해 주세요.");
+    }
+    if (heartbeatId && existingAccount.lastHeartbeatId === heartbeatId) return;
+    const heartbeatResult = crewGrowthPolicy.processGuestHeartbeat({
+      existingAccount,
+      nowMs,
+      isVisible,
+      isFocused,
+      heartbeatId,
+    });
+
+    becameEligible = heartbeatResult.becameEligible;
+
+    transaction.set(guestAccountRef, {
+      ...heartbeatResult.nextAccount,
+      uid,
+      crewId,
+      crewName: crewData.name || "스터디 크루",
+      alias: getCrewGuestAlias(uid),
+      status: existingAccount.status || "active",
+      eventReviewStatus: existingAccount.eventReviewStatus || "clear",
+      firstJoinedAt: existingAccount.firstJoinedAt || FieldValue.serverTimestamp(),
+      firstJoinedAtMs: existingAccount.firstJoinedAtMs || nowMs,
+      lastSeenAt: FieldValue.serverTimestamp(),
+      updatedAt: FieldValue.serverTimestamp(),
+      expiresAt: Timestamp.fromMillis(nowMs + 30 * 24 * 60 * 60 * 1000),
+    }, { merge: true });
+
+    const guestSessionRef = crewRef.collection("guestSessions").doc(uid);
+    transaction.set(guestSessionRef, {
       uid,
       crewId,
       alias: getCrewGuestAlias(uid),
       isGuest: true,
       state: "online",
       lastSeenAt: FieldValue.serverTimestamp(),
-      expiresAt: Timestamp.fromMillis(Date.now() + (30 * 24 * 60 * 60 * 1000)),
-    }, { merge: true }),
-    guestAccountRef.set({
-      uid,
-      crewId,
-      crewName: crewData.name || "스터디 크루",
-      alias: getCrewGuestAlias(uid),
-      status: "active",
-      ...(!guestAccountSnap.exists ? { eventReviewStatus: "clear", firstJoinedAt: FieldValue.serverTimestamp(), firstJoinedAtMs: Date.now() } : {}),
-      lastSeenAt: FieldValue.serverTimestamp(),
-      updatedAt: FieldValue.serverTimestamp(),
-    }, { merge: true }),
-  ]);
+      expiresAt: Timestamp.fromMillis(nowMs + (30 * 24 * 60 * 60 * 1000)),
+    }, { merge: true });
+  });
+
+  if (becameEligible) {
+    await crewGrowthService.reconcileCrewGrowthEventV2(db, crewId).catch((err) => {
+      console.warn("Crew growth event V2 sync after guest qualification failed", crewId, err);
+    });
+  }
+
   return { success: true };
 });
 
@@ -10680,61 +10738,117 @@ exports.getCrewGrowthEventProgress = regionalFunctions.https.onCall(async (data,
   const crewId = cleanId(data?.crewId, 160);
   if (!crewId) throw new functions.https.HttpsError("invalid-argument", "크루 ID가 없습니다.");
   const db = admin.firestore();
-  const [crewSnap, guestSnap] = await Promise.all([
+  const [crewSnap, guestSnap, userLockSnap] = await Promise.all([
     db.collection("crews").doc(crewId).get(),
     db.collection("crewGuestAccounts").doc(uid).get(),
+    crewGrowthService.getParticipantLockRef(db, uid).get(),
   ]);
   if (!crewSnap.exists) throw new functions.https.HttpsError("not-found", "크루를 찾을 수 없습니다.");
   const crew = crewSnap.data() || {};
   const isMember = crew.leaderId === uid || (crew.memberIds || []).includes(uid);
   const isCrewGuest = guestSnap.exists && guestSnap.data()?.crewId === crewId;
   if (!isMember && !isCrewGuest) throw new functions.https.HttpsError("permission-denied", "이 크루의 이벤트만 확인할 수 있습니다.");
-  const progress = await reconcileCrewGrowthEvent(crewId);
-  const event = progress.event || progress.crew.growthEvent2026 || {};
-  const snapshotState = getCrewGrowthSnapshotState(progress, event);
-  const displayEligibleCount = event.rewardedAt
-    ? Math.max(CREW_GROWTH_EVENT_TARGET, Number(event.finalEligibleCount || 0))
-    : event.achievedAtMs
-      ? snapshotState.retainedCount
-      : progress.eligibleCount;
+
+  // Bootstrap old/missing aggregates once; routine UI reads never scan the roster.
+  const eventV2 = crew.growthEventV2?.schemaVersion === 2 ? crew.growthEventV2
+    : (await crewGrowthService.reconcileCrewGrowthEventV2(db, crewId)).eventV2;
+  const progressV2 = {
+    eligibleCount: eventV2.eligibleCount || 0, memberCount: eventV2.memberCount || 0,
+    eventEligibleMemberCount: eventV2.eligibleMemberCount || 0,
+    eventExcludedMemberCount: eventV2.excludedMemberCount || 0,
+    activeGuestCount: eventV2.activeGuestCount || 0,
+  };
+  const tiers = eventV2.tiers || {};
+  const tier20 = tiers.t20 || {};
+  const tier40 = tiers.t40 || {};
+  const isT20Rewarded = tier20.status === "rewarded";
+
+  const nextTierId = isT20Rewarded ? "t40" : "t20";
+  const currentActiveTier = isT20Rewarded ? tier40 : tier20;
+  const currentTarget = isT20Rewarded ? 40 : 20;
+  const currentReward = isT20Rewarded ? 4000 : 1000;
+
+  const userLock = userLockSnap.exists ? userLockSnap.data() : null;
+  const userLockedToThisCrew = userLock?.originCrewId === crewId && userLock?.status === "active";
+  const userLockStatus = userLock?.status || "none";
+
   return {
-    campaignId: CREW_GROWTH_EVENT_CAMPAIGN_ID,
-    target: CREW_GROWTH_EVENT_TARGET,
-    reward: CREW_GROWTH_EVENT_REWARD,
-    memberCount: progress.memberCount,
-    eventEligibleMemberCount: progress.eventEligibleMemberCount,
-    eventCompletedMemberCount: progress.eventCompletedMemberCount,
-    activeGuestCount: progress.activeGuestCount,
-    pendingGuestCount: progress.pendingGuests.length,
-    eligibleCount: displayEligibleCount,
-    snapshotEligibleCount: Number(event.snapshotEligibleCount || 0),
-    snapshotRetainedCount: snapshotState.retainedCount,
-    achievedAtMs: Number(event.achievedAtMs || 0),
-    verificationEndsAtMs: Number(event.verificationEndsAtMs || 0),
-    rewarded: Boolean(event.rewardedAt),
-    rewardedAtMs: Number(event.rewardedAtMs || timestampMillis(event.rewardedAt)),
-    rewardedMemberCount: Array.isArray(event.rewardedMemberIds) ? event.rewardedMemberIds.length : 0,
-    openedMemberCount: Array.isArray(event.openedMemberIds) ? event.openedMemberIds.length : 0,
-    reactionCounts: event.reactionCounts || {},
-    currentUserEventCompleted: progress.eventCompletedMemberIds.includes(uid),
+    campaignId: crewGrowthPolicy.CAMPAIGN_ID,
+    tierId: nextTierId,
+    nextTierId,
+    target: currentTarget,
+    reward: currentReward,
+    eligibleCount: progressV2.eligibleCount,
+    neededForNextTarget: Math.max(0, currentTarget - progressV2.eligibleCount),
+    memberCount: progressV2.memberCount,
+    eventEligibleMemberCount: progressV2.eventEligibleMemberCount,
+    eventExcludedMemberCount: progressV2.eventExcludedMemberCount,
+    activeGuestCount: progressV2.activeGuestCount,
+    pendingGuestCount: eventV2.pendingGuestCount || 0,
+    tiers: {
+      t20: {
+        target: 20,
+        reward: 1000,
+        status: tier20.status || "collecting",
+        achievedAtMs: Number(tier20.achievedAtMs || 0),
+        verificationEndsAtMs: Number(tier20.verificationEndsAtMs || 0),
+        rewarded: tier20.status === "rewarded",
+        rewardedAtMs: Number(tier20.rewardedAtMs || 0),
+        snapshotRetainedCount: Number(tier20.snapshotRetainedCount || 0),
+        snapshotEligibleCount: Number(tier20.snapshotEligibleCount || 20),
+        rewardedMemberCount: Array.isArray(tier20.rewardedMemberIds) ? tier20.rewardedMemberIds.length : 0,
+        openedMemberCount: Array.isArray(tier20.openedMemberIds) ? tier20.openedMemberIds.length : 0,
+        reactionCounts: tier20.reactionCounts || {},
+      },
+      t40: {
+        target: 40,
+        reward: 4000,
+        status: tier40.status || "collecting",
+        achievedAtMs: Number(tier40.achievedAtMs || 0),
+        verificationEndsAtMs: Number(tier40.verificationEndsAtMs || 0),
+        rewarded: tier40.status === "rewarded",
+        rewardedAtMs: Number(tier40.rewardedAtMs || 0),
+        snapshotRetainedCount: Number(tier40.snapshotRetainedCount || 0),
+        snapshotEligibleCount: Number(tier40.snapshotEligibleCount || 40),
+        rewardedMemberCount: Array.isArray(tier40.rewardedMemberIds) ? tier40.rewardedMemberIds.length : 0,
+        openedMemberCount: Array.isArray(tier40.openedMemberIds) ? tier40.openedMemberIds.length : 0,
+        reactionCounts: tier40.reactionCounts || {},
+      },
+    },
+    // V1 호환 필드 (기존 컴포넌트 즉각 호환용)
+    achievedAtMs: Number(currentActiveTier.achievedAtMs || 0),
+    verificationEndsAtMs: Number(currentActiveTier.verificationEndsAtMs || 0),
+    rewarded: currentActiveTier.status === "rewarded",
+    rewardedAtMs: Number(currentActiveTier.rewardedAtMs || 0),
+    snapshotEligibleCount: Number(currentActiveTier.snapshotEligibleCount || currentTarget),
+    snapshotRetainedCount: Number(currentActiveTier.snapshotRetainedCount || 0),
+    rewardedMemberCount: Array.isArray(currentActiveTier.rewardedMemberIds) ? currentActiveTier.rewardedMemberIds.length : 0,
+    openedMemberCount: Array.isArray(currentActiveTier.openedMemberIds) ? currentActiveTier.openedMemberIds.length : 0,
+    reactionCounts: currentActiveTier.reactionCounts || {},
+    currentUserEventCompleted: userLockStatus === "forfeited" || Boolean(userLock && !userLockedToThisCrew),
+    currentUserLockedToThisCrew: userLockedToThisCrew,
+    currentUserLockStatus: userLockStatus,
   };
 });
 
-function serializeCrewGrowthCelebration(claim = {}, crew = {}) {
-  const event = crew.growthEvent2026 || {};
-  const reactionCounts = event.reactionCounts || {};
+function serializeCrewGrowthCelebration(claim = {}, crew = {}, tierId = "t20") {
+  const eventV2 = crew.growthEventV2 || {};
+  const tierEvent = eventV2.tiers?.[tierId] || {};
+  const legacyEvent = crew.growthEvent2026 || {};
+  const reactionCounts = tierEvent.reactionCounts || legacyEvent.reactionCounts || {};
   return {
     available: Boolean(claim.uid && claim.crewId),
-    campaignId: claim.campaignId || CREW_GROWTH_EVENT_CAMPAIGN_ID,
+    campaignId: claim.campaignId || crewGrowthPolicy.CAMPAIGN_ID,
+    tierId: claim.tierId || tierId,
     crewId: claim.crewId || "",
     crewName: claim.crewName || crew.name || "스터디 크루",
-    amount: Number(claim.amount || CREW_GROWTH_EVENT_REWARD),
+    amount: Number(claim.amount || (tierId === "t40" ? crewGrowthPolicy.REWARD_T2 : crewGrowthPolicy.REWARD_T1)),
     rewardedAtMs: Number(claim.rewardedAtMs || timestampMillis(claim.rewardedAt)),
     opened: Boolean(claim.openedAt || Number(claim.openedAtMs || 0) > 0),
     openedAtMs: Number(claim.openedAtMs || timestampMillis(claim.openedAt)),
     reaction: ["applause", "launch", "thanks"].includes(claim.reaction) ? claim.reaction : "",
-    rewardedMemberCount: Array.isArray(event.rewardedMemberIds) ? event.rewardedMemberIds.length : 0,
-    openedMemberCount: Array.isArray(event.openedMemberIds) ? event.openedMemberIds.length : 0,
+    rewardedMemberCount: Array.isArray(tierEvent.rewardedMemberIds) ? tierEvent.rewardedMemberIds.length : (Array.isArray(legacyEvent.rewardedMemberIds) ? legacyEvent.rewardedMemberIds.length : 0),
+    openedMemberCount: Array.isArray(tierEvent.openedMemberIds) ? tierEvent.openedMemberIds.length : (Array.isArray(legacyEvent.openedMemberIds) ? legacyEvent.openedMemberIds.length : 0),
     reactionCounts: {
       applause: Math.max(0, Number(reactionCounts.applause || 0)),
       launch: Math.max(0, Number(reactionCounts.launch || 0)),
@@ -10743,37 +10857,63 @@ function serializeCrewGrowthCelebration(claim = {}, crew = {}) {
   };
 }
 
-async function loadCrewGrowthCelebration(uid) {
+async function loadCrewGrowthCelebration(uid, tierId = "t20") {
   const db = admin.firestore();
+  // V2 claim 우선 조회
+  const v2ClaimSnap = await crewGrowthService.getRewardClaimRef(db, tierId, uid).get();
+  if (v2ClaimSnap.exists) {
+    const claim = v2ClaimSnap.data() || {};
+    const crewSnap = claim.crewId ? await db.collection("crews").doc(claim.crewId).get() : null;
+    return serializeCrewGrowthCelebration(claim, crewSnap?.exists ? (crewSnap.data() || {}) : {}, tierId);
+  }
+
+  // V1 legacy claim fallback
   const claimSnap = await getCrewGrowthRewardClaimRef(db, uid).get();
   if (!claimSnap.exists) {
-    return { available: false, campaignId: CREW_GROWTH_EVENT_CAMPAIGN_ID };
+    return { available: false, campaignId: crewGrowthPolicy.CAMPAIGN_ID, tierId };
   }
   const claim = claimSnap.data() || {};
   const crewSnap = claim.crewId ? await db.collection("crews").doc(claim.crewId).get() : null;
-  return serializeCrewGrowthCelebration(claim, crewSnap?.exists ? (crewSnap.data() || {}) : {});
+  return serializeCrewGrowthCelebration(claim, crewSnap?.exists ? (crewSnap.data() || {}) : {}, "t20");
 }
 
 exports.getCrewGrowthRewardCelebration = regionalFunctions.https.onCall(async (data, context) => {
   const uid = await requireAuthUid(context);
-  return loadCrewGrowthCelebration(uid);
+  const tierId = cleanId(data?.tierId, 20);
+  if (tierId) return loadCrewGrowthCelebration(uid, tierId);
+  // The next goal may already be t40 while the member's t20 box is unopened.
+  const claims = await Promise.all(["t20", "t40"].map(id =>
+    crewGrowthService.getRewardClaimRef(admin.firestore(), id, uid).get()));
+  const available = claims.filter(snap => snap.exists).map(snap => snap.data());
+  const selected = available.find(claim => !claim.openedAt && !claim.openedAtMs) || available.at(-1);
+  if (!selected) return { available: false, campaignId: crewGrowthPolicy.CAMPAIGN_ID };
+  const crewSnap = await admin.firestore().collection("crews").doc(selected.crewId).get();
+  return serializeCrewGrowthCelebration(selected, crewSnap.data() || {}, selected.tierId);
 });
 
 exports.openCrewGrowthRewardCelebration = regionalFunctions.https.onCall(async (data, context) => {
   const uid = await requireAuthUid(context);
+  const tierId = cleanId(data?.tierId, 20) || "t20";
   const db = admin.firestore();
-  const claimRef = getCrewGrowthRewardClaimRef(db, uid);
   const openedAtMs = Date.now();
 
+  const v2ClaimRef = crewGrowthService.getRewardClaimRef(db, tierId, uid);
+  const legacyClaimRef = getCrewGrowthRewardClaimRef(db, uid);
+
   await db.runTransaction(async (transaction) => {
-    const claimSnap = await transaction.get(claimRef);
+    const [v2Snap, legacySnap] = await Promise.all([
+      transaction.get(v2ClaimRef),
+      transaction.get(legacyClaimRef),
+    ]);
+
+    const isV2 = v2Snap.exists;
+    const claimSnap = isV2 ? v2Snap : legacySnap;
+    const claimRef = isV2 ? v2ClaimRef : legacyClaimRef;
+
     if (!claimSnap.exists) {
-      throw new functions.https.HttpsError("not-found", "개봉할 CREW 20 보급 상자가 없습니다.");
+      throw new functions.https.HttpsError("not-found", "개봉할 보급 상자가 없습니다.");
     }
     const claim = claimSnap.data() || {};
-    if (claim.campaignId && claim.campaignId !== CREW_GROWTH_EVENT_CAMPAIGN_ID) {
-      throw new functions.https.HttpsError("failed-precondition", "현재 이벤트의 보급 상자가 아닙니다.");
-    }
     const crewId = cleanId(claim.crewId, 160);
     const crewRef = crewId ? db.collection("crews").doc(crewId) : null;
     const crewSnap = crewRef ? await transaction.get(crewRef) : null;
@@ -10786,18 +10926,26 @@ exports.openCrewGrowthRewardCelebration = regionalFunctions.https.onCall(async (
       }, { merge: true });
     }
     if (crewRef && crewSnap?.exists) {
-      transaction.update(crewRef, {
-        "growthEvent2026.openedMemberIds": FieldValue.arrayUnion(uid),
-        "growthEvent2026.updatedAt": FieldValue.serverTimestamp(),
-      });
+      if (isV2) {
+        transaction.update(crewRef, {
+          [`growthEventV2.tiers.${tierId}.openedMemberIds`]: FieldValue.arrayUnion(uid),
+          "growthEventV2.updatedAtMs": openedAtMs,
+        });
+      } else {
+        transaction.update(crewRef, {
+          "growthEvent2026.openedMemberIds": FieldValue.arrayUnion(uid),
+          "growthEvent2026.updatedAt": FieldValue.serverTimestamp(),
+        });
+      }
     }
   });
 
-  return loadCrewGrowthCelebration(uid);
+  return loadCrewGrowthCelebration(uid, tierId);
 });
 
 exports.reactCrewGrowthRewardCelebration = regionalFunctions.https.onCall(async (data, context) => {
   const uid = await requireAuthUid(context);
+  const tierId = cleanId(data?.tierId, 20) || "t20";
   const reaction = cleanId(data?.reaction, 20);
   const allowedReactions = ["applause", "launch", "thanks"];
   if (!allowedReactions.includes(reaction)) {
@@ -10805,11 +10953,21 @@ exports.reactCrewGrowthRewardCelebration = regionalFunctions.https.onCall(async 
   }
 
   const db = admin.firestore();
-  const claimRef = getCrewGrowthRewardClaimRef(db, uid);
+  const v2ClaimRef = crewGrowthService.getRewardClaimRef(db, tierId, uid);
+  const legacyClaimRef = getCrewGrowthRewardClaimRef(db, uid);
+
   await db.runTransaction(async (transaction) => {
-    const claimSnap = await transaction.get(claimRef);
+    const [v2Snap, legacySnap] = await Promise.all([
+      transaction.get(v2ClaimRef),
+      transaction.get(legacyClaimRef),
+    ]);
+
+    const isV2 = v2Snap.exists;
+    const claimSnap = isV2 ? v2Snap : legacySnap;
+    const claimRef = isV2 ? v2ClaimRef : legacyClaimRef;
+
     if (!claimSnap.exists) {
-      throw new functions.https.HttpsError("not-found", "CREW 20 보급 상자가 없습니다.");
+      throw new functions.https.HttpsError("not-found", "보급 상자가 없습니다.");
     }
     const claim = claimSnap.data() || {};
     if (!claim.openedAt && !Number(claim.openedAtMs || 0)) {
@@ -10828,8 +10986,10 @@ exports.reactCrewGrowthRewardCelebration = regionalFunctions.https.onCall(async 
     }, { merge: true });
 
     if (crewRef && crewSnap?.exists) {
-      const event = crewSnap.data()?.growthEvent2026 || {};
-      const currentCounts = event.reactionCounts || {};
+      const crewData = crewSnap.data() || {};
+      const currentCounts = isV2
+        ? (crewData.growthEventV2?.tiers?.[tierId]?.reactionCounts || {})
+        : (crewData.growthEvent2026?.reactionCounts || {});
       const nextCounts = {
         applause: Math.max(0, Number(currentCounts.applause || 0)),
         launch: Math.max(0, Number(currentCounts.launch || 0)),
@@ -10837,14 +10997,22 @@ exports.reactCrewGrowthRewardCelebration = regionalFunctions.https.onCall(async 
       };
       if (previousReaction) nextCounts[previousReaction] = Math.max(0, nextCounts[previousReaction] - 1);
       nextCounts[reaction] += 1;
-      transaction.update(crewRef, {
-        "growthEvent2026.reactionCounts": nextCounts,
-        "growthEvent2026.updatedAt": FieldValue.serverTimestamp(),
-      });
+
+      if (isV2) {
+        transaction.update(crewRef, {
+          [`growthEventV2.tiers.${tierId}.reactionCounts`]: nextCounts,
+          "growthEventV2.updatedAtMs": Date.now(),
+        });
+      } else {
+        transaction.update(crewRef, {
+          "growthEvent2026.reactionCounts": nextCounts,
+          "growthEvent2026.updatedAt": FieldValue.serverTimestamp(),
+        });
+      }
     }
   });
 
-  return loadCrewGrowthCelebration(uid);
+  return loadCrewGrowthCelebration(uid, tierId);
 });
 
 exports.adminListCrewGuestAccounts = regionalFunctions.https.onCall(async (data, context) => {
@@ -10857,6 +11025,8 @@ exports.adminListCrewGuestAccounts = regionalFunctions.https.onCall(async (data,
   const guests = snap.docs.map((docSnap) => {
     const row = docSnap.data() || {};
     const battleCounts = getCrewGuestBattleBreakdown(row);
+    const qualifiedSessions = crewGrowthPolicy.getGuestQualifiedSessionCount(row);
+    const isV2Eligible = crewGrowthPolicy.isCrewGrowthGuestEligibleV2(row);
     return {
       uid: docSnap.id,
       alias: row.alias || "게스트 탐사원",
@@ -10869,12 +11039,15 @@ exports.adminListCrewGuestAccounts = regionalFunctions.https.onCall(async (data,
       completedAIBattleCount: battleCounts.ai,
       completedPvpBattleCount: battleCounts.pvp,
       totalBattleAnswers: Number(row.totalBattleAnswers || 0),
+      qualifiedSessionCount: qualifiedSessions,
+      activeSecondsTotal: Math.max(0, Number(row.activeSecondsTotal || 0)),
+      eligibleAtMs: Number(row.eligibleAtMs || 0),
       firstJoinedAtMs: Number(row.firstJoinedAtMs || 0),
       lastSeenAtMs: timestampMillis(row.lastSeenAt || row.updatedAt),
       recentSameIpCount: Number(row.recentSameIpCount || 0),
       referralInviteId: row.referralInviteId || "",
       referrerStudentUid: row.referrerStudentUid || "",
-      eventEligible: isCrewGrowthGuestEligible(row, nowMs),
+      eventEligible: isV2Eligible,
     };
   }).sort((a, b) => b.firstJoinedAtMs - a.firstJoinedAtMs);
   return { guests };
@@ -10891,7 +11064,9 @@ exports.adminReviewCrewGuestAccount = regionalFunctions.https.onCall(async (data
   const snap = await ref.get();
   if (!snap.exists) throw new functions.https.HttpsError("not-found", "게스트 계정을 찾을 수 없습니다.");
   await ref.set({ eventReviewStatus: status, reviewedBy: adminUid, reviewedAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp() }, { merge: true });
-  if (snap.data()?.crewId) await reconcileCrewGrowthEvent(snap.data().crewId);
+  if (snap.data()?.crewId) {
+    await crewGrowthService.reconcileCrewGrowthEventV2(admin.firestore(), snap.data().crewId).catch(() => {});
+  }
   return { success: true };
 });
 
@@ -10917,7 +11092,9 @@ exports.adminSetCrewGuestSuspended = regionalFunctions.https.onCall(async (data,
       updatedAt: FieldValue.serverTimestamp(),
     }, { merge: true }),
   ]);
-  if (account.crewId) await reconcileCrewGrowthEvent(account.crewId);
+  if (account.crewId) {
+    await crewGrowthService.reconcileCrewGrowthEventV2(db, account.crewId).catch(() => {});
+  }
   return { success: true, suspended };
 });
 
@@ -10937,7 +11114,9 @@ exports.adminDeleteCrewGuestAccount = regionalFunctions.https.onCall(async (data
     account.crewId ? db.collection("crews").doc(account.crewId).collection("guestSessions").doc(guestUid).delete() : Promise.resolve(),
     accountRef.set({ status: "deleted", eventReviewStatus: "excluded", deletedBy: adminUid, deletedAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp() }, { merge: true }),
   ]);
-  if (account.crewId) await reconcileCrewGrowthEvent(account.crewId);
+  if (account.crewId) {
+    await crewGrowthService.reconcileCrewGrowthEventV2(db, account.crewId).catch(() => {});
+  }
   return { success: true };
 });
 
@@ -10946,15 +11125,28 @@ exports.finalizeCrewGrowthEvents = regionalFunctions.pubsub
   .timeZone("Asia/Seoul")
   .onRun(async () => {
     const nowMs = Date.now();
-    const snap = await admin.firestore().collection("crews").where("status", "==", "approved").get();
-    const dueDocs = snap.docs.filter((docSnap) => {
-      const event = docSnap.data()?.growthEvent2026 || {};
-      const verificationEndsAtMs = Number(event.verificationEndsAtMs || 0);
-      return !event.rewardedAt && verificationEndsAtMs > 0 && verificationEndsAtMs <= nowMs;
-    });
-    await Promise.all(dueDocs.map((docSnap) => reconcileCrewGrowthEvent(docSnap.id, { allowReward: true }).catch((err) => {
-      console.warn("Crew growth event reconciliation failed", docSnap.id, err);
-    })));
+    const db = admin.firestore();
+
+    // V2: 인덱스 쿼리를 통해 검증 마감 시각이 도래한 크루만 타겟팅 (전체 스캔 제거)
+    const dueV2Snap = await db.collection("crews")
+      .where("status", "==", "approved")
+      .where("growthEventNextVerificationEndsAt", ">", Timestamp.fromMillis(0))
+      .where("growthEventNextVerificationEndsAt", "<=", Timestamp.fromMillis(nowMs))
+      .limit(50)
+      .get();
+
+    await Promise.all(dueV2Snap.docs.map((docSnap) => {
+      return crewGrowthService.reconcileCrewGrowthEventV2(db, docSnap.id, {
+        allowReward: true,
+        nowMs,
+        recordCrystalTransactionFn: recordCrystalTransaction,
+        FieldValue,
+        Timestamp,
+      }).catch((err) => {
+        console.warn("Crew growth V2 reconciliation failed", docSnap.id, err);
+      });
+    }));
+
     return null;
   });
 
@@ -13171,6 +13363,7 @@ exports.leaveStudyCrew = regionalFunctions.https.onCall(async (data, context) =>
       throw new functions.https.HttpsError("failed-precondition", "리더는 혼자 남았을 때만 탈퇴할 수 있습니다.");
     }
 
+    const growthLockSnap = await tx.get(crewGrowthService.getParticipantLockRef(db, uid));
     if (crewData.activeStudyRoomId) {
       const roomRef = db.collection("studyRooms").doc(crewData.activeStudyRoomId);
       const roomSnap = await tx.get(roomRef);
@@ -13193,6 +13386,7 @@ exports.leaveStudyCrew = regionalFunctions.https.onCall(async (data, context) =>
         tx.set(mUserRef, buildClearedCrewUserFields(), { merge: true });
       });
 
+      await crewGrowthService.forfeitParticipantLock(db, tx, uid, crewId, "crew_dissolved", Date.now(), growthLockSnap);
       tx.delete(crewRef);
       if (nameRegistrySnap?.exists && nameRegistrySnap.data()?.crewId === crewId) {
         tx.delete(nameRegistryRef);
@@ -13216,6 +13410,7 @@ exports.leaveStudyCrew = regionalFunctions.https.onCall(async (data, context) =>
       updatedAt: nextCrewData.updatedAt,
     }, { merge: true });
     cleanup.nextCrewData = nextCrewData;
+    await crewGrowthService.forfeitParticipantLock(db, tx, uid, crewId, "member_left", Date.now(), growthLockSnap);
   });
 
   if (cleanup.deleteCrew) {
@@ -13231,8 +13426,8 @@ exports.leaveStudyCrew = regionalFunctions.https.onCall(async (data, context) =>
       ...cleanup.nextCrewData,
       updatedAt: new Date().toISOString(),
     });
-    await reconcileCrewGrowthEvent(crewId).catch((err) => {
-      console.warn("Crew growth event sync after member leave failed", crewId, err);
+    await crewGrowthService.reconcileCrewGrowthEventV2(db, crewId).catch((err) => {
+      console.warn("Crew growth event V2 sync after member leave failed", crewId, err);
     });
   }
 
@@ -13252,3 +13447,40 @@ exports.adminSendFamilyBillingNotice = referralBilling.adminSendFamilyBillingNot
 exports.adminMarkBillingNoticeSent = referralBilling.adminMarkBillingNoticeSent;
 exports.prepareMonthlyFamilyBillingStatements = referralBilling.prepareMonthlyFamilyBillingStatements;
 exports.adminBroadcastParentAnnouncement = referralBilling.adminBroadcastParentAnnouncement;
+
+// Stellar Leaderboard pre-aggregation pipeline
+const { generateStellarLeaderboardData } = require("./stellarLeaderboardService.cjs");
+
+async function rebuildStellarLeaderboard() {
+  const db = admin.firestore();
+  const payload = await generateStellarLeaderboardData(db, {
+    getKSTDateString,
+    getKSTWeekMondayString,
+  });
+  await db.collection("stellarLeaderboard").doc("latest").set(payload);
+  return payload;
+}
+
+exports.aggregateStellarLeaderboardScheduled = regionalFunctions.pubsub
+  .schedule("every 10 minutes")
+  .timeZone("Asia/Seoul")
+  .onRun(async () => {
+    try {
+      await rebuildStellarLeaderboard();
+      console.log("[stellarLeaderboard] Scheduled leaderboard aggregation completed.");
+    } catch (err) {
+      console.error("[stellarLeaderboard] Scheduled leaderboard aggregation failed:", err);
+    }
+    return null;
+  });
+
+exports.refreshStellarLeaderboard = regionalFunctions.https.onCall(async () => {
+  try {
+    const payload = await rebuildStellarLeaderboard();
+    return { success: true, generatedAtMs: payload.generatedAtMs, totalPilots: payload.totalPilots };
+  } catch (err) {
+    console.error("[stellarLeaderboard] Manual refresh failed:", err);
+    throw new functions.https.HttpsError("internal", "Failed to refresh leaderboard");
+  }
+});
+

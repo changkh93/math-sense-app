@@ -8,6 +8,7 @@
     "build": "npm run test:frontier-audio-assets && vite build",
     "build:ext": "bash scripts/build-ext.sh",
     "lint": "eslint .",
+    "test:crew-growth": "node --test functions/crewGrowthEventPolicy.test.cjs functions/crewGrowthEventService.test.cjs functions/crewGuestTrial.test.cjs",
     "test:store-gift": "node scripts/validate-base-theme-catalog.mjs && node --test functions/storeGiftPolicy.test.cjs",
     "test:agora-badges": "node scripts/test-agora-badges.mjs",
     "backfill:agora-stats": "node scripts/backfill-agora-stats.mjs",

@@ -585,7 +585,7 @@ export default function PublicApplication({ fixedType }) {
                   <strong>추천 혜택 확인 <span className="referral-badge">4주 무료체험</span></strong>
                 </div>
                 <p className="referral-hint">
-                  <b>{referralPreview.inviterLabel}</b>님의 추천 링크가 확인되었습니다. 담당자와 시작일을 정해 4주 동안 체험할 수 있습니다. 체험 후 자동으로 유료 전환되거나 결제되지 않습니다.
+                  기존 수강생의 추천으로 특별히 4주 무료체험을 신청할 수 있습니다. 담당자와 시작일을 정하며, 체험 후 자동으로 유료 전환되거나 결제되지 않습니다.
                 </p>
               </div>
             )}

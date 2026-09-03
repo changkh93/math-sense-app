@@ -1,15 +1,15 @@
 import React, { useState, useEffect } from 'react'
 import { motion as Motion, AnimatePresence } from 'framer-motion'
 import { useNavigate } from 'react-router-dom'
-import { db, auth } from '../../firebase'
-import { collection, query, orderBy, limit, onSnapshot, getDocs, doc, runTransaction } from 'firebase/firestore'
+import { db } from '../../firebase'
+import { collection, query, orderBy, limit, getDocs, getDoc, doc, where, runTransaction } from 'firebase/firestore'
 import './SpaceRanking.css'
 import soundManager from '../../utils/SoundManager'
 import { Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer, Tooltip } from 'recharts'
 import CometBadge from './CometBadge'
 import CrewMothership from './CrewMothership'
 import ModularShip from './ModularShip'
-import { getEffectiveStreak, getTodayKST, getKSTComponents } from '../../utils/streakUtils'
+import { getEffectiveStreak, getTodayKST, getMondayKSTKey } from '../../utils/streakUtils'
 import { calculateSEI, FOCUS_MAX_SCORE, BATTLE_MAX_SCORE } from '../../utils/rankingUtils'
 import { HALL_OF_FAME_LOOKBACK_DAYS, HALL_SHOWCASE_DURATION_DAYS, getFrameSurfaceStyles, getQuestionAnonymousLabel, isHallSpotlightActive, isWithinLastDays } from '../../utils/socialUtils'
 import { getCrewMothershipLevel, getEquippedCrewModules } from '../../utils/crewMothershipCatalog'
@@ -44,8 +44,27 @@ function CrewLeaderboardVessel({ summary, crew, rank }) {
   )
 }
 
+const LEADERBOARD_SESSION_KEY = 'stellar_leaderboard_cache_v3';
+const LEADERBOARD_TTL_MS = 5 * 60 * 1000; // 5 minutes
+
+function assignDenseRanks(list, isTieFn) {
+  let currentRank = 1;
+  for (let i = 0; i < list.length; i++) {
+    if (i > 0) {
+      const prev = list[i - 1];
+      const curr = list[i];
+      const isTie = isTieFn(prev, curr);
+      if (!isTie) {
+        currentRank = i + 1;
+      }
+    }
+    list[i].displayRank = currentRank;
+  }
+}
+
 export default function SpaceRanking({ user, userData }) {
   const navigate = useNavigate()
+  const [leaderboardPayload, setLeaderboardPayload] = useState(null)
   const [topUsers, setTopUsers] = useState([])
   const [loading, setLoading] = useState(true)
   const [rankMode, setRankMode] = useState('sei') 
@@ -55,20 +74,6 @@ export default function SpaceRanking({ user, userData }) {
   const [rankingCrewsById, setRankingCrewsById] = useState({})
   const [hallOfFame, setHallOfFame] = useState({ bestAnswer: null, bestQuestion: null, growthStar: null })
   const [activatingShowcase, setActivatingShowcase] = useState(false)
-
-  useEffect(() => {
-    const unsubscribe = onSnapshot(collection(db, 'crews'), (snapshot) => {
-      const next = {}
-      snapshot.docs.forEach((crewDoc) => {
-        const crew = crewDoc.data() || {}
-        if (crew.status === 'approved') next[crewDoc.id] = { id: crewDoc.id, ...crew }
-      })
-      setRankingCrewsById(next)
-    }, (error) => {
-      console.warn('Crew mothership ranking sync failed:', error)
-    })
-    return () => unsubscribe()
-  }, [])
 
   const SEI_TIPS = {
     skill: {
@@ -101,238 +106,280 @@ export default function SpaceRanking({ user, userData }) {
     }
   };
 
+  // 1. Initial Load: Session Cache -> Server Pre-aggregated Doc (1 Read) -> Fallback Direct Query
   useEffect(() => {
-
-    setLoading(true);
     let isActive = true;
-    let unsubscribeSnapshot = null;
-    let cleanupTimeout = null;
 
-    const baseQuery = query(
-      collection(db, 'users'),
-      limit(500)
-    )
-
-    unsubscribeSnapshot = onSnapshot(baseQuery, async (snapshot) => {
-      const docMap = new Map(snapshot.docs.map((userDoc) => [userDoc.id, userDoc]));
-      if (rankMode === 'battle') {
-        try {
-          // orderBy('battleRating')는 해당 필드가 없는 문서를 제외한다.
-          // 기본 목록과 병합해 개발/초기 데이터에서도 미참전 사용자가 사라지지 않게 한다.
-          const battleSnap = await getDocs(query(
-            collection(db, 'users'),
-            orderBy('battleRating', 'desc'),
-            limit(500)
-          ));
-          battleSnap.docs.forEach((userDoc) => docMap.set(userDoc.id, userDoc));
-        } catch (error) {
-          console.warn('Battle ranking query failed; falling back to base users', error);
+    async function loadRankingData() {
+      // Step A: In-memory / SessionStorage Cache (0 Network Reads, 0ms)
+      try {
+        const cachedRaw = sessionStorage.getItem(LEADERBOARD_SESSION_KEY);
+        if (cachedRaw) {
+          const cached = JSON.parse(cachedRaw);
+          if (cached && (Date.now() - (cached.timestamp || 0) < LEADERBOARD_TTL_MS)) {
+            if (!isActive) return;
+            setLeaderboardPayload(cached.data);
+            setCrewLeaderboard(cached.data.crewLeaderboard || []);
+            setHallOfFame(cached.data.hallOfFame || { bestAnswer: null, bestQuestion: null, growthStar: null });
+            setLoading(false);
+            return;
+          }
         }
+      } catch {
+        // ignore storage errors
       }
-      if (!isActive) return;
 
-      const kstPart = getKSTComponents()
-      const todayKey = getTodayKST()
-      const mondayOffset = (kstPart.dayOfWeek + 6) % 7
-      const mondayDate = new Date()
-      mondayDate.setDate(mondayDate.getDate() - mondayOffset)
-      const mondayKey = getTodayKST(mondayDate)
+      setLoading(true);
 
-      const users = Array.from(docMap.values()).map(userDoc => {
-        const d = userDoc.data()
-        const streak = getEffectiveStreak(d) || 0;
-        const weeklyGain = d.weeklyGrowthMonday === mondayKey ? (d.weeklyGrowth || 0) : 0;
-        const dailyGain = d.dailyGrowthDate === todayKey ? (d.dailyGrowth || 0) : 0;
-        
-        // Calculate SEI & Tier
-        const seiData = calculateSEI(d, weeklyGain, streak);
-
-        return {
-          id: userDoc.id,
-          ...d,
-          streak,
-          dailyGain,
-          weeklyGain,
-          seiData,
-        }
-      }).filter(u => u.role !== 'admin' && u.role !== 'developer' && u.role !== 'teacher');
-
-      const growthLeaders = [...users].sort((a, b) => {
-        if ((b.weeklyGain || 0) !== (a.weeklyGain || 0)) return (b.weeklyGain || 0) - (a.weeklyGain || 0)
-        return (b.seiData?.total || 0) - (a.seiData?.total || 0)
-      })
-
-      const crewMap = new Map()
-      users.forEach(u => {
-        if (!u.crewId) return
-        const rankingCrew = rankingCrewsById[u.crewId]
-        const mothershipXP = Math.max(0, Number(rankingCrew?.mothershipXP || rankingCrew?.mothershipStats?.xp || 0))
-        const existing = crewMap.get(u.crewId) || {
-          crewId: u.crewId,
-          crewName: u.crewName || rankingCrew?.name || '이름 없는 크루',
-          crewColor: u.crewColor || rankingCrew?.color || '#00f3ff',
-          totalSEI: 0,
-          totalWeeklyGain: 0,
-          memberCount: 0,
-          mothershipXP,
-        }
-
-        existing.totalSEI += u.seiData?.total || 0
-        existing.totalWeeklyGain += u.weeklyGain || 0
-        existing.memberCount += 1
-        crewMap.set(u.crewId, existing)
-      })
-
-      const crewLeaders = Array.from(crewMap.values())
-        .sort((a, b) => {
-          const scoreA = a.totalWeeklyGain + (a.mothershipXP * 10)
-          const scoreB = b.totalWeeklyGain + (b.mothershipXP * 10)
-          if (scoreB !== scoreA) return scoreB - scoreA
-          return b.totalSEI - a.totalSEI
-        })
-        .slice(0, 3)
-
-      // Sort based on current rankMode
-      if (rankMode === 'sei') {
-        users.sort((a, b) => b.seiData.total - a.seiData.total)
-      } else if (rankMode === 'growth') {
-        users.sort((a, b) => {
-          if (b.weeklyGain !== a.weeklyGain) return b.weeklyGain - a.weeklyGain;
-          if (b.seiData.total !== a.seiData.total) return b.seiData.total - a.seiData.total;
-          return (b.crystals || 0) - (a.crystals || 0);
-        });
-      } else if (rankMode === 'streak') {
-        users.sort((a, b) => b.streak - a.streak)
-      } else if (rankMode === 'battle') {
-        users.sort((a, b) => {
-          // 배틀 경험이 없는 사용자는 항상 뒤로 보낸다. 실제 순위는 전적 수가 아니라
-          // battle SEI를 우선한다. battleRating이 아직 0인 과거/개발 데이터도 공정하게 정렬된다.
-          const aMatches = a.totalBattleMatches || 0;
-          const bMatches = b.totalBattleMatches || 0;
-          const aHasBattle = aMatches > 0;
-          const bHasBattle = bMatches > 0;
-          if (aHasBattle !== bHasBattle) return bHasBattle ? 1 : -1;
-          if ((b.seiData?.battleCompetitive || 0) !== (a.seiData?.battleCompetitive || 0)) return (b.seiData?.battleCompetitive || 0) - (a.seiData?.battleCompetitive || 0);
-          const aRating = a.seiData?.battleData?.battleRating || 0;
-          const bRating = b.seiData?.battleData?.battleRating || 0;
-          if (bRating !== aRating) return bRating - aRating;
-          const aWinRate = aMatches > 0 ? (a.totalBattleWins || 0) / aMatches : 0;
-          const bWinRate = bMatches > 0 ? (b.totalBattleWins || 0) / bMatches : 0;
-          if (bWinRate !== aWinRate) return bWinRate - aWinRate;
-          if (bMatches !== aMatches) return bMatches - aMatches;
-          return (b.seiData?.total || 0) - (a.seiData?.total || 0);
-        });
-      }
-      
-      // 4. Dense Ranking 처리
-      let currentRank = 1;
-      for (let i = 0; i < users.length; i++) {
-        if (i > 0) {
-          const prev = users[i - 1];
-          const curr = users[i];
-          let isTie = false;
-
-          if (rankMode === 'sei') {
-            isTie = prev.seiData.total === curr.seiData.total;
-          } else if (rankMode === 'growth') {
-            isTie = prev.weeklyGain === curr.weeklyGain &&
-                    prev.seiData.total === curr.seiData.total &&
-                    (prev.crystals || 0) === (curr.crystals || 0);
-          } else if (rankMode === 'streak') {
-            isTie = prev.streak === curr.streak;
-          } else if (rankMode === 'battle') {
-            // 배틀 미참전자끼리는 동점으로 묶는다.
-            const prevMatches = prev.totalBattleMatches || 0;
-            const currMatches = curr.totalBattleMatches || 0;
-            if (prevMatches === 0 && currMatches === 0) {
-              isTie = true;
-            } else {
-              const prevWinRate = prevMatches > 0 ? (prev.totalBattleWins || 0) / prevMatches : 0;
-              const currWinRate = currMatches > 0 ? (curr.totalBattleWins || 0) / currMatches : 0;
-              isTie = (prev.seiData?.battleCompetitive || 0) === (curr.seiData?.battleCompetitive || 0) &&
-                      (prev.seiData?.battleData?.battleRating || 0) === (curr.seiData?.battleData?.battleRating || 0) &&
-                      prevWinRate === currWinRate &&
-                      prevMatches === currMatches;
+      // Step B: Fetch Server Pre-aggregated Document (1 Read!)
+      try {
+        const snap = await getDoc(doc(db, 'stellarLeaderboard', 'latest'));
+        if (snap.exists()) {
+          const data = snap.data();
+          // Fresh within 2 hours
+          if (data && (Date.now() - (data.generatedAtMs || 0) < 2 * 60 * 60 * 1000)) {
+            if (!isActive) return;
+            setLeaderboardPayload(data);
+            setCrewLeaderboard(data.crewLeaderboard || []);
+            setHallOfFame(data.hallOfFame || { bestAnswer: null, bestQuestion: null, growthStar: null });
+            try {
+              sessionStorage.setItem(LEADERBOARD_SESSION_KEY, JSON.stringify({ timestamp: Date.now(), data }));
+            } catch {
+              // ignore session storage error
             }
-          }
-
-          if (!isTie) {
-            currentRank = i + 1;
+            setLoading(false);
+            return;
           }
         }
-        users[i].displayRank = currentRank;
+      } catch (err) {
+        console.warn('Pre-aggregated stellar leaderboard fetch failed, falling back to client query:', err);
       }
 
-      setTopUsers(users.slice(0, 100))
-      setCrewLeaderboard(crewLeaders)
-      setHallOfFame(prev => ({ ...prev, growthStar: growthLeaders[0] || null }))
-      setLoading(false)
-    }, (error) => {
-      if (!isActive) return;
-      console.error("❌ SpaceRanking: Firestore error:", error)
-      setLoading(false)
-    })
+      // Step C: Fallback Optimized Direct Query (limit 500, single one-shot getDocs)
+      try {
+        const [usersSnap, crewsSnap] = await Promise.all([
+          getDocs(query(collection(db, 'users'), limit(500))),
+          getDocs(query(collection(db, 'crews'), where('status', '==', 'approved'), limit(30))),
+        ]);
+
+        if (!isActive) return;
+
+        const crewsById = {};
+        crewsSnap.docs.forEach((cDoc) => {
+          crewsById[cDoc.id] = { id: cDoc.id, ...cDoc.data() };
+        });
+        setRankingCrewsById(crewsById);
+
+        const todayKey = getTodayKST();
+        const mondayKey = getMondayKSTKey();
+
+        const parsedUsers = usersSnap.docs
+          .map((userDoc) => {
+            const d = userDoc.data() || {};
+            const streak = getEffectiveStreak(d) || 0;
+            const weeklyGain = d.weeklyGrowthMonday === mondayKey ? (d.weeklyGrowth || 0) : 0;
+            const dailyGain = d.dailyGrowthDate === todayKey ? (d.dailyGrowth || 0) : 0;
+            const seiData = calculateSEI(d, weeklyGain, streak);
+            return {
+              id: userDoc.id,
+              ...d,
+              streak,
+              dailyGain,
+              weeklyGain,
+              seiData,
+            };
+          })
+          .filter((u) => u.role !== 'admin' && u.role !== 'developer' && u.role !== 'teacher');
+
+        // 1. SEI
+        const topSei = [...parsedUsers]
+          .sort((a, b) => b.seiData.total - a.seiData.total)
+          .map((u) => ({ ...u }));
+        assignDenseRanks(topSei, (p, c) => p.seiData.total === c.seiData.total);
+
+        // 2. Growth
+        const topGrowth = [...parsedUsers]
+          .sort((a, b) => {
+            if (b.weeklyGain !== a.weeklyGain) return b.weeklyGain - a.weeklyGain;
+            if (b.seiData.total !== a.seiData.total) return b.seiData.total - a.seiData.total;
+            return (b.crystals || 0) - (a.crystals || 0);
+          })
+          .map((u) => ({ ...u }));
+        assignDenseRanks(topGrowth, (p, c) => (
+          p.weeklyGain === c.weeklyGain &&
+          p.seiData.total === c.seiData.total &&
+          (p.crystals || 0) === (c.crystals || 0)
+        ));
+
+        // 3. Streak
+        const topStreak = [...parsedUsers]
+          .sort((a, b) => b.streak - a.streak)
+          .map((u) => ({ ...u }));
+        assignDenseRanks(topStreak, (p, c) => p.streak === c.streak);
+
+        // 4. Battle
+        const topBattle = [...parsedUsers]
+          .sort((a, b) => {
+            const aMatches = a.totalBattleMatches || 0;
+            const bMatches = b.totalBattleMatches || 0;
+            const aHasBattle = aMatches > 0;
+            const bHasBattle = bMatches > 0;
+            if (aHasBattle !== bHasBattle) return bHasBattle ? 1 : -1;
+            if ((b.seiData?.battleCompetitive || 0) !== (a.seiData?.battleCompetitive || 0)) {
+              return (b.seiData?.battleCompetitive || 0) - (a.seiData?.battleCompetitive || 0);
+            }
+            const aRating = a.seiData?.battleData?.battleRating || 0;
+            const bRating = b.seiData?.battleData?.battleRating || 0;
+            if (bRating !== aRating) return bRating - aRating;
+            const aWinRate = aMatches > 0 ? (a.totalBattleWins || 0) / aMatches : 0;
+            const bWinRate = bMatches > 0 ? (b.totalBattleWins || 0) / bMatches : 0;
+            if (bWinRate !== aWinRate) return bWinRate - aWinRate;
+            if (bMatches !== aMatches) return bMatches - aMatches;
+            return (b.seiData?.total || 0) - (a.seiData?.total || 0);
+          })
+          .map((u) => ({ ...u }));
+        assignDenseRanks(topBattle, (p, c) => {
+          const prevMatches = p.totalBattleMatches || 0;
+          const currMatches = c.totalBattleMatches || 0;
+          if (prevMatches === 0 && currMatches === 0) return true;
+          const prevWinRate = prevMatches > 0 ? (p.totalBattleWins || 0) / prevMatches : 0;
+          const currWinRate = currMatches > 0 ? (c.totalBattleWins || 0) / currMatches : 0;
+          return (
+            (p.seiData?.battleCompetitive || 0) === (c.seiData?.battleCompetitive || 0) &&
+            (p.seiData?.battleData?.battleRating || 0) === (c.seiData?.battleData?.battleRating || 0) &&
+            prevWinRate === currWinRate &&
+            prevMatches === currMatches
+          );
+        });
+
+        // 5. Crew Map
+        const crewMap = new Map();
+        parsedUsers.forEach((u) => {
+          if (!u.crewId) return;
+          const rankingCrew = crewsById[u.crewId];
+          const mothershipXP = Math.max(0, Number(rankingCrew?.mothershipXP || rankingCrew?.mothershipStats?.xp || 0));
+          const existing = crewMap.get(u.crewId) || {
+            crewId: u.crewId,
+            crewName: u.crewName || rankingCrew?.name || '이름 없는 크루',
+            crewColor: u.crewColor || rankingCrew?.color || '#00f3ff',
+            totalSEI: 0,
+            totalWeeklyGain: 0,
+            memberCount: 0,
+            mothershipXP,
+          };
+          existing.totalSEI += u.seiData?.total || 0;
+          existing.totalWeeklyGain += u.weeklyGain || 0;
+          existing.memberCount += 1;
+          crewMap.set(u.crewId, existing);
+        });
+
+        const crewLeaders = Array.from(crewMap.values())
+          .sort((a, b) => {
+            const scoreA = a.totalWeeklyGain + (a.mothershipXP * 10);
+            const scoreB = b.totalWeeklyGain + (b.mothershipXP * 10);
+            if (scoreB !== scoreA) return scoreB - scoreA;
+            return b.totalSEI - a.totalSEI;
+          })
+          .slice(0, 3);
+
+        const fallbackPayload = {
+          topSei: topSei.slice(0, 100),
+          topGrowth: topGrowth.slice(0, 100),
+          topStreak: topStreak.slice(0, 100),
+          topBattle: topBattle.slice(0, 100),
+          crewLeaderboard: crewLeaders,
+          hallOfFame: {
+            bestAnswer: null,
+            bestQuestion: null,
+            growthStar: topGrowth[0] || null,
+          },
+        };
+
+        setLeaderboardPayload(fallbackPayload);
+        setCrewLeaderboard(crewLeaders);
+        setHallOfFame((prev) => ({ ...prev, growthStar: topGrowth[0] || null }));
+
+        try {
+          sessionStorage.setItem(LEADERBOARD_SESSION_KEY, JSON.stringify({ timestamp: Date.now(), data: fallbackPayload }));
+        } catch {
+          // ignore session storage error
+        }
+      } catch (error) {
+        console.error('❌ SpaceRanking: Firestore fallback query error:', error);
+      } finally {
+        if (isActive) setLoading(false);
+      }
+    }
+
+    loadRankingData();
 
     return () => {
       isActive = false;
-      if (cleanupTimeout) clearTimeout(cleanupTimeout);
-      if (unsubscribeSnapshot) {
-        if (!auth.currentUser) {
-           unsubscribeSnapshot();
-        } else {
-           cleanupTimeout = setTimeout(() => {
-             if (unsubscribeSnapshot) unsubscribeSnapshot();
-           }, 100);
-        }
-      }
     };
-  }, [rankMode])
+  }, []);
 
+  // 2. Instant tab switching (0 Network Reads, 0ms)
   useEffect(() => {
-    let isMounted = true
+    if (!leaderboardPayload) return;
+    let list = [];
+    if (rankMode === 'sei') list = leaderboardPayload.topSei || [];
+    else if (rankMode === 'growth') list = leaderboardPayload.topGrowth || [];
+    else if (rankMode === 'streak') list = leaderboardPayload.topStreak || [];
+    else if (rankMode === 'battle') list = leaderboardPayload.topBattle || [];
+    setTopUsers(list);
+  }, [rankMode, leaderboardPayload]);
+
+  // 3. Hall of Fame secondary load (only if not already provided by pre-aggregated payload)
+  useEffect(() => {
+    if (hallOfFame.bestQuestion && hallOfFame.bestAnswer) return;
+    let isMounted = true;
 
     const loadHallOfFame = async () => {
       try {
         const [questionSnap, answerSnap] = await Promise.all([
-          getDocs(query(collection(db, 'questions'), orderBy('createdAt', 'desc'), limit(80))),
-          getDocs(query(collection(db, 'answers'), orderBy('createdAt', 'desc'), limit(120)))
-        ])
+          getDocs(query(collection(db, 'questions'), orderBy('createdAt', 'desc'), limit(15))),
+          getDocs(query(collection(db, 'answers'), orderBy('createdAt', 'desc'), limit(25))),
+        ]);
 
         const questions = questionSnap.docs
-          .map(doc => ({ id: doc.id, ...doc.data() }))
-          .filter(item => isWithinLastDays(item.createdAt, HALL_OF_FAME_LOOKBACK_DAYS))
+          .map((doc) => ({ id: doc.id, ...doc.data() }))
+          .filter((item) => isWithinLastDays(item.createdAt, HALL_OF_FAME_LOOKBACK_DAYS));
 
         const answers = answerSnap.docs
-          .map(doc => ({ id: doc.id, ...doc.data() }))
-          .filter(item => isWithinLastDays(item.createdAt, HALL_OF_FAME_LOOKBACK_DAYS))
+          .map((doc) => ({ id: doc.id, ...doc.data() }))
+          .filter((item) => isWithinLastDays(item.createdAt, HALL_OF_FAME_LOOKBACK_DAYS));
 
         const bestQuestion = [...questions].sort((a, b) => {
-          const aScore = (a.upvotes || 0) * 3 + (a.answerCount || 0) * 2 + Math.floor((a.bountyAmount || 0) / 10)
-          const bScore = (b.upvotes || 0) * 3 + (b.answerCount || 0) * 2 + Math.floor((b.bountyAmount || 0) / 10)
-          return bScore - aScore
-        })[0] || null
+          const aScore = (a.upvotes || 0) * 3 + (a.answerCount || 0) * 2 + Math.floor((a.bountyAmount || 0) / 10);
+          const bScore = (b.upvotes || 0) * 3 + (b.answerCount || 0) * 2 + Math.floor((b.bountyAmount || 0) / 10);
+          return bScore - aScore;
+        })[0] || null;
 
         const bestAnswer = [...answers]
           .filter((answer) => answer?.isTeacher !== true && answer?.userId !== 'admin')
           .sort((a, b) => {
-          const aScore = (a.isAccepted ? 18 : 0) + (a.isVerified ? 10 : 0) + Math.min((a.content || '').length, 400) / 20
-          const bScore = (b.isAccepted ? 18 : 0) + (b.isVerified ? 10 : 0) + Math.min((b.content || '').length, 400) / 20
-          return bScore - aScore
-          })[0] || null
+            const aScore = (a.isAccepted ? 18 : 0) + (a.isVerified ? 10 : 0) + Math.min((a.content || '').length, 400) / 20;
+            const bScore = (b.isAccepted ? 18 : 0) + (b.isVerified ? 10 : 0) + Math.min((b.content || '').length, 400) / 20;
+            return bScore - aScore;
+          })[0] || null;
 
         if (isMounted) {
-          setHallOfFame(prev => ({ ...prev, bestQuestion, bestAnswer }))
+          setHallOfFame((prev) => ({
+            ...prev,
+            bestQuestion: prev.bestQuestion || bestQuestion,
+            bestAnswer: prev.bestAnswer || bestAnswer,
+          }));
         }
       } catch (error) {
-        console.error('Failed to load hall of fame:', error)
+        console.error('Failed to load hall of fame:', error);
       }
-    }
+    };
 
-    loadHallOfFame()
+    loadHallOfFame();
     return () => {
-      isMounted = false
-    }
-  }, [])
+      isMounted = false;
+    };
+  }, [hallOfFame.bestQuestion, hallOfFame.bestAnswer]);
 
   const handleActivateShowcase = async () => {
     if (!user?.uid || activatingShowcase || (userData?.hallShowcaseCredits || 0) < 1) return
@@ -643,7 +690,7 @@ export default function SpaceRanking({ user, userData }) {
                   topUsers.map((u) => {
                     const isMe = u.id === user?.uid
                     const isExpanded = inspectUserId === u.id
-                    const growth = rankMode === 'growth' ? (u.weeklyGain || 0) : (u.dailyGain || 0);
+                    const growth = u.weeklyGain || 0;
                     const tier = u.seiData?.tier || { name: '브론즈 파일럿', color: '#cd7f32', icon: '🚀' };
                     const isPodium = (u.displayRank || 0) <= 3;
                     const hasCustomFrame = u.selectedProfileFrame === 'nebula' || u.selectedProfileFrame === 'solar';
@@ -895,17 +942,17 @@ export default function SpaceRanking({ user, userData }) {
                               alignItems: 'flex-end'
                             }}>
                               <span
-                                title={growth === 0 && rankMode === 'growth' ? "첫 광석을 채집하고 이번 주 첫 번째 급상승 주인공이 되세요!" : ""}
+                                title={growth === 0 ? (rankMode === 'growth' ? "첫 광석을 채집하고 이번 주 첫 번째 급상승 주인공이 되세요!" : "이번 주 아직 채집한 광석이 없습니다.") : `이번 주 획득 광석: +${growth.toLocaleString()}개`}
                                 style={{
                                 color: growth > 0 ? 'var(--planet-green)' : growth < 0 ? '#ff4d4d' : 'rgba(255,255,255,0.4)',
                                 fontWeight: 800,
                                 fontSize: '0.9rem',
-                                cursor: growth === 0 && rankMode === 'growth' ? 'help' : 'default'
+                                cursor: growth === 0 ? 'help' : 'default'
                               }}>
-                                {growth > 0 ? `▲ ${growth}` : growth < 0 ? `▼ ${Math.abs(growth)}` : '─'}
+                                {growth > 0 ? `▲ ${growth.toLocaleString()}` : growth < 0 ? `▼ ${Math.abs(growth).toLocaleString()}` : '─'}
                               </span>
                               <span style={{ fontSize: '0.6rem', color: 'rgba(255,255,255,0.3)', marginTop: '2px' }}>
-                                {rankMode === 'growth' ? 'WEEKLY' : 'GROWTH'}
+                                WEEKLY
                               </span>
                             </div>
                           </>

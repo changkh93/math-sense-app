@@ -71,6 +71,8 @@ export default function CrewGrowthRewardExperience({
     ? Math.min(100, Math.max(0, ((nowMs - achievedAtMs) / (verificationEndsAtMs - achievedAtMs)) * 100))
     : rewarded ? 100 : 0;
 
+  const targetTierId = progress?.tierId || 't20';
+
   const loadCelebration = useCallback(async ({ autoOpen = false } = {}) => {
     if (isGuest) return null;
     try {
@@ -108,7 +110,7 @@ export default function CrewGrowthRewardExperience({
 
   useEffect(() => {
     loadCelebration({ autoOpen: true });
-  }, [loadCelebration, rewarded]);
+  }, [loadCelebration, rewarded, targetTierId]);
 
   const openSupply = async () => {
     if (action) return;
@@ -121,7 +123,7 @@ export default function CrewGrowthRewardExperience({
     setMessage('');
     try {
       const fn = httpsCallable(functions, 'openCrewGrowthRewardCelebration');
-      const result = await fn({});
+      const result = await fn({ tierId: celebration?.tierId || targetTierId });
       const next = result.data || celebration;
       setCelebration(next);
       setRevealed(true);
@@ -140,7 +142,7 @@ export default function CrewGrowthRewardExperience({
     setMessage('');
     try {
       const fn = httpsCallable(functions, 'reactCrewGrowthRewardCelebration');
-      const result = await fn({ reaction });
+      const result = await fn({ reaction, tierId: celebration?.tierId || targetTierId });
       setCelebration(result.data || celebration);
       await refreshProgress();
       setMessage('크루 항해 기록에 마음을 남겼습니다.');
@@ -170,10 +172,10 @@ export default function CrewGrowthRewardExperience({
           <div className="crew-growth-voyage__heading">
             <div className="crew-growth-voyage__icon">{rewarded ? <Gift size={22} /> : <Rocket size={22} />}</div>
             <div>
-              <span className="font-tech">{rewarded ? 'SUPPLY SHIP · ARRIVED' : finalApproach ? 'FINAL APPROACH' : 'CREW 20 · VERIFICATION FLIGHT'}</span>
-              <strong className="font-title">{rewarded ? 'CREW 20 보급선 도착 완료' : awaitingSupply ? '검증 완료 · 보급품 적재 중' : '48시간 항해 카운트다운'}</strong>
+              <span className="font-tech">{rewarded ? 'SUPPLY SHIP · ARRIVED' : finalApproach ? 'FINAL APPROACH' : `${progress?.target === 40 ? 'CREW 40' : 'CREW 20'} · VERIFICATION FLIGHT`}</span>
+              <strong className="font-title">{rewarded ? `${progress?.target === 40 ? 'CREW 40' : 'CREW 20'} 보급선 도착 완료` : awaitingSupply ? '검증 완료 · 보급품 적재 중' : '48시간 항해 카운트다운'}</strong>
             </div>
-            <div className="crew-growth-voyage__roster font-tech"><ShieldCheck size={14} /> 고정 승무원 {progress?.snapshotRetainedCount || 0} / {progress?.snapshotEligibleCount || 20}</div>
+            <div className="crew-growth-voyage__roster font-tech"><ShieldCheck size={14} /> 고정 승무원 {progress?.snapshotRetainedCount || 0} / {progress?.snapshotEligibleCount || progress?.target || 20}</div>
           </div>
 
           {!rewarded && !awaitingSupply && (
@@ -235,7 +237,7 @@ export default function CrewGrowthRewardExperience({
               {!revealed ? (
                 <>
                   <div className="crew-growth-ceremony__chest"><Gift size={62} /><Sparkles size={22} /></div>
-                  <h3 className="font-title">20명의 항해가 하나의 빛이 되었습니다</h3>
+                  <h3 className="font-title">{celebration.target || 20}명의 항해가 하나의 빛이 되었습니다</h3>
                   <p>48시간 동안 자리를 지킨 승무원에게 보급 상자가 도착했습니다. 광석은 이미 계정에 안전하게 지급되어 있습니다.</p>
                   <button type="button" className="crew-growth-ceremony__open font-tech" onClick={openSupply} disabled={!!action}>
                     {action === 'open' ? <Loader2 size={18} className="crew-spin" /> : <Gift size={18} />} CREW 보급 상자 개봉
@@ -244,10 +246,10 @@ export default function CrewGrowthRewardExperience({
               ) : (
                 <>
                   <Motion.div className="crew-growth-ceremony__gem" initial={{ scale: 0.35, rotate: -18 }} animate={{ scale: [0.35, 1.18, 1], rotate: 0 }}>
-                    <Gem size={42} /><strong>+{celebration.amount || 1000}</strong><span className="font-tech">광석</span>
+                    <Gem size={42} /><strong>+{celebration.amount || (celebration.target === 40 ? 4000 : 1000)}</strong><span className="font-tech">광석</span>
                   </Motion.div>
-                  <h3 className="font-title">CREW 20 항해 성공!</h3>
-                  <p>{celebration.rewardedMemberCount || 20}명의 승무원이 함께 만든 기록입니다. 이 순간은 크루 항해 기록에 영구 보존됩니다.</p>
+                  <h3 className="font-title">{celebration.target === 40 ? 'CREW 40' : 'CREW 20'} 항해 성공!</h3>
+                  <p>{celebration.rewardedMemberCount || celebration.target || 20}명의 승무원이 함께 만든 기록입니다. 이 순간은 크루 항해 기록에 영구 보존됩니다.</p>
                   <div className="crew-growth-ceremony__reaction-title font-tech">우리 크루에게 마음 보내기</div>
                   <div className="crew-growth-ceremony__reactions">
                     {REACTIONS.map((item) => (

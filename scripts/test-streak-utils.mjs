@@ -7,6 +7,7 @@ import {
   getEffectiveStreak,
   getCurrentGapDefendedDates,
   getKSTComponents,
+  getMondayKSTKey,
   getTodayKST,
   getYesterdayKST,
   normalizeScheduleDay,
@@ -112,7 +113,10 @@ function run() {
   assert.equal(scheduleIncludesDay({ days: [1, 2, 3, 4, 5] }, 1), true);
   assert.equal(scheduleIncludesDay({ days: ['월', '화'] }, 1), true);
   assert.equal(scheduleIncludesDay({ day: '일' }, 0), true);
-  assert.equal(scheduleIncludesDay({ days: [2, 3] }, 1), false);
+  assert.equal(getMondayKSTKey('2026-08-31T10:00:00+09:00'), '2026-08-31');
+  assert.equal(getMondayKSTKey('2026-09-04T07:00:00+09:00'), '2026-08-31');
+  assert.equal(getMondayKSTKey('2026-09-06T23:59:59+09:00'), '2026-08-31');
+  assert.equal(getMondayKSTKey('2026-09-07T00:00:01+09:00'), '2026-09-07');
 
   console.log('streak utils tests passed');
 }

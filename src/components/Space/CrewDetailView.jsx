@@ -17,6 +17,7 @@ import CrewSettingsModal from './CrewSettingsModal';
 import CrewGuideModal from './CrewGuideModal';
 import CrewCrystalChest from './CrewCrystalChest';
 import CrewGrowthRewardExperience from './CrewGrowthRewardExperience';
+import CrewGuestTrialModal from './CrewGuestTrialModal';
 import StudyCrewDailyMission from './StudyCrewDailyMission';
 import ModularShip from './ModularShip';
 import { getActiveShipFamily, getShipGrade } from '../../utils/shipCatalog';
@@ -548,6 +549,7 @@ export default function CrewDetailView({ onBack }) {
   const [guestLogoutAction, setGuestLogoutAction] = useState('');
   const [showCrewInfo, setShowCrewInfo] = useState(false);
   const [guestInviteUrl, setGuestInviteUrl] = useState('');
+  const [trialModalOpen, setTrialModalOpen] = useState(false);
   const [guestInviteRequested, setGuestInviteRequested] = useState(false);
   const [growthEvent, setGrowthEvent] = useState(null);
   const effectiveMemberProfiles = memberProfiles;
@@ -640,8 +642,9 @@ export default function CrewDetailView({ onBack }) {
       }
     };
     load();
-    return () => { cancelled = true; };
-  }, [activeCrewSystem, activeGuestCount, crewId, crewMemberIds.length, user?.uid]);
+    const timerId = window.setInterval(() => { if (!document.hidden) load(); }, 60000);
+    return () => { cancelled = true; window.clearInterval(timerId); };
+  }, [activeCrewSystem, activeGuestCount, crewId, crewMemberIds.length, crew?.growthEventV2?.updatedAtMs, user?.uid]);
 
   useEffect(() => {
     if (!crewId || !guestAccessEnabled || isGuest || !user?.uid || !guestInviteRequested) {
@@ -684,11 +687,35 @@ export default function CrewDetailView({ onBack }) {
     }
   };
 
+  const getShareTemplate = () => {
+    return `🎁 우리 Study Crew에서 같이 공부하자!\n가입 없이 크루에 바로 들어올 수 있고, 원하면 학부모와 4주 무료체험도 신청할 수 있어.\n결제정보 등록이나 자동 유료 전환은 없어 🙂\n${guestInviteUrl}`;
+  };
+
+  const shareGuestInvite = async () => {
+    if (!guestInviteUrl) return;
+    const shareText = getShareTemplate();
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: `${crew?.name || '스터디 크루'} 친구 초대`,
+          text: shareText,
+          url: guestInviteUrl,
+        });
+        setGuestMessage('친구에게 초대장을 공유했습니다.');
+        return;
+      } catch (err) {
+        if (err.name === 'AbortError') return;
+      }
+    }
+    await copyGuestInvite();
+  };
+
   const copyGuestInvite = async () => {
     if (!guestInviteUrl) return;
+    const shareText = getShareTemplate();
     try {
-      await navigator.clipboard.writeText(guestInviteUrl);
-      setGuestMessage('게스트 초대 링크를 복사했습니다.');
+      await navigator.clipboard.writeText(shareText);
+      setGuestMessage('초대 메시지와 링크를 복사했습니다. 친구에게 전송해보세요!');
     } catch {
       setGuestMessage(guestInviteUrl);
     }
@@ -796,17 +823,42 @@ export default function CrewDetailView({ onBack }) {
 
   useEffect(() => {
     if (!isGuest || !crewId) return undefined;
-    const touchPresence = async () => {
+    let requestInFlight = false;
+    const touchPresence = async (pause = false) => {
+      const isVisible = document.visibilityState === 'visible';
+      const isFocused = typeof document.hasFocus === 'function' ? document.hasFocus() : true;
+      if (requestInFlight || (!pause && (!isVisible || !isFocused))) return;
+      requestInFlight = true;
       try {
         const fn = httpsCallable(functions, 'touchCrewGuestPresence');
-        await fn({ crewId });
+        await fn({
+          crewId,
+          isVisible,
+          isFocused,
+          heartbeatId: `hb_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+        });
       } catch (err) {
         console.warn('Failed to refresh guest presence:', err);
+      } finally {
+        requestInFlight = false;
       }
     };
     touchPresence();
-    const timerId = window.setInterval(touchPresence, 45000);
-    return () => window.clearInterval(timerId);
+    const timerId = window.setInterval(touchPresence, 60000);
+
+    const handleVisibility = () => {
+      touchPresence(true);
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+    window.addEventListener('focus', handleVisibility);
+    window.addEventListener('blur', handleVisibility);
+
+    return () => {
+      window.clearInterval(timerId);
+      document.removeEventListener('visibilitychange', handleVisibility);
+      window.removeEventListener('focus', handleVisibility);
+      window.removeEventListener('blur', handleVisibility);
+    };
   }, [crewId, isGuest]);
 
   useEffect(() => {
@@ -988,7 +1040,7 @@ export default function CrewDetailView({ onBack }) {
 
     const confirmMessage = isLeader
       ? '혼자 남은 리더가 탈퇴하면 크루가 삭제됩니다.\n정말 크루를 삭제할까요?'
-      : '정말 이 크루에서 탈퇴할까요?';
+      : '정말 이 크루에서 탈퇴할까요?\n\n⚠️ 주의: 크루 탈퇴 시 이번 성장 이벤트(CREW GROWTH MISSION)의 달성 인원 및 광석 보상 대상에서 영구 제외됩니다.';
     if (!window.confirm(confirmMessage)) return;
 
     setLeaveAction('leaving');
@@ -1024,6 +1076,7 @@ export default function CrewDetailView({ onBack }) {
 
   return (
     <div className="crew-bridge-shell">
+      {trialModalOpen && <CrewGuestTrialModal onClose={() => setTrialModalOpen(false)} />}
       <div className="crew-bridge-ambient" aria-hidden="true" />
       <button onClick={onBack} className="crew-bridge-back font-tech">
         <ArrowLeft size={15} /> 크루 목록
@@ -1299,13 +1352,13 @@ export default function CrewDetailView({ onBack }) {
 
         {isGuest && (
           <div className="crew-guest-strip font-tech">
-            <div><span>GUEST PASS</span> 친구와 4주 동안 함께 공부해 보세요 · 첫 입장 24시간 후 퀴즈 배틀 2회와 실제 답변 10문제를 완료하면 활동 게스트로 자동 집계됩니다. 탐사원·NOVA-7 대결 모두 인정됩니다.</div>
-            {userData?.referralTracked && userData?.referralToken && (
+            <div><span>GUEST PASS</span> 친구와 크루를 둘러보세요 · 30분 이상 간격으로 두 번 방문해 각 3분 이상, 총 10분 활동하면 이벤트 인원으로 인정됩니다. 퀴즈 배틀은 필수가 아니에요.</div>
+            {isGuest && (
               <button
                 type="button"
-                onClick={() => navigate(`/trial?ref=${encodeURIComponent(userData.referralToken)}`)}
+                onClick={() => setTrialModalOpen(true)}
               >
-                <Rocket size={13} /> 4주 무료체험 신청
+                <Rocket size={13} /> 무료체험 간편 신청
               </button>
             )}
             <button type="button" onClick={handleGuestLogout} disabled={!!guestLogoutAction}>
@@ -1343,14 +1396,18 @@ export default function CrewDetailView({ onBack }) {
       {status === 'approved' && !isGuest && (guestAccessEnabled || isLeader) && (
         <Motion.section initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="crew-guest-access-bar">
           <div className="crew-guest-access-label">
-            <span className="font-tech"><Share2 size={14} /> GUEST ACCESS</span>
-            <strong className="font-tech">{guestAccessEnabled ? '외부 승무원 초대 가능' : '게스트 초대 중지'}</strong>
-            {guestAccessEnabled && <small className="crew-guest-benefit-copy font-tech">링크로 초대된 친구는 학부모 확인 후 4주 무료체험을 신청할 수 있습니다.</small>}
+            <span className="font-tech"><Share2 size={14} /> GUEST PASS</span>
+            <strong className="font-tech">{guestAccessEnabled ? '🎁 친구 초대 · 추천 4주 무료체험' : '게스트 초대 중지'}</strong>
+            {guestAccessEnabled && <small className="crew-guest-benefit-copy font-tech">친구가 패스로 2회 참여하면 크루 성장 인원 +1! 학부모 확인 후 4주 무료체험도 신청 가능합니다.</small>}
           </div>
           {guestAccessEnabled && guestInviteUrl && (
-            <div className="crew-guest-share-link">
-              <span className="font-tech">{guestInviteUrl}</span>
-              <button type="button" className="font-tech" onClick={copyGuestInvite}><Copy size={13} /> 링크 복사</button>
+            <div className="crew-guest-share-link" style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+              <button type="button" className="font-tech space-btn cosmic-btn" onClick={shareGuestInvite} style={{ padding: '0.45rem 0.8rem', borderRadius: 8, fontSize: '0.82rem' }}>
+                <Share2 size={13} /> 친구 초대하기
+              </button>
+              <button type="button" className="font-tech" onClick={copyGuestInvite} style={{ padding: '0.45rem 0.8rem', borderRadius: 8, fontSize: '0.82rem' }}>
+                <Copy size={13} /> 문구+링크 복사
+              </button>
             </div>
           )}
           {guestAccessEnabled && !guestInviteUrl && (
@@ -1375,14 +1432,14 @@ export default function CrewDetailView({ onBack }) {
       {status === 'approved' && crewId && activeCrewSystem === 'event' && (
         <section className="crew-growth-status">
           <div className="crew-growth-status__head">
-            <div><span className="font-tech">CREW 20 EVENT</span><strong className="font-title">크루 구성 현황</strong></div>
-            <b className="font-tech">{growthEvent?.eligibleCount ?? '…'} / 20명</b>
+            <div><span className="font-tech">CREW GROWTH MISSION · V2</span><strong className="font-title">크루 성장 현황</strong></div>
+            <b className="font-tech">{growthEvent?.eligibleCount ?? '…'} / 40명 <span style={{ fontSize: '0.78rem', color: '#94a3b8' }}>(다음: {growthEvent?.target || 20}명)</span></b>
           </div>
           <div className="crew-growth-status__metrics">
             <div><span>정식 크루원</span><strong>{growthEvent?.memberCount ?? crewMemberIds.length}명</strong></div>
             <div><span>이벤트 대상 정회원</span><strong>{growthEvent?.eventEligibleMemberCount ?? growthEvent?.memberCount ?? crewMemberIds.length}명</strong></div>
             <div><span>활동 게스트</span><strong>{growthEvent?.activeGuestCount ?? 0}명</strong></div>
-            <div><span>참여 완료·재집계 제외</span><strong>{growthEvent?.eventCompletedMemberCount ?? 0}명</strong></div>
+            <div><span>이동·탈퇴 제외</span><strong>{growthEvent?.eventExcludedMemberCount ?? 0}명</strong></div>
             <div><span>체험·확인 중</span><strong>{growthEvent?.pendingGuestCount ?? activeGuestCount}명</strong></div>
             <div><span>현재 접속 게스트</span><strong>{activeGuestCount}명</strong></div>
           </div>
@@ -1418,11 +1475,12 @@ export default function CrewDetailView({ onBack }) {
             </button>
             {showGrowthRules && (
               <div className="crew-growth-rules-body" style={{ marginTop: '0.65rem', display: 'grid', gap: '0.35rem' }}>
-                <span>첫 입장 24시간 + 퀴즈 배틀 2회 + 실제 답변 10문제를 완료하면 자동 집계됩니다.</span>
-                <span>탐사원 대전과 NOVA-7 AI 대결을 모두 인정합니다. 동일 기기 중복은 자동 제외되며, 동일 IP의 단시간 다량 생성과 비정상 활동은 운영툴에서 사후 검토하여 로그인 정지·삭제할 수 있습니다.</span>
-                <span>20명 도달 순간의 명단이 48시간 고정됩니다. 중간에 새로 가입한 회원은 이탈자를 대신할 수 없으며, 인원이 부족해지면 검증이 다시 시작됩니다.</span>
-                <span>한 계정은 이벤트 전체에서 한 번만 달성 인원과 1,000광석 대상이 될 수 있습니다. 보상 후 다른 크루 가입은 가능하지만 이벤트에는 재집계되지 않습니다.</span>
-                {growthEvent?.currentUserEventCompleted && <span style={{ color: '#f0abfc' }}>내 계정은 이벤트 참여를 이미 완료해 현재 크루의 달성 인원에서 제외됩니다.</span>}
+                <span>30분 이상 간격으로 두 번 방문하고, 각 3분 이상·총 10분 화면을 보며 활동하면 자동 집계됩니다. 배틀은 필수가 아닙니다.</span>
+                <span>동일 기기 중복은 제외되며, 같은 IP의 단시간 다량 생성과 비정상 활동은 운영자가 검토합니다.</span>
+                <span>20명·40명 각각 도달 순간의 명단을 48시간 검증합니다. 새 회원은 고정 명단의 이탈자를 대신할 수 없습니다.</span>
+                <span>정회원은 최초 크루에 고정되고 48시간 후 집계됩니다. 탈퇴하면 같은 크루 재가입·다른 크루 이동 후에도 이번 캠페인의 인원과 보상에서 제외됩니다.</span>
+                <span>20명 달성 시 +1,000광석, 40명 달성 시 +4,000광석입니다. 첫 보상 이후 합류한 회원에게 1,000광석을 소급 지급하지 않습니다.</span>
+                {growthEvent?.currentUserEventCompleted && <span style={{ color: '#f0abfc' }}>내 계정은 크루 이동·탈퇴에 따른 이벤트 제외 상태입니다.</span>}
                 <span>멤버별 고유 링크는 1회용이 아닙니다. 같은 링크 하나로 여러 친구를 제한 없이 초대할 수 있으며, 친구마다 별도의 게스트 UID가 발급됩니다.</span>
               </div>
             )}

@@ -533,6 +533,14 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
+    match /crewGrowthParticipantLocks/{lockId} {
+      allow read, write: if false;
+    }
+
+    match /crewGrowthRewardClaims/{claimId} {
+      allow read, write: if false;
+    }
+
     match /studyCrewMissionPlans/{dateKey} {
       allow read: if isAuth();
       allow write: if false;
@@ -682,6 +690,11 @@ service cloud.firestore {
 
     match /leaderboardCaches/{cacheId} {
       allow read, write: if false;
+    }
+
+    match /stellarLeaderboard/{docId} {
+      allow read: if isAuth();
+      allow write: if false;
     }
 
     // Server-managed crystal gifting audit and daily limit documents.

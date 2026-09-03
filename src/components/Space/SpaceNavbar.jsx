@@ -13,6 +13,7 @@ import NotificationMenu from './NotificationMenu';
 import DirectMemoMenu from './DirectMemoMenu';
 import CometBadge from './CometBadge';
 import CrewMothership from './CrewMothership';
+import CrewGuestTrialModal from './CrewGuestTrialModal';
 import { getEffectiveStreak } from '../../utils/streakUtils';
 import { getCrewMothershipLevel } from '../../utils/crewMothershipCatalog';
 import './SpaceNavbar.css';
@@ -56,7 +57,6 @@ export default function SpaceNavbar({ currentView, onViewChange }) {
   const [isLiveMenuOpen, setIsLiveMenuOpen] = React.useState(false);
   const [isDeletingAccount, setIsDeletingAccount] = React.useState(false);
   const [isGuestSignupPromptOpen, setIsGuestSignupPromptOpen] = React.useState(false);
-  const [isStartingSignup, setIsStartingSignup] = React.useState(false);
   const [isBrandImageFailed, setIsBrandImageFailed] = React.useState(false);
   const [isProfileImageFailed, setIsProfileImageFailed] = React.useState(false);
   const [crewNavData, setCrewNavData] = React.useState(null);
@@ -67,16 +67,15 @@ export default function SpaceNavbar({ currentView, onViewChange }) {
   }, [user?.photoURL, userData?.photoURL, userData?.profileImageUrl, userData?.avatarUrl]);
 
   React.useEffect(() => {
-    if (!isLiveMenuOpen && !isGuestSignupPromptOpen) return undefined;
+    if (!isLiveMenuOpen) return undefined;
 
     const handleKeyDown = (event) => {
       if (event.key === 'Escape') setIsLiveMenuOpen(false);
-      if (event.key === 'Escape') setIsGuestSignupPromptOpen(false);
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isGuestSignupPromptOpen, isLiveMenuOpen]);
+  }, [isLiveMenuOpen]);
 
   React.useEffect(() => {
     if (!isCompactNavbar) {
@@ -121,30 +120,6 @@ export default function SpaceNavbar({ currentView, onViewChange }) {
     setIsProfileMenuOpen(false);
     setIsLiveMenuOpen(false);
     setIsGuestSignupPromptOpen(true);
-  };
-
-  const handleGuestSignup = async () => {
-    if (isStartingSignup) return;
-    soundManager.playClick();
-    setIsStartingSignup(true);
-    if (userData?.crewId) {
-      try {
-        const leaveGuestSession = httpsCallable(functions, 'leaveCrewGuestSession');
-        await leaveGuestSession({ crewId: userData.crewId });
-      } catch (error) {
-        console.warn('Failed to close guest presence before signup:', error);
-      }
-    }
-    try {
-      window.sessionStorage.removeItem('crewGuestSession');
-      await signOut(auth);
-    } catch (error) {
-      console.warn('Failed to close guest session before signup:', error);
-    } finally {
-      setIsGuestSignupPromptOpen(false);
-      setIsStartingSignup(false);
-      navigate('/signup');
-    }
   };
 
   const handleLogout = async () => {
@@ -623,48 +598,7 @@ export default function SpaceNavbar({ currentView, onViewChange }) {
       </div>
     </nav>
 
-      <AnimatePresence>
-        {isGuestSignupPromptOpen && (
-          <Motion.div
-            className="guest-signup-backdrop"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.18 }}
-            onClick={() => setIsGuestSignupPromptOpen(false)}
-          >
-            <Motion.div
-              className="guest-signup-modal hud-border"
-              role="alertdialog"
-              aria-modal="true"
-              aria-labelledby="guest-signup-title"
-              aria-describedby="guest-signup-description"
-              initial={{ opacity: 0, y: 18, scale: 0.96 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: 10, scale: 0.98 }}
-              transition={{ duration: 0.2 }}
-              onClick={(event) => event.stopPropagation()}
-            >
-              <span className="guest-signup-eyebrow font-tech">GUEST EXPERIENCE</span>
-              <h2 id="guest-signup-title" className="font-title">정식 회원가입이 필요한 메뉴예요</h2>
-              <p id="guest-signup-description">
-                메타센스 회원이 되면 학습 기록, 오답노트, 과제, 랭킹, 스토어와 아고라를 모두 이용할 수 있어요.
-              </p>
-              <div className="guest-signup-actions">
-                <button type="button" className="guest-signup-primary font-tech" onClick={handleGuestSignup} disabled={isStartingSignup}>
-                  {isStartingSignup ? '이동 중...' : '부모님 회원가입'}
-                </button>
-                <button type="button" className="guest-signup-secondary font-tech" onClick={() => setIsGuestSignupPromptOpen(false)} disabled={isStartingSignup}>
-                  계속 둘러보기
-                </button>
-              </div>
-              <button type="button" className="guest-session-logout font-tech" onClick={handleLogout} disabled={isStartingSignup}>
-                게스트 세션 종료 및 로그아웃
-              </button>
-            </Motion.div>
-          </Motion.div>
-        )}
-      </AnimatePresence>
+      {isGuestSignupPromptOpen && <CrewGuestTrialModal onClose={() => setIsGuestSignupPromptOpen(false)} />}
 
       <AnimatePresence>
         {isLiveMenuOpen && !isGuest && (

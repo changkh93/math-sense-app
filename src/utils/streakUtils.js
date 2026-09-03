@@ -101,6 +101,17 @@ export function shiftKSTDate(dateStr, dayOffset) {
 }
 
 /**
+ * KST 기준 이번 주 월요일 날짜를 YYYY-MM-DD 형식으로 반환 (브라우저 타임존 독립)
+ * @param {Date|number|string} [date] - 기준 날짜
+ */
+export function getMondayKSTKey(date = new Date()) {
+  const kstPart = getKSTComponents(date);
+  const todayKey = getTodayKST(date);
+  const mondayOffset = (kstPart.dayOfWeek + 6) % 7;
+  return shiftKSTDate(todayKey, -mondayOffset);
+}
+
+/**
  * 전 세계 어디서든 KST 기준의 시간 정보를 객체로 반환
  * @param {Date|number|string} [date] - 기준 날짜
  */

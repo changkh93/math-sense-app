@@ -4,7 +4,7 @@ import { useQueries } from '@tanstack/react-query'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { auth, googleProvider, db, functions } from '../../firebase'
 import { signInWithEmailAndPassword, signOut } from 'firebase/auth'
-import { collection, addDoc, serverTimestamp, query, orderBy, onSnapshot, doc, where, getDocs, getDoc, writeBatch, increment, limit, runTransaction, Timestamp, documentId, updateDoc } from 'firebase/firestore'
+import { collection, serverTimestamp, query, orderBy, onSnapshot, doc, where, getDocs, getDoc, writeBatch, increment, limit, runTransaction, Timestamp, updateDoc } from 'firebase/firestore'
 import { useClusters, useRegions, useRegion, useChapters, useChapter, useUnits, useUnit, useQuizzes } from '../../hooks/useContent'
 import { useAuth } from '../../hooks/useAuth'
 import { usePresence } from '../../hooks/usePresence'
@@ -34,7 +34,7 @@ import { useGlobalActiveRoomId } from '../../utils/roomState'
 import { useRecordAttendance, useStudentAttendance } from '../../hooks/useAssignments'
 
 // import { useParticles, createParticleBurst } from './ParticleEffects'
-import { buildStreakWriteAudit, calculateStreakUpdate, getTodayKST, getKSTComponents, calculateStreakFromHistory, extractDefendedDates, extractLearningActivityDates, isRadarActive } from '../../utils/streakUtils'
+import { buildStreakWriteAudit, calculateStreakUpdate, getTodayKST, getMondayKSTKey, calculateStreakFromHistory, extractDefendedDates, extractLearningActivityDates, isRadarActive } from '../../utils/streakUtils'
 import { recordCrystalTransaction } from '../../utils/crystalLedger'
 import { applyCrystalRewardMultiplier } from '../../utils/holidayUtils'
 import { calculateGrowthUpdates } from '../../utils/rankingUtils'
@@ -1001,7 +1001,7 @@ function SpaceHome() {
           maxFail: iqSnap.docs.reduce((max, d) => Math.max(max, d.data()?.failCount || 0), 0),
           causeStats
         })
-      } catch (e) { /* non-critical */ }
+      } catch { /* non-critical */ }
     }
     loadCount()
   }, [user, isRecheckDue])
@@ -2123,8 +2123,7 @@ function SpaceHome() {
           }
         }
         
-        if (actualCrystalsEarned > 0) {
-        } else {
+        if (actualCrystalsEarned <= 0) {
           actualCrystalsEarned = 0
         }
       } else {
@@ -2228,12 +2227,8 @@ function SpaceHome() {
         const dailyWorkbookCount = (lastWorkbookDate === today) ? (freshUserData.dailyWorkbookCount || 0) + 1 : 1
 
         // --- Direct Growth Counter ---
-        const kstPart = getKSTComponents()
         const todayKST = getTodayKST()
-        const mondayOffset = (kstPart.dayOfWeek + 6) % 7
-        const mondayDate = new Date()
-        mondayDate.setDate(mondayDate.getDate() - mondayOffset)
-        const mondayKST = getTodayKST(mondayDate)
+        const mondayKST = getMondayKSTKey()
 
         const growthUpdates = {}
         if (atomicCrystalsEarned > 0) {
@@ -2522,7 +2517,7 @@ function SpaceHome() {
         const updatedList = await fetchDarkMatterQuestions()
         setDarkMatterQuestions(updatedList)
         setDarkMatterCount(updatedList.length)
-      } catch (e) { /* non-critical */ }
+      } catch { /* non-critical */ }
 
       // Mastery Compensation removed duplicate check
 
@@ -3130,7 +3125,6 @@ function SpaceHome() {
       // Visual feedback
       // ONLY show the large completion modal for completion or data log rewards.
       // Interval rewards (영상 교신 수신) only show the Silent Toast in MissionHub.
-      const isIntervalActivity = activityType.includes('수신');
       const shouldShowModal = activityType.includes('완료') || isLogActivity;
 
       if (actualReward > 0 || shouldShowModal) {
@@ -3163,21 +3157,7 @@ function SpaceHome() {
     }
   }
 
-  const hasStartedRef = useRef(false)
-
   // No sound engine sync needed for typing anymore
-
-  // Animation Variants
-  const titleContainerVariants = {
-    hidden: { opacity: 0 },
-    visible: {
-      opacity: 1,
-      transition: {
-        staggerChildren: 0.08,
-        delayChildren: 0.5
-      }
-    }
-  }
 
   const letterVariants = {
     hidden: { opacity: 0, scale: 0, y: 0, filter: "blur(20px)" },

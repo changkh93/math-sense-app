@@ -141,12 +141,16 @@ export default function Applications() {
                     <span style={{ color: '#94a3b8', fontSize: '0.85rem' }}>{formatDate(app.createdAt)}</span>
                   </div>
                   <div style={{ color: '#fff', lineHeight: 1.7 }}>
-                    <strong>{app.applicantName}</strong> 학부모 · {formatPhone(app.parentPhone)}<br />
+                    <strong>{app.applicantRole === 'student' ? '학생 간편 신청 · 운영자 전화 확인 필요' : `${app.applicantName} 학부모`}</strong> · {formatPhone(app.parentPhone)}<br />
                     자녀: {app.studentName} ({app.grade}) · 과정: {app.selectedCourse || '-'}
                   </div>
                   {app.type === 'trial' && (
                     <div style={{ marginTop: 8, color: '#bbf7d0', fontSize: '0.92rem' }}>
-                      추천 수강생: {app.referredStudentName || '-'} · 추천인 전화: {formatPhone(app.referrerParentPhone)}
+                      {app.referralInviteId ? <>
+                        추천 혜택: {app.oneMonthReferralTrial ? '4주 무료체험' : '확인 필요'}<br />
+                        추천 학생 UID: {app.referrerStudentUid || '-'} · 추천 학부모 UID: {app.referrerParentUid || '-'}<br />
+                        초대 기록: {app.referralInviteId}
+                      </> : <>추천 수강생: {app.referredStudentName || '-'} · 추천인 전화: {formatPhone(app.referrerParentPhone)}</>}
                     </div>
                   )}
                   {(app.preferredTime || app.message) && (

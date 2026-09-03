@@ -1,0 +1,18 @@
+.crew-trial-backdrop { position: fixed; inset: 0; z-index: 12000; display: grid; place-items: center; padding: 20px; background: #020617bd; backdrop-filter: blur(10px); }
+.crew-trial-modal { position: relative; width: min(100%, 510px); max-height: calc(100dvh - 40px); overflow-y: auto; box-sizing: border-box; padding: 32px; border: 1px solid #22d3ee66; border-radius: 24px; background: linear-gradient(145deg,#103142,#0d1328 45%,#090e1e); color: #f8fafc; box-shadow: 0 24px 90px #0008; }
+.crew-trial-modal h2 { margin: 12px 0 20px; font-size: 1.5rem; line-height: 1.4; }
+.crew-trial-modal p { color: #b4c1d2; font-size: .9rem; line-height: 1.7; }
+.crew-trial-eyebrow { color: #22d3ee; font-size: .72rem; font-weight: 900; letter-spacing: 1.6px; }
+.crew-trial-close { position: absolute; top: 12px; right: 14px; width: 36px; height: 36px; border: 0; border-radius: 50%; background: #ffffff10; color: white; font-size: 24px; cursor: pointer; }
+.crew-trial-benefit { padding: 14px 16px; background: #10b98112; border: 1px solid #10b98155; border-radius: 12px; color: #a7f3d0; font-size: .9rem; line-height: 1.65; }
+.crew-trial-modal label { display: block; color: #d5deeb; font-size: .85rem; line-height: 1.6; }
+.crew-trial-fields { display: grid; grid-template-columns: 1fr 110px; gap: 12px; }
+.crew-trial-modal input:not([type=checkbox]), .crew-trial-modal select { width: 100%; box-sizing: border-box; min-height: 46px; margin: 7px 0 16px; padding: 11px 12px; border: 1px solid #ffffff30; border-radius: 10px; background: #182237; color: white; font: inherit; }
+.crew-trial-modal :focus-visible { outline: 2px solid #22d3ee; outline-offset: 3px; }
+.crew-trial-modal .crew-trial-privacy { text-align: center; font-size: .76rem; margin: 12px 0 0; }
+.crew-trial-privacy a { color: #94a3b8; }
+.crew-trial-modal .crew-trial-reassurance { text-align: center; color: #a7f3d0; font-size: .76rem; margin: 18px 0 10px; }
+.crew-trial-submit { width: 100%; min-height: 48px; padding: 12px; border: 0; border-radius: 12px; background: linear-gradient(110deg,#22d3ee,#8b5cf6); color: #061224; font-weight: 900; font-size: 1rem; cursor: pointer; }
+.crew-trial-submit:disabled { opacity: .5; cursor: wait; }
+.crew-trial-modal .crew-trial-error { color: #fca5a5; }
+@media(max-width: 480px) { .crew-trial-modal { padding: 26px 20px; } .crew-trial-backdrop { padding: 12px; } .crew-trial-modal h2 { font-size: 1.3rem; } }

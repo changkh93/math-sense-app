@@ -1,4 +1,4 @@
-import { getTodayKST, getKSTComponents } from './streakUtils.js';
+import { getTodayKST, getMondayKSTKey } from './streakUtils.js';
 
 export const FOCUS_MAX_SCORE = 600;
 export const FOCUS_WILSON_Z = 1.0;
@@ -220,12 +220,8 @@ export function calculateGrowthUpdates(userData, earnedAmount) {
   if (!earnedAmount || earnedAmount <= 0) return {};
   if (!userData) return {};
 
-  const kstPart = getKSTComponents();
   const todayKST = getTodayKST();
-  const mondayOffset = (kstPart.dayOfWeek + 6) % 7;
-  const mondayDate = new Date();
-  mondayDate.setDate(mondayDate.getDate() - mondayOffset);
-  const mondayKST = getTodayKST(mondayDate);
+  const mondayKST = getMondayKSTKey();
 
   const growthUpdates = {};
   

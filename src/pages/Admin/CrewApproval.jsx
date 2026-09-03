@@ -62,9 +62,16 @@ async function loadMemberProfiles(crews = []) {
         crewRole: data.crewRole || '',
         currentStreak: data.currentStreak || 0,
         lastStreakDate: data.lastStreakDate || '',
-        crewGrowthEvent2026RewardedAtMs: Number(data.crewGrowthEvent2026RewardedAtMs || data.crewGrowthEvent2026RewardedAt?.toMillis?.() || data.lastCrewGrowthRewardAt?.toMillis?.() || 0),
+        crewGrowthEvent2026RewardedAtMs: Number(
+          data.crewGrowthReward_t40_AtMs ||
+          data.crewGrowthReward_t20_AtMs ||
+          data.crewGrowthEvent2026RewardedAtMs ||
+          data.crewGrowthEvent2026RewardedAt?.toMillis?.() ||
+          data.lastCrewGrowthRewardAt?.toMillis?.() ||
+          0
+        ),
         crewGrowthEvent2026CrewId: data.crewGrowthEvent2026CrewId || '',
-        crewGrowthEvent2026CampaignId: data.crewGrowthEvent2026CampaignId || (data.lastCrewGrowthRewardAt ? 'crew_growth_20_2026' : ''),
+        crewGrowthEvent2026CampaignId: data.crewGrowthEvent2026CampaignId || (data.crewGrowthReward_t20_AtMs ? 'crew_growth_v2_2026' : (data.lastCrewGrowthRewardAt ? 'crew_growth_20_2026' : '')),
       });
     });
   }

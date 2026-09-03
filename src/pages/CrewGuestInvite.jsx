@@ -98,13 +98,16 @@ export default function CrewGuestInvite() {
         </header>
 
         <section style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 18, padding: 28, boxShadow: '0 24px 70px rgba(0,0,0,0.28)', textAlign: 'center' }}>
-          <div className="font-tech" style={{ color: '#86efac', fontWeight: 900, fontSize: '0.8rem', letterSpacing: 1, marginBottom: 14 }}>STUDY CREW · GUEST</div>
+          <div className="font-tech" style={{ color: '#86efac', fontWeight: 900, fontSize: '0.8rem', letterSpacing: 1.2, marginBottom: 14 }}>
+            STUDY CREW · GUEST PASS
+          </div>
           <div style={{ width: 64, height: 64, borderRadius: 16, background: crewColor, margin: '0 auto 16px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.8rem', fontWeight: 900, color: '#05111f' }}>
             {(crewName || '?').slice(0, 1)}
           </div>
-          <h1 style={{ margin: '0 0 8px', fontSize: '1.5rem' }}>{crewName}</h1>
-          <p style={{ margin: '0 0 20px', color: 'rgba(255,255,255,0.62)', lineHeight: 1.6, fontSize: '0.92rem' }}>
-            초대받은 스터디 크루의 대기룸과 집중방(Google Meet)을 회원가입 없이 체험할 수 있습니다.
+          <h1 style={{ margin: '0 0 8px', fontSize: '1.5rem', fontWeight: 800 }}>{crewName}</h1>
+          <p style={{ margin: '0 0 20px', color: 'rgba(255,255,255,0.78)', lineHeight: 1.6, fontSize: '0.94rem' }}>
+            친구와 함께 공부하는 스터디 크루에 초대되었습니다.<br />
+            회원가입 없이 대기룸과 집중방(Google Meet)에 바로 입장할 수 있어요.
           </p>
 
           {preview?.isOwnInviteTest && (
@@ -120,10 +123,14 @@ export default function CrewGuestInvite() {
             </div>
           )}
 
-          <div style={{ textAlign: 'left', background: 'rgba(0,0,0,0.18)', borderRadius: 12, padding: '14px 16px', marginBottom: 22, fontSize: '0.84rem', color: 'rgba(255,255,255,0.72)', lineHeight: 1.6 }}>
-            <div style={{ marginBottom: 6 }}>✓ 크루 대기룸과 집중방(Google Meet) 입장</div>
-            <div style={{ marginBottom: 6 }}>✓ 크루 멤버에게 포스트잇 메시지 작성</div>
-            <div>✗ 학습 기록·출석·광석·랭킹은 저장되지 않습니다</div>
+          <div style={{ textAlign: 'left', background: 'rgba(0,0,0,0.22)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 14, padding: '16px 18px', marginBottom: 22, fontSize: '0.86rem', color: 'rgba(255,255,255,0.85)', lineHeight: 1.7 }}>
+            <div style={{ fontWeight: 800, color: '#67e8f9', marginBottom: 6 }}>🛡️ 안심하고 체험하세요</div>
+            <div style={{ marginBottom: 5 }}>✓ <strong>신용카드·결제정보 등록 불필요</strong></div>
+            <div style={{ marginBottom: 5 }}>✓ <strong>체험 종료 후 자동 유료 전환 절대 없음</strong></div>
+            <div style={{ marginBottom: 5 }}>✓ <strong>크루 대기룸 및 집중방(Google Meet) 즉시 입장</strong></div>
+            <div style={{ color: 'rgba(255,255,255,0.55)', fontSize: '0.78rem', marginTop: 8, borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: 8 }}>
+              정규 학습(수학·파이썬) 4주 무료체험은 크루 입장 후 학부모 확인을 통해 별도 신청할 수 있습니다.
+            </div>
           </div>
 
           {message && (
@@ -137,7 +144,7 @@ export default function CrewGuestInvite() {
               disabled={phase === 'entering' || !preview?.guestsAdmitted}
               style={{ width: '100%', border: 'none', borderRadius: 13, padding: '15px 18px', background: (phase === 'entering' || !preview?.guestsAdmitted) ? 'rgba(0,212,255,0.35)' : 'linear-gradient(135deg, #00d4ff, #7c3aed)', color: 'white', fontWeight: 900, fontSize: '1.05rem', cursor: (phase === 'entering' || !preview?.guestsAdmitted) ? 'not-allowed' : 'pointer' }}
             >
-              {preview?.isOwnInviteTest ? '테스트 완료 · 내 크루로 돌아가기' : preview?.registeredUserActive ? '현재 계정으로 메타센스 돌아가기' : phase === 'entering' ? '입장 중...' : '게스트로 입장하기'}
+              {preview?.isOwnInviteTest ? '테스트 완료 · 내 크루로 돌아가기' : preview?.registeredUserActive ? '현재 계정으로 메타센스 돌아가기' : phase === 'entering' ? '입장 중...' : '선물 받은 패스로 크루 바로 입장하기'}
             </button>
           )}
 

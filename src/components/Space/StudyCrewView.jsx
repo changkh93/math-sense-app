@@ -1163,9 +1163,12 @@ export default function StudyCrewView({ onNavigateStore }) {
       }
     };
     load();
-    const timerId = window.setInterval(load, 60000);
-    return () => { cancelled = true; window.clearInterval(timerId); };
-  }, [crewId, user?.uid]);
+    // Member crewSnapshot is cached; poll only while the event is actually open.
+    const timerId = growthEventOpen ? window.setInterval(() => {
+      if (!document.hidden) load();
+    }, 60000) : null;
+    return () => { cancelled = true; if (timerId) window.clearInterval(timerId); };
+  }, [crewId, crew?.growthEventV2?.updatedAtMs, growthEventOpen, user?.uid]);
 
   // Guests are routed straight into the invited crew's waiting room.
   useEffect(() => {
@@ -1764,16 +1767,40 @@ export default function StudyCrewView({ onNavigateStore }) {
           >
             <div style={{ padding: isMobile ? '1.25rem' : '1.7rem 2rem', display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr auto', gap: '1.2rem', alignItems: 'center' }}>
               <div>
-                <div className="font-tech" style={{ color: '#67e8f9', fontWeight: 900, letterSpacing: 1.3, fontSize: '0.76rem' }}>CREW 20 · GROWTH EVENT</div>
-                <h3 className="font-title" style={{ margin: '0.45rem 0 0.55rem', fontSize: isMobile ? '1.45rem' : '2rem', color: 'white' }}>함께 20명을 채우면 정식 크루원 모두 1,000광석</h3>
-                <p className="font-tech" style={{ margin: 0, color: 'rgba(255,255,255,0.72)', lineHeight: 1.6, fontSize: '0.9rem' }}>
-                  정식 크루원과 활동을 완료한 게스트가 달성 인원에 함께 집계됩니다. 한 계정은 이벤트 전체에서 한 번만 달성 인원과 보상 대상이 될 수 있습니다.
+                <div className="font-tech" style={{ color: '#67e8f9', fontWeight: 900, letterSpacing: 1.3, fontSize: '0.76rem' }}>CREW GROWTH MISSION · V2</div>
+                <h3 className="font-title" style={{ margin: '0.45rem 0 0.55rem', fontSize: isMobile ? '1.4rem' : '1.85rem', color: 'white' }}>친구와 함께 공부하고 크루를 키워보세요 🚀</h3>
+                <p className="font-tech" style={{ margin: 0, color: 'rgba(255,255,255,0.78)', lineHeight: 1.6, fontSize: '0.9rem' }}>
+                  친구가 게스트 패스로 <strong>2회 함께 참여해 총 10분 활동</strong>하면 1명 인정!<br />
+                  <strong>20명 달성 시 +1,000광석</strong>, <strong>40명 달성 시 +4,000광석</strong>(누적 5,000광석)이 정회원 전원에게 지급됩니다.
                 </p>
               </div>
-              <div style={{ minWidth: isMobile ? 0 : 245 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', color: '#e9d5ff', fontWeight: 900, marginBottom: 7 }}><span>우리 크루</span><span>{growthEvent?.eligibleCount ?? (hasCrew ? '…' : 0)} / 20</span></div>
-                <div style={{ height: 10, borderRadius: 999, background: 'rgba(255,255,255,0.12)', overflow: 'hidden' }}><div style={{ width: `${Math.min(100, ((growthEvent?.eligibleCount || 0) / 20) * 100)}%`, height: '100%', background: 'linear-gradient(90deg,#22d3ee,#8b5cf6,#fbbf24)', transition: 'width .4s ease' }} /></div>
-                <div className="font-tech" style={{ color: growthEvent?.rewarded ? '#86efac' : 'rgba(255,255,255,0.58)', fontSize: '0.72rem', marginTop: 7 }}>{growthEvent?.rewarded ? '달성 확정 · 최초 자격 명단의 정식 크루원에게 1,000광석 지급 완료' : growthEvent?.verificationEndsAtMs ? `20명 달성 · 고정 명단 ${growthEvent.snapshotRetainedCount || 0}/${growthEvent.snapshotEligibleCount || 20}명 · ${new Intl.DateTimeFormat('ko-KR', { dateStyle: 'short', timeStyle: 'short' }).format(new Date(growthEvent.verificationEndsAtMs))}까지 검증 중` : growthEvent ? `이벤트 대상 정회원 ${growthEvent.eventEligibleMemberCount ?? growthEvent.memberCount} · 참여 완료 제외 ${growthEvent.eventCompletedMemberCount || 0} · 활동 게스트 ${growthEvent.activeGuestCount}` : hasCrew ? '진행도를 불러오는 중' : '크루에 참여하면 진행도가 표시됩니다'}</div>
+              <div style={{ minWidth: isMobile ? '100%' : 270 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', color: '#e9d5ff', fontWeight: 900, marginBottom: 7 }}>
+                  <span>우리 크루 인원</span>
+                  <span style={{ fontSize: '1.1rem', color: '#67e8f9' }}>{growthEvent?.eligibleCount ?? (hasCrew ? '…' : 0)} <span style={{ fontSize: '0.8rem', color: 'rgba(255,255,255,0.6)' }}>/ 40명</span></span>
+                </div>
+                {/* 20명 & 40명 2단계 마일스톤 게이지 */}
+                <div style={{ position: 'relative', height: 12, borderRadius: 999, background: 'rgba(255,255,255,0.12)', overflow: 'hidden', marginBottom: 6 }}>
+                  <div style={{ width: `${Math.min(100, ((growthEvent?.eligibleCount || 0) / 40) * 100)}%`, height: '100%', background: 'linear-gradient(90deg, #22d3ee 0%, #a855f7 50%, #eab308 100%)', transition: 'width .4s ease' }} />
+                  {/* 20명 마일스톤 핀 */}
+                  <div style={{ position: 'absolute', left: '50%', top: 0, bottom: 0, width: 2, background: 'rgba(255,255,255,0.45)' }} />
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.72rem', color: '#cbd5e1', marginBottom: 6 }} className="font-tech">
+                  <span>시작</span>
+                  <span style={{ color: (growthEvent?.eligibleCount || 0) >= 20 ? '#86efac' : '#fde047', fontWeight: 700 }}>20명 (+1,000💎)</span>
+                  <span style={{ color: (growthEvent?.eligibleCount || 0) >= 40 ? '#86efac' : '#e2e8f0', fontWeight: 700 }}>40명 (+4,000💎)</span>
+                </div>
+                <div className="font-tech" style={{ color: growthEvent?.rewarded ? '#86efac' : (growthEvent?.neededForNextTarget > 0 ? '#fde047' : 'rgba(255,255,255,0.58)'), fontSize: '0.74rem', marginTop: 4 }}>
+                  {growthEvent?.tiers?.t40?.status === 'rewarded'
+                    ? '40명 달성 확정 · 총 5,000광석 지급 완료'
+                    : growthEvent?.tiers?.t20?.status === 'rewarded'
+                      ? `20명 완료(+1,000💎)! 다음 40명 목표까지 ${Math.max(0, 40 - (growthEvent?.eligibleCount || 0))}명 남음`
+                      : growthEvent?.verificationEndsAtMs
+                        ? `목표 달성 · 고정 명단 ${growthEvent.snapshotRetainedCount || 0}명 48시간 검증 중`
+                        : growthEvent
+                          ? `다음 목표까지 앞으로 ${growthEvent.neededForNextTarget ?? Math.max(0, 20 - (growthEvent.eligibleCount || 0))}명 · 활동 게스트 ${growthEvent.activeGuestCount || 0}명`
+                          : hasCrew ? '진행도를 불러오는 중…' : '크루에 참여하면 진행도가 표시됩니다'}
+                </div>
               </div>
             </div>
             {hasCrew && (
@@ -1788,14 +1815,29 @@ export default function StudyCrewView({ onNavigateStore }) {
               </div>
             )}
             <div style={{ padding: '0 2rem 1.5rem', display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-              <button type="button" onClick={() => setGrowthEventOpen((open) => !open)} className="space-btn font-tech" style={{ padding: '0.7rem 1rem', borderRadius: 10, color: '#e9d5ff' }}>{growthEventOpen ? '안내 접기' : '이벤트 참여 방법과 혜택 보기'}</button>
-              {hasCrew && !isGuest && <button type="button" onClick={() => setDetailView(true)} className="space-btn cosmic-btn font-tech" style={{ padding: '0.7rem 1rem', borderRadius: 10 }}>외부 승무원 초대 링크 복사하기</button>}
+              <button type="button" onClick={() => setGrowthEventOpen((open) => !open)} className="space-btn font-tech" style={{ padding: '0.7rem 1rem', borderRadius: 10, color: '#e9d5ff' }}>{growthEventOpen ? '안내 접기' : '참여 방법과 상세 기준 보기'}</button>
+              {hasCrew && !isGuest && <button type="button" onClick={() => setDetailView(true)} className="space-btn cosmic-btn font-tech" style={{ padding: '0.7rem 1rem', borderRadius: 10, display: 'inline-flex', alignItems: 'center', gap: 6 }}>🎁 친구 초대 패스 보내기</button>}
             </div>
             <AnimatePresence>{growthEventOpen && (
               <Motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} style={{ overflow: 'hidden' }}>
                 <div style={{ borderTop: '1px solid rgba(255,255,255,0.1)', padding: isMobile ? '1.2rem' : '1.5rem 2rem', display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 14 }}>
-                  <div style={{ padding: 16, borderRadius: 14, background: 'rgba(0,0,0,0.2)' }}><strong style={{ color: '#67e8f9' }}>참여 방법</strong><ol className="font-tech" style={{ color: 'rgba(255,255,255,0.76)', lineHeight: 1.8, paddingLeft: 20, marginBottom: 0 }}><li>내 크루의 GUEST ACCESS에서 외부 승무원 초대 링크를 복사합니다. 개인별 링크 하나로 여러 친구를 제한 없이 초대할 수 있습니다.</li><li>친구에게 링크를 보내 게스트로 메타센스를 체험하게 합니다.</li><li>게스트가 첫 입장 24시간 후, 퀴즈 배틀 2회·실제 답변 10문제를 완료하면 자동으로 활동 게스트에 집계됩니다. 탐사원 대전과 NOVA-7 AI 대결 모두 인정됩니다.</li><li>동일 기기 중복 등 명확한 부정 신호는 자동 제외되고, 의심 계정은 운영툴에서 사후 정지·삭제할 수 있습니다.</li><li>정회원+활동 게스트 20명을 48시간 유지하면 달성이 확정됩니다.</li></ol></div>
-                  <div style={{ padding: 16, borderRadius: 14, background: 'rgba(0,0,0,0.2)' }}><strong style={{ color: '#fde68a' }}>함께 공부하기</strong><ul className="font-tech" style={{ color: 'rgba(255,255,255,0.76)', lineHeight: 1.8, paddingLeft: 20, marginBottom: 0 }}><li>친구와 메타센스에서 4주 동안 함께 공부해 보세요.</li><li>무료체험과 수강 관련 안내는 학부모가 확인합니다.</li><li>20명 달성 보상: 고정 명단을 48시간 유지한 정식 크루원에게 각 1,000광석</li><li>이미 보상을 받은 계정은 다른 크루에 가입할 수 있지만 이벤트 인원·보상에는 다시 포함되지 않습니다.</li></ul><p className="font-tech" style={{ color: '#fca5a5', fontSize: '0.75rem', lineHeight: 1.55, marginBottom: 0 }}>게스트는 달성 인원에는 기여하지만 광석 계정이 없어 1,000광석 지급 대상에서는 제외됩니다. 동일 기기 중복·비정상 활동은 운영자 검토 후 제외될 수 있습니다.</p></div>
+                  <div style={{ padding: 16, borderRadius: 14, background: 'rgba(0,0,0,0.22)' }}>
+                    <strong style={{ color: '#67e8f9', display: 'block', marginBottom: 8 }}>🚀 쉬운 3단계 참여 방법</strong>
+                    <ol className="font-tech" style={{ color: 'rgba(255,255,255,0.85)', lineHeight: 1.8, paddingLeft: 20, marginBottom: 0, fontSize: '0.88rem' }}>
+                      <li><strong>초대 패스 선물</strong>: 내 크루의 GUEST ACCESS에서 친구에게 초대 링크를 보냅니다.</li>
+                      <li><strong>친구와 2회 함께 공부</strong>: 친구가 크루 대기룸/집중방에 2회 참여하고 총 10분 활동하면 1명 인정됩니다. (배틀 불필요!)</li>
+                      <li><strong>크루 성장 보급</strong>: 20명 달성 시 1,000광석, 40명 달성 시 +4,000광석(누적 5,000광석) 보급!</li>
+                    </ol>
+                  </div>
+                  <div style={{ padding: 16, borderRadius: 14, background: 'rgba(0,0,0,0.22)' }}>
+                    <strong style={{ color: '#fde68a', display: 'block', marginBottom: 8 }}>🛡️ 보상 및 부정 방지 기준</strong>
+                    <ul className="font-tech" style={{ color: 'rgba(255,255,255,0.8)', lineHeight: 1.75, paddingLeft: 20, marginBottom: 0, fontSize: '0.84rem' }}>
+                      <li><strong>48시간 검증 유지</strong>: 목표 인원 도달 시점의 고정 명단이 48시간 동안 유지되어야 보상이 확정됩니다.</li>
+                      <li><strong>원소속 크루 고정</strong>: 이벤트 집계는 최초 소속 크루에 고정되며, 도중 탈퇴 시 이번 이벤트 집계·보상에서 영구 제외됩니다.</li>
+                      <li><strong>막판 가입 체리피킹 차단</strong>: 달성 시점 기준 최소 48시간 이상 가입 유지 중인 정회원에게만 광석이 지급됩니다.</li>
+                      <li><strong>초대받은 친구 혜택</strong>: 가입 없이 크루 바로 체험 + 원할 경우 학부모와 함께 4주 무료체험 신청 가능 (자동 유료 전환 없음).</li>
+                    </ul>
+                  </div>
                 </div>
               </Motion.div>
             )}</AnimatePresence>

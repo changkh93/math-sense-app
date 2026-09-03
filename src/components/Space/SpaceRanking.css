@@ -146,9 +146,15 @@
   min-height: 0;
 }
 
+/* 대형 랭킹 목록 컨테이너는 hover 시 transform을 비활성화하여 GPU 텍스처 초과(블랙박스) 및 끊김 방지 */
+.ranking-main-area,
+.ranking-main-area:hover {
+  transform: none !important;
+  transition: none !important;
+}
+
 .ranking-row {
-  content-visibility: auto;
-  contain-intrinsic-size: auto 92px;
+  /* content-visibility 제거: 100개 행에서 GPU 타일 체커보딩(검은 사각 박스) 및 스크롤 덜컥거림 방지 */
 }
 
 .ranking-pilot-cell {
