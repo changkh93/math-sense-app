@@ -457,6 +457,36 @@ export const PYTHON_CONCEPT_REGISTRY = Object.freeze({
     },
     protocolRepairId: 'PR-APPENDLEFT-001',
   },
+  'syntax:nested-indexing': {
+    conceptId: 'syntax:nested-indexing',
+    displayName: 'grid[r][c] (2차원 격자 인덱싱)',
+    kind: 'syntax',
+    canonicalFirstProblemId: 'AC-GRID-BOUND-82',
+    why: '2차원 행렬이나 격자에서 특정 행(r)과 열(c)에 있는 원소에 접근해요.',
+    tinyExample: 'grid = [[1, 2], [3, 4]]일 때 grid[0][1]은 2',
+    syntaxExample: 'cell = grid[r][c]',
+    predictionCheck: {
+      prompt: 'grid = [[10, 20], [30, 40]]일 때 grid[1][0]의 값은 무엇일까요?',
+      options: ['30', '20', '10', '40'],
+      expected: '30',
+    },
+    protocolRepairId: 'PR-NESTED-INDEX-001',
+  },
+  'syntax:sequence-unpacking': {
+    conceptId: 'syntax:sequence-unpacking',
+    displayName: 'r, c = point (시퀀스 언패킹)',
+    kind: 'syntax',
+    canonicalFirstProblemId: 'AC-GRID-FLOOD-83',
+    why: '좌표 튜플이나 목록에 담긴 여러 원소를 한 번에 각 변수에 나누어 담아요.',
+    tinyExample: 'r, c = (3, 5) -> r은 3, c는 5',
+    syntaxExample: 'r, c = point',
+    predictionCheck: {
+      prompt: 'point = (2, 7)일 때 r, c = point를 실행하면 c의 값은 무엇일까요?',
+      options: ['7', '2', '(2, 7)'],
+      expected: '7',
+    },
+    protocolRepairId: 'PR-SEQ-UNPACK-001',
+  },
 })
 
 export function getConceptDetails(conceptId) {

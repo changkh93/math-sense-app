@@ -131,7 +131,7 @@ export const CONSTELLATIONS = Object.freeze([
     branchCount: 2,
     capstoneCount: 0,
     totalCount: 10,
-    requiredAnchors: ['AC-NAV-006'],
+    requiredAnchors: ['AC-GRID-NEIGHBOR-81', 'AC-GRID-FLOOD-83', 'AC-NAV-006'],
     minimumCoreToUnlockNext: 6,
   },
   {

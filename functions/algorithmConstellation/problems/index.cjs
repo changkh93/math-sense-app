@@ -86,6 +86,15 @@ const acQueueCard77 = require('./ac_queue_card_77.private.cjs')
 const acDequeDock78 = require('./ac_deque_dock_78.private.cjs')
 const acStackQueue79 = require('./ac_stack_queue_79.private.cjs')
 const acQueuePop80 = require('./ac_queue_pop_80.private.cjs')
+const acGridNeighbor81 = require('./ac_grid_neighbor_81.private.cjs')
+const acGridBound82 = require('./ac_grid_bound_82.private.cjs')
+const acGridFlood83 = require('./ac_grid_flood_83.private.cjs')
+const acGridIsland84 = require('./ac_grid_island_84.private.cjs')
+const acGridMulti86 = require('./ac_grid_multi_86.private.cjs')
+const acGraphAdj87 = require('./ac_graph_adj_87.private.cjs')
+const acGraphReach88 = require('./ac_graph_reach_88.private.cjs')
+const acNavCompare89 = require('./ac_nav_compare_89.private.cjs')
+const acNavVisited90 = require('./ac_nav_visited_90.private.cjs')
 
 const RAW_PRIVATE_PROBLEMS = {
   'AC-COND-001@v1': acCond001,
@@ -169,6 +178,15 @@ const RAW_PRIVATE_PROBLEMS = {
   'AC-DEQUE-DOCK-78@v1': acDequeDock78,
   'AC-STACK-QUEUE-79@v1': acStackQueue79,
   'AC-QUEUE-POP-80@v1': acQueuePop80,
+  'AC-GRID-NEIGHBOR-81@v1': acGridNeighbor81,
+  'AC-GRID-BOUND-82@v1': acGridBound82,
+  'AC-GRID-FLOOD-83@v1': acGridFlood83,
+  'AC-GRID-ISLAND-84@v1': acGridIsland84,
+  'AC-GRID-MULTI-86@v1': acGridMulti86,
+  'AC-GRAPH-ADJ-87@v1': acGraphAdj87,
+  'AC-GRAPH-REACH-88@v1': acGraphReach88,
+  'AC-NAV-COMPARE-89@v1': acNavCompare89,
+  'AC-NAV-VISITED-90@v1': acNavVisited90,
 }
 
 // Every attempt stores this value in Firestore and exposes it in the replay

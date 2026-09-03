@@ -79,6 +79,15 @@ import { AC_QUEUE_CARD_77 } from './ac_queue_card_77.js'
 import { AC_DEQUE_DOCK_78 } from './ac_deque_dock_78.js'
 import { AC_STACK_QUEUE_79 } from './ac_stack_queue_79.js'
 import { AC_QUEUE_POP_80 } from './ac_queue_pop_80.js'
+import { AC_GRID_NEIGHBOR_81 } from './ac_grid_neighbor_81.js'
+import { AC_GRID_BOUND_82 } from './ac_grid_bound_82.js'
+import { AC_GRID_FLOOD_83 } from './ac_grid_flood_83.js'
+import { AC_GRID_ISLAND_84 } from './ac_grid_island_84.js'
+import { AC_GRID_MULTI_86 } from './ac_grid_multi_86.js'
+import { AC_GRAPH_ADJ_87 } from './ac_graph_adj_87.js'
+import { AC_GRAPH_REACH_88 } from './ac_graph_reach_88.js'
+import { AC_NAV_COMPARE_89 } from './ac_nav_compare_89.js'
+import { AC_NAV_VISITED_90 } from './ac_nav_visited_90.js'
 
 export const PUBLIC_KERNELS = Object.freeze({
   'AC-COND-001': AC_COND_001,
@@ -162,6 +171,15 @@ export const PUBLIC_KERNELS = Object.freeze({
   'AC-DEQUE-DOCK-78': AC_DEQUE_DOCK_78,
   'AC-STACK-QUEUE-79': AC_STACK_QUEUE_79,
   'AC-QUEUE-POP-80': AC_QUEUE_POP_80,
+  'AC-GRID-NEIGHBOR-81': AC_GRID_NEIGHBOR_81,
+  'AC-GRID-BOUND-82': AC_GRID_BOUND_82,
+  'AC-GRID-FLOOD-83': AC_GRID_FLOOD_83,
+  'AC-GRID-ISLAND-84': AC_GRID_ISLAND_84,
+  'AC-GRID-MULTI-86': AC_GRID_MULTI_86,
+  'AC-GRAPH-ADJ-87': AC_GRAPH_ADJ_87,
+  'AC-GRAPH-REACH-88': AC_GRAPH_REACH_88,
+  'AC-NAV-COMPARE-89': AC_NAV_COMPARE_89,
+  'AC-NAV-VISITED-90': AC_NAV_VISITED_90,
 })
 
 export function getPublicKernel(problemId) {
@@ -251,5 +269,14 @@ export {
   AC_DEQUE_DOCK_78,
   AC_STACK_QUEUE_79,
   AC_QUEUE_POP_80,
+  AC_GRID_NEIGHBOR_81,
+  AC_GRID_BOUND_82,
+  AC_GRID_FLOOD_83,
+  AC_GRID_ISLAND_84,
+  AC_GRID_MULTI_86,
+  AC_GRAPH_ADJ_87,
+  AC_GRAPH_REACH_88,
+  AC_NAV_COMPARE_89,
+  AC_NAV_VISITED_90,
 }
 

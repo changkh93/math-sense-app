@@ -203,6 +203,16 @@ for (const pid of [
   'AC-DEQUE-DOCK-78',
   'AC-STACK-QUEUE-79',
   'AC-QUEUE-POP-80',
+  'AC-GRID-NEIGHBOR-81',
+  'AC-GRID-BOUND-82',
+  'AC-GRID-FLOOD-83',
+  'AC-GRID-ISLAND-84',
+  'AC-NAV-006',
+  'AC-GRID-MULTI-86',
+  'AC-GRAPH-ADJ-87',
+  'AC-GRAPH-REACH-88',
+  'AC-NAV-COMPARE-89',
+  'AC-NAV-VISITED-90',
 ]) {
   const waveDefinition = getPrivateProblemDefinition(pid, 1)
   const waveContext = auth(`student_${pid.toLowerCase().replace(/-/g, '_')}`)
@@ -233,7 +243,7 @@ for (const pid of [
   }, waveContext)
   const waveIssued = await handlers.handleIssueTransferChallenge({ attemptId: waveStarted.attemptId }, waveContext)
   assert.ok(waveIssued.transferChallenge.starterCode.includes(`def ${waveIssued.transferChallenge.entryFunction}(`))
-  const waveTransferDefinition = waveDefinition.transferMasterSet.find(
+  const waveTransferDefinition = (waveDefinition.transferMasterSet || waveDefinition.transferChallenges).find(
     (item) => item.transferChallengeId === waveIssued.transferChallenge.transferChallengeId
   )
   // Student-facing scaffold contract: the issued transfer must deliver the
@@ -353,6 +363,44 @@ assert.equal(
   "80 Transfer starter must fail the judge (uses popleft instead of pop)"
 )
 console.log('  -> [PASS] Constellation 7 representative fixture rejection and 80 starter-failure contract verified')
+
+console.log('[Test 2f] Constellation 8 (81~90) representative wrong fixtures and 90 starter-failure contract...')
+for (const pid of [
+  'AC-GRID-NEIGHBOR-81',
+  'AC-GRID-BOUND-82',
+  'AC-GRID-FLOOD-83',
+  'AC-GRID-ISLAND-84',
+  'AC-NAV-006',
+  'AC-GRID-MULTI-86',
+  'AC-GRAPH-ADJ-87',
+  'AC-GRAPH-REACH-88',
+  'AC-NAV-COMPARE-89',
+  'AC-NAV-VISITED-90',
+]) {
+  const c8Def = getPrivateProblemDefinition(pid, 1)
+  const repFixture = (c8Def.intendedWrongFixtures || c8Def.intendedWrongSolutions)[0]
+  assert.equal(
+    evaluateBaseSubmission(pid, 1, repFixture.code).resultStar,
+    false,
+    `C8 fixture ${repFixture.id || repFixture.label} of ${pid} must be rejected`
+  )
+}
+// 90's shipped Base starter is the repair target: it must be judged WRONG.
+const visited90Public = PUBLIC_KERNELS['AC-NAV-VISITED-90']
+assert.equal(
+  evaluateBaseSubmission('AC-NAV-VISITED-90', 1, visited90Public.modes.code.starterCode).resultStar,
+  false,
+  "90 Base starter must fail the judge (late visited recording causes duplicate enqueues)"
+)
+// 90's shipped Transfer starter: it must also be judged WRONG.
+const visited90Definition = getPrivateProblemDefinition('AC-NAV-VISITED-90', 1)
+const visited90Transfer = (visited90Definition.transferMasterSet || visited90Definition.transferChallenges)[0]
+assert.equal(
+  evaluateTransferSubmission('AC-NAV-VISITED-90', 1, visited90Transfer.transferChallengeId, visited90Transfer.starterCode).passed,
+  false,
+  "90 Transfer starter must fail the judge (late visited recording causes duplicate enqueues)"
+)
+console.log('  -> [PASS] Constellation 8 representative fixture rejection and 90 starter-failure contract verified')
 
 console.log('[Test 3] AI use withholds new mastery, then independent return restores it...')
 const aiAttempt = await completeAttempt('student_beta', 'learn', {

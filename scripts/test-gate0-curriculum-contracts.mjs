@@ -1231,4 +1231,125 @@ assert.equal(
 
 console.log('  -> [PASS] Constellation 7 (71~80) prerequisites, anchors 71·74, and Core 6/8 unlock verified')
 
+// [Test 20] Constellation 8 Grid Navigation (81~90) Curriculum & Gate Contracts
+console.log('[Test 20] Validating Constellation 8 Grid Navigation (81~90) and gate isolation...')
+const c8Published = ALGORITHM_EDITORIAL_CATALOG.filter(
+  (entry) => entry.constellationId === 'constellation-8' && entry.status === 'published'
+)
+assert.deepEqual(
+  c8Published.map((entry) => entry.problemId),
+  [
+    'AC-GRID-NEIGHBOR-81',
+    'AC-GRID-BOUND-82',
+    'AC-GRID-FLOOD-83',
+    'AC-GRID-ISLAND-84',
+    'AC-NAV-006',
+    'AC-GRID-MULTI-86',
+    'AC-GRAPH-ADJ-87',
+    'AC-GRAPH-REACH-88',
+    'AC-NAV-COMPARE-89',
+    'AC-NAV-VISITED-90',
+  ],
+  'Constellation 8 must have exactly the 10 published problems 81~90'
+)
+const c8Cores = c8Published.filter((entry) => entry.routeRole === 'core')
+const c8Branches = c8Published.filter((entry) => entry.routeRole === 'branch')
+assert.equal(c8Cores.length, 8, 'Constellation 8 must have exactly 8 Core problems (81~88)')
+assert.equal(c8Branches.length, 2, 'Constellation 8 must have exactly 2 Branch problems (89~90)')
+assert.deepEqual(
+  c8Branches.map((entry) => entry.problemId),
+  ['AC-NAV-COMPARE-89', 'AC-NAV-VISITED-90']
+)
+for (const entry of c8Published) {
+  assert.deepEqual(
+    PUBLIC_KERNELS[entry.problemId].curriculum.prerequisites,
+    entry.prerequisites,
+    `Constellation 8 kernel and catalog prerequisites must stay synchronized for ${entry.problemId}`
+  )
+}
+
+// Registry anchor contract: 81, 83, 85
+const c8Anchors = CONSTELLATIONS.find((item) => item.id === 'constellation-8').requiredAnchors
+assert.deepEqual(
+  c8Anchors,
+  ['AC-GRID-NEIGHBOR-81', 'AC-GRID-FLOOD-83', 'AC-NAV-006'],
+  'Constellation 8 requiredAnchors must be exactly 81, 83, 85'
+)
+
+// Prerequisite lock transitions for Constellation 8
+assert.equal(isMissionPrerequisitesMet('AC-GRID-NEIGHBOR-81', ['AC-SEQ-005'], ALGORITHM_EDITORIAL_CATALOG), false)
+assert.equal(isMissionPrerequisitesMet('AC-GRID-NEIGHBOR-81', ['AC-SEQ-005', 'AC-SEQ-RUNNING-35'], ALGORITHM_EDITORIAL_CATALOG), true)
+assert.equal(isMissionPrerequisitesMet('AC-GRID-BOUND-82', ['AC-GRID-NEIGHBOR-81'], ALGORITHM_EDITORIAL_CATALOG), false)
+assert.equal(isMissionPrerequisitesMet('AC-GRID-BOUND-82', ['AC-GRID-NEIGHBOR-81', 'AC-COND-RANGE-15'], ALGORITHM_EDITORIAL_CATALOG), true)
+assert.equal(isMissionPrerequisitesMet('AC-GRID-FLOOD-83', ['AC-GRID-BOUND-82', 'AC-NAV-005'], ALGORITHM_EDITORIAL_CATALOG), false)
+assert.equal(isMissionPrerequisitesMet('AC-GRID-FLOOD-83', ['AC-GRID-BOUND-82', 'AC-NAV-005', 'AC-SET-MEMBERSHIP-42'], ALGORITHM_EDITORIAL_CATALOG), true)
+assert.equal(isMissionPrerequisitesMet('AC-NAV-006', ['AC-NAV-005'], ALGORITHM_EDITORIAL_CATALOG), false)
+assert.equal(isMissionPrerequisitesMet('AC-NAV-006', ['AC-GRID-FLOOD-83', 'AC-NAV-005'], ALGORITHM_EDITORIAL_CATALOG), true)
+assert.equal(
+  isMissionPrerequisitesMet('AC-NAV-006', ['AC-NAV-006'], ALGORITHM_EDITORIAL_CATALOG),
+  true,
+  'Students who completed legacy AC-NAV-006 must retain review access after new prerequisites are added'
+)
+assert.equal(isMissionPrerequisitesMet('AC-NAV-COMPARE-89', ['AC-NAV-006', 'AC-GRAPH-REACH-88'], ALGORITHM_EDITORIAL_CATALOG), false)
+assert.equal(isMissionPrerequisitesMet('AC-NAV-COMPARE-89', ['AC-NAV-006', 'AC-GRAPH-REACH-88', 'AC-STACK-BOX-71'], ALGORITHM_EDITORIAL_CATALOG), true)
+assert.equal(isMissionPrerequisitesMet('AC-NAV-VISITED-90', ['AC-NAV-006', 'AC-GRAPH-REACH-88'], ALGORITHM_EDITORIAL_CATALOG), false)
+assert.equal(isMissionPrerequisitesMet('AC-NAV-VISITED-90', ['AC-NAV-006', 'AC-GRAPH-REACH-88', 'AC-CODE-FIRST-ERROR-01'], ALGORITHM_EDITORIAL_CATALOG), true)
+
+// Constellation 9 unlock gating:
+const c8CoreIds = c8Cores.map((entry) => entry.problemId)
+// 1. Five cores + both branches are NOT enough.
+assert.equal(
+  isConstellationUnlocked(9, [...c8CoreIds.slice(0, 5), ...c8Branches.map((entry) => entry.problemId)], ALGORITHM_EDITORIAL_CATALOG),
+  false,
+  'Constellation 9 must stay locked with only 5 of 8 Core missions even when both Branches are done'
+)
+// 2. Seven cores missing required anchor 81 are NOT enough.
+const c8SevenCoresMissingAnchor81 = c8CoreIds.filter((id) => id !== 'AC-GRID-NEIGHBOR-81')
+assert.equal(
+  isConstellationUnlocked(9, c8SevenCoresMissingAnchor81, ALGORITHM_EDITORIAL_CATALOG),
+  false,
+  'Constellation 9 must stay locked when required anchor 81 is missing even with 7 Cores done'
+)
+// 3. Seven cores missing required anchor 83 are NOT enough.
+const c8SevenCoresMissingAnchor83 = c8CoreIds.filter((id) => id !== 'AC-GRID-FLOOD-83')
+assert.equal(
+  isConstellationUnlocked(9, c8SevenCoresMissingAnchor83, ALGORITHM_EDITORIAL_CATALOG),
+  false,
+  'Constellation 9 must stay locked when required anchor 83 is missing even with 7 Cores done'
+)
+// 4. All 3 anchors + 6 cores unlock Constellation 9.
+const c8SixCoreWithAnchors = ['AC-GRID-NEIGHBOR-81', 'AC-GRID-FLOOD-83', 'AC-NAV-006', 'AC-GRID-BOUND-82', 'AC-GRID-ISLAND-84', 'AC-GRID-MULTI-86']
+assert.equal(
+  isConstellationUnlocked(9, c8SixCoreWithAnchors, ALGORITHM_EDITORIAL_CATALOG),
+  true,
+  'Constellation 9 must unlock with anchors 81·83·85 and Core 6/8'
+)
+
+// 5. Branch completion (89, 90) does not alter unlock state
+assert.equal(
+  isConstellationUnlocked(9, [...c8SixCoreWithAnchors, 'AC-NAV-COMPARE-89', 'AC-NAV-VISITED-90'], ALGORITHM_EDITORIAL_CATALOG),
+  true,
+  'Constellation 9 unlock remains true with branch completions'
+)
+
+// 6. Hub getConstellationAccess validation
+const accessC8 = getConstellationAccess(8, c7SixCoreWithAnchors, ALGORITHM_EDITORIAL_CATALOG)
+assert.equal(accessC8.accessible, true, 'Constellation 8 must be accessible with C7 requirements met')
+const legacyC8Access = getConstellationAccess(8, ['AC-NAV-006'], ALGORITHM_EDITORIAL_CATALOG)
+assert.deepEqual(
+  { accessible: legacyC8Access.accessible, mode: legacyC8Access.mode },
+  { accessible: true, mode: 'grandfathered' },
+  'Existing AC-NAV-006 completion must grandfather Constellation 8 review access'
+)
+
+const mockCatalogWithC9 = ALGORITHM_EDITORIAL_CATALOG.map((entry) =>
+  entry.problemId === 'AC-REC-BASE-91' ? { ...entry, status: 'published' } : entry
+)
+const accessC9Locked = getConstellationAccess(9, c8SevenCoresMissingAnchor81, mockCatalogWithC9)
+assert.equal(accessC9Locked.accessible, false, 'Constellation 9 must be locked when anchor 81 is missing')
+const accessC9Unlocked = getConstellationAccess(9, c8SixCoreWithAnchors, mockCatalogWithC9)
+assert.equal(accessC9Unlocked.accessible, true, 'Constellation 9 must be accessible with C8 anchors 81·83·85 and 6 cores')
+
+console.log('  -> [PASS] Constellation 8 (81~90) prerequisites, anchors 81·83·85, and Core 6/8 unlock verified')
+
 console.log('\n=== Gate 0 Curriculum & Contract Tests Passed 100%! ===\n')

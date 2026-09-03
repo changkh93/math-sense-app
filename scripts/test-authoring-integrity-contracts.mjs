@@ -2059,7 +2059,279 @@ for (const transfer of [prefixPublic.assessment.transferChallenges[0], prefixPri
   }
 }
 
-// Pattern Card Syntax Leak Check for 41~50 and 51~60
+// 26. Constellation 8 (81~90) — independent oracles, private evidence,
+// runtime budget, and the nested-subscript evaluator guard.
+const c8ProblemIds = [
+  'AC-GRID-NEIGHBOR-81',
+  'AC-GRID-BOUND-82',
+  'AC-GRID-FLOOD-83',
+  'AC-GRID-ISLAND-84',
+  'AC-NAV-006',
+  'AC-GRID-MULTI-86',
+  'AC-GRAPH-ADJ-87',
+  'AC-GRAPH-REACH-88',
+  'AC-NAV-COMPARE-89',
+  'AC-NAV-VISITED-90',
+]
+const fourDirections = [[-1, 0], [1, 0], [0, -1], [0, 1]]
+
+function gridNeighborsOracle(rows, cols, r, c) {
+  return fourDirections
+    .map(([dr, dc]) => [r + dr, c + dc])
+    .filter(([nr, nc]) => nr >= 0 && nr < rows && nc >= 0 && nc < cols)
+}
+
+function openGridNeighborsOracle(grid, r, c, openValue = 0) {
+  return gridNeighborsOracle(grid.length, grid[0].length, r, c)
+    .filter(([nr, nc]) => grid[nr][nc] === openValue)
+}
+
+function floodSizeOracle(grid, start, openValue) {
+  const [sr, sc] = start
+  if (grid[sr][sc] !== openValue) return 0
+  const queue = [[sr, sc]]
+  const seen = new Set([`${sr},${sc}`])
+  for (let head = 0; head < queue.length; head += 1) {
+    const [r, c] = queue[head]
+    for (const [nr, nc] of openGridNeighborsOracle(grid, r, c, openValue)) {
+      const key = `${nr},${nc}`
+      if (!seen.has(key)) {
+        seen.add(key)
+        queue.push([nr, nc])
+      }
+    }
+  }
+  return seen.size
+}
+
+function componentCountOracle(grid, openValue) {
+  const seen = new Set()
+  let count = 0
+  for (let r = 0; r < grid.length; r += 1) {
+    for (let c = 0; c < grid[0].length; c += 1) {
+      const startKey = `${r},${c}`
+      if (grid[r][c] !== openValue || seen.has(startKey)) continue
+      count += 1
+      const queue = [[r, c]]
+      seen.add(startKey)
+      for (let head = 0; head < queue.length; head += 1) {
+        const [cr, cc] = queue[head]
+        for (const [nr, nc] of openGridNeighborsOracle(grid, cr, cc, openValue)) {
+          const key = `${nr},${nc}`
+          if (!seen.has(key)) {
+            seen.add(key)
+            queue.push([nr, nc])
+          }
+        }
+      }
+    }
+  }
+  return count
+}
+
+function shortestPathOracle(grid, start, target) {
+  const [sr, sc] = start
+  const [tr, tc] = target
+  const queue = [[sr, sc, 0]]
+  const seen = new Set([`${sr},${sc}`])
+  for (let head = 0; head < queue.length; head += 1) {
+    const [r, c, distance] = queue[head]
+    if (r === tr && c === tc) return distance
+    for (const [nr, nc] of openGridNeighborsOracle(grid, r, c)) {
+      const key = `${nr},${nc}`
+      if (!seen.has(key)) {
+        seen.add(key)
+        queue.push([nr, nc, distance + 1])
+      }
+    }
+  }
+  return -1
+}
+
+function multiSourceTimeOracle(grid, sources) {
+  const queue = sources.map(([r, c]) => [r, c, 0])
+  const seen = new Set(sources.map(([r, c]) => `${r},${c}`))
+  let maxDistance = 0
+  for (let head = 0; head < queue.length; head += 1) {
+    const [r, c, distance] = queue[head]
+    maxDistance = Math.max(maxDistance, distance)
+    for (const [nr, nc] of openGridNeighborsOracle(grid, r, c)) {
+      const key = `${nr},${nc}`
+      if (!seen.has(key)) {
+        seen.add(key)
+        queue.push([nr, nc, distance + 1])
+      }
+    }
+  }
+  for (let r = 0; r < grid.length; r += 1) {
+    for (let c = 0; c < grid[0].length; c += 1) {
+      if (grid[r][c] === 0 && !seen.has(`${r},${c}`)) return -1
+    }
+  }
+  return maxDistance
+}
+
+function adjacencyListOracle(nodeCount, links) {
+  const network = Array.from({ length: nodeCount }, () => [])
+  for (const [u, v] of links) {
+    network[u].push(v)
+    network[v].push(u)
+  }
+  return network
+}
+
+function bfsOrderOracle(network, start) {
+  const queue = [start]
+  const seen = new Set([start])
+  const order = []
+  for (let head = 0; head < queue.length; head += 1) {
+    const node = queue[head]
+    order.push(node)
+    for (const neighbor of network[node]) {
+      if (!seen.has(neighbor)) {
+        seen.add(neighbor)
+        queue.push(neighbor)
+      }
+    }
+  }
+  return order
+}
+
+function dfsOrderOracle(network, start) {
+  const stack = [start]
+  const seen = new Set([start])
+  const order = []
+  while (stack.length > 0) {
+    const node = stack.pop()
+    order.push(node)
+    for (let i = network[node].length - 1; i >= 0; i -= 1) {
+      const neighbor = network[node][i]
+      if (!seen.has(neighbor)) {
+        seen.add(neighbor)
+        stack.push(neighbor)
+      }
+    }
+  }
+  return order
+}
+
+const c8BaseOracles = {
+  'AC-GRID-NEIGHBOR-81': ({ rows, cols, r, c }) => gridNeighborsOracle(rows, cols, r, c),
+  'AC-GRID-BOUND-82': ({ grid, r, c }) => openGridNeighborsOracle(grid, r, c),
+  'AC-GRID-FLOOD-83': ({ grid, start }) => floodSizeOracle(grid, start, 0),
+  'AC-GRID-ISLAND-84': ({ grid }) => componentCountOracle(grid, 0),
+  'AC-NAV-006': ({ grid, start, target }) => shortestPathOracle(grid, start, target),
+  'AC-GRID-MULTI-86': ({ grid, sources }) => multiSourceTimeOracle(grid, sources),
+  'AC-GRAPH-ADJ-87': ({ node_count: nodeCount, links }) => adjacencyListOracle(nodeCount, links),
+  'AC-GRAPH-REACH-88': ({ network, start }) => bfsOrderOracle(network, start),
+  'AC-NAV-COMPARE-89': ({ network, start }) => [bfsOrderOracle(network, start), dfsOrderOracle(network, start)],
+  'AC-NAV-VISITED-90': ({ network, start }) => {
+    const order = bfsOrderOracle(network, start)
+    return [order, order.length]
+  },
+}
+const c8TransferOracles = {
+  'AC-GRID-NEIGHBOR-81': ({ rows, cols, seat }) => gridNeighborsOracle(rows, cols, seat[0], seat[1]),
+  'AC-GRID-BOUND-82': ({ grid, position }) => openGridNeighborsOracle(grid, position[0], position[1]),
+  'AC-GRID-FLOOD-83': ({ grid, start }) => floodSizeOracle(grid, start, 1),
+  'AC-GRID-ISLAND-84': ({ grid }) => componentCountOracle(grid, 1),
+  'AC-NAV-006': ({ grid, start, target }) => shortestPathOracle(grid, start, target),
+  'AC-GRID-MULTI-86': ({ grid, stations }) => multiSourceTimeOracle(grid, stations),
+  'AC-GRAPH-ADJ-87': ({ student_count: nodeCount, friendships }) => adjacencyListOracle(nodeCount, friendships),
+  'AC-GRAPH-REACH-88': ({ connections, start }) => bfsOrderOracle(connections, start).length,
+  'AC-NAV-COMPARE-89': ({ network, start }) => [bfsOrderOracle(network, start), dfsOrderOracle(network, start)],
+  'AC-NAV-VISITED-90': ({ grid, start }) => {
+    const count = floodSizeOracle(grid, start, 0)
+    return [count, count]
+  },
+}
+const nestedSubscriptIndexPattern = /\[\s*[A-Za-z_]\w*\s*\[[^\]]+\]\s*\]/
+
+for (const problemId of c8ProblemIds) {
+  const publicKernel = PUBLIC_KERNELS[problemId]
+  const privateDef = getPrivateProblemDefinition(problemId, 1)
+  const privateTransfers = getTransferChallenges(privateDef)
+  const publicTransfer = publicKernel.assessment.transferChallenges[0]
+  const privateTransfer = privateTransfers[0]
+  const publicInputs = new Set(publicKernel.assessment.publicTests.map(inputKey))
+  const previewInputs = new Set(publicTransfer.testCases.map(inputKey))
+
+  assert.equal(
+    privateDef.hiddenTests.some((test) => publicInputs.has(inputKey(test))),
+    false,
+    `${problemId} hidden tests must not repeat public inputs`
+  )
+  assert.equal(
+    privateTransfer.testCases.some((test) => previewInputs.has(inputKey(test))),
+    false,
+    `${problemId} authoritative transfer tests must not repeat client preview inputs`
+  )
+  assert.equal(publicTransfer.transferChallengeId, privateTransfer.transferChallengeId, `${problemId} transfer challenge ID parity`)
+  assert.equal(publicTransfer.entryFunction, privateTransfer.entryFunction, `${problemId} transfer entry function parity`)
+  assert.equal(publicTransfer.title, privateTransfer.title, `${problemId} transfer title parity`)
+  assert.equal(publicTransfer.description, privateTransfer.description, `${problemId} transfer description parity`)
+  assert.deepEqual(publicTransfer.contextCard, privateTransfer.contextCard, `${problemId} transfer context card parity`)
+  assert.deepEqual(publicTransfer.thoughtCheck, privateTransfer.thoughtCheck, `${problemId} transfer thought check parity`)
+
+  const publicUnderstanding = publicKernel.assessment.understandingChallenges[0]
+  const privateUnderstanding = privateDef.understandingChallenges[0]
+  assert.equal(publicUnderstanding.challengeId, privateUnderstanding.challengeId, `${problemId} understanding challenge ID parity`)
+  assert.equal(publicUnderstanding.title, privateUnderstanding.title, `${problemId} understanding title parity`)
+  assert.equal(publicUnderstanding.prompt, privateUnderstanding.prompt, `${problemId} understanding prompt parity`)
+  assert.deepEqual(
+    publicUnderstanding.questions.map(({ id, text, options, expected }) => ({ id, text, options, expected })),
+    privateUnderstanding.questions.map(({ id, text, options, expected }) => ({ id, text, options, expected })),
+    `${problemId} understanding question display/answer parity`
+  )
+
+  const codeSamples = [
+    publicKernel.modes.code.starterCode,
+    privateDef.officialSolutionCode,
+    ...(privateDef.alternativeSolutions || []),
+    ...(privateDef.intendedWrongFixtures || privateDef.intendedWrongSolutions || []).map((fixture) => fixture.code),
+    publicTransfer.starterCode,
+    privateTransfer.starterCode,
+    privateTransfer.officialSolutionCode,
+  ].filter(Boolean)
+  for (const code of codeSamples) {
+    assert.equal(
+      nestedSubscriptIndexPattern.test(code),
+      false,
+      `${problemId} must extract coordinate parts before using them as another subscript index`
+    )
+  }
+
+  for (const test of [...publicKernel.assessment.publicTests, ...privateDef.hiddenTests]) {
+    assert.deepEqual(test.expected, c8BaseOracles[problemId](test.inputs), `${problemId} Base oracle mismatch: ${JSON.stringify(test.inputs)}`)
+  }
+  for (const test of [...publicTransfer.testCases, ...privateTransfer.testCases]) {
+    assert.deepEqual(test.expected, c8TransferOracles[problemId](test.inputs), `${problemId} Transfer oracle mismatch: ${JSON.stringify(test.inputs)}`)
+  }
+
+  assert.equal(
+    evaluateBaseSubmission(problemId, 1, privateDef.officialSolutionCode, { maxCumulativeSteps: 20_000 }).passed,
+    true,
+    `${problemId} official Base must pass within the 20,000-step authoring budget`
+  )
+  assert.equal(
+    evaluateTransferSubmission(problemId, 1, privateTransfer.transferChallengeId, privateTransfer.officialSolutionCode, { maxCumulativeSteps: 20_000 }).passed,
+    true,
+    `${problemId} official Transfer must pass within the 20,000-step authoring budget`
+  )
+}
+
+const bound82PreEncounterText = JSON.stringify({
+  identity: PUBLIC_KERNELS['AC-GRID-BOUND-82'].identity,
+  observe: PUBLIC_KERNELS['AC-GRID-BOUND-82'].modes.observe,
+  explore: PUBLIC_KERNELS['AC-GRID-BOUND-82'].modes.explore,
+})
+assert.equal(
+  /\bgrid\s*\[[^\]]+\]\s*\[[^\]]+\]/.test(bound82PreEncounterText),
+  false,
+  'AC-GRID-BOUND-82 must not expose nested-indexing syntax before its First Encounter card'
+)
+
+// Pattern Card Syntax Leak Check for 41~60 and 71~90
 for (const patternId of [
   'pattern:deduplicate-then-measure',
   'pattern:membership-query',
@@ -2090,6 +2362,15 @@ for (const patternId of [
   'pattern:discard-and-rotate',
   'pattern:two-ended-buffer',
   'pattern:two-stack-fifo',
+  'pattern:four-neighbor-enumeration',
+  'pattern:bounds-before-access',
+  'pattern:flood-fill',
+  'pattern:connected-components',
+  'pattern:bfs-shortest-path',
+  'pattern:multi-source-bfs',
+  'pattern:adjacency-list',
+  'pattern:graph-reachability',
+  'pattern:mark-when-enqueued',
 ]) {
   const pattern = PROBLEM_SOLVING_PATTERN_REGISTRY[patternId]
   assert.ok(pattern, `Pattern registry missing: ${patternId}`)
@@ -2101,5 +2382,5 @@ for (const patternId of [
   )
 }
 
-assert.equal(registeredProblemIds.length, 81, 'Total registered problems must be exactly 81 (54 + Constellation 5 + Constellation 6 + Constellation 7)')
+assert.equal(registeredProblemIds.length, 90, 'Total registered problems must be exactly 90 (Constellations 0~8 complete)')
 console.log(`✅ All 10 Authoring Invariants PASSED across all ${registeredProblemIds.length} registered problems!`)
