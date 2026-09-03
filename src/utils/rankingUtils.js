@@ -194,8 +194,8 @@ export function calculateSEI(user, weeklyGain = 0, streak = 0) {
 }
 
 export const SEI_TIERS = [
-  { minSEI: 40000, level: 9, name: '인피니티 스텔라 초월자', label: 'Infinity', color: '#e0aaff', icon: '🌠' },
-  { minSEI: 30000, level: 8, name: '챌린저 초신성 정복자', label: 'Challenger', color: '#ff8800', icon: '🌟' },
+  { minSEI: 80000, level: 9, name: '인피니티 스텔라 초월자', label: 'Infinity', color: '#e0aaff', icon: '🌠' },
+  { minSEI: 40000, level: 8, name: '챌린저 초신성 정복자', label: 'Challenger', color: '#ff8800', icon: '🌟' },
   { minSEI: 20000, level: 7, name: '그랜드마스터 차원 항해자', label: 'Grandmaster', color: '#f43f5e', icon: '⚡' },
   { minSEI: 10000, level: 6, name: '마스터 코스믹 사령관', label: 'Master', color: '#a855f7', icon: '🔮' },
   { minSEI: 5000,  level: 5, name: '다이아몬드 성단 개척자', label: 'Diamond', color: '#00f0ff', icon: '💎' },
@@ -206,7 +206,7 @@ export const SEI_TIERS = [
 ];
 
 export function getTierFromSEI(sei) {
-  // 기존 임계값(600/1200/2000)을 유지하면서, 그 위에 5단계 상위 티어(5000/10000/20000/30000/40000)를 신설
+  // 기존 임계값(600/1200/2000)을 유지하면서, 그 위에 5단계 상위 티어(5000/10000/20000/40000/80000)를 신설
   const safeSei = Math.max(0, Number(sei) || 0);
   for (const tier of SEI_TIERS) {
     if (safeSei >= tier.minSEI) {

@@ -263,9 +263,9 @@ export default function StateTransitionLens({ kernel, onDiscoveryComplete }) {
             </div>
           )}
 
-          {currentFrame.prompt && (
+          {(currentFrame.prompt || currentFrame.explanation) && (
             <div style={{ padding: '12px 16px', borderRadius: '8px', background: 'rgba(56, 189, 248, 0.1)', color: '#bae6fd', fontSize: '14px', lineHeight: 1.6 }}>
-              💡 {currentFrame.prompt}
+              💡 {currentFrame.prompt || currentFrame.explanation}
             </div>
           )}
         </div>
@@ -292,7 +292,7 @@ export default function StateTransitionLens({ kernel, onDiscoveryComplete }) {
             {nextFrame.choiceTitle || '🎯 다음 단계 미션: 빠진 명령 선택'}
           </div>
           <div style={{ fontSize: '14px', color: '#e2e8f0', lineHeight: '1.5' }}>
-            {nextFrame.choicePrompt || nextFrame.prompt || '다음 단계에 알맞은 명령을 선택해 보세요.'}
+            {nextFrame.choicePrompt || nextFrame.prompt || nextFrame.explanation || '다음 단계에 알맞은 명령을 선택해 보세요.'}
           </div>
           {nextFrame.choiceHint && (
             <div style={{ fontSize: '13px', color: '#a5f3fc', background: 'rgba(56, 189, 248, 0.12)', padding: '8px 12px', borderRadius: '6px', borderLeft: '3px solid #38bdf8', lineHeight: '1.4' }}>
@@ -369,7 +369,7 @@ export default function StateTransitionLens({ kernel, onDiscoveryComplete }) {
           }}
         >
           {nextFrame
-            ? `${nextFrame.stepTitle || nextFrame.operationLabel || '다음 명령'} 확인 ➔`
+            ? `${nextFrame.stepTitle || nextFrame.operationLabel || nextFrame.label || '다음 명령'} 확인 ➔`
             : (hasDiscovery && !discoveryPassed ? '발견 퀴즈로 이동 ➔' : '핵심 규칙 확인 ➔')}
         </button>
       </div>
