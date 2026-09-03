@@ -95,6 +95,16 @@ const acGraphAdj87 = require('./ac_graph_adj_87.private.cjs')
 const acGraphReach88 = require('./ac_graph_reach_88.private.cjs')
 const acNavCompare89 = require('./ac_nav_compare_89.private.cjs')
 const acNavVisited90 = require('./ac_nav_visited_90.private.cjs')
+const acRecBase91 = require('./ac_rec_base_91.private.cjs')
+const acRecRepeat92 = require('./ac_rec_repeat_92.private.cjs')
+const acMemoClimb01 = require('./ac_memo_climb_01.private.cjs')
+const acGreedyInterval94 = require('./ac_greedy_interval_94.private.cjs')
+const acGreedyCoin95 = require('./ac_greedy_coin_95.private.cjs')
+const acDpMaxsub96 = require('./ac_dp_maxsub_96.private.cjs')
+const acCapDecode97 = require('./ac_cap_decode_97.private.cjs')
+const acCapDispatch98 = require('./ac_cap_dispatch_98.private.cjs')
+const acCapRescue99 = require('./ac_cap_rescue_99.private.cjs')
+const acCapAutorover100 = require('./ac_cap_autorover_100.private.cjs')
 
 const RAW_PRIVATE_PROBLEMS = {
   'AC-COND-001@v1': acCond001,
@@ -187,6 +197,16 @@ const RAW_PRIVATE_PROBLEMS = {
   'AC-GRAPH-REACH-88@v1': acGraphReach88,
   'AC-NAV-COMPARE-89@v1': acNavCompare89,
   'AC-NAV-VISITED-90@v1': acNavVisited90,
+  'AC-REC-BASE-91@v1': acRecBase91,
+  'AC-REC-REPEAT-92@v1': acRecRepeat92,
+  'AC-MEMO-CLIMB-01@v1': acMemoClimb01,
+  'AC-GREEDY-INTERVAL-94@v1': acGreedyInterval94,
+  'AC-GREEDY-COIN-95@v1': acGreedyCoin95,
+  'AC-DP-MAXSUB-96@v1': acDpMaxsub96,
+  'AC-CAP-DECODE-97@v1': acCapDecode97,
+  'AC-CAP-DISPATCH-98@v1': acCapDispatch98,
+  'AC-CAP-RESCUE-99@v1': acCapRescue99,
+  'AC-CAP-AUTOROVER-100@v1': acCapAutorover100,
 }
 
 // Every attempt stores this value in Firestore and exposes it in the replay

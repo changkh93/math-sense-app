@@ -1,4 +1,4 @@
-import { getTodayKST, getKSTComponents } from './streakUtils';
+import { getTodayKST, getKSTComponents } from './streakUtils.js';
 
 export const FOCUS_MAX_SCORE = 600;
 export const FOCUS_WILSON_Z = 1.0;
@@ -193,15 +193,27 @@ export function calculateSEI(user, weeklyGain = 0, streak = 0) {
   };
 }
 
+export const SEI_TIERS = [
+  { minSEI: 40000, level: 9, name: '인피니티 스텔라 초월자', label: 'Infinity', color: '#e0aaff', icon: '🌠' },
+  { minSEI: 30000, level: 8, name: '챌린저 초신성 정복자', label: 'Challenger', color: '#ff8800', icon: '🌟' },
+  { minSEI: 20000, level: 7, name: '그랜드마스터 차원 항해자', label: 'Grandmaster', color: '#f43f5e', icon: '⚡' },
+  { minSEI: 10000, level: 6, name: '마스터 코스믹 사령관', label: 'Master', color: '#a855f7', icon: '🔮' },
+  { minSEI: 5000,  level: 5, name: '다이아몬드 성단 개척자', label: 'Diamond', color: '#00f0ff', icon: '💎' },
+  { minSEI: 2000,  level: 4, name: '플래티넘 은하 수호자', label: 'Platinum', color: '#e5e4e2', icon: '🌌' },
+  { minSEI: 1200,  level: 3, name: '골드 제독', label: 'Gold', color: '#ffd700', icon: '👑' },
+  { minSEI: 600,   level: 2, name: '실버 캡틴', label: 'Silver', color: '#c0c0c0', icon: '⚔️' },
+  { minSEI: 0,     level: 1, name: '브론즈 파일럿', label: 'Bronze', color: '#cd7f32', icon: '🚀' },
+];
+
 export function getTierFromSEI(sei) {
-  // 기존 임계값(600/1200/2000)을 유지한다.
-  // battle 축(최대 600)이 추가되어 총점은 상향되지만, 임계값을 올리면
-  // 배틀 미참여자의 등급이 강등되는 부작용이 생긴다. 대신 battle 점수는
-  // 기존 사용자의 tier를 올리는 방향으로만 작용한다.
-  if (sei >= 2000) return { name: '플래티넘 은하 수호자', label: 'Platinum', color: '#e5e4e2', icon: '🌌' };
-  if (sei >= 1200) return { name: '골드 제독', label: 'Gold', color: '#ffd700', icon: '👑' };
-  if (sei >= 600)  return { name: '실버 캡틴', label: 'Silver', color: '#c0c0c0', icon: '⚔️' };
-  return { name: '브론즈 파일럿', label: 'Bronze', color: '#cd7f32', icon: '🚀' };
+  // 기존 임계값(600/1200/2000)을 유지하면서, 그 위에 5단계 상위 티어(5000/10000/20000/30000/40000)를 신설
+  const safeSei = Math.max(0, Number(sei) || 0);
+  for (const tier of SEI_TIERS) {
+    if (safeSei >= tier.minSEI) {
+      return { ...tier };
+    }
+  }
+  return { ...SEI_TIERS[SEI_TIERS.length - 1] };
 }
 
 export function calculateGrowthUpdates(userData, earnedAmount) {

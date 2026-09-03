@@ -226,7 +226,7 @@ export default function StateTransitionLens({ kernel, onDiscoveryComplete }) {
               onClick={() => setCurrentFrameIndex(index)}
               style={timelineButtonStyle(currentFrameIndex === index, disabled)}
             >
-              {frame.stepTitle || `단계 ${index + 1} (${frame.operationLabel || `명령 ${index + 1}`})`}
+              {frame.stepTitle || frame.label || `단계 ${index + 1} (${frame.operationLabel || `명령 ${index + 1}`})`}
             </button>
           )
         })}
@@ -247,7 +247,7 @@ export default function StateTransitionLens({ kernel, onDiscoveryComplete }) {
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
               <span style={{ fontSize: '12px', fontWeight: 'bold', color: '#38bdf8', padding: '4px 10px', borderRadius: '12px', background: 'rgba(56, 189, 248, 0.15)', border: '1px solid rgba(56, 189, 248, 0.3)' }}>
-                {currentFrame.operationLabel || '명령 실행'}
+                {currentFrame.operationLabel || currentFrame.label || '명령 실행'}
               </span>
               <span style={{ fontSize: '20px', color: '#38bdf8' }}>➔</span>
             </div>

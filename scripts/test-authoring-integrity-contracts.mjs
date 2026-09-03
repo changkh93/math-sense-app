@@ -2331,7 +2331,460 @@ assert.equal(
   'AC-GRID-BOUND-82 must not expose nested-indexing syntax before its First Encounter card'
 )
 
-// Pattern Card Syntax Leak Check for 41~60 and 71~90
+const c9ProblemIds = [
+  'AC-REC-BASE-91',
+  'AC-REC-REPEAT-92',
+  'AC-MEMO-CLIMB-01',
+  'AC-GREEDY-INTERVAL-94',
+  'AC-GREEDY-COIN-95',
+  'AC-DP-MAXSUB-96',
+  'AC-CAP-DECODE-97',
+  'AC-CAP-DISPATCH-98',
+  'AC-CAP-RESCUE-99',
+  'AC-CAP-AUTOROVER-100',
+]
+
+const c9BaseOracles = {
+  'AC-REC-BASE-91': ({ n }) => {
+    if (n === 0) return [1]
+    const table = [1, 1]
+    for (let i = 2; i <= n; i++) table.push(table[i - 1] + table[i - 2])
+    return table
+  },
+  'AC-REC-REPEAT-92': ({ n }) => {
+    if (n <= 1) return 1
+    const work = [1, 1]
+    for (let i = 2; i <= n; i++) work.push(work[i - 1] + work[i - 2] + 1)
+    return work[n]
+  },
+  'AC-MEMO-CLIMB-01': ({ n }) => {
+    if (n <= 1) return 1
+    const ways = [1, 1]
+    for (let i = 2; i <= n; i++) ways.push(ways[i - 1] + ways[i - 2])
+    return ways[n]
+  },
+  'AC-GREEDY-INTERVAL-94': ({ starts, ends }) => {
+    const n = starts.length
+    if (n === 0) return 0
+    const used = new Array(n).fill(false)
+    let count = 0
+    let freeFrom = 0
+    for (let step = 0; step < n; step++) {
+      let bestIdx = -1
+      let bestEnd = 999999
+      for (let i = 0; i < n; i++) {
+        if (!used[i] && starts[i] >= freeFrom && ends[i] < bestEnd) {
+          bestEnd = ends[i]
+          bestIdx = i
+        }
+      }
+      if (bestIdx !== -1) {
+        used[bestIdx] = true
+        count++
+        freeFrom = bestEnd
+      }
+    }
+    return count
+  },
+  'AC-GREEDY-COIN-95': ({ coins, amount }) => {
+    if (amount === 0) return 0
+    const dp = new Array(amount + 1).fill(999999)
+    dp[0] = 0
+    for (let a = 1; a <= amount; a++) {
+      for (const c of coins) {
+        if (c <= a && dp[a - c] !== 999999) {
+          dp[a] = Math.min(dp[a], dp[a - c] + 1)
+        }
+      }
+    }
+    return dp[amount] >= 999999 ? -1 : dp[amount]
+  },
+  'AC-DP-MAXSUB-96': ({ values }) => {
+    let cur = values[0]
+    let best = values[0]
+    for (let i = 1; i < values.length; i++) {
+      cur = Math.max(values[i], cur + values[i])
+      best = Math.max(best, cur)
+    }
+    return best
+  },
+  'AC-CAP-DECODE-97': ({ pairs }) => {
+    if (pairs.length === 0) return [0, {}, '']
+    let tot = 0
+    const freq = {}
+    const seen = []
+    for (const [cnt, sym] of pairs) {
+      tot += cnt
+      if (!(sym in freq)) {
+        freq[sym] = 0
+        seen.push(sym)
+      }
+      freq[sym] += cnt
+    }
+    let mx = -1
+    let best = ''
+    for (const sym of seen) {
+      if (freq[sym] > mx) {
+        mx = freq[sym]
+        best = sym
+      }
+    }
+    return [tot, freq, best]
+  },
+  'AC-CAP-DISPATCH-98': ({ priorities }) => {
+    const n = priorities.length
+    const used = new Array(n).fill(false)
+    const order = []
+    for (let step = 0; step < n; step++) {
+      let bestIdx = -1
+      let bestPrio = -1
+      for (let i = 0; i < n; i++) {
+        if (!used[i] && priorities[i] > bestPrio) {
+          bestPrio = priorities[i]
+          bestIdx = i
+        }
+      }
+      if (bestIdx !== -1) {
+        used[bestIdx] = true
+        order.push(bestIdx)
+      }
+    }
+    return order
+  },
+  'AC-CAP-RESCUE-99': ({ grid, start, targets }) => {
+    const R = grid.length
+    const C = grid[0].length
+    const numTargets = targets.length
+    const served = new Array(numTargets).fill(false)
+    let totalDist = 0
+    let curR = start[0]
+    let curC = start[1]
+    for (let step = 0; step < numTargets; step++) {
+      const q = [[curR, curC, 0]]
+      const vis = new Set([`${curR},${curC}`])
+      let bestIdx = -1
+      let bestDist = 999999
+      let head = 0
+      while (head < q.length) {
+        const [r, c, d] = q[head++]
+        let matchedIdx = -1
+        for (let k = 0; k < numTargets; k++) {
+          if (!served[k] && targets[k][0] === r && targets[k][1] === c) {
+            matchedIdx = k
+            break
+          }
+        }
+        if (matchedIdx !== -1) {
+          bestIdx = matchedIdx
+          bestDist = d
+          break
+        }
+        for (const [dr, dc] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) {
+          const nr = r + dr
+          const nc = c + dc
+          if (nr >= 0 && nr < R && nc >= 0 && nc < C && grid[nr][nc] === 0) {
+            const key = `${nr},${nc}`
+            if (!vis.has(key)) {
+              vis.add(key)
+              q.push([nr, nc, d + 1])
+            }
+          }
+        }
+      }
+      if (bestIdx !== -1) {
+        served[bestIdx] = true
+        totalDist += bestDist
+        curR = targets[bestIdx][0]
+        curC = targets[bestIdx][1]
+      }
+    }
+    return totalDist
+  },
+  'AC-CAP-AUTOROVER-100': ({ grid, start, commands }) => {
+    const R = grid.length
+    const C = grid[0].length
+    let r = start[0]
+    let c = start[1]
+    let d = 0
+    const dr = [-1, 0, 1, 0]
+    const dc = [0, 1, 0, -1]
+    for (const cmd of commands) {
+      if (cmd === 'TURN') {
+        d = (d + 1) % 4
+      } else if (cmd === 'MOVE') {
+        const nr = r + dr[d]
+        const nc = c + dc[d]
+        if (nr >= 0 && nr < R && nc >= 0 && nc < C && grid[nr][nc] === 0) {
+          r = nr
+          c = nc
+        }
+      }
+    }
+    return [r, c, d]
+  },
+}
+
+const c9TransferOracles = {
+  'AC-REC-BASE-91': ({ days }) => {
+    if (days === 0) return [1]
+    const table = [1, 1]
+    for (let i = 2; i <= days; i++) table.push(table[i - 1] + table[i - 2])
+    return table
+  },
+  'AC-REC-REPEAT-92': ({ spans }) => {
+    if (spans <= 1) return 1
+    const work = [1, 1]
+    for (let i = 2; i <= spans; i++) work.push(work[i - 1] + work[i - 2] + 1)
+    return work[spans]
+  },
+  'AC-MEMO-CLIMB-01': ({ n }) => {
+    if (n <= 2) return 1
+    const ways = [1, 1, 1]
+    for (let i = 3; i <= n; i++) ways.push(ways[i - 1] + ways[i - 3])
+    return ways[n]
+  },
+  'AC-GREEDY-INTERVAL-94': ({ starts, ends }) => {
+    const n = starts.length
+    if (n === 0) return 0
+    const used = new Array(n).fill(false)
+    let count = 0
+    let freeFrom = 0
+    for (let step = 0; step < n; step++) {
+      let bestIdx = -1
+      let bestEnd = 999999
+      for (let i = 0; i < n; i++) {
+        if (!used[i] && starts[i] >= freeFrom && ends[i] < bestEnd) {
+          bestEnd = ends[i]
+          bestIdx = i
+        }
+      }
+      if (bestIdx !== -1) {
+        used[bestIdx] = true
+        count++
+        freeFrom = bestEnd
+      }
+    }
+    return count
+  },
+  'AC-GREEDY-COIN-95': ({ values, total }) => {
+    if (total === 0) return 0
+    const dp = new Array(total + 1).fill(999999)
+    dp[0] = 0
+    for (let a = 1; a <= total; a++) {
+      for (const v of values) {
+        if (v <= a && dp[a - v] !== 999999) {
+          dp[a] = Math.min(dp[a], dp[a - v] + 1)
+        }
+      }
+    }
+    return dp[total] >= 999999 ? -1 : dp[total]
+  },
+  'AC-DP-MAXSUB-96': ({ readings }) => {
+    let cur = readings[0]
+    let best = readings[0]
+    for (let i = 1; i < readings.length; i++) {
+      cur = Math.max(readings[i], cur + readings[i])
+      best = Math.max(best, cur)
+    }
+    return best
+  },
+  'AC-CAP-DECODE-97': ({ pairs }) => {
+    if (pairs.length === 0) return [0, {}, '']
+    let tot = 0
+    const freq = {}
+    const seen = []
+    for (const [cnt, sym] of pairs) {
+      tot += cnt
+      if (!(sym in freq)) {
+        freq[sym] = 0
+        seen.push(sym)
+      }
+      freq[sym] += cnt
+    }
+    let mx = -1
+    let best = ''
+    for (const sym of seen) {
+      if (freq[sym] > mx) {
+        mx = freq[sym]
+        best = sym
+      }
+    }
+    return [tot, freq, best]
+  },
+  'AC-CAP-DISPATCH-98': ({ severities }) => {
+    const n = severities.length
+    const used = new Array(n).fill(false)
+    const order = []
+    for (let step = 0; step < n; step++) {
+      let bestIdx = -1
+      let bestPrio = -1
+      for (let i = 0; i < n; i++) {
+        if (!used[i] && severities[i] > bestPrio) {
+          bestPrio = severities[i]
+          bestIdx = i
+        }
+      }
+      if (bestIdx !== -1) {
+        used[bestIdx] = true
+        order.push(bestIdx)
+      }
+    }
+    return order
+  },
+  'AC-CAP-RESCUE-99': ({ grid, start, stations }) => {
+    const R = grid.length
+    const C = grid[0].length
+    const numTargets = stations.length
+    const served = new Array(numTargets).fill(false)
+    let totalDist = 0
+    let curR = start[0]
+    let curC = start[1]
+    for (let step = 0; step < numTargets; step++) {
+      const q = [[curR, curC, 0]]
+      const vis = new Set([`${curR},${curC}`])
+      let bestIdx = -1
+      let bestDist = 999999
+      let head = 0
+      while (head < q.length) {
+        const [r, c, d] = q[head++]
+        let matchedIdx = -1
+        for (let k = 0; k < numTargets; k++) {
+          if (!served[k] && stations[k][0] === r && stations[k][1] === c) {
+            matchedIdx = k
+            break
+          }
+        }
+        if (matchedIdx !== -1) {
+          bestIdx = matchedIdx
+          bestDist = d
+          break
+        }
+        for (const [dr, dc] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) {
+          const nr = r + dr
+          const nc = c + dc
+          if (nr >= 0 && nr < R && nc >= 0 && nc < C && grid[nr][nc] === 0) {
+            const key = `${nr},${nc}`
+            if (!vis.has(key)) {
+              vis.add(key)
+              q.push([nr, nc, d + 1])
+            }
+          }
+        }
+      }
+      if (bestIdx !== -1) {
+        served[bestIdx] = true
+        totalDist += bestDist
+        curR = stations[bestIdx][0]
+        curC = stations[bestIdx][1]
+      }
+    }
+    return totalDist
+  },
+  'AC-CAP-AUTOROVER-100': ({ grid, start, commands }) => {
+    const R = grid.length
+    const C = grid[0].length
+    let r = start[0]
+    let c = start[1]
+    let d = 0
+    const dr = [-1, 0, 1, 0]
+    const dc = [0, 1, 0, -1]
+    const visited = new Set([`${r},${c}`])
+    for (const cmd of commands) {
+      if (cmd === 'TURN') {
+        d = (d + 1) % 4
+      } else if (cmd === 'MOVE') {
+        const nr = r + dr[d]
+        const nc = c + dc[d]
+        if (nr >= 0 && nr < R && nc >= 0 && nc < C && grid[nr][nc] === 0) {
+          r = nr
+          c = nc
+          visited.add(`${r},${c}`)
+        }
+      }
+    }
+    return [[r, c, d], visited.size]
+  },
+}
+
+for (const problemId of c9ProblemIds) {
+  const publicKernel = PUBLIC_KERNELS[problemId]
+  const privateDef = getPrivateProblemDefinition(problemId, 1)
+  const privateTransfers = getTransferChallenges(privateDef)
+  const publicTransfer = publicKernel.assessment.transferChallenges[0]
+  const privateTransfer = privateTransfers[0]
+  const publicInputs = new Set(publicKernel.assessment.publicTests.map(inputKey))
+  const previewInputs = new Set(publicTransfer.testCases.map(inputKey))
+
+  assert.equal(
+    privateDef.hiddenTests.some((test) => publicInputs.has(inputKey(test))),
+    false,
+    `${problemId} hidden tests must not repeat public inputs`
+  )
+  assert.equal(
+    privateTransfer.testCases.some((test) => previewInputs.has(inputKey(test))),
+    false,
+    `${problemId} authoritative transfer tests must not repeat client preview inputs`
+  )
+  assert.equal(publicTransfer.transferChallengeId, privateTransfer.transferChallengeId, `${problemId} transfer challenge ID parity`)
+  assert.equal(publicTransfer.entryFunction, privateTransfer.entryFunction, `${problemId} transfer entry function parity`)
+  assert.equal(publicTransfer.title, privateTransfer.title, `${problemId} transfer title parity`)
+  assert.equal(publicTransfer.description, privateTransfer.description, `${problemId} transfer description parity`)
+  assert.deepEqual(publicTransfer.contextCard, privateTransfer.contextCard, `${problemId} transfer context card parity`)
+  assert.deepEqual(publicTransfer.thoughtCheck, privateTransfer.thoughtCheck, `${problemId} transfer thought check parity`)
+
+  const publicUnderstanding = publicKernel.assessment.understandingChallenges[0]
+  const privateUnderstanding = privateDef.understandingChallenges[0]
+  assert.equal(publicUnderstanding.challengeId, privateUnderstanding.challengeId, `${problemId} understanding challenge ID parity`)
+  assert.equal(publicUnderstanding.title, privateUnderstanding.title, `${problemId} understanding title parity`)
+  assert.equal(publicUnderstanding.prompt, privateUnderstanding.prompt, `${problemId} understanding prompt parity`)
+  assert.deepEqual(
+    publicUnderstanding.questions.map(({ id, text, options, expected }) => ({ id, text, options, expected })),
+    privateUnderstanding.questions.map(({ id, text, options, expected }) => ({ id, text, options, expected })),
+    `${problemId} understanding question display/answer parity`
+  )
+
+  const codeSamples = [
+    publicKernel.modes.code.starterCode,
+    privateDef.officialSolutionCode,
+    ...(privateDef.alternativeSolutions || []),
+    ...(privateDef.intendedWrongFixtures || privateDef.intendedWrongSolutions || []).map((fixture) => fixture.code),
+    publicTransfer.starterCode,
+    privateTransfer.starterCode,
+    privateTransfer.officialSolutionCode,
+  ].filter(Boolean)
+  for (const code of codeSamples) {
+    assert.equal(
+      nestedSubscriptIndexPattern.test(code),
+      false,
+      `${problemId} must extract coordinate parts before using them as another subscript index`
+    )
+    assert.equal(
+      /\.pop\s*\(\s*[A-Za-z0-9_]+\s*\)/.test(code),
+      false,
+      `${problemId} must not use positional pop(k)`
+    )
+  }
+
+  for (const test of [...publicKernel.assessment.publicTests, ...privateDef.hiddenTests]) {
+    assert.deepEqual(test.expected, c9BaseOracles[problemId](test.inputs), `${problemId} Base oracle mismatch: ${JSON.stringify(test.inputs)}`)
+  }
+  for (const test of [...publicTransfer.testCases, ...privateTransfer.testCases]) {
+    assert.deepEqual(test.expected, c9TransferOracles[problemId](test.inputs), `${problemId} Transfer oracle mismatch: ${JSON.stringify(test.inputs)}`)
+  }
+
+  assert.equal(
+    evaluateBaseSubmission(problemId, 1, privateDef.officialSolutionCode, { maxCumulativeSteps: 20_000 }).passed,
+    true,
+    `${problemId} official Base must pass within the 20,000-step authoring budget`
+  )
+  assert.equal(
+    evaluateTransferSubmission(problemId, 1, privateTransfer.transferChallengeId, privateTransfer.officialSolutionCode, { maxCumulativeSteps: 20_000 }).passed,
+    true,
+    `${problemId} official Transfer must pass within the 20,000-step authoring budget`
+  )
+}
+
+// Pattern Card Syntax Leak Check for 41~60, 71~90, and 91~100
 for (const patternId of [
   'pattern:deduplicate-then-measure',
   'pattern:membership-query',
@@ -2371,6 +2824,12 @@ for (const patternId of [
   'pattern:adjacency-list',
   'pattern:graph-reachability',
   'pattern:mark-when-enqueued',
+  'pattern:shrinking-structure',
+  'pattern:repeat-cost-awareness',
+  'pattern:reuse-table',
+  'pattern:greedy-earliest-end',
+  'pattern:table-over-greedy',
+  'pattern:running-best-reset',
 ]) {
   const pattern = PROBLEM_SOLVING_PATTERN_REGISTRY[patternId]
   assert.ok(pattern, `Pattern registry missing: ${patternId}`)
@@ -2382,5 +2841,5 @@ for (const patternId of [
   )
 }
 
-assert.equal(registeredProblemIds.length, 90, 'Total registered problems must be exactly 90 (Constellations 0~8 complete)')
+assert.equal(registeredProblemIds.length, 100, 'Total registered problems must be exactly 100 (Constellations 0~9 complete - Regular curriculum complete!)')
 console.log(`✅ All 10 Authoring Invariants PASSED across all ${registeredProblemIds.length} registered problems!`)

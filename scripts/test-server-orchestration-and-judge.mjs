@@ -213,6 +213,16 @@ for (const pid of [
   'AC-GRAPH-REACH-88',
   'AC-NAV-COMPARE-89',
   'AC-NAV-VISITED-90',
+  'AC-REC-BASE-91',
+  'AC-REC-REPEAT-92',
+  'AC-MEMO-CLIMB-01',
+  'AC-GREEDY-INTERVAL-94',
+  'AC-GREEDY-COIN-95',
+  'AC-DP-MAXSUB-96',
+  'AC-CAP-DECODE-97',
+  'AC-CAP-DISPATCH-98',
+  'AC-CAP-RESCUE-99',
+  'AC-CAP-AUTOROVER-100',
 ]) {
   const waveDefinition = getPrivateProblemDefinition(pid, 1)
   const waveContext = auth(`student_${pid.toLowerCase().replace(/-/g, '_')}`)

@@ -88,6 +88,16 @@ import { AC_GRAPH_ADJ_87 } from './ac_graph_adj_87.js'
 import { AC_GRAPH_REACH_88 } from './ac_graph_reach_88.js'
 import { AC_NAV_COMPARE_89 } from './ac_nav_compare_89.js'
 import { AC_NAV_VISITED_90 } from './ac_nav_visited_90.js'
+import { AC_REC_BASE_91 } from './ac_rec_base_91.js'
+import { AC_REC_REPEAT_92 } from './ac_rec_repeat_92.js'
+import { AC_MEMO_CLIMB_01 } from './ac_memo_climb_01.js'
+import { AC_GREEDY_INTERVAL_94 } from './ac_greedy_interval_94.js'
+import { AC_GREEDY_COIN_95 } from './ac_greedy_coin_95.js'
+import { AC_DP_MAXSUB_96 } from './ac_dp_maxsub_96.js'
+import { AC_CAP_DECODE_97 } from './ac_cap_decode_97.js'
+import { AC_CAP_DISPATCH_98 } from './ac_cap_dispatch_98.js'
+import { AC_CAP_RESCUE_99 } from './ac_cap_rescue_99.js'
+import { AC_CAP_AUTOROVER_100 } from './ac_cap_autorover_100.js'
 
 export const PUBLIC_KERNELS = Object.freeze({
   'AC-COND-001': AC_COND_001,
@@ -180,6 +190,16 @@ export const PUBLIC_KERNELS = Object.freeze({
   'AC-GRAPH-REACH-88': AC_GRAPH_REACH_88,
   'AC-NAV-COMPARE-89': AC_NAV_COMPARE_89,
   'AC-NAV-VISITED-90': AC_NAV_VISITED_90,
+  'AC-REC-BASE-91': AC_REC_BASE_91,
+  'AC-REC-REPEAT-92': AC_REC_REPEAT_92,
+  'AC-MEMO-CLIMB-01': AC_MEMO_CLIMB_01,
+  'AC-GREEDY-INTERVAL-94': AC_GREEDY_INTERVAL_94,
+  'AC-GREEDY-COIN-95': AC_GREEDY_COIN_95,
+  'AC-DP-MAXSUB-96': AC_DP_MAXSUB_96,
+  'AC-CAP-DECODE-97': AC_CAP_DECODE_97,
+  'AC-CAP-DISPATCH-98': AC_CAP_DISPATCH_98,
+  'AC-CAP-RESCUE-99': AC_CAP_RESCUE_99,
+  'AC-CAP-AUTOROVER-100': AC_CAP_AUTOROVER_100,
 })
 
 export function getPublicKernel(problemId) {
@@ -278,5 +298,15 @@ export {
   AC_GRAPH_REACH_88,
   AC_NAV_COMPARE_89,
   AC_NAV_VISITED_90,
+  AC_REC_BASE_91,
+  AC_REC_REPEAT_92,
+  AC_MEMO_CLIMB_01,
+  AC_GREEDY_INTERVAL_94,
+  AC_GREEDY_COIN_95,
+  AC_DP_MAXSUB_96,
+  AC_CAP_DECODE_97,
+  AC_CAP_DISPATCH_98,
+  AC_CAP_RESCUE_99,
+  AC_CAP_AUTOROVER_100,
 }
 

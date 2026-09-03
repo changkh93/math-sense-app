@@ -106,8 +106,9 @@ assert.equal(grandfatheredConst3.mode, 'grandfathered')
 // Constellation 4 previous gate (Constellation 3) is now fully ready -> gated
 assert.equal(getConstellationAccess(4, [], ALGORITHM_EDITORIAL_CATALOG).mode, 'gated')
 assert.equal(getConstellationAccess(4, [], ALGORITHM_EDITORIAL_CATALOG).accessible, false)
-// Constellation 9 is unavailable
-assert.equal(getConstellationAccess(9, [], ALGORITHM_EDITORIAL_CATALOG).mode, 'unavailable')
+// Constellation 9 previous gate (Constellation 8) is now fully ready and C9 is published -> gated
+assert.equal(getConstellationAccess(9, [], ALGORITHM_EDITORIAL_CATALOG).mode, 'gated')
+assert.equal(getConstellationAccess(9, [], ALGORITHM_EDITORIAL_CATALOG).accessible, false)
 
 // A fresh student, including one who just completed #3, must not skip to C8.
 const firstThreeCompleted = ['AC-EXP-SEQ-01', 'AC-EXP-VAR-02', 'AC-EXP-STEP-03']
@@ -1342,14 +1343,114 @@ assert.deepEqual(
   'Existing AC-NAV-006 completion must grandfather Constellation 8 review access'
 )
 
-const mockCatalogWithC9 = ALGORITHM_EDITORIAL_CATALOG.map((entry) =>
-  entry.problemId === 'AC-REC-BASE-91' ? { ...entry, status: 'published' } : entry
-)
-const accessC9Locked = getConstellationAccess(9, c8SevenCoresMissingAnchor81, mockCatalogWithC9)
+const accessC9Locked = getConstellationAccess(9, c8SevenCoresMissingAnchor81, ALGORITHM_EDITORIAL_CATALOG)
 assert.equal(accessC9Locked.accessible, false, 'Constellation 9 must be locked when anchor 81 is missing')
-const accessC9Unlocked = getConstellationAccess(9, c8SixCoreWithAnchors, mockCatalogWithC9)
+const accessC9Unlocked = getConstellationAccess(9, c8SixCoreWithAnchors, ALGORITHM_EDITORIAL_CATALOG)
 assert.equal(accessC9Unlocked.accessible, true, 'Constellation 9 must be accessible with C8 anchors 81·83·85 and 6 cores')
 
 console.log('  -> [PASS] Constellation 8 (81~90) prerequisites, anchors 81·83·85, and Core 6/8 unlock verified')
+
+// [Test 21] Constellation 9 Strategy & Memory (91~100) Curriculum & Terminal Invariants
+console.log('[Test 21] Validating Constellation 9 Strategy & Memory (91~100) and terminal curriculum invariants...')
+const c9Published = ALGORITHM_EDITORIAL_CATALOG.filter(
+  (entry) => entry.constellationId === 'constellation-9' && entry.status === 'published'
+)
+assert.deepEqual(
+  c9Published.map((entry) => entry.problemId),
+  [
+    'AC-REC-BASE-91',
+    'AC-REC-REPEAT-92',
+    'AC-MEMO-CLIMB-01',
+    'AC-GREEDY-INTERVAL-94',
+    'AC-GREEDY-COIN-95',
+    'AC-DP-MAXSUB-96',
+    'AC-CAP-DECODE-97',
+    'AC-CAP-DISPATCH-98',
+    'AC-CAP-RESCUE-99',
+    'AC-CAP-AUTOROVER-100',
+  ],
+  'Constellation 9 must have exactly the 10 published problems 91~100'
+)
+const c9Cores = c9Published.filter((entry) => entry.routeRole === 'core')
+const c9Branches = c9Published.filter((entry) => entry.routeRole === 'branch')
+const c9Capstones = c9Published.filter((entry) => entry.routeRole === 'capstone')
+assert.equal(c9Cores.length, 4, 'Constellation 9 must have exactly 4 Core problems (91~94)')
+assert.equal(c9Branches.length, 2, 'Constellation 9 must have exactly 2 Branch problems (95~96)')
+assert.equal(c9Capstones.length, 4, 'Constellation 9 must have exactly 4 Capstone problems (97~100)')
+
+assert.deepEqual(
+  c9Cores.map((entry) => entry.problemId),
+  ['AC-REC-BASE-91', 'AC-REC-REPEAT-92', 'AC-MEMO-CLIMB-01', 'AC-GREEDY-INTERVAL-94']
+)
+assert.deepEqual(
+  c9Branches.map((entry) => entry.problemId),
+  ['AC-GREEDY-COIN-95', 'AC-DP-MAXSUB-96']
+)
+assert.deepEqual(
+  c9Capstones.map((entry) => entry.problemId),
+  ['AC-CAP-DECODE-97', 'AC-CAP-DISPATCH-98', 'AC-CAP-RESCUE-99', 'AC-CAP-AUTOROVER-100']
+)
+
+for (const entry of c9Published) {
+  assert.deepEqual(
+    PUBLIC_KERNELS[entry.problemId].curriculum.prerequisites,
+    entry.prerequisites,
+    `Constellation 9 kernel and catalog prerequisites must stay synchronized for ${entry.problemId}`
+  )
+}
+
+// Registry anchor contract: 93
+const c9Config = CONSTELLATIONS.find((item) => item.id === 'constellation-9')
+assert.deepEqual(
+  c9Config.requiredAnchors,
+  ['AC-MEMO-CLIMB-01'],
+  'Constellation 9 requiredAnchors must be exactly AC-MEMO-CLIMB-01 (93)'
+)
+assert.equal(
+  c9Config.minimumCoreToUnlockNext,
+  null,
+  'Constellation 9 is terminal, minimumCoreToUnlockNext must be null'
+)
+
+// Invariant: Capstone problems must NEVER be required as prerequisites for any other problem
+const allCatalogPrerequisites = new Set(
+  ALGORITHM_EDITORIAL_CATALOG.flatMap((entry) => entry.prerequisites || [])
+)
+for (const capstone of c9Capstones) {
+  assert.equal(
+    allCatalogPrerequisites.has(capstone.problemId),
+    false,
+    `Capstone ${capstone.problemId} must never be a prerequisite for any other problem`
+  )
+}
+
+// Prerequisite lock transitions for Constellation 9
+assert.equal(isMissionPrerequisitesMet('AC-REC-BASE-91', [], ALGORITHM_EDITORIAL_CATALOG), false)
+assert.equal(isMissionPrerequisitesMet('AC-REC-BASE-91', ['AC-SEQ-RUNNING-35'], ALGORITHM_EDITORIAL_CATALOG), false)
+assert.equal(isMissionPrerequisitesMet('AC-REC-BASE-91', ['AC-SEQ-RUNNING-35', 'AC-PAT-003'], ALGORITHM_EDITORIAL_CATALOG), true)
+
+assert.equal(isMissionPrerequisitesMet('AC-REC-REPEAT-92', [], ALGORITHM_EDITORIAL_CATALOG), false)
+assert.equal(isMissionPrerequisitesMet('AC-REC-REPEAT-92', ['AC-REC-BASE-91'], ALGORITHM_EDITORIAL_CATALOG), true)
+
+assert.equal(isMissionPrerequisitesMet('AC-MEMO-CLIMB-01', [], ALGORITHM_EDITORIAL_CATALOG), false)
+assert.equal(isMissionPrerequisitesMet('AC-MEMO-CLIMB-01', ['AC-REC-REPEAT-92'], ALGORITHM_EDITORIAL_CATALOG), true)
+
+assert.equal(isMissionPrerequisitesMet('AC-GREEDY-INTERVAL-94', ['AC-SORT-MIN-01'], ALGORITHM_EDITORIAL_CATALOG), false)
+assert.equal(isMissionPrerequisitesMet('AC-GREEDY-INTERVAL-94', ['AC-SORT-MIN-01', 'AC-ENUM-BEST-68'], ALGORITHM_EDITORIAL_CATALOG), true)
+
+// Capstones unlock once their specific cross-constellation prerequisites are met
+assert.equal(isMissionPrerequisitesMet('AC-CAP-DECODE-97', ['AC-STR-COMPRESS-39'], ALGORITHM_EDITORIAL_CATALOG), false)
+assert.equal(isMissionPrerequisitesMet('AC-CAP-DECODE-97', ['AC-STR-COMPRESS-39', 'AC-DICT-FREQ-44'], ALGORITHM_EDITORIAL_CATALOG), true)
+
+assert.equal(isMissionPrerequisitesMet('AC-CAP-DISPATCH-98', ['AC-NAV-005'], ALGORITHM_EDITORIAL_CATALOG), false)
+assert.equal(isMissionPrerequisitesMet('AC-CAP-DISPATCH-98', ['AC-NAV-005', 'AC-SORT-MIN-01'], ALGORITHM_EDITORIAL_CATALOG), true)
+
+assert.equal(isMissionPrerequisitesMet('AC-CAP-RESCUE-99', ['AC-NAV-006'], ALGORITHM_EDITORIAL_CATALOG), false)
+assert.equal(isMissionPrerequisitesMet('AC-CAP-RESCUE-99', ['AC-NAV-006', 'AC-SRCH-LINEAR-58'], ALGORITHM_EDITORIAL_CATALOG), true)
+
+assert.equal(isMissionPrerequisitesMet('AC-CAP-AUTOROVER-100', ['AC-MEMO-CLIMB-01', 'AC-NAV-006'], ALGORITHM_EDITORIAL_CATALOG), false)
+assert.equal(isMissionPrerequisitesMet('AC-CAP-AUTOROVER-100', ['AC-MEMO-CLIMB-01', 'AC-NAV-006', 'AC-SIM-COMPASS-52'], ALGORITHM_EDITORIAL_CATALOG), true)
+
+console.log('  -> [PASS] Constellation 9 (91~100) Strategy & Memory, Capstones, and Terminal Curriculum verified')
 
 console.log('\n=== Gate 0 Curriculum & Contract Tests Passed 100%! ===\n')
