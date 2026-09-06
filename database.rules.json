@@ -61,6 +61,10 @@
                 "displayName": {
                   ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 40"
                 },
+                "y": { ".validate": "newData.isNumber() && newData.val() >= -8 && newData.val() <= 24" },
+                "scale": { ".validate": "newData.isNumber() && newData.val() >= 0.14 && newData.val() <= 0.7" },
+                "equipment": { ".validate": "newData.val() === 'none' || newData.val() === 'hoverpack' || newData.val() === 'diving'" },
+                "movementMode": { ".validate": "newData.val() === 'grounded' || newData.val() === 'flying' || newData.val() === 'landing' || newData.val() === 'swimming' || newData.val() === 'diving'" },
                 "x": { ".validate": "newData.isNumber()" },
                 "z": { ".validate": "newData.isNumber()" },
                 "yaw": { ".validate": "newData.isNumber()" },

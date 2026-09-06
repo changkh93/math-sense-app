@@ -1,3 +1,4 @@
+import { releaseFrontierPointerLock } from './frontierPointerLock.js'
 import { createElement, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { collection, doc, limit, onSnapshot, orderBy, query } from 'firebase/firestore'
 import { httpsCallable } from 'firebase/functions'
@@ -849,7 +850,7 @@ export default function MetaGalaxy({ user, userData, playSession, playRemainingS
 
   useEffect(() => {
     const onKeyDown = (event) => {
-      if (event.key !== 'Escape' || event.repeat) return
+      if (event.key !== 'Escape' || event.repeat || event.defaultPrevented) return
 
       // GalaxyWorld3D owns Escape while building. The same key must never close the builder
       // and return from the game in one press.
@@ -864,11 +865,12 @@ export default function MetaGalaxy({ user, userData, playSession, playRemainingS
       else if (arrivalOpen) setArrivalOpen(false)
       else if (audioSettingsOpen) setAudioSettingsOpen(false)
       else if (menu) setMenu('')
-      else requestReturn()
+      // Escape releases the mouse; only the explicit return button ends a session.
+      else releaseFrontierPointerLock(document)
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [arrivalOpen, audioSettingsOpen, builderActive, finaleOpen, menu, objectDialogOpen, requestReturn])
+  }, [arrivalOpen, audioSettingsOpen, builderActive, finaleOpen, menu, objectDialogOpen])
 
   const planet = home?.planet || {}
   const ownPlanet = home?.ownPlanet || {}
@@ -2284,7 +2286,6 @@ export default function MetaGalaxy({ user, userData, playSession, playRemainingS
         onSaveBuilderState={saveBuilderState}
         onPurchaseBuilderUpgrade={buyBuilderUpgrade}
         onBuilderModeChange={setBuilderActive}
-        onExplorationExitRequest={requestReturn}
         onOpenMenu={openGameMenu}
         onMessage={flash}
         objective={todayObjective}

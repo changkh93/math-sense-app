@@ -74,6 +74,8 @@ function basePlan(overrides = {}) {
 
 function testOnlineAndProximityEnforcement() {
   assert.equal(basePlan().kind, 'allowed');
+  assert.equal(basePlan({ targetConnections: { target: { ...connection('student-2', 0, 0), y: 8 } } }).kind, 'too_far');
+  assert.equal(basePlan({ actorConnection: { ...connection('student-1', 0, 0), y: NaN } }).kind, 'invalid_position');
   assert.equal(basePlan({ targetConnections: { target: connection('student-2', 4.5, 0) } }).kind, 'allowed');
   assert.equal(basePlan({ targetConnections: { target: connection('student-2', 4.51, 0) } }).kind, 'too_far');
   assert.equal(basePlan({ actorAccess: { uid: 'student-1', expiresAtMs: NOW_MS } }).kind, 'offline');

@@ -13,6 +13,7 @@ import {
   update,
 } from 'firebase/database'
 import { realtimeDb } from '../firebase'
+import { normalizeExplorationKit, normalizeMovementMode } from '../components/GalaxySocial/exploration/frontierExploration.js'
 
 const POSITION_THROTTLE_MS = 120
 const POSITION_EPSILON = 0.035
@@ -58,6 +59,8 @@ const normalizePosition = (position = {}) => {
   const scale = Number(position.scale)
   if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(z) || !Number.isFinite(yaw)) return null
   return {
+    equipment: normalizeExplorationKit(position.equipment),
+    movementMode: normalizeMovementMode(position.movementMode),
     x: Math.round(clamp(x, -32, 32) * 1000) / 1000,
     y: Math.round(clamp(y, -8, 24) * 1000) / 1000,
     z: Math.round(clamp(z, -32, 32) * 1000) / 1000,
@@ -67,6 +70,8 @@ const normalizePosition = (position = {}) => {
 }
 
 const hasSignificantPositionChange = (previous, next) => !previous
+  || next.equipment !== previous.equipment
+  || next.movementMode !== previous.movementMode
   || Math.hypot(next.x - previous.x, next.z - previous.z) >= POSITION_EPSILON
   || Math.abs(next.y - previous.y) >= HEIGHT_EPSILON
   || Math.abs(next.scale - previous.scale) >= SCALE_EPSILON
@@ -115,6 +120,8 @@ const normalizeRemotePlayers = (value, ownSafeUid, nowMs) => Object.entries(valu
       z: clamp(z, -32, 32),
       yaw: normalizeYaw(yaw),
       scale: clamp(Number(connection.scale) || .28, .14, .7),
+      equipment: normalizeExplorationKit(connection.equipment),
+      movementMode: normalizeMovementMode(connection.movementMode),
       lastSeenMs: Number(connection.updatedAtMs),
       speech: speech?.text ? speech : null,
     })

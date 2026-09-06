@@ -50,6 +50,10 @@ const ReferralPolicy = lazy(() => import('./pages/ReferralPolicy'))
 const CrewGuestInvite = lazy(() => import('./pages/CrewGuestInvite'))
 const AlgorithmConstellationHub = lazy(() => import('./components/AlgorithmConstellation/client/hub/AlgorithmConstellationHub'))
 
+const FrontierExplorationQa = import.meta.env.DEV
+  ? lazy(() => import('./components/GalaxySocial/exploration/FrontierExplorationQa'))
+  : null
+
 const AstraBuilderQa = import.meta.env.DEV
   ? lazy(() => import('./components/GalaxySocial/builder/AstraBuilderQa'))
   : null
@@ -95,6 +99,7 @@ function App() {
       <Route path="/signup" element={<Signup />} />
       <Route path="/terms" element={<Terms />} />
       <Route path="/referral" element={<ReferralPolicy />} />
+      {FrontierExplorationQa && <Route path="/dev/frontier-exploration" element={<FrontierExplorationQa />} />}
       {AstraBuilderQa && (
         <Route
           path="/dev/astra-builder"

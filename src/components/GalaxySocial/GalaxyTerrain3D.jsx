@@ -91,7 +91,7 @@ const OCEAN_FRAGMENT_SHADER = `
     water += vec3(0.72, 0.91, 1.0) * reflection * 0.28;
     water += vec3(0.94, 0.99, 1.0) * sparkle * 0.38;
     water += vec3(0.8, 0.96, 1.0) * shoreFoam * 0.2;
-    gl_FragColor = vec4(water, 1.0);
+    gl_FragColor = vec4(water, gl_FrontFacing ? 0.78 : 0.55);
     #include <tonemapping_fragment>
     #include <colorspace_fragment>
   }
@@ -690,7 +690,9 @@ function OceanSurface({ palette }) {
           uniforms={uniforms}
           vertexShader={OCEAN_VERTEX_SHADER}
           fragmentShader={OCEAN_FRAGMENT_SHADER}
-          depthWrite
+          transparent
+          side={THREE.DoubleSide}
+          depthWrite={false}
         />
       </mesh>
       <mesh position={[0, .014, 0]} rotation={[-Math.PI / 2, 0, 0]} renderOrder={1} raycast={() => null}>

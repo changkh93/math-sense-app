@@ -747,10 +747,12 @@ function planGalaxyLiveSpeech({ actorAccess = {}, targetAccess = {}, actorConnec
 
   const actorX = Number(actorConnection.x);
   const actorZ = Number(actorConnection.z);
+  const actorY = Number(actorConnection.y ?? 0);
   const targetX = Number(targetConnection.x);
   const targetZ = Number(targetConnection.z);
-  if (![actorX, actorZ, targetX, targetZ].every(Number.isFinite)) return { kind: "invalid_position" };
-  const distance = Math.hypot(actorX - targetX, actorZ - targetZ);
+  const targetY = Number(targetConnection.y ?? 0);
+  if (![actorX, actorY, actorZ, targetX, targetY, targetZ].every(Number.isFinite)) return { kind: "invalid_position" };
+  const distance = Math.hypot(actorX - targetX, actorY - targetY, actorZ - targetZ);
   if (distance > GALAXY_LIVE_PROXIMITY_DISTANCE) return { kind: "too_far", distance };
   return { kind: "allowed", targetConnection, distance };
 }
