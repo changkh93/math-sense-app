@@ -12,6 +12,7 @@ export default function FrontierExplorationQa() {
   return <main style={{ position: 'fixed', inset: 0 }}>
     <GalaxyWorld3D planet={planet} restorationPercent={60} isPlanetOwner builderOwnerId="exploration-qa"
       isFirstPerson={firstPerson} onToggleFirstPerson={() => setFirstPerson(!firstPerson)}
+      ownedExplorationKits={['hoverpack', 'diving']} explorationWallet={2000}
       qaCommand={command} onPlayerTransform={setPosition} paused={paused} />
     <div style={{ position: 'absolute', top: 10, left: 16, zIndex: 100, color: 'white', background: '#123b', padding: 8, maxWidth: 'calc(100% - 32px)', fontSize: 11, maxHeight: 72, overflow: 'auto' }}>
       <strong>프론티어 탐험 QA</strong> <button onClick={() => setPaused(!paused)}>{paused ? '계속하기' : '일시정지'}</button>

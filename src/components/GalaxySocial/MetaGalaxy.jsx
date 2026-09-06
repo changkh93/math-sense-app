@@ -621,6 +621,10 @@ export default function MetaGalaxy({ user, userData, playSession, playRemainingS
     (payload) => callGalaxy('purchaseGalaxyTerritoryExpansion', payload),
     [callGalaxy],
   )
+  const purchaseExplorationKit = useCallback(
+    (payload) => callGalaxy('purchaseStoreItem', payload),
+    [callGalaxy],
+  )
 
   const liveSessionEnabled = Boolean(
     overlayReady
@@ -730,8 +734,10 @@ export default function MetaGalaxy({ user, userData, playSession, playRemainingS
     if (isGuest || !user?.uid) return undefined
     return onSnapshot(doc(db, 'users', user.uid), (snapshot) => {
       if (!snapshot.exists()) return
-      const nextWallet = Math.max(0, Number(snapshot.data()?.crystals || 0))
-      setHome((current) => current ? { ...current, wallet: nextWallet } : current)
+      const profile = snapshot.data() || {}
+      const nextWallet = Math.max(0, Number(profile.crystals || 0))
+      const ownedExplorationKits = Array.isArray(profile.ownedExplorationKits) ? profile.ownedExplorationKits : []
+      setHome((current) => current ? { ...current, wallet: nextWallet, ownedExplorationKits } : current)
     })
   }, [isGuest, user?.uid])
 
@@ -2282,6 +2288,9 @@ export default function MetaGalaxy({ user, userData, playSession, playRemainingS
         builderAccess={home?.builderAccess}
         builderStates={home?.builderStates}
         builderWallet={wallet}
+        explorationWallet={wallet}
+        ownedExplorationKits={home?.ownedExplorationKits ?? userData?.ownedExplorationKits ?? []}
+        onPurchaseExplorationKit={isGuest ? null : purchaseExplorationKit}
         onOpenBuilderPlot={openBuilderPlot}
         onSaveBuilderState={saveBuilderState}
         onPurchaseBuilderUpgrade={buyBuilderUpgrade}

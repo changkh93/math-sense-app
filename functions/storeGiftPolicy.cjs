@@ -23,6 +23,20 @@ const STORE_ITEM_GIFT_CATALOG = {
     cost: 100,
     ownedMode: "purchase_only",
   },
+  frontier_hoverpack: {
+    name: "호버팩",
+    cost: 1000,
+    ownedMode: "purchase_only",
+    explorationKitId: "hoverpack",
+    giftable: false,
+  },
+  frontier_diving_suit: {
+    name: "잠수복",
+    cost: 1000,
+    ownedMode: "purchase_only",
+    explorationKitId: "diving",
+    giftable: false,
+  },
   signature_unlock: {
     name: "시그니처 해금",
     cost: 30,
@@ -122,6 +136,8 @@ const SERVER_PURCHASE_ITEM_IDS = new Set([
   "signature_unlock",
   "frame_nebula",
   "frame_solar",
+  "frontier_hoverpack",
+  "frontier_diving_suit",
   ...Object.entries(STORE_ITEM_GIFT_CATALOG)
     .filter(([, item]) => Boolean(item.baseThemeId))
     .map(([itemId]) => itemId),
@@ -137,6 +153,12 @@ function getOwnedBaseThemes(userData = {}) {
   const safe = userData && typeof userData === "object" ? userData : {};
   const owned = Array.isArray(safe.ownedBaseThemes) ? safe.ownedBaseThemes : [];
   return Array.from(new Set(["orbital", ...owned]));
+}
+
+function getOwnedExplorationKits(userData = {}) {
+  const safe = userData && typeof userData === "object" ? userData : {};
+  const owned = Array.isArray(safe.ownedExplorationKits) ? safe.ownedExplorationKits : [];
+  return Array.from(new Set(owned.filter((kitId) => kitId === "hoverpack" || kitId === "diving")));
 }
 
 function validateGiftRequest({
@@ -157,6 +179,9 @@ function validateGiftRequest({
   const item = STORE_ITEM_GIFT_CATALOG[itemId];
   if (!item) {
     return { valid: false, code: "invalid-argument", error: "선물할 수 없는 아이템입니다." };
+  }
+  if (item.giftable === false) {
+    return { valid: false, code: "invalid-argument", error: "이 아이템은 직접 구매만 할 수 있습니다." };
   }
   if (mode !== "purchase" && mode !== "owned") {
     return { valid: false, code: "invalid-argument", error: "선물 방식이 올바르지 않습니다." };
@@ -208,6 +233,13 @@ function calculateGiftRecipientUpdates({
       ok: false,
       code: "invalid-argument",
       error: "선물할 수 없는 아이템입니다.",
+    };
+  }
+  if (item.giftable === false) {
+    return {
+      ok: false,
+      code: "invalid-argument",
+      error: "이 아이템은 직접 구매만 할 수 있습니다.",
     };
   }
 
@@ -343,6 +375,12 @@ function calculatePurchaseUserUpdates({
     updates.hasRadar = true;
     updates.radarActivatedAtMs = nowMs;
     updates.radarExpiresAtMs = nowMs + STORE_RADAR_DURATION_DAYS * 24 * 60 * 60 * 1000;
+  } else if (item.explorationKitId) {
+    const ownedKits = getOwnedExplorationKits(userData);
+    if (ownedKits.includes(item.explorationKitId)) {
+      return { ok: false, code: "failed-precondition", error: `이미 ${item.name}을 보유 중입니다.` };
+    }
+    updates.ownedExplorationKits = [...ownedKits, item.explorationKitId];
   } else if (item.uniqueField) {
     if (userData[item.uniqueField]) {
       return { ok: false, code: "failed-precondition", error: `이미 ${item.name}을 보유 중입니다.` };
@@ -379,6 +417,7 @@ function calculatePurchaseUserUpdates({
 
 function getPurchaseTransactionType(itemId) {
   const item = STORE_ITEM_GIFT_CATALOG[itemId];
+  if (item?.explorationKitId) return "frontier_equipment_purchase";
   if (item?.baseThemeId) return "base_theme_purchase";
   if (item?.uniqueField || item?.frameId) return "agora_profile_purchase";
   return "store_purchase";
@@ -391,6 +430,7 @@ module.exports = {
   SERVER_PURCHASE_ITEM_IDS,
   getOwnedProfileFrames,
   getOwnedBaseThemes,
+  getOwnedExplorationKits,
   validateGiftRequest,
   calculateGiftRecipientUpdates,
   validatePurchaseRequest,

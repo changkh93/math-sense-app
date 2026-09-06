@@ -5312,6 +5312,9 @@ export default function GalaxyWorld3D({
   builderAccess = null,
   builderStates = null,
   builderWallet = 0,
+  explorationWallet = 0,
+  ownedExplorationKits = [],
+  onPurchaseExplorationKit,
   onOpenBuilderPlot,
   onSaveBuilderState,
   onPurchaseBuilderUpgrade,
@@ -5989,7 +5992,8 @@ export default function GalaxyWorld3D({
 
       {!builderActive && <FrontierExplorationHud key={builderOwnerId} travel={travel} setTravel={setTravel} inputRef={inputRef}
         position={playerPosition} worldRadius={getWorldRadius(Boolean(planet?.territoryExpanded))}
-        disabled={paused} storageKey={`frontier-marine-journal-v1:${builderOwnerId}`} />}
+        disabled={paused} storageKey={`frontier-marine-journal-v1:${builderOwnerId}`}
+        wallet={explorationWallet} ownedKits={ownedExplorationKits} onPurchaseKit={onPurchaseExplorationKit} />}
       {!builderActive && <MiniMap playerPosition={playerPosition} nearby={nearby} dailyEventNode={dailyEventNode} objectiveTarget={objectiveTarget} objective={objective} worldRadius={getWorldRadius(Boolean(planet?.territoryExpanded))} expanded={mapExpanded} onToggleExpanded={() => setMapExpanded((current) => !current)} />}
       {!builderActive && <button
         type="button"

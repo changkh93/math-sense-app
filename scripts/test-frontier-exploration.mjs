@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { advanceExplorationHeight, getExplorationMode, sampleExplorationWater, getExplorationRadius, getMarineHabitat, findMarineObservation, MARINE_SPECIES, normalizeExplorationKit, FLIGHT_CEILING } from '../src/components/GalaxySocial/exploration/frontierExploration.js'
+import { advanceExplorationHeight, getExplorationMode, sampleExplorationWater, getExplorationRadius, getMarineHabitat, findMarineObservation, MARINE_SPECIES, normalizeExplorationKit, normalizeOwnedExplorationKits, EXPLORATION_KITS, EXPLORATION_KIT_COST, FLIGHT_CEILING } from '../src/components/GalaxySocial/exploration/frontierExploration.js'
 import { setTerritoryExpanded } from '../src/components/GalaxySocial/GalaxyTerrainModel.js'
 
 setTerritoryExpanded(false)
@@ -9,6 +9,11 @@ assert.equal(sampleExplorationWater(40, 0, 20), null)
 assert.equal(sampleExplorationWater(0, 5, 20), null)
 assert.equal(getExplorationRadius(28.284), 31)
 assert.equal(normalizeExplorationKit('admin-jet'), 'none')
+assert.deepEqual(normalizeOwnedExplorationKits(null), ['none'])
+assert.deepEqual(normalizeOwnedExplorationKits(['diving', 'admin-jet', 'diving', 'hoverpack']), ['none', 'diving', 'hoverpack'])
+assert.equal(EXPLORATION_KITS.find((kit) => kit.id === 'none').cost, 0)
+assert.equal(EXPLORATION_KITS.find((kit) => kit.id === 'hoverpack').cost, EXPLORATION_KIT_COST)
+assert.equal(EXPLORATION_KITS.find((kit) => kit.id === 'diving').cost, EXPLORATION_KIT_COST)
 assert.equal(getExplorationMode({ kit: 'none', flight: true, y: 3, water }), 'grounded')
 assert.equal(getExplorationMode({ kit: 'hoverpack', flight: true, y: 3, water }), 'flying')
 assert.equal(getExplorationMode({ kit: 'none', y: -.3, water }), 'swimming')

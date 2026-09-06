@@ -7,6 +7,7 @@ const {
   SERVER_PURCHASE_ITEM_IDS,
   getOwnedProfileFrames,
   getOwnedBaseThemes,
+  getOwnedExplorationKits,
   validateGiftRequest,
   calculateGiftRecipientUpdates,
   validatePurchaseRequest,
@@ -42,6 +43,8 @@ test("STORE_ITEM_GIFT_CATALOG의 기존 아이템들이 누락 없이 보존된�
     "cryo_core",
     "photon_shield",
     "radar",
+    "frontier_hoverpack",
+    "frontier_diving_suit",
     "signature_unlock",
     "frame_nebula",
     "frame_solar",
@@ -60,6 +63,24 @@ test("STORE_ITEM_GIFT_CATALOG의 기존 아이템들이 누락 없이 보존된�
   for (const key of expectedKeys) {
     assert.ok(STORE_ITEM_GIFT_CATALOG[key], `${key} 항목이 카탈로그에 존재해야 합니다.`);
   }
+});
+
+test("프론티어 호버팩과 잠수복은 각각 1000광석의 직접 구매 장비다", () => {
+  assert.deepEqual(STORE_ITEM_GIFT_CATALOG.frontier_hoverpack, {
+    name: "호버팩",
+    cost: 1000,
+    ownedMode: "purchase_only",
+    explorationKitId: "hoverpack",
+    giftable: false,
+  });
+  assert.deepEqual(STORE_ITEM_GIFT_CATALOG.frontier_diving_suit, {
+    name: "잠수복",
+    cost: 1000,
+    ownedMode: "purchase_only",
+    explorationKitId: "diving",
+    giftable: false,
+  });
+  assert.deepEqual(getOwnedExplorationKits({ ownedExplorationKits: ["diving", "unknown", "diving"] }), ["diving"]);
 });
 
 test("getOwnedBaseThemes는 orbital을 항상 기본 포함하고 중복을 제거한다", () => {
@@ -133,12 +154,52 @@ test("calculatePurchaseUserUpdates: 신규 배경 구매 시 소유 목록 추�
   assert.equal(duplicate.code, "failed-precondition");
 });
 
+test("프론티어 장비 구매는 광석을 차감하고 영구 소유권을 중복 없이 기록한다", () => {
+  const result = calculatePurchaseUserUpdates({
+    itemId: "frontier_hoverpack",
+    userData: { crystals: 2400, ownedExplorationKits: ["diving"] },
+  });
+  assert.equal(result.ok, true);
+  assert.equal(result.userUpdates.crystals, 1400);
+  assert.deepEqual(result.userUpdates.ownedExplorationKits, ["diving", "hoverpack"]);
+
+  const duplicate = calculatePurchaseUserUpdates({
+    itemId: "frontier_diving_suit",
+    userData: { crystals: 2400, ownedExplorationKits: ["diving"] },
+  });
+  assert.equal(duplicate.ok, false);
+  assert.equal(duplicate.code, "failed-precondition");
+
+  const poor = validatePurchaseRequest({
+    userId: "student1",
+    itemId: "frontier_diving_suit",
+    userData: { crystals: 999, role: "student" },
+  });
+  assert.equal(poor.valid, false);
+  assert.equal(poor.code, "failed-precondition");
+});
+
+test("프론티어 장비는 선물 경로로 우회 구매할 수 없다", () => {
+  const result = validateGiftRequest({
+    senderId: "student1",
+    recipientId: "student2",
+    itemId: "frontier_hoverpack",
+    mode: "purchase",
+    senderData: { crystals: 2000, role: "student" },
+    recipientData: { role: "student" },
+  });
+  assert.equal(result.valid, false);
+  assert.equal(result.code, "invalid-argument");
+});
+
 test("서버 구매 callable은 정책이 완전히 이전된 항목만 허용한다", () => {
   for (const itemId of [
     "radar",
     "signature_unlock",
     "frame_nebula",
     "frame_solar",
+    "frontier_hoverpack",
+    "frontier_diving_suit",
     "base_lunar_library",
   ]) {
     assert.equal(SERVER_PURCHASE_ITEM_IDS.has(itemId), true, `${itemId} should use server purchase`);
@@ -161,6 +222,7 @@ test("구매 거래 유형은 기존 원장 분류와 호환된다", () => {
   assert.equal(getPurchaseTransactionType("signature_unlock"), "agora_profile_purchase");
   assert.equal(getPurchaseTransactionType("frame_solar"), "agora_profile_purchase");
   assert.equal(getPurchaseTransactionType("radar"), "store_purchase");
+  assert.equal(getPurchaseTransactionType("frontier_hoverpack"), "frontier_equipment_purchase");
 });
 
 test("validateGiftRequest: 수신자 없음 및 자기 선물 차단", () => {

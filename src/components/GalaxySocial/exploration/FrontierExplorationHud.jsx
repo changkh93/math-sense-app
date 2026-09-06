@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { EXPLORATION_KITS, MARINE_SPECIES, findMarineObservation, getSkyLandmarks, getNearestHabitat } from './frontierExploration.js'
+import { EXPLORATION_KITS, MARINE_SPECIES, findMarineObservation, getSkyLandmarks, getNearestHabitat, normalizeOwnedExplorationKits } from './frontierExploration.js'
 import './FrontierExploration.css'
 import { useFrame } from '@react-three/fiber'
 import { releaseFrontierPointerLock } from '../frontierPointerLock.js'
@@ -40,8 +40,21 @@ function HoldButton({ direction, inputRef, disabled, children }) {
   onKeyUp={release} onBlur={release}>{children}</button>
 }
 
-export default function FrontierExplorationHud({ travel, setTravel, inputRef, position, worldRadius, disabled, storageKey }) {
+export default function FrontierExplorationHud({
+  travel,
+  setTravel,
+  inputRef,
+  position,
+  worldRadius,
+  disabled,
+  storageKey,
+  wallet = 0,
+  ownedKits = [],
+  onPurchaseKit,
+}) {
   const [open, setOpen] = useState(false)
+  const [purchasingKit, setPurchasingKit] = useState('')
+  const [sessionOwnedKits, setSessionOwnedKits] = useState([])
   const [skyFound, setSkyFound] = useState(() => {
     try {
       const value = JSON.parse(localStorage.getItem(`${storageKey}:sky`) || '[]')
@@ -56,6 +69,7 @@ export default function FrontierExplorationHud({ travel, setTravel, inputRef, po
   const [notice, setNotice] = useState('')
   const [journalOpen, setJournalOpen] = useState(false)
   const ids = journal.ids
+  const ownedKitIds = normalizeOwnedExplorationKits([...ownedKits, ...sessionOwnedKits])
   useEffect(() => {
     const reset = () => { inputRef.current.vertical = 0 }
     window.addEventListener('blur', reset)
@@ -85,6 +99,7 @@ export default function FrontierExplorationHud({ travel, setTravel, inputRef, po
   const direction = (target) => {
     const dx = target.x - position.x
     const dz = target.z - position.z
+    if (Math.abs(dx) <= 1 && Math.abs(dz) <= 1) return '바로 여기'
     return `${Math.abs(dz) > 1 ? dz > 0 ? '남' : '북' : ''}${Math.abs(dx) > 1 ? dx > 0 ? '동' : '서' : ''}쪽`
   }
   const recordSky = () => {
@@ -98,6 +113,32 @@ export default function FrontierExplorationHud({ travel, setTravel, inputRef, po
     ...current, kit, flight: false,
     recovery: current.recovery,
   }))
+  const selectOrPurchaseKit = async (kit) => {
+    if (disabled || purchasingKit) return
+    if (ownedKitIds.includes(kit.id)) {
+      chooseKit(kit.id)
+      return
+    }
+    if (!kit.storeItemId || !onPurchaseKit) return
+    if (wallet < kit.cost) {
+      setNotice(`광석이 부족합니다. ${kit.cost - wallet}광석을 더 모아주세요.`)
+      return
+    }
+
+    setPurchasingKit(kit.id)
+    setNotice('')
+    try {
+      const result = await onPurchaseKit({ itemId: kit.storeItemId })
+      if (!result?.success) throw new Error('구매 처리 결과를 확인할 수 없습니다.')
+      setSessionOwnedKits((current) => Array.from(new Set([...current, kit.id])))
+      chooseKit(kit.id)
+      setNotice(`${kit.label} 구매 완료 · ${kit.cost.toLocaleString('ko-KR')}광석을 사용했어요.`)
+    } catch (error) {
+      setNotice(error?.message || `${kit.label} 구매에 실패했습니다. 다시 시도해주세요.`)
+    } finally {
+      setPurchasingKit('')
+    }
+  }
   const record = () => {
     if (!observe || ids.includes(observe.id)) return
     const next = [...ids, observe.id]
@@ -113,8 +154,33 @@ export default function FrontierExplorationHud({ travel, setTravel, inputRef, po
       <button type="button" aria-expanded={journalOpen} onClick={() => setJournalOpen(!journalOpen)}>바다 도감 {ids.length}/6</button>
     </div>
     {open && <section className="frontier-exploration__panel">
-      <strong>어디로 떠나볼까요?</strong><p>기본 장비 · 연료와 재료 소비 없이 탐험해요.</p>
-      <div className="frontier-exploration__kits">{EXPLORATION_KITS.map((kit) => <button key={kit.id} type="button" disabled={disabled} aria-pressed={travel.kit === kit.id} onClick={() => chooseKit(kit.id)}><strong>{kit.label}</strong><small>{kit.description}</small></button>)}</div>
+      <strong>어디로 떠나볼까요?</strong><p>산책은 무료이며, 특수 장비는 한 번 구매하면 계속 사용할 수 있어요. · 보유 {wallet.toLocaleString('ko-KR')}광석</p>
+      <div className="frontier-exploration__kits">{EXPLORATION_KITS.map((kit) => {
+        const owned = ownedKitIds.includes(kit.id)
+        const unavailable = !owned && !onPurchaseKit
+        const shortfall = Math.max(0, kit.cost - wallet)
+        const status = kit.cost === 0
+          ? '기본 장비'
+          : owned
+            ? '보유 · 선택 가능'
+            : unavailable
+              ? `회원 전용 · ${kit.cost.toLocaleString('ko-KR')}광석`
+              : shortfall > 0
+                ? `${kit.cost.toLocaleString('ko-KR')}광석 · ${shortfall.toLocaleString('ko-KR')} 부족`
+                : `${kit.cost.toLocaleString('ko-KR')}광석 · 구매`
+        return <button
+          key={kit.id}
+          type="button"
+          disabled={disabled || Boolean(purchasingKit) || unavailable}
+          aria-pressed={travel.kit === kit.id}
+          aria-label={`${kit.label} · ${status}`}
+          onClick={() => selectOrPurchaseKit(kit)}
+        >
+          <strong>{purchasingKit === kit.id ? '구매 처리 중…' : kit.label}</strong>
+          <small>{kit.description}</small>
+          <em>{status}</em>
+        </button>
+      })}</div>
       <p>섬 둘레의 산호 숲에서 물고기·거북·해파리를 만나보세요. 하늘에는 고도 7·11·15의 빛나는 탐험 고리가 있어요.</p>
     </section>}
     <div className="frontier-exploration__movement">
