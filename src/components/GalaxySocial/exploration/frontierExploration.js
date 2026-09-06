@@ -3,6 +3,11 @@ import {
 } from '../GalaxyTerrainModel.js'
 
 export const EXPLORATION_KIT_COST = 1000
+export const HOVERPACK_FLAME_LAYERS = Object.freeze([
+  { id: 'outer', radius: .17, height: .76, color: '#ff3d0d', opacity: .58 },
+  { id: 'middle', radius: .115, height: .56, color: '#ff9b24', opacity: .82 },
+  { id: 'core', radius: .058, height: .36, color: '#fff0a3', opacity: .96 },
+])
 export const EXPLORATION_KITS = Object.freeze([
   { id: 'none', label: '산책', description: '가볍게 걷고 수면에서 수영해요', cost: 0 },
   { id: 'hoverpack', label: '호버팩', description: '이륙 후 공중에서 멈추고 자유롭게 이동해요', cost: EXPLORATION_KIT_COST, storeItemId: 'frontier_hoverpack' },
@@ -15,13 +20,34 @@ export const normalizeOwnedExplorationKits = (value) => {
 }
 export const normalizeMovementMode = (value) => ['grounded', 'flying', 'landing', 'swimming', 'diving'].includes(value) ? value : 'grounded'
 export const getExplorationRadius = (worldRadius) => Math.min(31, worldRadius + 6)
-export const OCEAN_FLOOR_Y = -3.6
+export const OCEAN_FLOOR_Y = -4.65
 export const FLIGHT_CEILING = 18
+
+const smoothstep = (value) => {
+  const t = Math.max(0, Math.min(1, value))
+  return t * t * (3 - 2 * t)
+}
+
+// A sloped, gently ridged shelf replaces the old single flat ocean plane. This
+// function is shared by rendering and collision so divers never float above or
+// clip through the visible seabed.
+export function getOceanFloorY(x, z, worldRadius) {
+  const shelfWidth = Math.max(1, getExplorationRadius(worldRadius) - worldRadius)
+  const distanceFromCoast = Math.max(0, Math.hypot(x, z) - worldRadius)
+  const depth = smoothstep(distanceFromCoast / shelfWidth)
+  const coastFloor = OCEAN_SURFACE_Y - .68
+  const reliefEnvelope = Math.sin(Math.PI * Math.min(1, distanceFromCoast / shelfWidth))
+  const broadRidge = Math.sin(x * .31 + z * .17) * .38
+    + Math.cos(z * .37 - x * .11) * .25
+    + Math.sin((x + z) * .58) * .12
+  const reefMounds = Math.max(0, Math.sin(x * .53) * Math.cos(z * .47)) * .35
+  return coastFloor - depth * 3.82 + (broadRidge + reefMounds) * reliefEnvelope
+}
 
 export function sampleExplorationWater(x, z, worldRadius, distantOcean = false) {
   const radius = Math.hypot(x, z)
   if (radius > worldRadius && radius < (distantOcean ? 62 : getExplorationRadius(worldRadius))) {
-    return { kind: 'ocean', surfaceY: OCEAN_SURFACE_Y, floorY: OCEAN_FLOOR_Y }
+    return { kind: 'ocean', surfaceY: OCEAN_SURFACE_Y, floorY: getOceanFloorY(x, z, worldRadius) }
   }
   const floorY = terrainHeight(x, z)
   if (isRiverWater(x, z) && floorY < RIVER_SURFACE_Y - .08) {
@@ -73,34 +99,10 @@ export const MARINE_HABITAT_COUNT = 24
 export function getMarineHabitat(index, worldRadius) {
   const angle = -.6 + index * Math.PI * 2 / MARINE_HABITAT_COUNT
   const radius = worldRadius + (getExplorationRadius(worldRadius) - worldRadius) * .53
-  return { x: Math.cos(angle) * radius, z: Math.sin(angle) * radius, y: -1.25 - (index % 3) * .62 }
+  const x = Math.cos(angle) * radius
+  const z = Math.sin(angle) * radius
+  return { x, z, y: getOceanFloorY(x, z, worldRadius) + 1.05 + (index % 3) * .18 }
 }
-
-export function findMarineObservation(position, worldRadius) {
-  if (!position || !['diving', 'swimming'].includes(position.movementMode)) return null
-  let nearest = null
-  let distance = 3
-  Array.from({ length: MARINE_HABITAT_COUNT }, (_, index) => index).forEach((index) => {
-    const species = MARINE_SPECIES[index % MARINE_SPECIES.length]
-    const habitat = getMarineHabitat(index, worldRadius)
-    const next = Math.hypot(position.x - habitat.x, position.y - habitat.y, position.z - habitat.z)
-    if (next < distance) { nearest = species; distance = next }
-  })
-  return nearest
-}
-
-
-export function getNearestHabitat(position, worldRadius) {
-  if (!position) return null
-  let result = null
-  for (let index = 0; index < MARINE_HABITAT_COUNT; index++) {
-    const habitat = getMarineHabitat(index, worldRadius)
-    const distance = Math.hypot(position.x - habitat.x, position.z - habitat.z)
-    if (!result || distance < result.distance) result = { ...habitat, distance }
-  }
-  return result
-}
-
 export function getSkyLandmarks(worldRadius) {
   const r = worldRadius * .5
   return [

@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
 import {
   createThirdPersonReturnPose,
   getWheelZoomValue,
@@ -121,5 +122,19 @@ const builderBlockedCamera = resolveCameraLineOfSight({
 })
 assert.equal(builderBlockedCamera.obstructed, true)
 assert.ok(builderBlockedCamera.position[2] > -1.1)
+
+const worldSource = readFileSync(
+  new URL('../src/components/GalaxySocial/GalaxyWorld3D.jsx', import.meta.url),
+  'utf8',
+)
+const cameraModeEffect = worldSource.match(
+  /useLayoutEffect\(\(\) => \{\n    const wasFirstPerson = previousCameraMode\.current[\s\S]*?\n  \}, \[camera, isFirstPerson\]\)/,
+)?.[0]
+assert.ok(cameraModeEffect, 'camera mode transition must run before paint')
+assert.match(cameraModeEffect, /camera\.position\.set\(player\.x, eyeY, player\.z\)/)
+assert.match(cameraModeEffect, /camera\.near = FIRST_PERSON_CAMERA_NEAR/)
+assert.doesNotMatch(worldSource, /minDistance=\{isFirstPerson/)
+assert.doesNotMatch(worldSource, /maxDistance=\{isFirstPerson/)
+assert.doesNotMatch(worldSource, /minPolarAngle=\{isFirstPerson/)
 
 console.log('Galaxy navigation safety tests passed')

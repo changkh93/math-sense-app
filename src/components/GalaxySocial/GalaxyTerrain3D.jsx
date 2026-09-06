@@ -695,7 +695,7 @@ function OceanSurface({ palette }) {
           depthWrite={false}
         />
       </mesh>
-      <mesh position={[0, .014, 0]} rotation={[-Math.PI / 2, 0, 0]} renderOrder={1} raycast={() => null}>
+      <mesh position={[0, OCEAN_SURFACE_Y + .024, 0]} rotation={[-Math.PI / 2, 0, 0]} renderOrder={1} raycast={() => null}>
         <ringGeometry args={[worldRadius - .22, worldRadius + .08, 128, 1, 1.2, Math.PI * 2 - .75]} />
         <meshBasicMaterial color={palette.groundDeep} transparent opacity={.28} depthWrite={false} />
       </mesh>
@@ -1059,7 +1059,7 @@ export default function WorldTerrain({ palette, territoryExpanded = false, villa
         <meshStandardMaterial map={groundTextures.albedo} bumpMap={groundTextures.bump} bumpScale={.09} roughness={.95} metalness={.01} />
       </mesh>
       <mesh geometry={islandSkirtGeometry} receiveShadow>
-        <meshStandardMaterial color={palette.edge} roughness={.96} side={THREE.DoubleSide} />
+        <meshStandardMaterial color={new THREE.Color(palette.edge).lerp(new THREE.Color('#6f9480'), .5)} roughness={.96} side={THREE.DoubleSide} />
       </mesh>
       <TerrainRoads palette={palette} structurePositions={structurePositions} />
       <GroundCover palette={palette} clearings={detailClearings} />

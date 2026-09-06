@@ -11,6 +11,8 @@ for (const mode of ['swimming', 'diving']) {
 const left = pose({ mode: 'flying', moving: true, strafe: -1, time: .1 })
 const right = pose({ mode: 'flying', moving: true, strafe: 1, time: .1 })
 assert.equal(left.bodyZ, -right.bodyZ, 'bank into lateral travel')
+assert.ok(left.bodyZ < 0, 'left strafe banks the torso left')
+assert.ok(right.bodyZ > 0, 'right strafe banks the torso right')
 assert.ok(left.leftLegX < 0 && left.rightLegX < 0, 'hover legs tucked, no walking stride')
 assert.equal(pose({ mode: 'grounded', moving: false }).bodyX, 0)
 const bone = () => ({ current: { rotation: { x: 0, z: 0 }, position: { y: 0, z: 0 } } })

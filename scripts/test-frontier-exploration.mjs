@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
-import { advanceExplorationHeight, getExplorationMode, sampleExplorationWater, getExplorationRadius, getMarineHabitat, findMarineObservation, MARINE_SPECIES, normalizeExplorationKit, normalizeOwnedExplorationKits, EXPLORATION_KITS, EXPLORATION_KIT_COST, FLIGHT_CEILING } from '../src/components/GalaxySocial/exploration/frontierExploration.js'
+import { readFileSync } from 'node:fs'
+import { advanceExplorationHeight, getExplorationMode, sampleExplorationWater, getExplorationRadius, getMarineHabitat, getOceanFloorY, MARINE_SPECIES, normalizeExplorationKit, normalizeOwnedExplorationKits, EXPLORATION_KITS, EXPLORATION_KIT_COST, HOVERPACK_FLAME_LAYERS, FLIGHT_CEILING } from '../src/components/GalaxySocial/exploration/frontierExploration.js'
 import { setTerritoryExpanded } from '../src/components/GalaxySocial/GalaxyTerrainModel.js'
 
 setTerritoryExpanded(false)
@@ -7,6 +8,9 @@ const water = sampleExplorationWater(23, 0, 20)
 assert.equal(water.kind, 'ocean')
 assert.equal(sampleExplorationWater(40, 0, 20), null)
 assert.equal(sampleExplorationWater(0, 5, 20), null)
+assert.ok(getOceanFloorY(20.2, 0, 20) > getOceanFloorY(25.8, 0, 20))
+assert.notEqual(getOceanFloorY(23, 0, 20), getOceanFloorY(0, 23, 20))
+assert.equal(water.floorY, getOceanFloorY(23, 0, 20))
 assert.equal(getExplorationRadius(28.284), 31)
 assert.equal(normalizeExplorationKit('admin-jet'), 'none')
 assert.deepEqual(normalizeOwnedExplorationKits(null), ['none'])
@@ -14,6 +18,8 @@ assert.deepEqual(normalizeOwnedExplorationKits(['diving', 'admin-jet', 'diving',
 assert.equal(EXPLORATION_KITS.find((kit) => kit.id === 'none').cost, 0)
 assert.equal(EXPLORATION_KITS.find((kit) => kit.id === 'hoverpack').cost, EXPLORATION_KIT_COST)
 assert.equal(EXPLORATION_KITS.find((kit) => kit.id === 'diving').cost, EXPLORATION_KIT_COST)
+assert.deepEqual(HOVERPACK_FLAME_LAYERS.map((layer) => layer.color), ['#ff3d0d', '#ff9b24', '#fff0a3'])
+assert.ok(HOVERPACK_FLAME_LAYERS.every((layer) => layer.height > 0 && layer.radius > 0 && layer.opacity > 0 && layer.opacity <= 1))
 assert.equal(getExplorationMode({ kit: 'none', flight: true, y: 3, water }), 'grounded')
 assert.equal(getExplorationMode({ kit: 'hoverpack', flight: true, y: 3, water }), 'flying')
 assert.equal(getExplorationMode({ kit: 'none', y: -.3, water }), 'swimming')
@@ -40,12 +46,13 @@ for (let i = 0; i < 100; i++) depth = advanceExplorationHeight({ y: depth, mode:
 assert.ok(depth < water.surfaceY)
 for (const radius of [20, 28.284271]) {
   setTerritoryExpanded(radius > 20)
-  MARINE_SPECIES.forEach((species, i) => {
+  MARINE_SPECIES.forEach((_, i) => {
     const habitat = getMarineHabitat(i, radius)
     assert.equal(sampleExplorationWater(habitat.x, habitat.z, radius)?.kind, 'ocean')
-    assert.equal(findMarineObservation({ ...habitat, movementMode: 'diving' }, radius)?.id, species.id)
-    assert.equal(findMarineObservation({ ...habitat, y: 12, movementMode: 'flying' }, radius), null)
+    assert.ok(habitat.y > sampleExplorationWater(habitat.x, habitat.z, radius).floorY)
   })
 }
+const hudSource = readFileSync(new URL('../src/components/GalaxySocial/exploration/FrontierExplorationHud.jsx', import.meta.url), 'utf8')
+assert.doesNotMatch(hudSource, /바다 도감|관찰 기록하기|가까운 산호 숲/)
 setTerritoryExpanded(false)
-console.log('Frontier exploration: flight ceiling, hover, pause, collision sweep, swimming, diving floor, water boundaries and marine observation passed')
+console.log('Frontier exploration: flight ceiling, hover, pause, collision sweep, swimming, varied seabed and free-form marine exploration passed')

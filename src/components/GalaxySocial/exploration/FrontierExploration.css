@@ -13,11 +13,7 @@
 .frontier-exploration__kits { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
 .frontier-exploration__kits small { display: block; line-height: 1.4; margin-top: 6px; color: #c0dcd6; }
 .frontier-exploration__kits em { display: block; margin-top: 7px; color: #ffe3a2; font-size: 10px; font-style: normal; font-weight: 700; }
-.frontier-exploration__species article { display: flex; align-items: center; gap: 12px; padding: 9px 0; border-bottom: 1px solid #bce3da19; }
-.frontier-exploration__species i { display: block; width: 24px; height: 14px; border-radius: 70% 35%; background: var(--fish-color); flex-shrink: 0; }
-.frontier-exploration__species p { font-size: 11px; margin: 4px 0 0; }
 .frontier-exploration__hint { padding: 7px 10px; border-radius: 8px; background: #143739e8; }
-.frontier-exploration__observe { margin-top: 8px; }
 @media (max-width: 700px) { .frontier-exploration { top: 90px; left: 8px; max-width: calc(100% - 16px); font-size: 11px; } .frontier-exploration button { padding: 7px 9px; } .frontier-exploration__panel { max-width: 360px; max-height: 28vh; } .frontier-exploration kbd { display: none; } }
 
 @media (max-width: 700px) {

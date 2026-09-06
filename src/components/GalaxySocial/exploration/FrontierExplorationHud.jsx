@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
-import { EXPLORATION_KITS, MARINE_SPECIES, findMarineObservation, getSkyLandmarks, getNearestHabitat, normalizeOwnedExplorationKits } from './frontierExploration.js'
+import { AdditiveBlending } from 'three'
+import { EXPLORATION_KITS, HOVERPACK_FLAME_LAYERS, getSkyLandmarks, normalizeOwnedExplorationKits } from './frontierExploration.js'
 import './FrontierExploration.css'
 import { useFrame } from '@react-three/fiber'
 import { releaseFrontierPointerLock } from '../frontierPointerLock.js'
@@ -10,17 +11,37 @@ export function SwimFin() {
   </mesh>
 }
 
-export function ExplorationEquipment({ kit = 'none', flying = false }) {
-  const jets = useRef()
+function HoverpackFlames({ flying }) {
+  const flames = useRef()
   useFrame(({ clock }) => {
-    if (jets.current) jets.current.scale.y = flying ? 1 + Math.sin(clock.elapsedTime * 22) * .15 : .1
+    if (!flames.current) return
+    const flicker = Math.sin(clock.elapsedTime * 27) * .08 + Math.sin(clock.elapsedTime * 43) * .04
+    flames.current.visible = flying
+    flames.current.scale.set(1 - flicker * .28, 1 + flicker, 1 - flicker * .28)
   })
+  return <group ref={flames} position={[0, -.39, 0]} visible={flying}>
+    {[-.46, .46].map((x) => <group key={x} position={[x, 0, 0]}>
+      {HOVERPACK_FLAME_LAYERS.map((layer) => <mesh key={layer.id} position={[0, -layer.height / 2, 0]} rotation={[Math.PI, 0, 0]}>
+        <coneGeometry args={[layer.radius, layer.height, 12]} />
+        <meshBasicMaterial
+          color={layer.color}
+          transparent
+          opacity={layer.opacity}
+          blending={AdditiveBlending}
+          depthWrite={false}
+          toneMapped={false}
+        />
+      </mesh>)}
+    </group>)}
+  </group>
+}
+
+export function ExplorationEquipment({ kit = 'none', flying = false }) {
   if (kit === 'hoverpack') return <group position={[0, 1.24, -.58]}>
     {[-.46, .46].map((x) => <group key={x} position={[x, 0, 0]}>
       <mesh><cylinderGeometry args={[.19, .24, .78, 8]} /><meshStandardMaterial color="#62cbd5" metalness={.5} roughness={.4} /></mesh>
-      
     </group>)}
-    <group ref={jets}>{[-.46, .46].map((x) => <mesh key={x} position={[x, -.63, 0]} rotation={[Math.PI, 0, 0]}><coneGeometry args={[.13, .5, 8]} /><meshBasicMaterial color="#91fff0" transparent opacity={.75} depthWrite={false} /></mesh>)}</group>
+    <HoverpackFlames flying={flying} />
   </group>
   if (kit === 'diving') return <group>
     <mesh position={[0, 1.24, -.62]}><capsuleGeometry args={[.25, .52, 4, 8]} /><meshStandardMaterial color="#ffd48d" roughness={.5} /></mesh>
@@ -61,14 +82,7 @@ export default function FrontierExplorationHud({
       return Array.isArray(value) ? value.filter((id) => getSkyLandmarks(worldRadius).some((site) => site.id === id)) : []
     } catch { return [] }
   })
-  const [journal, setJournal] = useState(() => {
-    let saved = []
-    try { saved = JSON.parse(localStorage.getItem(storageKey) || '[]') } catch { /* Memory-only when storage is unavailable. */ }
-    return { ids: Array.isArray(saved) ? saved.filter((id) => MARINE_SPECIES.some((species) => species.id === id)) : [] }
-  })
   const [notice, setNotice] = useState('')
-  const [journalOpen, setJournalOpen] = useState(false)
-  const ids = journal.ids
   const ownedKitIds = normalizeOwnedExplorationKits([...ownedKits, ...sessionOwnedKits])
   useEffect(() => {
     const reset = () => { inputRef.current.vertical = 0 }
@@ -78,24 +92,21 @@ export default function FrontierExplorationHud({
     return () => { reset(); window.removeEventListener('blur', reset); document.removeEventListener('visibilitychange', reset) }
   }, [disabled, inputRef])
   useEffect(() => {
-    if (!open && !journalOpen) return undefined
+    if (!open) return undefined
     releaseFrontierPointerLock(document)
     const closePanel = (event) => {
       if (event.key !== 'Escape' || event.repeat) return
       event.preventDefault()
       event.stopPropagation()
-      if (journalOpen) setJournalOpen(false)
-      else setOpen(false)
+      setOpen(false)
     }
     // Capture before the world/builder shortcuts so one Escape closes one layer.
     window.addEventListener('keydown', closePanel, true)
     return () => window.removeEventListener('keydown', closePanel, true)
-  }, [open, journalOpen])
-  const observe = findMarineObservation(position, worldRadius)
+  }, [open])
   const skySites = getSkyLandmarks(worldRadius)
   const skyNearby = position.movementMode === 'flying' && skySites.find((site) => Math.hypot(position.x - site.x, position.y - site.y, position.z - site.z) < 2)
   const skyTarget = skySites.find((site) => !skyFound.includes(site.id))
-  const nearestReef = getNearestHabitat(position, worldRadius)
   const direction = (target) => {
     const dx = target.x - position.x
     const dz = target.z - position.z
@@ -139,19 +150,11 @@ export default function FrontierExplorationHud({
       setPurchasingKit('')
     }
   }
-  const record = () => {
-    if (!observe || ids.includes(observe.id)) return
-    const next = [...ids, observe.id]
-    setJournal({ key: storageKey, ids: next })
-    try { localStorage.setItem(storageKey, JSON.stringify(next)); setNotice(`${observe.name} 관찰 기록을 남겼어요.`) }
-    catch { setNotice('저장 공간을 사용할 수 없어 이번 탐험 동안 기록해요.') }
-  }
   const mode = { grounded: '산책 중', flying: '비행 중', landing: '천천히 착륙', swimming: '수면 수영', diving: '잠수 탐험' }[position.movementMode] || '산책 중'
   return <aside className="frontier-exploration" aria-label="탐험 장비와 시점" onPointerDown={(event) => { event.stopPropagation(); releaseFrontierPointerLock(document) }}>
     <div className="frontier-exploration__toolbar">
       <button type="button" aria-expanded={open} onClick={() => setOpen(!open)}>장비 · {EXPLORATION_KITS.find((kit) => kit.id === travel.kit)?.label}</button>
       <button type="button" disabled={disabled} aria-pressed={travel.birdView} onClick={() => setTravel((current) => ({ ...current, birdView: !current.birdView }))}>{travel.birdView ? '시점 복귀' : '조감 시점'} <kbd>B</kbd></button>
-      <button type="button" aria-expanded={journalOpen} onClick={() => setJournalOpen(!journalOpen)}>바다 도감 {ids.length}/6</button>
     </div>
     {open && <section className="frontier-exploration__panel">
       <strong>어디로 떠나볼까요?</strong><p>산책은 무료이며, 특수 장비는 한 번 구매하면 계속 사용할 수 있어요. · 보유 {wallet.toLocaleString('ko-KR')}광석</p>
@@ -197,12 +200,6 @@ export default function FrontierExplorationHud({
       <strong>구름 위 탐험 · {skyFound.length}/3</strong>
       <p>{skyTarget ? `${skyTarget.name} · ${direction(skyTarget)} ${Math.round(Math.hypot(position.x - skyTarget.x, position.z - skyTarget.z))}m · 목표 높이 ${skyTarget.y}` : '세 하늘 명소를 모두 발견했어요. 구름 사이에서 잠시 쉬어가요.'}</p>
       {skyNearby && <button type="button" disabled={disabled || skyFound.includes(skyNearby.id)} onClick={recordSky}>{skyFound.includes(skyNearby.id) ? '발견 완료' : '풍경 기록하기'} · {skyNearby.name}</button>}
-    </section>}
-    {(position.movementMode === 'diving' || position.movementMode === 'swimming') && nearestReef && !observe && <p className="frontier-exploration__hint">가까운 산호 숲 · {direction(nearestReef)} {Math.round(nearestReef.distance)}m · 기포를 따라가 보세요</p>}
-    {observe && <button type="button" className="frontier-exploration__observe" disabled={disabled || ids.includes(observe.id)} onClick={record}>{ids.includes(observe.id) ? '관찰 완료' : '관찰 기록하기'} · {observe.name}</button>}
-    {journalOpen && <section className="frontier-exploration__panel" aria-label="바다 관찰 도감">
-      <strong>나의 바다 관찰 도감</strong><p>이 브라우저에 보관하는 탐험 기록이에요.</p>
-      <div className="frontier-exploration__species">{MARINE_SPECIES.map((species) => <article key={species.id} style={{ '--fish-color': ids.includes(species.id) ? species.color : '#537073' }}><i /><div><strong>{ids.includes(species.id) ? species.name : '아직 만나지 못한 친구'}</strong><p>{ids.includes(species.id) ? species.note : '섬 둘레 산호 숲에서 가까이 다가가 관찰해 보세요.'}</p></div></article>)}</div>
     </section>}
     {notice && <p className="frontier-exploration__hint" role="status">{notice}</p>}
   </aside>

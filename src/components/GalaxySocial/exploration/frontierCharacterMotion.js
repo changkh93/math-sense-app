@@ -18,7 +18,9 @@ export function sampleFrontierCharacterMotion({ mode = 'grounded', time = 0, mov
     }
   }
   if (air) return {
-    bodyX: moving ? .24 * clamp(forward, -.6, 1) : .04, bodyZ: -side * .32,
+    // Positive strafe input travels toward the astronaut's local -X axis, so a
+    // positive Z roll banks the torso into (rather than away from) that turn.
+    bodyX: moving ? .24 * clamp(forward, -.6, 1) : .04, bodyZ: side * .32,
     bodyY: .12 + Math.sin(time * 2.4) * .035, bodyOffsetZ: 0,
     leftArmX: -.18, rightArmX: -.18,
     leftArmZ: -.55 - side * .12, rightArmZ: .55 - side * .12,

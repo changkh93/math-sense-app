@@ -95,7 +95,9 @@ export const RIVER_MOUTH_START_X = 9.6
 export const RIVER_MOUTH_END_X = 16.4
 export const RIVER_MOUTH_BLEND_END_X = 19.6
 export const RIVER_SURFACE_Y = -.075
-export const OCEAN_SURFACE_Y = -.24
+// Keep the ocean just below the river mouth so the coast reads as a shoreline,
+// rather than a deep ledge around the island.
+export const OCEAN_SURFACE_Y = -.09
 export const LANDING_PAD_RADIUS = 2.72
 export const LANDING_PAD_SURFACE_LIFT = .18
 export const ROAD_EDGE_HALF_WIDTH = .7
@@ -475,8 +477,10 @@ export function createIslandSkirtGeometry() {
   const positions = []
   const uvs = []
   const indices = []
-  const bottomRadius = activeWorldRadius - 2.4
-  const bottomY = -2.59
+  // Continue the coast outward into the shallow shelf. The old inward skirt
+  // formed a near-black vertical wall when viewed from underwater.
+  const bottomRadius = activeWorldRadius + 1.35
+  const bottomY = OCEAN_SURFACE_Y - .82
 
   for (let segment = 0; segment <= angularSegments; segment += 1) {
     const amount = segment / angularSegments

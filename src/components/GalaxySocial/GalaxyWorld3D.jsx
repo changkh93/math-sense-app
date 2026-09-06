@@ -48,7 +48,7 @@ import FrontierExplorationHud, { ExplorationEquipment, SwimFin } from './explora
 import FrontierMarineWorld from './exploration/FrontierMarineWorld'
 import FrontierSkyWorld from './exploration/FrontierSkyWorld'
 import { sampleFrontierCharacterMotion, applyFrontierCharacterMotion } from './exploration/frontierCharacterMotion.js'
-import { advanceExplorationHeight, getExplorationMode, getExplorationRadius, sampleExplorationWater, OCEAN_FLOOR_Y } from './exploration/frontierExploration.js'
+import { advanceExplorationHeight, getExplorationMode, getExplorationRadius, getOceanFloorY, sampleExplorationWater } from './exploration/frontierExploration.js'
 import {
   VILLAGE_BEACON_POSITION,
   VILLAGE_SLOTS,
@@ -3690,19 +3690,37 @@ function Astronaut({ travel, inputRef, interactables, blockers, structureCollide
     }
   }, [builderBuildMode, builderOverview, gl, paused])
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const wasFirstPerson = previousCameraMode.current
     const player = group.current?.position
-    if (!wasFirstPerson && isFirstPerson && controls.current) {
-      const minDistance = getThirdPersonMinDistance(characterScale.current)
-      savedThirdPersonDistance.current = THREE.MathUtils.clamp(
-        camera.position.distanceTo(controls.current.target),
-        minDistance,
-        THIRD_PERSON_MAX_DISTANCE,
-      )
+    if (!wasFirstPerson && isFirstPerson && player) {
+      if (controls.current) {
+        const minDistance = getThirdPersonMinDistance(characterScale.current)
+        savedThirdPersonDistance.current = THREE.MathUtils.clamp(
+          camera.position.distanceTo(controls.current.target),
+          minDistance,
+          THIRD_PERSON_MAX_DISTANCE,
+        )
+      }
       thirdPersonZoomDistance.current = savedThirdPersonDistance.current
       thirdPersonReturn.current.active = false
       controlsReady.current = false
+
+      // Apply the first-person pose before paint. Waiting for the next render-loop
+      // frame made the first V toggle appear unresponsive on a cold scene.
+      const eyeY = player.y + 1.96 * characterScale.current
+      const yaw = group.current.rotation.y + firstPersonYawOffset.current
+      const pitch = firstPersonPitch.current
+      const lookDistance = 10
+      camera.near = FIRST_PERSON_CAMERA_NEAR
+      camera.fov = firstPersonFov.current
+      camera.updateProjectionMatrix()
+      camera.position.set(player.x, eyeY, player.z)
+      camera.lookAt(
+        player.x + Math.sin(yaw) * Math.cos(pitch) * lookDistance,
+        eyeY + Math.sin(pitch) * lookDistance,
+        player.z + Math.cos(yaw) * Math.cos(pitch) * lookDistance,
+      )
     } else if (wasFirstPerson && !isFirstPerson && player) {
       const lookDirection = new THREE.Vector3()
       camera.getWorldDirection(lookDirection)
@@ -3721,6 +3739,9 @@ function Astronaut({ travel, inputRef, interactables, blockers, structureCollide
       transition.toPosition.set(...pose.position)
       transition.toTarget.set(...pose.target)
       thirdPersonZoomDistance.current = pose.distance
+      camera.near = DEFAULT_CAMERA_NEAR
+      camera.fov = 48
+      camera.updateProjectionMatrix()
       camera.position.copy(transition.toPosition)
       controls.current?.target.copy(transition.toTarget)
       camera.lookAt(transition.toTarget)
@@ -3943,7 +3964,7 @@ function Astronaut({ travel, inputRef, interactables, blockers, structureCollide
     explorationMode.current = mode
     const movementSurface = (x, z, footY, scale) => {
       if (!freeMovement) return walkHeightAt(x, z, footY, scale)
-      const ground = Math.hypot(x, z) > worldRadius ? OCEAN_FLOOR_Y : terrainHeight(x, z)
+      const ground = Math.hypot(x, z) > worldRadius ? getOceanFloorY(x, z, worldRadius) : terrainHeight(x, z)
       // Allow a small bank step, but never climb the underwater island wall.
       return mode !== 'flying' && mode !== 'landing' && ground > footY && ground - footY < .72 ? ground : footY
     }
@@ -4048,7 +4069,7 @@ function Astronaut({ travel, inputRef, interactables, blockers, structureCollide
     const collisionScaleDelta = PLAYER_COLLISION_RADIUS * (characterScale.current / CHARACTER_SCALE - 1)
     const checkObstacle = (testX, testZ, testFootY = group.current.position.y) => {
       if (Math.hypot(testX, testZ) >= getExplorationRadius(worldRadius) - .3 - collisionScaleDelta) return true
-      const ground = Math.hypot(testX, testZ) > worldRadius ? OCEAN_FLOOR_Y : terrainHeight(testX, testZ)
+      const ground = Math.hypot(testX, testZ) > worldRadius ? getOceanFloorY(testX, testZ, worldRadius) : terrainHeight(testX, testZ)
       if (freeMovement && testFootY < ground - .04) return true
       if (freeMovement && isBridgeDeck(testX, testZ) && testFootY < BRIDGE_DECK_HEIGHT - .02
         && testFootY + characterScale.current * 2.7 > BRIDGE_DECK_HEIGHT - .16) return true
@@ -4271,7 +4292,9 @@ function Astronaut({ travel, inputRef, interactables, blockers, structureCollide
         + (inputRef.current.vertical || 0) + (state.clock.elapsedTime < qaVertical.current.until ? qaVertical.current.axis : 0)))
       if (verticalIntent < 0) inputRef.current.takeoff = false
       const axis = paused ? 0 : verticalIntent || (inputRef.current.takeoff ? 1 : 0)
-      const floorY = Math.hypot(group.current.position.x, group.current.position.z) > worldRadius ? OCEAN_FLOOR_Y : walkHeightAt(group.current.position.x, group.current.position.z, group.current.position.y, characterScale.current)
+      const floorY = Math.hypot(group.current.position.x, group.current.position.z) > worldRadius
+        ? getOceanFloorY(group.current.position.x, group.current.position.z, worldRadius)
+        : walkHeightAt(group.current.position.x, group.current.position.z, group.current.position.y, characterScale.current)
       group.current.position.y = advanceExplorationHeight({ y: group.current.position.y, mode, axis,
         dt: paused ? 0 : delta, water, floorY, scale: characterScale.current,
         blocked: (y) => checkObstacle(group.current.position.x, group.current.position.z, y) })
@@ -4531,10 +4554,10 @@ function Astronaut({ travel, inputRef, interactables, blockers, structureCollide
         enableDamping={false}
         rotateSpeed={.38}
         zoomSpeed={1.05}
-        minDistance={isFirstPerson ? 0.05 : getThirdPersonMinDistance(CHARACTER_SCALE)}
-        maxDistance={isFirstPerson ? 0.2 : THIRD_PERSON_MAX_DISTANCE}
-        minPolarAngle={isFirstPerson ? 0.1 : CAMERA_MIN_POLAR}
-        maxPolarAngle={travel.birdView ? .65 : isFirstPerson ? Math.PI - 0.1 : CAMERA_MAX_POLAR}
+        minDistance={getThirdPersonMinDistance(CHARACTER_SCALE)}
+        maxDistance={THIRD_PERSON_MAX_DISTANCE}
+        minPolarAngle={CAMERA_MIN_POLAR}
+        maxPolarAngle={travel.birdView ? .65 : CAMERA_MAX_POLAR}
         mouseButtons={{
           LEFT: builderBuildMode ? undefined : THREE.MOUSE.ROTATE,
           MIDDLE: builderBuildMode ? THREE.MOUSE.ROTATE : THREE.MOUSE.DOLLY,
@@ -4809,7 +4832,7 @@ function FrontierScene({ travel, planet, restorationPercent = 0, beaconRepaired 
     [biomeColliders, builderBlockColliders, structureColliders],
   )
   const walkHeightAt = useCallback((x, z, currentFootY = null, characterScale = CHARACTER_SCALE) => {
-    const terrainY = Math.hypot(x, z) > worldRadius ? OCEAN_FLOOR_Y : walkSurfaceHeight(x, z)
+    const terrainY = Math.hypot(x, z) > worldRadius ? getOceanFloorY(x, z, worldRadius) : walkSurfaceHeight(x, z)
     if (!builderEnabled) return terrainY
     const runtime = builderRuntimePlots.find(({ plot }) => (
       Math.abs(x - plot.center[0]) <= plot.width * plot.cellSize * .5
