@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
+import { OCEAN_DRAW_RADIUS } from '../../utils/galaxyWorldBounds.js'
 import {
   BRIDGE_DECK_HEIGHT,
   BRIDGE_X,
@@ -15,7 +16,6 @@ import {
   WORLD_RADIUS,
   WORLD_ZONES,
   createEstuaryBankGeometry,
-  createIslandSkirtGeometry,
   createRiverGeometry,
   createRibbonGeometry,
   createTerrainGeometry,
@@ -91,7 +91,15 @@ const OCEAN_FRAGMENT_SHADER = `
     water += vec3(0.72, 0.91, 1.0) * reflection * 0.28;
     water += vec3(0.94, 0.99, 1.0) * sparkle * 0.38;
     water += vec3(0.8, 0.96, 1.0) * shoreFoam * 0.2;
-    gl_FragColor = vec4(water, gl_FrontFacing ? 0.78 : 0.55);
+    float opacity = 0.78;
+    if (cameraPosition.y < vWorldPosition.y) {
+      // Scatter light through the water column without a hard disc horizon.
+      float transmission = exp(-length(cameraPosition - vWorldPosition) * 0.055);
+      water = mix(vec3(0.012, 0.065, 0.095), vec3(0.23, 0.46, 0.43), transmission);
+      water += vec3(0.16, 0.22, 0.17) * crest * transmission * 0.3;
+      opacity = transmission * 0.75;
+    }
+    gl_FragColor = vec4(water, opacity);
     #include <tonemapping_fragment>
     #include <colorspace_fragment>
   }
@@ -684,7 +692,7 @@ function OceanSurface({ palette }) {
   return (
     <group>
       <mesh position={[0, OCEAN_SURFACE_Y, 0]} rotation={[-Math.PI / 2, 0, 0]} renderOrder={-3} raycast={() => null}>
-        <circleGeometry args={[62, 128]} />
+        <circleGeometry args={[OCEAN_DRAW_RADIUS, 192]} />
         <shaderMaterial
           ref={materialRef}
           uniforms={uniforms}
@@ -1028,16 +1036,11 @@ export default function WorldTerrain({ palette, territoryExpanded = false, villa
     void territoryExpanded
     return createTerrainGeometry(palette)
   }, [palette, territoryExpanded])
-  const islandSkirtGeometry = useMemo(() => {
-    void territoryExpanded
-    return createIslandSkirtGeometry()
-  }, [territoryExpanded])
   const groundTextures = useMemo(() => {
     void territoryExpanded
     return createGroundDetailTextures(palette)
   }, [palette, territoryExpanded])
   useEffect(() => () => terrainGeometry.dispose(), [terrainGeometry])
-  useEffect(() => () => islandSkirtGeometry.dispose(), [islandSkirtGeometry])
   useEffect(() => () => {
     groundTextures.albedo.dispose()
     groundTextures.bump.dispose()
@@ -1058,9 +1061,8 @@ export default function WorldTerrain({ palette, territoryExpanded = false, villa
       >
         <meshStandardMaterial map={groundTextures.albedo} bumpMap={groundTextures.bump} bumpScale={.09} roughness={.95} metalness={.01} />
       </mesh>
-      <mesh geometry={islandSkirtGeometry} receiveShadow>
-        <meshStandardMaterial color={new THREE.Color(palette.edge).lerp(new THREE.Color('#6f9480'), .5)} roughness={.96} side={THREE.DoubleSide} />
-      </mesh>
+      {/* The continuous marine heightfield now joins this coast directly.
+          A second island skirt here would overlap the seabed. */}
       <TerrainRoads palette={palette} structurePositions={structurePositions} />
       <GroundCover palette={palette} clearings={detailClearings} />
       <River palette={palette} />

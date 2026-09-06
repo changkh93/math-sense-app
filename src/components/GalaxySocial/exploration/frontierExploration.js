@@ -1,6 +1,9 @@
 import {
   OCEAN_SURFACE_Y, RIVER_SURFACE_Y, isRiverWater, terrainHeight,
+  getOceanFloorY,
 } from '../GalaxyTerrainModel.js'
+import { OCEAN_DRAW_RADIUS } from '../../../utils/galaxyWorldBounds.js'
+export { getOceanFloorY } from '../GalaxyTerrainModel.js'
 
 export const EXPLORATION_KIT_COST = 1000
 export const HOVERPACK_FLAME_LAYERS = Object.freeze([
@@ -19,34 +22,13 @@ export const normalizeOwnedExplorationKits = (value) => {
   return Array.from(new Set(['none', ...owned.filter((id) => id === 'hoverpack' || id === 'diving')]))
 }
 export const normalizeMovementMode = (value) => ['grounded', 'flying', 'landing', 'swimming', 'diving'].includes(value) ? value : 'grounded'
-export const getExplorationRadius = (worldRadius) => Math.min(31, worldRadius + 6)
-export const OCEAN_FLOOR_Y = -4.65
+export const getExplorationRadius = (worldRadius) => Math.min(92, worldRadius + 60)
+export const OCEAN_FLOOR_Y = -36
 export const FLIGHT_CEILING = 18
-
-const smoothstep = (value) => {
-  const t = Math.max(0, Math.min(1, value))
-  return t * t * (3 - 2 * t)
-}
-
-// A sloped, gently ridged shelf replaces the old single flat ocean plane. This
-// function is shared by rendering and collision so divers never float above or
-// clip through the visible seabed.
-export function getOceanFloorY(x, z, worldRadius) {
-  const shelfWidth = Math.max(1, getExplorationRadius(worldRadius) - worldRadius)
-  const distanceFromCoast = Math.max(0, Math.hypot(x, z) - worldRadius)
-  const depth = smoothstep(distanceFromCoast / shelfWidth)
-  const coastFloor = OCEAN_SURFACE_Y - .68
-  const reliefEnvelope = Math.sin(Math.PI * Math.min(1, distanceFromCoast / shelfWidth))
-  const broadRidge = Math.sin(x * .31 + z * .17) * .38
-    + Math.cos(z * .37 - x * .11) * .25
-    + Math.sin((x + z) * .58) * .12
-  const reefMounds = Math.max(0, Math.sin(x * .53) * Math.cos(z * .47)) * .35
-  return coastFloor - depth * 3.82 + (broadRidge + reefMounds) * reliefEnvelope
-}
 
 export function sampleExplorationWater(x, z, worldRadius, distantOcean = false) {
   const radius = Math.hypot(x, z)
-  if (radius > worldRadius && radius < (distantOcean ? 62 : getExplorationRadius(worldRadius))) {
+  if (radius > worldRadius && radius < (distantOcean ? OCEAN_DRAW_RADIUS : getExplorationRadius(worldRadius))) {
     return { kind: 'ocean', surfaceY: OCEAN_SURFACE_Y, floorY: getOceanFloorY(x, z, worldRadius) }
   }
   const floorY = terrainHeight(x, z)
@@ -95,13 +77,13 @@ export const MARINE_SPECIES = Object.freeze([
 ])
 
 // Habitats encircle the whole island, with repeated species and no network simulation.
-export const MARINE_HABITAT_COUNT = 24
+export const MARINE_HABITAT_COUNT = 48
 export function getMarineHabitat(index, worldRadius) {
-  const angle = -.6 + index * Math.PI * 2 / MARINE_HABITAT_COUNT
-  const radius = worldRadius + (getExplorationRadius(worldRadius) - worldRadius) * .53
+  const angle = -.6 + index * 2.3999632297
+  const radius = worldRadius + 6 + (index % 4) * 10 + Math.sin(index * 4.1) * 2
   const x = Math.cos(angle) * radius
   const z = Math.sin(angle) * radius
-  return { x, z, y: getOceanFloorY(x, z, worldRadius) + 1.05 + (index % 3) * .18 }
+  return { x, z, y: Math.min(OCEAN_SURFACE_Y - .35, getOceanFloorY(x, z, worldRadius) + 1.7 + (index % 3) * .5) }
 }
 export function getSkyLandmarks(worldRadius) {
   const r = worldRadius * .5

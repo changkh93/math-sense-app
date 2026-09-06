@@ -25,7 +25,8 @@ try {
   await set(own, valid)
   await update(own, { movementMode: 'landing' })
   await update(own, { y: -3, equipment: 'diving', movementMode: 'diving' })
-  for (const invalid of [{ y: 25 }, { y: -9 }, { y: '3' }, { scale: 2 }, { equipment: 'admin' }, { movementMode: 'teleport' }, { x: 40 }, { coins: 999 }, { uid: 'other' }]) {
+  await update(own, { x: 82, z: -50, y: -34 })
+  for (const invalid of [{ y: 25 }, { y: -41 }, { y: '3' }, { scale: 2 }, { equipment: 'admin' }, { movementMode: 'teleport' }, { x: 97 }, { z: -97 }, { coins: 999 }, { uid: 'other' }]) {
     await assert.rejects(update(own, invalid), /PERMISSION_DENIED/, JSON.stringify(invalid))
   }
   await assert.rejects(set(ref(db, 'galaxyWorldRooms/island/players/other/connections/test'), valid), /PERMISSION_DENIED/)

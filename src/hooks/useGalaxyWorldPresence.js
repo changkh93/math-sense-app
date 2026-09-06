@@ -13,6 +13,7 @@ import {
   update,
 } from 'firebase/database'
 import { realtimeDb } from '../firebase'
+import { GALAXY_POSITION_LIMIT, GALAXY_MIN_Y, GALAXY_MAX_Y } from '../utils/galaxyWorldBounds.js'
 import { normalizeExplorationKit, normalizeMovementMode } from '../components/GalaxySocial/exploration/frontierExploration.js'
 
 const POSITION_THROTTLE_MS = 120
@@ -61,9 +62,9 @@ const normalizePosition = (position = {}) => {
   return {
     equipment: normalizeExplorationKit(position.equipment),
     movementMode: normalizeMovementMode(position.movementMode),
-    x: Math.round(clamp(x, -32, 32) * 1000) / 1000,
-    y: Math.round(clamp(y, -8, 24) * 1000) / 1000,
-    z: Math.round(clamp(z, -32, 32) * 1000) / 1000,
+    x: Math.round(clamp(x, -GALAXY_POSITION_LIMIT, GALAXY_POSITION_LIMIT) * 1000) / 1000,
+    y: Math.round(clamp(y, GALAXY_MIN_Y, GALAXY_MAX_Y) * 1000) / 1000,
+    z: Math.round(clamp(z, -GALAXY_POSITION_LIMIT, GALAXY_POSITION_LIMIT) * 1000) / 1000,
     yaw: Math.round(normalizeYaw(yaw) * 1000) / 1000,
     scale: Math.round(clamp(Number.isFinite(scale) ? scale : .28, .14, .7) * 1000) / 1000,
   }
@@ -115,9 +116,9 @@ const normalizeRemotePlayers = (value, ownSafeUid, nowMs) => Object.entries(valu
       uid: cleanText(connection.uid, 180),
       displayName: cleanText(connection.displayName || '탐사원', 40),
       connectionId: connection.connectionId,
-      x: clamp(x, -32, 32),
-      y: Number.isFinite(y) ? clamp(y, -8, 24) : null,
-      z: clamp(z, -32, 32),
+      x: clamp(x, -GALAXY_POSITION_LIMIT, GALAXY_POSITION_LIMIT),
+      y: Number.isFinite(y) ? clamp(y, GALAXY_MIN_Y, GALAXY_MAX_Y) : null,
+      z: clamp(z, -GALAXY_POSITION_LIMIT, GALAXY_POSITION_LIMIT),
       yaw: normalizeYaw(yaw),
       scale: clamp(Number(connection.scale) || .28, .14, .7),
       equipment: normalizeExplorationKit(connection.equipment),

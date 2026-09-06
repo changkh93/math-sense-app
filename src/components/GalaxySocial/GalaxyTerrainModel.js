@@ -98,6 +98,24 @@ export const RIVER_SURFACE_Y = -.075
 // Keep the ocean just below the river mouth so the coast reads as a shoreline,
 // rather than a deep ledge around the island.
 export const OCEAN_SURFACE_Y = -.09
+
+// Shared continuous heightfield for the seabed, coast skirt, swimming and camera.
+export function getOceanFloorY(x, z, worldRadius = activeWorldRadius) {
+  const radius = Math.hypot(x, z)
+  const d = Math.max(0, radius - worldRadius)
+  const smooth = (a, b, v) => {
+    const t = Math.max(0, Math.min(1, (v - a) / (b - a)))
+    return t * t * (3 - 2 * t)
+  }
+  const coast = terrainHeight(x / Math.max(radius, .001) * worldRadius, z / Math.max(radius, .001) * worldRadius) - .018
+  const shelf = -.85 - 6 * smooth(0, 16, d) - 19 * smooth(12, 44, d) - 5 * smooth(38, 60, d)
+  const ridges = Math.sin(x * .19 + z * .1) * 1.7 + Math.cos(z * .24 - x * .12) * 1.1
+    + Math.sin(x * .48 + Math.sin(z * .31)) * Math.cos(z * .38) * 1.05
+  const canyon = -2.5 * Math.exp(-Math.pow(Math.sin(Math.atan2(z, x) * 3 + .4) * 4, 2)) * smooth(8, 32, d)
+  const ripples = Math.sin(x * 1.2 + z * .37 + Math.sin(z * .43)) * .055
+  const floor = Math.max(-36, Math.min(-.8, shelf + (ridges + canyon + ripples) * smooth(1.35, 8, d)))
+  return THREE.MathUtils.lerp(coast, floor, smooth(0, 1.35, d))
+}
 export const LANDING_PAD_RADIUS = 2.72
 export const LANDING_PAD_SURFACE_LIFT = .18
 export const ROAD_EDGE_HALF_WIDTH = .7
@@ -480,7 +498,6 @@ export function createIslandSkirtGeometry() {
   // Continue the coast outward into the shallow shelf. The old inward skirt
   // formed a near-black vertical wall when viewed from underwater.
   const bottomRadius = activeWorldRadius + 1.35
-  const bottomY = OCEAN_SURFACE_Y - .82
 
   for (let segment = 0; segment <= angularSegments; segment += 1) {
     const amount = segment / angularSegments
@@ -490,7 +507,7 @@ export function createIslandSkirtGeometry() {
     const x = cos * activeWorldRadius
     const z = sin * activeWorldRadius
     positions.push(x, terrainHeight(x, z) - .018, z)
-    positions.push(cos * bottomRadius, bottomY, sin * bottomRadius)
+    positions.push(cos * bottomRadius, getOceanFloorY(cos * bottomRadius, sin * bottomRadius), sin * bottomRadius)
     uvs.push(amount, 1, amount, 0)
     if (segment < angularSegments) {
       const start = segment * 2

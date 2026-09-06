@@ -3377,6 +3377,15 @@ function MissionPortal({ portal, active }) {
   )
 }
 
+function AtmosphericBackdrop({ worldRadius, children }) {
+  const group = useRef()
+  useFrame(({ camera }) => {
+    const water = sampleExplorationWater(camera.position.x, camera.position.z, worldRadius, true)
+    group.current.visible = !(water && camera.position.y < water.surfaceY - .03)
+  })
+  return <group ref={group}>{children}</group>
+}
+
 function DistantWorlds({ palette }) {
   return (
     <group>
@@ -3946,6 +3955,11 @@ function Astronaut({ travel, inputRef, interactables, blockers, structureCollide
         groundHeight.current = group.current.position.y
         jump.current = { height: 0, velocity: 0, requested: false }
       }
+      if (Number.isFinite(travel.qaCommand.yaw)) {
+        group.current.rotation.y = travel.qaCommand.yaw
+        firstPersonYawOffset.current = 0
+        firstPersonPitch.current = travel.qaCommand.pitch || 0
+      }
       qaVertical.current = { until: state.clock.elapsedTime + (travel.qaCommand.duration || 1), axis: travel.qaCommand.axis || 0, x: travel.qaCommand.x || 0, z: travel.qaCommand.z || 0 }
     }
     const entryWater = sampleExplorationWater(group.current.position.x, group.current.position.z, worldRadius)
@@ -4468,7 +4482,8 @@ function Astronaut({ travel, inputRef, interactables, blockers, structureCollide
             orbitCamera.position.x = Math.cos(angle) * (worldRadius + .3)
             orbitCamera.position.z = Math.sin(angle) * (worldRadius + .3)
           }
-          orbitCamera.position.y = Math.max(playerWater.floorY + .15, Math.min(orbitCamera.position.y, playerWater.surfaceY - .12))
+          const cameraFloor = getOceanFloorY(orbitCamera.position.x, orbitCamera.position.z, worldRadius)
+          orbitCamera.position.y = Math.max(cameraFloor + .25, Math.min(orbitCamera.position.y, playerWater.surfaceY - .12))
           orbitCamera.lookAt(controls.current.target)
         } else if (!cameraWater && orbitCamera.position.y < minimumCameraY) {
           orbitCamera.position.setY(THREE.MathUtils.lerp(orbitCamera.position.y, minimumCameraY, Math.min(1, delta * 12)))
@@ -4938,9 +4953,11 @@ function FrontierScene({ travel, planet, restorationPercent = 0, beaconRepaired 
       <directionalLight position={[10, 16, 8]} intensity={2.05} color={palette.light} castShadow shadow-mapSize={[1024, 1024]} shadow-camera-left={-worldRadius - 4} shadow-camera-right={worldRadius + 4} shadow-camera-top={worldRadius + 4} shadow-camera-bottom={-worldRadius - 4} shadow-normalBias={.04} shadow-bias={-.0004} />
       <directionalLight position={[-12, 7, -9]} intensity={.32} color={palette.accent} />
       <ambientLight intensity={.24} />
-      <Stars radius={72} depth={34} count={720} factor={2.2} saturation={.18} fade speed={.08} />
-      <Sparkles count={Math.round(24 + restorationProgress * .7)} scale={[48, 20, 48]} position={[0, 9, 0]} size={1.25} color={palette.particle} speed={.12} />
-      <DistantWorlds palette={palette} />
+      <AtmosphericBackdrop worldRadius={worldRadius}>
+        <Stars radius={72} depth={34} count={720} factor={2.2} saturation={.18} fade speed={.08} />
+        <Sparkles count={Math.round(24 + restorationProgress * .7)} scale={[48, 20, 48]} position={[0, 9, 0]} size={1.25} color={palette.particle} speed={.12} />
+        <DistantWorlds palette={palette} />
+      </AtmosphericBackdrop>
       <FrontierMarineWorld worldRadius={worldRadius} paused={paused} playerRef={playerGroupRef} />
       <FrontierSkyWorld worldRadius={worldRadius} paused={paused} playerRef={playerGroupRef} />
       <WorldTerrain
@@ -5917,7 +5934,7 @@ export default function GalaxyWorld3D({
       <Canvas
         shadows
         dpr={[1, 1.5]}
-        camera={{ position: [6, 5.4, 12], fov: 48, near: DEFAULT_CAMERA_NEAR, far: 120 }}
+        camera={{ position: [6, 5.4, 12], fov: 48, near: DEFAULT_CAMERA_NEAR, far: 300 }}
         gl={{ antialias: true, powerPreference: 'high-performance' }}
         onCreated={({ gl }) => {
           gl.toneMapping = THREE.ACESFilmicToneMapping
