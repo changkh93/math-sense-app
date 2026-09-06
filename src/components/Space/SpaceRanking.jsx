@@ -48,7 +48,7 @@ function CrewLeaderboardVessel({ summary, crew, rank }) {
   )
 }
 
-const LEADERBOARD_SESSION_KEY = 'stellar_leaderboard_cache_v4';
+const LEADERBOARD_SESSION_KEY = 'stellar_leaderboard_cache_v5';
 const LEADERBOARD_TTL_MS = 5 * 60 * 1000; // 5 minutes
 
 function assignDenseRanks(list, isTieFn) {
