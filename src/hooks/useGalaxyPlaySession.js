@@ -1,8 +1,8 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useEffectEvent, useMemo, useRef, useState } from 'react'
 import { httpsCallable } from 'firebase/functions'
 import { functions } from '../firebase'
 
-const CHECKPOINT_INTERVAL_MS = 30_000
+import { PLAY_CHECKPOINT_INTERVAL_MS as CHECKPOINT_INTERVAL_MS, PLAY_CHECKPOINT_BURST_MS } from '../utils/frontierNetworkPolicy.js'
 const IDLE_PROMPT_MS = 3 * 60_000
 const IDLE_EXIT_MS = 5 * 60_000
 
@@ -77,8 +77,11 @@ export function useGalaxyPlaySession({ uid, active, isGuest = false }) {
   const lastInteractionRef = useRef(Date.now())
   const endingRef = useRef(false)
   const checkpointRef = useRef(null)
+  const activeUidRef = useRef(uid)
+  const lastCheckpointAttemptRef = useRef({ key: '', at: -Infinity })
 
   useEffect(() => {
+    activeUidRef.current = uid
     const restored = readStoredSession(uid)
     setSession(restored)
     setAccess(null)
@@ -86,6 +89,7 @@ export function useGalaxyPlaySession({ uid, active, isGuest = false }) {
     setEndedSummary(null)
     setIdleWarning(false)
     sequenceRef.current = Number(restored?.sequenceNumber || 0)
+    return () => { activeUidRef.current = null }
   }, [uid])
 
   const lastAccessFetchedAtRef = useRef(0)
@@ -212,6 +216,10 @@ export function useGalaxyPlaySession({ uid, active, isGuest = false }) {
   const endSession = useCallback(async (reason = 'manual_exit') => {
     const currentSession = readStoredSession(uid) || session
     if (!uid || !currentSession?.sessionId || endingRef.current) return endedSummary
+    if (isGuest) {
+      finishLocally({ endReason: reason })
+      return null
+    }
     endingRef.current = true
     setBusy('end')
     setError('')
@@ -243,16 +251,20 @@ export function useGalaxyPlaySession({ uid, active, isGuest = false }) {
     } finally {
       setBusy('')
     }
-  }, [endedSummary, finishLocally, session, syncServerClock, uid])
+  }, [endedSummary, finishLocally, isGuest, session, syncServerClock, uid])
 
   const checkpoint = useCallback(async () => {
     const currentSession = readStoredSession(uid) || session
-    if (!uid || !active || !currentSession?.sessionId || endingRef.current) return null
+    if (isGuest || !uid || !active || !currentSession?.sessionId || endingRef.current) return null
     if (!navigator.onLine || document.visibilityState !== 'visible') {
       setConnectionState('reconnecting')
       return null
     }
     if (checkpointRef.current) return checkpointRef.current
+    const requestKey = `${uid}:${currentSession.sessionId}`
+    const lastAttempt = lastCheckpointAttemptRef.current
+    if (lastAttempt.key === requestKey && Date.now() - lastAttempt.at < PLAY_CHECKPOINT_BURST_MS) return null
+    lastCheckpointAttemptRef.current = { key: requestKey, at: Date.now() }
     sequenceRef.current += 1
     const sequenceNumber = sequenceRef.current
     const sentAtMs = Date.now()
@@ -264,6 +276,8 @@ export function useGalaxyPlaySession({ uid, active, isGuest = false }) {
       visible: true,
       recentActivity: Date.now() - lastInteractionRef.current < IDLE_PROMPT_MS,
     }).then((result) => {
+      if (activeUidRef.current !== uid || readStoredSession(uid)?.sessionId !== currentSession.sessionId) return null
+      sequenceRef.current = Math.max(sequenceRef.current, sequenceNumber)
       syncServerClock(result?.serverNowMs, sentAtMs, Date.now())
       setConnectionState('online')
       if (result?.ended) {
@@ -283,6 +297,7 @@ export function useGalaxyPlaySession({ uid, active, isGuest = false }) {
       writeStoredSession(uid, nextSession)
       return result
     }).catch((checkpointError) => {
+      if (activeUidRef.current !== uid || readStoredSession(uid)?.sessionId !== currentSession.sessionId) return null
       setConnectionState('reconnecting')
       const code = String(checkpointError?.code || '')
       if (code.includes('failed-precondition') || code.includes('permission-denied') || code.includes('not-found')) {
@@ -294,7 +309,11 @@ export function useGalaxyPlaySession({ uid, active, isGuest = false }) {
     })
     checkpointRef.current = promise
     return promise
-  }, [active, finishLocally, session, syncServerClock, uid])
+  }, [active, finishLocally, isGuest, session, syncServerClock, uid])
+
+  // Responses update session/clock state. They must not restart the timer and
+  // immediately issue another paid callable. Read fresh state at invocation.
+  const checkpointFromTimer = useEffectEvent(() => checkpoint())
 
   const acknowledgeIdle = useCallback(() => {
     lastInteractionRef.current = Date.now()
@@ -321,13 +340,14 @@ export function useGalaxyPlaySession({ uid, active, isGuest = false }) {
 
   useEffect(() => {
     if (!active || !session?.sessionId) return undefined
-    checkpoint()
-    const timer = window.setInterval(checkpoint, CHECKPOINT_INTERVAL_MS)
+    if (isGuest) return undefined
+    checkpointFromTimer()
+    const timer = window.setInterval(() => checkpointFromTimer(), CHECKPOINT_INTERVAL_MS)
     const handleVisibility = () => {
-      if (document.visibilityState === 'visible') checkpoint()
+      if (document.visibilityState === 'visible') checkpointFromTimer()
       else setConnectionState('reconnecting')
     }
-    const handleOnline = () => checkpoint()
+    const handleOnline = () => checkpointFromTimer()
     const handleOffline = () => setConnectionState('reconnecting')
     document.addEventListener('visibilitychange', handleVisibility)
     window.addEventListener('online', handleOnline)
@@ -338,7 +358,7 @@ export function useGalaxyPlaySession({ uid, active, isGuest = false }) {
       window.removeEventListener('online', handleOnline)
       window.removeEventListener('offline', handleOffline)
     }
-  }, [active, checkpoint, session?.sessionId])
+  }, [active, isGuest, uid, session?.sessionId])
 
   useEffect(() => {
     if (!active || !session?.sessionId) return undefined

@@ -13,6 +13,7 @@ import {
   update,
 } from 'firebase/database'
 import { realtimeDb } from '../firebase'
+import { PRESENCE_HEARTBEAT_MS, positionPatch, needsPresenceHeartbeat } from '../utils/frontierNetworkPolicy.js'
 import { GALAXY_POSITION_LIMIT, GALAXY_MIN_Y, GALAXY_MAX_Y } from '../utils/galaxyWorldBounds.js'
 import { normalizeExplorationKit, normalizeMovementMode } from '../components/GalaxySocial/exploration/frontierExploration.js'
 
@@ -21,7 +22,7 @@ const POSITION_EPSILON = 0.035
 const YAW_EPSILON = 0.02
 const HEIGHT_EPSILON = 0.025
 const SCALE_EPSILON = 0.015
-const HEARTBEAT_MS = 5_000
+const HEARTBEAT_MS = PRESENCE_HEARTBEAT_MS
 const STALE_CONNECTION_MS = 15_000
 const STALE_SWEEP_MS = 1_000
 const SPEECH_LIFETIME_MS = 8_000
@@ -185,21 +186,31 @@ export function useGalaxyWorldPresence({
     if (!next) return
     pendingPositionRef.current = null
     latestPositionRef.current = next
+    if (!connectionRef.current || !isConnectedRef.current) return
+    const patch = positionPatch(lastSentPositionRef.current, next)
+    if (!Object.keys(patch).length) return
+    const activeConnection = connectionRef.current
     lastSentPositionRef.current = next
     lastPositionSentAtRef.current = Date.now()
-    if (!connectionRef.current || !isConnectedRef.current) return
-    update(connectionRef.current, {
-      ...next,
+    update(activeConnection, {
+      ...patch,
       updatedAtMs: serverTimestamp(),
-    }).catch((error) => console.warn('Failed to update galaxy world position', error))
+    }).catch((error) => {
+      // Any rejected delta can invalidate later deltas based on it. Force a
+      // complete transform on the next frame even if newer writes are pending.
+      if (connectionRef.current === activeConnection) {
+        lastSentPositionRef.current = null
+        lastPositionSentAtRef.current = 0
+      }
+      console.warn('Failed to update galaxy world position', error)
+    })
   }, [])
 
   const updatePosition = useCallback((position) => {
     const next = normalizePosition(position)
     if (!next) return false
     latestPositionRef.current = next
-    const comparisonPosition = pendingPositionRef.current || lastSentPositionRef.current
-    if (!hasSignificantPositionChange(comparisonPosition, next)) return false
+    if (!hasSignificantPositionChange(lastSentPositionRef.current, next) && !pendingPositionRef.current) return false
     pendingPositionRef.current = next
     const waitMs = Math.max(0, POSITION_THROTTLE_MS - (Date.now() - lastPositionSentAtRef.current))
     if (waitMs === 0) flushPendingPosition()
@@ -274,13 +285,14 @@ export function useGalaxyWorldPresence({
   }, [displayName])
 
   useEffect(() => {
+    if (!enabled) return undefined
     const serverOffsetRef = ref(realtimeDb, '.info/serverTimeOffset')
     return onValue(serverOffsetRef, (snapshot) => {
       const offsetMs = Number(snapshot.val())
       serverTimeOffsetRef.current = Number.isFinite(offsetMs) ? offsetMs : 0
       scheduleRemoteRefresh()
     })
-  }, [scheduleRemoteRefresh])
+  }, [enabled, scheduleRemoteRefresh])
 
   useEffect(() => {
     let cancelled = false
@@ -309,10 +321,11 @@ export function useGalaxyWorldPresence({
     const writeConnection = async () => {
       await disconnectRegistration.remove()
       if (cancelled || connectionRef.current !== currentConnectionRef) return
+      const initialPosition = latestPositionRef.current
       await set(currentConnectionRef, {
         uid: cleanText(uid, 180),
         displayName: latestDisplayNameRef.current,
-        ...latestPositionRef.current,
+        ...initialPosition,
         speech: null,
         connectedAtMs: serverTimestamp(),
         updatedAtMs: serverTimestamp(),
@@ -321,7 +334,7 @@ export function useGalaxyWorldPresence({
         remove(currentConnectionRef).catch(() => {})
         return
       }
-      lastSentPositionRef.current = latestPositionRef.current
+      lastSentPositionRef.current = initialPosition
       lastPositionSentAtRef.current = Date.now()
       isConnectedRef.current = true
       setIsConnected(true)
@@ -344,6 +357,7 @@ export function useGalaxyWorldPresence({
     })
     const heartbeat = window.setInterval(() => {
       if (!connectionRef.current || !isConnectedRef.current) return
+      if (!needsPresenceHeartbeat(Date.now(), lastPositionSentAtRef.current)) return
       update(connectionRef.current, { updatedAtMs: serverTimestamp() })
         .catch((error) => console.warn('Failed to refresh galaxy world presence', error))
     }, HEARTBEAT_MS)
@@ -376,7 +390,7 @@ export function useGalaxyWorldPresence({
     if (!enabled || !roomPlayersPath || !safeUid) return () => { cancelled = true }
     const playersRef = ref(realtimeDb, roomPlayersPath)
     const handlePlayerUpdate = (snapshot) => {
-      if (!snapshot.key) return
+      if (!snapshot.key || snapshot.key === safeUid) return
       rawPlayersRef.current[snapshot.key] = snapshot.val() || {}
       scheduleRemoteRefresh()
       setPresenceError('')

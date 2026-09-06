@@ -29,6 +29,7 @@ import {
   isNearRoad,
   riverCenterZ,
   setActivePathNetwork,
+  RIVER_SURFACE_Y,
 } from '../src/components/GalaxySocial/GalaxyTerrainModel.js'
 
 setActivePathNetwork([[[-5, 2.4], [5, 2.4]]])
@@ -739,7 +740,7 @@ test('Walk surfaces and river emitters use the rendered world model', () => {
   assert.equal(getWalkSurface(10, 10, 'ocean'), 'terrain.ocean')
   assert.equal(isNearRoad(-4.8, 2.4), true)
   const [x, y, z] = getRiverAudioPoint(1.2)
-  assert.deepEqual([x, y], [1.2, 0.05])
+  assert.deepEqual([x, y], [1.2, RIVER_SURFACE_Y])
   assert.equal(z, riverCenterZ(1.2))
   const nearRiver = getRiverAudioProximity(1.2, riverCenterZ(1.2) + 1.2)
   const farRiver = getRiverAudioProximity(1.2, 5)

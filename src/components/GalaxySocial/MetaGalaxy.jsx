@@ -1,5 +1,5 @@
 import { releaseFrontierPointerLock } from './frontierPointerLock.js'
-import { createElement, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { createElement, useCallback, useEffect, useEffectEvent, useMemo, useRef, useState } from 'react'
 import { collection, doc, limit, onSnapshot, orderBy, query } from 'firebase/firestore'
 import { httpsCallable } from 'firebase/functions'
 import { deleteObject, getDownloadURL, ref as createStorageRef, uploadBytes } from 'firebase/storage'
@@ -708,18 +708,20 @@ export default function MetaGalaxy({ user, userData, playSession, playRemainingS
     }
   }, [hasActiveOverlay])
 
+  const receiveOwnPlanet = useEffectEvent((snapshot) => {
+    if (!snapshot.exists() || snapshot.id !== user?.uid) return
+    const nextOwnPlanet = { id: snapshot.id, ...snapshot.data() }
+    setHome((current) => current ? {
+      ...current,
+      ownPlanet: nextOwnPlanet,
+      ...(targetUid === user.uid ? { planet: nextOwnPlanet } : {}),
+    } : current)
+  })
   useEffect(() => {
     if (isGuest || !user?.uid) return undefined
-    return onSnapshot(doc(db, 'galaxyPlanets', user.uid), (snapshot) => {
-      if (!snapshot.exists()) return
-      const nextOwnPlanet = { id: snapshot.id, ...snapshot.data() }
-      setHome((current) => current ? {
-        ...current,
-        ownPlanet: nextOwnPlanet,
-        ...(targetUid === user.uid ? { planet: nextOwnPlanet } : {}),
-      } : current)
-    }, (snapshotError) => setError(snapshotError?.message || '내 행성의 실시간 신호가 끊어졌습니다.'))
-  }, [isGuest, targetUid, user?.uid])
+    return onSnapshot(doc(db, 'galaxyPlanets', user.uid), (snapshot) => receiveOwnPlanet(snapshot),
+      (snapshotError) => setError(snapshotError?.message || '내 행성의 실시간 신호가 끊어졌습니다.'))
+  }, [isGuest, user?.uid])
 
   useEffect(() => {
     if (isGuest || !targetUid || targetUid === user?.uid) return undefined
@@ -762,7 +764,12 @@ export default function MetaGalaxy({ user, userData, playSession, playRemainingS
   useEffect(() => {
     if (!home?.liveSession?.granted || home.liveSession.roomOwnerUid !== targetUid || !user?.uid) return undefined
     let cancelled = false
+    let inFlight = false
+    let lastAttemptMs = -Infinity
     const renew = async () => {
+      if (document.visibilityState !== 'visible' || !navigator.onLine || inFlight || Date.now() - lastAttemptMs < 5000) return
+      inFlight = true
+      lastAttemptMs = Date.now()
       try {
         const result = await callGalaxy('renewGalaxyWorldSession', { roomOwnerUid: targetUid })
         if (cancelled || !result?.liveSession) return
@@ -771,18 +778,23 @@ export default function MetaGalaxy({ user, userData, playSession, playRemainingS
           : current)
       } catch (renewError) {
         console.warn('Failed to renew galaxy live session', renewError)
+      } finally {
+        inFlight = false
       }
     }
-    const timer = window.setInterval(renew, 2 * 60 * 1000)
+    // Server grants five minutes; renew with two minutes of headroom.
+    const timer = window.setInterval(renew, 3 * 60 * 1000)
     const handleFocus = () => {
       const estimatedServerNowMs = Date.now() + Number(home.serverClockOffsetMs || 0)
       if (Number(home.liveSession.expiresAtMs || 0) - estimatedServerNowMs < 90 * 1000) renew()
     }
     window.addEventListener('focus', handleFocus)
+    document.addEventListener('visibilitychange', handleFocus)
     return () => {
       cancelled = true
       window.clearInterval(timer)
       window.removeEventListener('focus', handleFocus)
+      document.removeEventListener('visibilitychange', handleFocus)
     }
   }, [callGalaxy, home?.liveSession?.expiresAtMs, home?.liveSession?.granted, home?.liveSession?.roomOwnerUid, home?.serverClockOffsetMs, targetUid, user?.uid])
 
