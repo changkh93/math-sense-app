@@ -2011,3 +2011,8 @@ body:has(.frontier-top-hud) .galaxy-play-hud,
     transition-duration: .01ms !important;
   }
 }
+.frontier-world-preparing { position: absolute; inset: 0; display: grid; place-items: center; background: radial-gradient(ellipse at 40% 30%, #18424a, #081522 72%); color: #bce5de; font-size: .9rem; }
+.frontier-graphics-control { position: absolute; right: 16px; bottom: 92px; z-index: 15; display: flex; gap: 8px; align-items: center; padding: 8px 10px; border: 1px solid #86c6c144; border-radius: 12px; background: #102b35ed; color: #d7eee7; font-size: 12px; }
+.frontier-graphics-control select { min-height: 32px; max-width: 150px; color: #eafff6; background: #173c44; border: 1px solid #75b5aa66; border-radius: 7px; }
+.frontier-graphics-control.inline { position: static; flex-wrap: wrap; margin-right: auto; }
+.frontier-graphics-control.inline small { color: #b0d1ca; max-width: 220px; line-height: 1.4; }

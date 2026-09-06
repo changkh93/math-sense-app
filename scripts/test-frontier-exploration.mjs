@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
-import { advanceExplorationHeight, getExplorationMode, sampleExplorationWater, getExplorationRadius, getMarineHabitat, getOceanFloorY, MARINE_SPECIES, normalizeExplorationKit, normalizeOwnedExplorationKits, EXPLORATION_KITS, EXPLORATION_KIT_COST, HOVERPACK_FLAME_LAYERS, FLIGHT_CEILING } from '../src/components/GalaxySocial/exploration/frontierExploration.js'
+import { advanceExplorationHeight, getExplorationMode, sampleExplorationWater, getExplorationRadius, getMarineHabitat, getOceanFloorY, MARINE_SPECIES, normalizeExplorationKit, normalizeOwnedExplorationKits, resolveExplorationKitShortcut, EXPLORATION_KITS, EXPLORATION_KIT_COST, HOVERPACK_FLAME_LAYERS, FLIGHT_CEILING } from '../src/components/GalaxySocial/exploration/frontierExploration.js'
 import { setTerritoryExpanded } from '../src/components/GalaxySocial/GalaxyTerrainModel.js'
 
 setTerritoryExpanded(false)
@@ -19,6 +19,11 @@ assert.deepEqual(normalizeOwnedExplorationKits(['diving', 'admin-jet', 'diving',
 assert.equal(EXPLORATION_KITS.find((kit) => kit.id === 'none').cost, 0)
 assert.equal(EXPLORATION_KITS.find((kit) => kit.id === 'hoverpack').cost, EXPLORATION_KIT_COST)
 assert.equal(EXPLORATION_KITS.find((kit) => kit.id === 'diving').cost, EXPLORATION_KIT_COST)
+assert.deepEqual(EXPLORATION_KITS.map((kit) => kit.shortcut), ['1', '2', '3'])
+assert.equal(resolveExplorationKitShortcut('Digit1'), 'none')
+assert.equal(resolveExplorationKitShortcut('Numpad2'), 'hoverpack')
+assert.equal(resolveExplorationKitShortcut('Digit3'), 'diving')
+assert.equal(resolveExplorationKitShortcut('KeyH'), null)
 assert.deepEqual(HOVERPACK_FLAME_LAYERS.map((layer) => layer.color), ['#ff3d0d', '#ff9b24', '#fff0a3'])
 assert.ok(HOVERPACK_FLAME_LAYERS.every((layer) => layer.height > 0 && layer.radius > 0 && layer.opacity > 0 && layer.opacity <= 1))
 assert.equal(getExplorationMode({ kit: 'none', flight: true, y: 3, water }), 'grounded')
@@ -55,5 +60,11 @@ for (const radius of [20, 28.284271]) {
 }
 const hudSource = readFileSync(new URL('../src/components/GalaxySocial/exploration/FrontierExplorationHud.jsx', import.meta.url), 'utf8')
 assert.doesNotMatch(hudSource, /바다 도감|관찰 기록하기|가까운 산호 숲/)
+assert.match(hudSource, /aria-keyshortcuts=\{kit\.shortcut\}/)
+assert.match(hudSource, /event\.code === 'KeyG'/)
+assert.match(hudSource, /flight: kit === 'hoverpack'/, 'selecting or purchasing the hoverpack launches immediately')
+assert.doesNotMatch(hudSource, /안전 착륙|aria-keyshortcuts="H"/, 'hoverpack has no redundant landing toggle')
+const worldSource = readFileSync(new URL('../src/components/GalaxySocial/GalaxyWorld3D.jsx', import.meta.url), 'utf8')
+assert.doesNotMatch(worldSource, /event\.code === 'KeyH'/, 'H landing toggle is removed')
 setTerritoryExpanded(false)
 console.log('Frontier exploration: flight ceiling, hover, pause, collision sweep, swimming, varied seabed and free-form marine exploration passed')

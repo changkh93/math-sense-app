@@ -1,5 +1,5 @@
 import { Clock3, Compass, LogOut, RefreshCw, ShieldCheck, Sparkles, X } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 
 function formatMinutes(seconds) {
   const safe = Math.max(0, Number(seconds || 0))
@@ -119,11 +119,8 @@ export function GalaxyReconnectNotice() {
 }
 
 export function GalaxyTimeWarning({ stage }) {
-  const [dismissed, setDismissed] = useState(false)
-
-  useEffect(() => {
-    setDismissed(false)
-  }, [stage])
+  const [dismissedStage, setDismissedStage] = useState(null)
+  const dismissed = stage != null && dismissedStage === stage
 
   if (!stage || dismissed) return null
   const text = stage === 5
@@ -134,7 +131,7 @@ export function GalaxyTimeWarning({ stage }) {
   return (
     <div className={`galaxy-play-time-warning stage-${stage}`} role="status" aria-live="polite">
       <span>{text}</span>
-      <button type="button" className="galaxy-warning-dismiss" onClick={() => setDismissed(true)} aria-label="알림 닫기">
+      <button type="button" className="galaxy-warning-dismiss" onClick={() => setDismissedStage(stage)} aria-label="알림 닫기">
         <X size={15} aria-hidden="true" />
       </button>
     </div>

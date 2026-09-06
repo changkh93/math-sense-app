@@ -4,6 +4,9 @@ import { Float, Html, OrbitControls, Sparkles, Stars } from '@react-three/drei'
 import { Bot, CircleCheck, Compass, Flower2, Gem, Hammer, Image as ImageIcon, Maximize2, Minimize2, Radio, Search, Sparkles as SparklesIcon, Sprout, Wrench } from 'lucide-react'
 import * as THREE from 'three'
 import { getCrewGates } from './frontierCrewRoutes'
+import { useFrontierRenderLoop } from '../../hooks/useFrontierRenderLoop'
+import { useFrontierGraphics } from '../../hooks/useFrontierGraphics'
+import FrontierGraphicsControl from './FrontierGraphicsControl'
 import {
   FRONTIER_AUDIO_ASSETS_READY,
   getFrontierAmbienceSoundId,
@@ -4643,7 +4646,7 @@ function Astronaut({ travel, inputRef, interactables, blockers, structureCollide
   )
 }
 
-function FrontierScene({ travel, planet, crewGatesEnabled = false, restorationPercent = 0, beaconRepaired = false, selectedStructureId, onSelectStructure, inputRef, paused, onNearbyChange, activeMission, collectedIds, onCollect, onPlayerPositionChange, playerPosition, buildItem, buildLevel = 1, onBuildAt, onInvalidBuild, roverStatus, roverStatusLabel, roverBayApplied, dailyEventNode, remotePlayers = [], nearbyRemoteUids, localPlayerName, localSpeech, isPlanetOwner, isFirstPerson, nearby, onInteract, onInspectStructure, signalPlazaSummary, observatorySummary, greenhouseSummary, gardenSummary, builderEnabled, builderActive, builderPlots = [], activeBuilderPlotId = '', builderCellsByPlot = {}, builderInputMode, builderTool, builderLayer, builderBlockType, builderRotation, builderTargetSlot, onBuilderEdit, onBuilderCopy, onBuilderInvalidEdit, onBuilderScaleBlocked }) {
+function FrontierScene({ travel, planet, budget, crewGatesEnabled = false, restorationPercent = 0, beaconRepaired = false, selectedStructureId, onSelectStructure, inputRef, paused, onNearbyChange, activeMission, collectedIds, onCollect, onPlayerPositionChange, playerPosition, buildItem, buildLevel = 1, onBuildAt, onInvalidBuild, roverStatus, roverStatusLabel, roverBayApplied, dailyEventNode, remotePlayers = [], nearbyRemoteUids, localPlayerName, localSpeech, isPlanetOwner, isFirstPerson, nearby, onInteract, onInspectStructure, signalPlazaSummary, observatorySummary, greenhouseSummary, gardenSummary, builderEnabled, builderActive, builderPlots = [], activeBuilderPlotId = '', builderCellsByPlot = {}, builderInputMode, builderTool, builderLayer, builderBlockType, builderRotation, builderTargetSlot, onBuilderEdit, onBuilderCopy, onBuilderInvalidEdit, onBuilderScaleBlocked }) {
   const territoryExpanded = Boolean(planet?.territoryExpanded)
   setTerritoryExpanded(territoryExpanded)
   const worldRadius = getWorldRadius(territoryExpanded)
@@ -4961,7 +4964,7 @@ function FrontierScene({ travel, planet, crewGatesEnabled = false, restorationPe
       <color attach="background" args={[palette.sky]} />
       <fogExp2 attach="fog" args={[palette.fog, .017]} />
       <hemisphereLight args={['#c8edff', palette.groundDeep, 1.22]} />
-      <directionalLight position={[10, 16, 8]} intensity={2.05} color={palette.light} castShadow shadow-mapSize={[1024, 1024]} shadow-camera-left={-worldRadius - 4} shadow-camera-right={worldRadius + 4} shadow-camera-top={worldRadius + 4} shadow-camera-bottom={-worldRadius - 4} shadow-normalBias={.04} shadow-bias={-.0004} />
+      <directionalLight position={[10, 16, 8]} intensity={2.05} color={palette.light} castShadow={budget.shadows} shadow-mapSize={[512, 512]} shadow-camera-left={-worldRadius - 4} shadow-camera-right={worldRadius + 4} shadow-camera-top={worldRadius + 4} shadow-camera-bottom={-worldRadius - 4} shadow-normalBias={.04} shadow-bias={-.0004} />
       <directionalLight position={[-12, 7, -9]} intensity={.32} color={palette.accent} />
       <ambientLight intensity={.24} />
       <AtmosphericBackdrop worldRadius={worldRadius}>
@@ -4969,10 +4972,12 @@ function FrontierScene({ travel, planet, crewGatesEnabled = false, restorationPe
         <Sparkles count={Math.round(24 + restorationProgress * .7)} scale={[48, 20, 48]} position={[0, 9, 0]} size={1.25} color={palette.particle} speed={.12} />
         <DistantWorlds palette={palette} />
       </AtmosphericBackdrop>
-      <FrontierMarineWorld worldRadius={worldRadius} paused={paused} playerRef={playerGroupRef} />
+      <FrontierMarineWorld worldRadius={worldRadius} paused={paused} playerRef={playerGroupRef} budget={budget} />
       <FrontierSkyWorld worldRadius={worldRadius} paused={paused} playerRef={playerGroupRef} />
       <CrewRouteGates gates={crewGates} />
       <WorldTerrain
+        groundTextureSize={budget.groundTextureSize}
+        groundCoverRatio={budget.groundTextureSize <= 96 ? .35 : budget.groundTextureSize <= 128 ? .65 : 1}
         palette={palette}
         territoryExpanded={territoryExpanded}
         villageSlots={villageSlots}
@@ -5377,17 +5382,15 @@ export default function GalaxyWorld3D({
   qaCommand = null,
 }) {
   const inputRef = useRef({ x: 0, z: 0, vertical: 0 })
+  const graphics = useFrontierGraphics()
+  const renderLoop = useFrontierRenderLoop(paused)
   const [travel, setTravel] = useState({ kit: 'none', flight: false, birdView: false, recovery: 0 })
   useEffect(() => {
     const keydown = (event) => {
-      if (paused || event.repeat || event.ctrlKey || event.metaKey || event.target?.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT', 'BUTTON'].includes(event.target?.tagName)) return
+      if (paused || event.repeat || event.ctrlKey || event.metaKey || event.altKey || event.target?.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(event.target?.tagName)) return
       if (event.code === 'KeyB') {
         event.preventDefault()
         setTravel((current) => ({ ...current, birdView: !current.birdView }))
-      }
-      if (event.code === 'KeyH') {
-        event.preventDefault()
-        setTravel((current) => current.kit !== 'hoverpack' ? current : ({ ...current, flight: !current.flight }))
       }
     }
     window.addEventListener('keydown', keydown)
@@ -5947,16 +5950,18 @@ export default function GalaxyWorld3D({
       onPointerDownCapture={() => soundManager.unlock()}
     >
       <Canvas
-        shadows
-        dpr={[1, 1.5]}
+        frameloop={renderLoop}
+        shadows={graphics.budget.shadows}
+        dpr={graphics.budget.dpr}
         camera={{ position: [6, 5.4, 12], fov: 48, near: DEFAULT_CAMERA_NEAR, far: 300 }}
-        gl={{ antialias: true, powerPreference: 'high-performance' }}
+        gl={{ antialias: false, powerPreference: 'default' }}
         onCreated={({ gl }) => {
           gl.toneMapping = THREE.ACESFilmicToneMapping
           gl.toneMappingExposure = 1.04
         }}
       >
         <FrontierScene
+          budget={graphics.budget}
           crewGatesEnabled={Boolean(onOpenCrewAtlas)}
           travel={{ ...travel, birdView: travel.birdView && !builderActive, qaCommand: import.meta.env.DEV ? qaCommand : null }}
           planet={planet}
@@ -6046,6 +6051,8 @@ export default function GalaxyWorld3D({
         />
       </Canvas>
 
+      {!paused && <FrontierGraphicsControl graphics={graphics} />}
+
       {!builderActive && <FrontierExplorationHud key={builderOwnerId} travel={travel} setTravel={setTravel} inputRef={inputRef}
         position={playerPosition} worldRadius={getWorldRadius(Boolean(planet?.territoryExpanded))}
         disabled={paused} storageKey={`frontier-marine-journal-v1:${builderOwnerId}`}
@@ -6097,7 +6104,7 @@ export default function GalaxyWorld3D({
           <button type="button" onClick={onCancelBuild}>취소</button>
         </div>
       )}
-      {!builderActive && <div className="frontier-control-hint"><kbd>WASD · 방향키</kbd><span>걷기</span><kbd>Shift</kbd><span>달리기</span><kbd>Space</kbd><span>점프</span><kbd>T</kbd><span>마우스 잡기·놓기</span><kbd>+ / −</kbd><span>크기</span><kbd>V</kbd><span>시점</span><kbd>E / F</kbd><span>상호작용·정보</span></div>}
+      {!builderActive && <div className="frontier-control-hint"><kbd>WASD · 방향키</kbd><span>걷기</span><kbd>Shift</kbd><span>달리기</span><kbd>G</kbd><span>장비</span><kbd>1 / 2 / 3</kbd><span>산책·호버팩·잠수복</span><kbd>Space / C</kbd><span>상승·하강</span><kbd>T</kbd><span>마우스 잡기·놓기</span><kbd>+ / −</kbd><span>크기</span><kbd>V</kbd><span>시점</span><kbd>E / F</kbd><span>상호작용·정보</span></div>}
       {builderActive && builderInputMode === 'build' && <div className="frontier-control-hint"><kbd>WASD · 방향키</kbd><span>이동</span><kbd>클릭</kbd><span>지정·배치</span><kbd>드래그</kbd><span>시점 회전</span><kbd>휠</kbd><span>확대·축소</span><kbd>+ / −</kbd><span>캐릭터 크기</span><kbd>Q / R</kbd><span>블록 회전</span></div>}
       {builderActive && builderInputMode === 'camera' && <div className="frontier-control-hint"><kbd>드래그</kbd><span>설계 시점 회전</span><kbd>휠</kbd><span>확대·축소</span><kbd>+ / −</kbd><span>캐릭터 크기</span></div>}
       {(!builderActive || builderInputMode === 'build') && <TouchJoystick inputRef={inputRef} disabled={paused} />}

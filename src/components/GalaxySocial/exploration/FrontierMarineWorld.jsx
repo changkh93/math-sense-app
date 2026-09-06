@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import { mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js'
+import { FRONTIER_GRAPHICS, isMarineHabitatVisible } from '../frontierPerformance'
 import {
   MARINE_HABITAT_COUNT,
   getMarineHabitat,
@@ -26,7 +27,7 @@ import {
 
 const SCHOOL_SIZE = 8
 
-function FishSchools({ habitats, worldRadius, playerRef, clock, paused }) {
+function FishSchools({ habitats, worldRadius, playerRef, clock, paused, budget }) {
   const meshes = useRef([])
   const assets = useMemo(
     () =>
@@ -65,19 +66,18 @@ function FishSchools({ habitats, worldRadius, playerRef, clock, paused }) {
     [assets],
   )
   useFrame(({ camera }, dt) => {
+    if (paused) return
     const delta = paused ? 0 : Math.min(dt, 0.05),
       t = clock.value
     const player = playerRef?.current?.position
     const counters = [0, 0, 0, 0]
     schools.forEach((school, si) => {
       const { habitat, fish, species } = school
-      const visible =
-        Math.hypot(
-          camera.position.x - habitat.x,
-          camera.position.z - habitat.z,
-        ) < 38
+      const visible = isMarineHabitatVisible(camera.position, habitat, budget.marineDistance)
       const mesh = meshes.current[species]
-      if (!mesh) return
+      // Scale zero still executes every vertex shader. Compact the draw range
+      // instead, and skip both simulation and matrix uploads for distant schools.
+      if (!mesh || !visible) return
       const speed = FISH_PROFILES[species].speed
       const heading = t * 0.085 + si * 2.4
       const cx = habitat.x + Math.cos(heading) * 3
@@ -148,13 +148,16 @@ function FishSchools({ habitats, worldRadius, playerRef, clock, paused }) {
         }
         dummy.position.set(f.x, f.y, f.z)
         dummy.rotation.set(0, f.yaw, Math.sin(t * 0.6 + i) * 0.035)
-        dummy.scale.setScalar(visible ? f.size : 0)
+        dummy.scale.setScalar(f.size)
         dummy.updateMatrix()
         mesh.setMatrixAt(counters[species]++, dummy.matrix)
       })
     })
-    meshes.current.forEach((mesh) => {
-      if (mesh) mesh.instanceMatrix.needsUpdate = true
+    meshes.current.forEach((mesh, index) => {
+      if (mesh) {
+        mesh.count = counters[index]
+        if (mesh.count) mesh.instanceMatrix.needsUpdate = true
+      }
     })
   })
   return assets.map(({ geometry, material }, i) => (
@@ -174,9 +177,9 @@ function FishSchools({ habitats, worldRadius, playerRef, clock, paused }) {
   ))
 }
 
-function ReefFields({ habitats, worldRadius, clock }) {
+function ReefFields({ habitats, worldRadius, clock, budget }) {
   const meshes = useRef([])
-  const lastCamera = useRef([Infinity, Infinity])
+  const lastCamera = useRef([Infinity, Infinity, Infinity])
   const variants = useMemo(
     () =>
       Array.from({ length: 10 }, (_, i) => createCoralGeometry(i % 5, i + 1)),
@@ -259,23 +262,24 @@ function ReefFields({ habitats, worldRadius, clock }) {
     return groups
   }, [habitats, worldRadius])
   useLayoutEffect(() => {
-    lastCamera.current = [Infinity, Infinity]
-  }, [placements])
+    lastCamera.current = [Infinity, Infinity, Infinity]
+  }, [placements, budget])
   useFrame(({ camera }) => {
     if (
       Math.hypot(
         camera.position.x - lastCamera.current[0],
         camera.position.z - lastCamera.current[1],
+        camera.position.y - lastCamera.current[2],
       ) < 2
     )
       return
-    lastCamera.current = [camera.position.x, camera.position.z]
+    lastCamera.current = [camera.position.x, camera.position.z, camera.position.y]
     placements.forEach((items, i) => {
       const mesh = meshes.current[i]
       if (!mesh) return
       let count = 0
       items.forEach((p) => {
-        if (Math.hypot(p.x - camera.position.x, p.z - camera.position.z) < 30)
+        if (isMarineHabitatVisible(camera.position, { x: p.x, y: p.matrix.elements[13], z: p.z }, budget.reefDistance))
           mesh.setMatrixAt(count++, p.matrix)
       })
       mesh.count = count
@@ -462,10 +466,12 @@ function WaterAtmosphere({ worldRadius, playerRef, clock }) {
     }
     if (light.current) light.current.intensity = submerged ? 0.55 : 0.06
     const player = playerRef?.current?.position
+    const active = player && player.y < -0.5
+    bubbles.current.count = active ? 40 : 0
+    if (!active) return
     for (let i = 0; i < 40; i++) {
       const phase =
         (clock.value * (0.17 + marineRandom(i) * 0.13) + i * 0.137) % 1
-      const active = player && player.y < -0.5
       dummy.position.set(
         (player?.x || 0) + Math.sin(i * 4.3 + phase * 2) * 0.1,
         (player?.y || 0) + 0.45 + phase * 2.5,
@@ -516,6 +522,7 @@ export default function FrontierMarineWorld({
   worldRadius,
   paused = false,
   playerRef,
+  budget = FRONTIER_GRAPHICS.balanced,
 }) {
   const clock = useMemo(() => ({ value: 0 }), [])
   const habitats = useMemo(
@@ -562,13 +569,14 @@ export default function FrontierMarineWorld({
         clock={clock}
       />
       <mesh geometry={seabed} material={sand} receiveShadow />
-      <ReefFields habitats={habitats} worldRadius={worldRadius} clock={clock} />
+      <ReefFields habitats={habitats} worldRadius={worldRadius} clock={clock} budget={budget} />
       <FishSchools
         habitats={habitats}
         worldRadius={worldRadius}
         playerRef={playerRef}
         clock={clock}
         paused={paused}
+        budget={budget}
       />
       {habitats
         .filter((_, i) => i % 6 === 0)

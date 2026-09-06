@@ -1,5 +1,5 @@
 import { releaseFrontierPointerLock } from './frontierPointerLock.js'
-import { createElement, useCallback, useEffect, useEffectEvent, useMemo, useRef, useState } from 'react'
+import { createElement, lazy, Suspense, useCallback, useEffect, useEffectEvent, useMemo, useRef, useState } from 'react'
 import { collection, doc, limit, onSnapshot, orderBy, query } from 'firebase/firestore'
 import { httpsCallable } from 'firebase/functions'
 import { deleteObject, getDownloadURL, ref as createStorageRef, uploadBytes } from 'firebase/storage'
@@ -86,15 +86,26 @@ import {
 } from '../../utils/frontierStory'
 import { compressImage } from '../../utils/storageUtils'
 import soundManager from '../../utils/SoundManager'
-import GalaxyObjectDialog from './GalaxyObjectDialog'
 import GalaxyRoverPanel from './GalaxyRoverPanel'
 import FrontierAudioSettingsModal from './FrontierAudioSettingsModal'
 import { getBuildRadius, isBridgeDeck, isRiverWater, terrainSlope } from './GalaxyTerrainModel'
-import GalaxyWorld3D, { StructurePreview3D } from './GalaxyWorld3D'
 import './MetaGalaxy.css'
 import FrontierCrewAtlas, { CrewVisitActivities } from './FrontierCrewAtlas'
 import { canVisitCrewRoute } from './frontierCrewRoutes'
 import { useFrontierCrewTravel } from '../../hooks/useFrontierCrewTravel'
+import { useDeferredFrontierWorld } from '../../hooks/useDeferredFrontierWorld'
+import { useFrontierGraphics } from '../../hooks/useFrontierGraphics'
+import FrontierGraphicsControl from './FrontierGraphicsControl'
+
+const GalaxyWorld3D = lazy(() => import('./GalaxyWorld3D'))
+const GalaxyObjectDialog = lazy(() => import('./GalaxyObjectDialog'))
+const LazyStructurePreview = lazy(() => import('./GalaxyWorld3D').then(module => ({ default: module.StructurePreview3D })))
+function StructurePreview3D(props) {
+  return <Suspense fallback={<span role="status">시설 미리보기 준비 중…</span>}><LazyStructurePreview {...props} /></Suspense>
+}
+function FrontierWorldLoading() {
+  return <div className="frontier-world-preparing" role="status">행성을 준비하고 있어요. 잠시만 기다려 주세요.</div>
+}
 
 const invokeGalaxy = (name, payload = {}) => httpsCallable(functions, name)(payload).then((result) => result.data)
 
@@ -532,6 +543,7 @@ function formatCountdown(seconds) {
 }
 
 export default function MetaGalaxy({ user, userData, playSession, playRemainingSeconds, dailyUsedSeconds, dailyLimitSeconds, warningStage = 0, onBack }) {
+  const graphics = useFrontierGraphics()
   const [home, setHome] = useState(null)
   const [targetUid, setTargetUid] = useState(user?.uid || '')
   const [menu, setMenu] = useState('')
@@ -594,6 +606,7 @@ export default function MetaGalaxy({ user, userData, playSession, playRemainingS
   const syncGuestCompletedDailyEventStory = guestGalaxy.syncCompletedDailyEventStory
   const isOwner = isGuest || targetUid === user?.uid
   const overlayReady = !loading && Boolean(home)
+  const worldReady = useDeferredFrontierWorld(overlayReady && !arrivalOpen && !menu && !audioSettingsOpen && !objectDialogOpen && !finaleOpen)
 
   useEffect(() => {
     audioMountedRef.current = true
@@ -2289,7 +2302,7 @@ export default function MetaGalaxy({ user, userData, playSession, playRemainingS
           <span><strong>게스트 체험 모드</strong>: 하루 500 광석이 기본 제공되며, 현재 브라우저에 건설 내역이 저장됩니다. 회원가입 시 작성한 행성이 정식 계정으로 안전하게 연결됩니다.</span>
         </div>
       )}
-      <GalaxyWorld3D
+      {worldReady ? <Suspense fallback={<FrontierWorldLoading />}><GalaxyWorld3D
         key={targetUid}
         planet={planet}
         frontierStory={isOwner ? frontierStory : planet.frontierStory}
@@ -2344,9 +2357,9 @@ export default function MetaGalaxy({ user, userData, playSession, playRemainingS
         onOpenCrewAtlas={() => openGameMenu('neighbors')}
         onMessage={flash}
         objective={todayObjective}
-        paused={Boolean(menu || arrivalOpen || objectDialogOpen || audioSettingsOpen || crewTravel.pending)}
+        paused={Boolean(menu || arrivalOpen || objectDialogOpen || audioSettingsOpen || finaleOpen || returning || crewTravel.pending)}
         onOpenBriefing={() => setArrivalOpen(true)}
-      />
+      /></Suspense> : <div className="frontier-world-preparing" aria-hidden="true" />}
 
       {crewTravel.pending && <div className="crew-travel-screen" role="dialog" aria-modal="true" aria-label="크루 항로 이동" onKeyDown={(event) => { if (event.key === 'Tab') event.preventDefault(); if (event.key === 'Escape') { event.preventDefault(); crewTravel.cancel() } }}>
         <span aria-hidden="true">✦</span><strong role="status">{crewTravel.pending.name} 연결 중</strong>
@@ -2458,7 +2471,7 @@ export default function MetaGalaxy({ user, userData, playSession, playRemainingS
         {objectDialogOpen && selectedObject && (
           <Motion.div className="frontier-object-dialog-backdrop" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={closeObjectDialog} onKeyDown={trapDialogFocus}>
             <Motion.div className="frontier-object-dialog-motion" initial={{ opacity: 0, y: 22, scale: .97 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 18, scale: .98 }} onClick={(event) => event.stopPropagation()}>
-              <GalaxyObjectDialog
+              <Suspense fallback={<div role="status">시설 정보를 준비 중입니다… <button type="button" onClick={closeObjectDialog}>닫기</button></div>}><GalaxyObjectDialog
                 key={`${selectedObject.instanceId}:${selectedObject.level || 1}:${selectedObject.name || ''}:${selectedObject.description || ''}:${selectedObject.x}:${selectedObject.y}:${selectedObject.imageUrl || ''}`}
                 item={selectedObject}
                 catalogItem={selectedObjectCatalog}
@@ -2494,7 +2507,7 @@ export default function MetaGalaxy({ user, userData, playSession, playRemainingS
                   openGameMenu('rover')
                 }}
                 playRemainingSeconds={playRemainingSeconds}
-              />
+              /></Suspense>
             </Motion.div>
           </Motion.div>
         )}
@@ -2562,6 +2575,7 @@ export default function MetaGalaxy({ user, userData, playSession, playRemainingS
               </div>
 
               <footer className="frontier-arrival-actions">
+                <FrontierGraphicsControl graphics={graphics} inline />
                 <button type="button" className="galaxy-secondary-btn" onClick={() => openGameMenu('logs')}><Radio size={17} aria-hidden="true" /> 신호 기록 보기</button>
                 <button type="button" className={roverStatus === 'ready' ? 'galaxy-primary-btn' : 'galaxy-secondary-btn'} onClick={() => openGameMenu('rover')}><Satellite size={17} aria-hidden="true" /> {roverStatus === 'ready' ? '귀환 상자 열기' : '로버 관제 열기'}</button>
                 <button type="button" className="galaxy-primary-btn" onClick={handleObjectiveAction}>

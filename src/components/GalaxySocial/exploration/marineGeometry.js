@@ -537,17 +537,18 @@ export function createFlipperGeometry() {
   )
 }
 
-export function createSeabedGeometry(worldRadius) {
+export function createSeabedGeometry(worldRadius, { seabedRadial = 144, seabedAngular = 320 } = {}) {
   const positions = [],
     indices = []
-  const radial = 220,
-    angular = 512
+  const radial = Math.max(32, Math.min(220, Math.floor(seabedRadial))),
+    angular = Math.max(64, Math.min(512, Math.floor(seabedAngular)))
+  const nearRings = Math.round(radial * .86)
   for (let ring = 0; ring <= radial; ring++) {
     // Concentrate samples in reachable water. The outer skirt disappears in fog.
     const d =
-      ring < 190
-        ? ring * 0.35
-        : 66.5 + ((ring - 190) * (OCEAN_DRAW_RADIUS - worldRadius - 66.5)) / 30
+      ring < nearRings
+        ? ring / nearRings * 66.5
+        : 66.5 + ((ring - nearRings) * (OCEAN_DRAW_RADIUS - worldRadius - 66.5)) / (radial - nearRings)
     const radius = worldRadius + d
     for (let j = 0; j <= angular; j++) {
       const a = (j / angular) * Math.PI * 2,

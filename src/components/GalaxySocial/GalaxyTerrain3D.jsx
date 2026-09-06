@@ -32,7 +32,7 @@ import {
   isNearRoad,
 } from './GalaxyTerrainModel.js'
 
-const GROUND_TEXTURE_SIZE = 512
+const GROUND_TEXTURE_SIZE = 128
 const OCEAN_VERTEX_SHADER = `
   varying vec2 vLocal;
   varying vec3 vWorldPosition;
@@ -235,8 +235,7 @@ function groundPatchMask(x, z, patch) {
   return edge * edge * (3 - 2 * edge)
 }
 
-function createGroundDetailTextures(palette) {
-  const size = GROUND_TEXTURE_SIZE
+function createGroundDetailTextures(palette, size = GROUND_TEXTURE_SIZE) {
   const worldRadius = getActiveWorldRadius()
   const albedoData = new Uint8Array(size * size * 4)
   const bumpData = new Uint8Array(size * size)
@@ -489,10 +488,13 @@ function createGroundScatter(kind, clearings = []) {
   return { grass, pebbles }
 }
 
-function GroundCover({ palette, clearings = [] }) {
+function GroundCover({ palette, clearings = [], density = 1 }) {
   const grassRef = useRef()
   const pebbleRef = useRef()
-  const scatter = useMemo(() => createGroundScatter(palette.prop, clearings), [clearings, palette.prop])
+  const scatter = useMemo(() => {
+    const all = createGroundScatter(palette.prop, clearings)
+    return { ...all, grass: all.grass.slice(0, Math.ceil(all.grass.length * density)) }
+  }, [clearings, density, palette.prop])
   const grassGeometry = useMemo(() => createGrassClumpGeometry(), [])
 
   useEffect(() => () => grassGeometry.dispose(), [grassGeometry])
@@ -1031,15 +1033,15 @@ function LandingPad({ palette }) {
   )
 }
 
-export default function WorldTerrain({ palette, territoryExpanded = false, villageSlots = [], showVillage = true, showVillageBeacon = true, detailClearings = [], buildItem = '', structurePositions = [], onBuildHover, onBuildCommit }) {
+export default function WorldTerrain({ palette, groundTextureSize = GROUND_TEXTURE_SIZE, groundCoverRatio = 1, territoryExpanded = false, villageSlots = [], showVillage = true, showVillageBeacon = true, detailClearings = [], buildItem = '', structurePositions = [], onBuildHover, onBuildCommit }) {
   const terrainGeometry = useMemo(() => {
     void territoryExpanded
     return createTerrainGeometry(palette)
   }, [palette, territoryExpanded])
   const groundTextures = useMemo(() => {
     void territoryExpanded
-    return createGroundDetailTextures(palette)
-  }, [palette, territoryExpanded])
+    return createGroundDetailTextures(palette, groundTextureSize)
+  }, [groundTextureSize, palette, territoryExpanded])
   useEffect(() => () => terrainGeometry.dispose(), [terrainGeometry])
   useEffect(() => () => {
     groundTextures.albedo.dispose()
@@ -1064,7 +1066,7 @@ export default function WorldTerrain({ palette, territoryExpanded = false, villa
       {/* The continuous marine heightfield now joins this coast directly.
           A second island skirt here would overlap the seabed. */}
       <TerrainRoads palette={palette} structurePositions={structurePositions} />
-      <GroundCover palette={palette} clearings={detailClearings} />
+      <GroundCover palette={palette} clearings={detailClearings} density={groundCoverRatio} />
       <River palette={palette} />
       <Bridge palette={palette} />
       {showVillage && <SettlementVillage slots={villageSlots} palette={palette} showBeacon={showVillageBeacon} />}

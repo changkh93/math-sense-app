@@ -12,10 +12,16 @@ export const HOVERPACK_FLAME_LAYERS = Object.freeze([
   { id: 'core', radius: .058, height: .36, color: '#fff0a3', opacity: .96 },
 ])
 export const EXPLORATION_KITS = Object.freeze([
-  { id: 'none', label: '산책', description: '가볍게 걷고 수면에서 수영해요', cost: 0 },
-  { id: 'hoverpack', label: '호버팩', description: '이륙 후 공중에서 멈추고 자유롭게 이동해요', cost: EXPLORATION_KIT_COST, storeItemId: 'frontier_hoverpack' },
-  { id: 'diving', label: '잠수복', description: '오리발과 함께 바닷속을 탐험해요', cost: EXPLORATION_KIT_COST, storeItemId: 'frontier_diving_suit' },
+  { id: 'none', label: '산책', shortcut: '1', description: '가볍게 걷고 수면에서 수영해요', cost: 0 },
+  { id: 'hoverpack', label: '호버팩', shortcut: '2', description: '이륙 후 공중에서 멈추고 자유롭게 이동해요', cost: EXPLORATION_KIT_COST, storeItemId: 'frontier_hoverpack' },
+  { id: 'diving', label: '잠수복', shortcut: '3', description: '오리발과 함께 바닷속을 탐험해요', cost: EXPLORATION_KIT_COST, storeItemId: 'frontier_diving_suit' },
 ])
+const EXPLORATION_KIT_SHORTCUTS = Object.freeze({
+  Digit1: 'none', Numpad1: 'none',
+  Digit2: 'hoverpack', Numpad2: 'hoverpack',
+  Digit3: 'diving', Numpad3: 'diving',
+})
+export const resolveExplorationKitShortcut = (code) => EXPLORATION_KIT_SHORTCUTS[code] || null
 export const normalizeExplorationKit = (value) => EXPLORATION_KITS.some((kit) => kit.id === value) ? value : 'none'
 export const normalizeOwnedExplorationKits = (value) => {
   const owned = Array.isArray(value) ? value : []

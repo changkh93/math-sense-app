@@ -19,7 +19,7 @@ const events = [
   { type: 'daily_event_completed' },
   { type: 'mission_completed' },
   { type: 'rover_dispatched' },
-  { type: 'rover_claimed', discoveryCount: 1 },
+  { type: 'rover_claimed', discoveryCount: 1, isNewDiscovery: true },
   { type: 'friend_visited' },
   { type: 'social_help_completed', routeLevel: 1 },
   { type: 'social_help_completed', routeLevel: 2 },

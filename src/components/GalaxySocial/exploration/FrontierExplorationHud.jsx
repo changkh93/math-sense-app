@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { AdditiveBlending } from 'three'
-import { EXPLORATION_KITS, HOVERPACK_FLAME_LAYERS, getSkyLandmarks, normalizeOwnedExplorationKits } from './frontierExploration.js'
+import { EXPLORATION_KITS, HOVERPACK_FLAME_LAYERS, getSkyLandmarks, normalizeOwnedExplorationKits, resolveExplorationKitShortcut } from './frontierExploration.js'
 import './FrontierExploration.css'
 import { useFrame } from '@react-three/fiber'
 import { releaseFrontierPointerLock } from '../frontierPointerLock.js'
@@ -121,7 +121,7 @@ export default function FrontierExplorationHud({
     try { localStorage.setItem(`${storageKey}:sky`, JSON.stringify(next)) } catch { setNotice('이번 탐험 동안 발견 기록을 보관해요.') }
   }
   const chooseKit = (kit) => setTravel((current) => ({
-    ...current, kit, flight: false,
+    ...current, kit, flight: kit === 'hoverpack',
     recovery: current.recovery,
   }))
   const selectOrPurchaseKit = async (kit) => {
@@ -150,10 +150,30 @@ export default function FrontierExplorationHud({
       setPurchasingKit('')
     }
   }
+  const selectKitRef = useRef(selectOrPurchaseKit)
+  selectKitRef.current = selectOrPurchaseKit
+  useEffect(() => {
+    const keyboardSelect = (event) => {
+      const tag = event.target?.tagName
+      if (disabled || event.repeat || event.ctrlKey || event.metaKey || event.altKey || event.target?.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(tag)) return
+      if (event.code === 'KeyG') {
+        event.preventDefault()
+        setOpen((current) => !current)
+        return
+      }
+      const kitId = resolveExplorationKitShortcut(event.code)
+      if (!kitId) return
+      event.preventDefault()
+      const kit = EXPLORATION_KITS.find((item) => item.id === kitId)
+      if (kit) void selectKitRef.current(kit)
+    }
+    window.addEventListener('keydown', keyboardSelect)
+    return () => window.removeEventListener('keydown', keyboardSelect)
+  }, [disabled])
   const mode = { grounded: '산책 중', flying: '비행 중', landing: '천천히 착륙', swimming: '수면 수영', diving: '잠수 탐험' }[position.movementMode] || '산책 중'
   return <aside className="frontier-exploration" aria-label="탐험 장비와 시점" onPointerDown={(event) => { event.stopPropagation(); releaseFrontierPointerLock(document) }}>
     <div className="frontier-exploration__toolbar">
-      <button type="button" aria-expanded={open} onClick={() => setOpen(!open)}>장비 · {EXPLORATION_KITS.find((kit) => kit.id === travel.kit)?.label}</button>
+      <button type="button" aria-expanded={open} aria-keyshortcuts="G" onClick={() => setOpen(!open)}>장비 · {EXPLORATION_KITS.find((kit) => kit.id === travel.kit)?.label} <kbd>G</kbd></button>
       <button type="button" disabled={disabled} aria-pressed={travel.birdView} onClick={() => setTravel((current) => ({ ...current, birdView: !current.birdView }))}>{travel.birdView ? '시점 복귀' : '조감 시점'} <kbd>B</kbd></button>
     </div>
     {open && <section className="frontier-exploration__panel">
@@ -177,9 +197,10 @@ export default function FrontierExplorationHud({
           disabled={disabled || Boolean(purchasingKit) || unavailable}
           aria-pressed={travel.kit === kit.id}
           aria-label={`${kit.label} · ${status}`}
+          aria-keyshortcuts={kit.shortcut}
           onClick={() => selectOrPurchaseKit(kit)}
         >
-          <strong>{purchasingKit === kit.id ? '구매 처리 중…' : kit.label}</strong>
+          <strong>{purchasingKit === kit.id ? '구매 처리 중…' : kit.label} <kbd>{kit.shortcut}</kbd></strong>
           <small>{kit.description}</small>
           <em>{status}</em>
         </button>
@@ -188,7 +209,6 @@ export default function FrontierExplorationHud({
     </section>}
     <div className="frontier-exploration__movement">
       <span data-testid="exploration-mode">{mode} · 높이 {Number(position.y || 0).toFixed(1)}</span>
-      {travel.kit === 'hoverpack' && <button type="button" disabled={disabled} aria-pressed={travel.flight} onClick={() => setTravel((current) => ({ ...current, flight: !current.flight }))}>{travel.flight ? '안전 착륙' : '이륙'} <kbd>H</kbd></button>}
       {(travel.flight || travel.kit === 'diving') && <>
         <HoldButton direction={1} inputRef={inputRef} disabled={disabled}>↑ 상승 <kbd>Space</kbd></HoldButton>
         <HoldButton direction={-1} inputRef={inputRef} disabled={disabled}>↓ 하강 <kbd>C</kbd></HoldButton>

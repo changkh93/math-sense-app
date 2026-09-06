@@ -40,6 +40,7 @@
     "test:frontier-ocean": "node scripts/test-frontier-ocean.mjs",
     "test:frontier-cost": "node scripts/test-frontier-cost.mjs",
     "test:frontier-crew": "node scripts/test-frontier-crew.mjs",
+    "test:frontier-performance": "node scripts/test-frontier-performance.mjs",
     "test:frontier-character-motion": "node scripts/test-frontier-character-motion.mjs",
     "test:frontier-story": "node scripts/test-frontier-story-utils.mjs",
     "test:guest-galaxy": "node scripts/test-guest-galaxy-data.mjs",
