@@ -54,6 +54,10 @@ const FrontierExplorationQa = import.meta.env.DEV
   ? lazy(() => import('./components/GalaxySocial/exploration/FrontierExplorationQa'))
   : null
 
+const FrontierCrewQa = import.meta.env.DEV
+  ? lazy(() => import('./components/GalaxySocial/FrontierCrewQa'))
+  : null
+
 const AstraBuilderQa = import.meta.env.DEV
   ? lazy(() => import('./components/GalaxySocial/builder/AstraBuilderQa'))
   : null
@@ -100,6 +104,7 @@ function App() {
       <Route path="/terms" element={<Terms />} />
       <Route path="/referral" element={<ReferralPolicy />} />
       {FrontierExplorationQa && <Route path="/dev/frontier-exploration" element={<FrontierExplorationQa />} />}
+      {FrontierCrewQa && <Route path="/dev/frontier-crew" element={<FrontierCrewQa />} />}
       {AstraBuilderQa && (
         <Route
           path="/dev/astra-builder"

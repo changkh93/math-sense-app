@@ -1,0 +1,183 @@
+.crew-atlas,
+.crew-activities {
+  padding: 20px;
+  border: 1px solid #81dac733;
+  border-radius: 20px;
+  background: linear-gradient(140deg, #132f35, #0c1d31);
+  color: #e7f5f0;
+}
+.crew-atlas > header {
+  margin: 0;
+  text-align: left;
+}
+.crew-atlas h3,
+.crew-activities h3 {
+  margin: 8px 0;
+  font-size: 1.1rem;
+}
+.crew-atlas p,
+.crew-activities p {
+  color: #b8cfcf;
+  line-height: 1.7;
+  font-size: 0.88rem;
+}
+.crew-atlas small,
+.crew-activities > small {
+  color: #85cdbf;
+  font-size: 0.73rem;
+  letter-spacing: 0.04em;
+}
+.crew-atlas-stars {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(125px, 1fr));
+  gap: 14px;
+  padding: 24px 0;
+}
+.crew-star,
+.crew-home-star {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  text-align: center;
+  padding: 14px 8px;
+  border: 1px solid #82bcc533;
+  border-radius: 18px;
+  background: #142d40;
+  color: #e3f5f3;
+}
+.crew-home-star {
+  background: #23473f;
+}
+.crew-star > span,
+.crew-home-star > span {
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  background: #79ddc71a;
+  color: #8aecd1;
+  font-size: 28px;
+  box-shadow: 0 0 24px #66d1db22;
+}
+.crew-star strong,
+.crew-home-star strong {
+  overflow-wrap: anywhere;
+}
+.crew-star {
+  cursor: pointer;
+}
+.crew-star[aria-pressed='true'] {
+  border-color: #adebce;
+  background: #254d55;
+}
+.crew-star.unavailable > span {
+  color: #90a4af;
+  box-shadow: none;
+}
+.crew-destination {
+  padding-top: 16px;
+  border-top: 1px solid #94c8d333;
+}
+.crew-destination span {
+  font-size: 0.8rem;
+  color: #edd799;
+}
+.crew-atlas button:focus-visible,
+.crew-activities button:focus-visible {
+  outline: 3px solid #f7d67b;
+  outline-offset: 3px;
+}
+.crew-depart,
+.crew-activities button {
+  min-height: 44px;
+  padding: 10px 16px;
+  border: 1px solid #79bfa9;
+  border-radius: 12px;
+  color: #e8fff4;
+  background: #28544f;
+  cursor: pointer;
+}
+.crew-depart {
+  width: 100%;
+  font-weight: 700;
+}
+.crew-atlas button:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+.crew-safety,
+.crew-activities footer {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-top: 12px;
+}
+.crew-safety button {
+  background: transparent;
+  border: 0;
+  min-height: 44px;
+  color: #b8c7ce;
+  cursor: pointer;
+  text-decoration: underline;
+}
+.crew-activities {
+  margin-bottom: 18px;
+}
+.crew-activity-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 10px;
+}
+.crew-activity-list button {
+  text-align: left;
+}
+.crew-activity-list span {
+  display: block;
+  font-size: 0.75rem;
+  color: #b9d6d1;
+  margin-top: 6px;
+}
+.crew-travel-screen {
+  position: absolute;
+  inset: 0;
+  z-index: 300;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 16px;
+  text-align: center;
+  padding: 24px;
+  background: radial-gradient(ellipse at center, #285c67f5, #071523fc 75%);
+  color: #e6fff5;
+}
+.crew-travel-screen > span {
+  font-size: 56px;
+  color: #99e5cb;
+}
+.crew-travel-screen p {
+  max-width: 440px;
+  line-height: 1.7;
+  color: #b9d3d5;
+}
+.crew-travel-screen button {
+  border: 1px solid #99bfc4;
+  border-radius: 12px;
+  padding: 12px 20px;
+  background: #173f49;
+  color: white;
+  cursor: pointer;
+}
+@media (max-width: 480px) {
+  .crew-atlas,
+  .crew-activities {
+    padding: 14px;
+  }
+  .crew-atlas-stars {
+    gap: 8px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}

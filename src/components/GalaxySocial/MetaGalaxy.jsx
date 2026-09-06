@@ -92,6 +92,9 @@ import FrontierAudioSettingsModal from './FrontierAudioSettingsModal'
 import { getBuildRadius, isBridgeDeck, isRiverWater, terrainSlope } from './GalaxyTerrainModel'
 import GalaxyWorld3D, { StructurePreview3D } from './GalaxyWorld3D'
 import './MetaGalaxy.css'
+import FrontierCrewAtlas, { CrewVisitActivities } from './FrontierCrewAtlas'
+import { canVisitCrewRoute } from './frontierCrewRoutes'
+import { useFrontierCrewTravel } from '../../hooks/useFrontierCrewTravel'
 
 const invokeGalaxy = (name, payload = {}) => httpsCallable(functions, name)(payload).then((result) => result.data)
 
@@ -316,7 +319,7 @@ const FALLBACK_BUILD_STORY = {
 const MENU_META = {
   rover: { overline: 'OFFLINE EXPEDITION', title: '루미 로버 원정 관제', Icon: Satellite },
   build: { overline: 'PLANET CONSTRUCTION', title: '욕망을 여는 건설 설계소', Icon: Hammer },
-  neighbors: { overline: 'CONNECTED ROUTES', title: '이웃 항로 은하 지도', Icon: Route },
+  neighbors: { overline: 'CREW CONSTELLATION', title: '크루 성도 · 함께할 일', Icon: Route },
   logs: { overline: 'RETURN SIGNALS', title: '귀환 신호 타임라인', Icon: Radio },
   passport: { overline: 'EXPLORER IDENTITY', title: '탐험가 패스포트', Icon: CircleUserRound },
 }
@@ -573,6 +576,7 @@ export default function MetaGalaxy({ user, userData, playSession, playRemainingS
   const menuCloseRef = useRef(null)
   const objectDialogCloseRef = useRef(null)
   const restoreFocusRef = useRef(null)
+  const crewTravelCancelRef = useRef(null)
   const activeOverlayRef = useRef('')
   const finaleShownRef = useRef(false)
   const storySessionStartedAtRef = useRef(Date.now())
@@ -691,6 +695,24 @@ export default function MetaGalaxy({ user, userData, playSession, playRemainingS
 
   useEffect(() => { loadHome(user?.uid) }, [loadHome, user?.uid])
 
+  const crewTravel = useFrontierCrewTravel({
+    identityKey: `${user?.uid || 'guest'}:${playSession?.sessionId || ''}`,
+    request: async (uid) => {
+      const sentAt = Date.now()
+      const data = await callGalaxy('openGalaxyHome', { targetUid: uid })
+      return { uid, data, serverClockOffsetMs: Number.isFinite(Number(data?.serverNowMs))
+        ? Number(data.serverNowMs) - Math.round((sentAt + Date.now()) / 2) : 0 }
+    },
+    onArrive: ({ uid, data, serverClockOffsetMs }) => {
+      setHome({ ...data, serverClockOffsetMs })
+      setTargetUid(uid)
+      setError('')
+      setMenu(uid === user?.uid ? '' : 'neighbors')
+      flash(uid === user?.uid ? '내 행성으로 안전하게 귀환했습니다.' : '크루 행성에 도착했습니다. 함께할 일을 골라보세요.')
+    },
+    onError: (err) => flash(err?.message || '항로 연결에 실패했습니다. 원래 행성에 머무릅니다.'),
+  })
+
   const hasActiveOverlay = Boolean(
     menu
     || arrivalOpen
@@ -698,6 +720,7 @@ export default function MetaGalaxy({ user, userData, playSession, playRemainingS
     || audioSettingsOpen
     || objectDialogOpen
     || selectedBuildItem
+    || crewTravel.pending
   )
 
   useEffect(() => {
@@ -836,7 +859,7 @@ export default function MetaGalaxy({ user, userData, playSession, playRemainingS
   }, [onBack])
 
   useEffect(() => {
-    const nextOverlay = overlayReady ? (objectDialogOpen ? 'object' : arrivalOpen ? 'arrival' : menu ? 'menu' : '') : ''
+    const nextOverlay = overlayReady ? (crewTravel.pending ? 'travel' : objectDialogOpen ? 'object' : arrivalOpen ? 'arrival' : menu ? 'menu' : '') : ''
     const previousOverlay = activeOverlayRef.current
     let frameId = 0
 
@@ -848,7 +871,9 @@ export default function MetaGalaxy({ user, userData, playSession, playRemainingS
     activeOverlayRef.current = nextOverlay
     if (nextOverlay) {
       frameId = window.requestAnimationFrame(() => {
-        const closeButton = nextOverlay === 'object'
+        const closeButton = nextOverlay === 'travel'
+          ? crewTravelCancelRef.current
+          : nextOverlay === 'object'
           ? objectDialogCloseRef.current
           : nextOverlay === 'arrival'
             ? arrivalCloseRef.current
@@ -864,7 +889,7 @@ export default function MetaGalaxy({ user, userData, playSession, playRemainingS
     }
 
     return () => window.cancelAnimationFrame(frameId)
-  }, [arrivalOpen, menu, objectDialogOpen, overlayReady])
+  }, [arrivalOpen, crewTravel.pending, menu, objectDialogOpen, overlayReady])
 
   useEffect(() => {
     const onKeyDown = (event) => {
@@ -1298,10 +1323,17 @@ export default function MetaGalaxy({ user, userData, playSession, playRemainingS
   }, [])
 
   const visitNeighbor = async (neighborUid) => {
+    if (crewTravel.pending || homeLoadInFlightRef.current.size || neighborUid === targetUid) return
+    if (!isGuest && neighborUid !== user?.uid && !canVisitCrewRoute((home?.neighbors || []).find(entry => entry.uid === neighborUid), targetUid)) {
+      flash('승인된 크루의 방문 가능한 행성을 선택해주세요.')
+      return
+    }
     setSelectedStructureId('')
     setObjectDialogOpen(false)
     setSelectedBuildItem('')
     setMenu('')
+    setArrivalOpen(false)
+    releaseFrontierPointerLock(document)
     if (isGuest && neighborUid === 'guest-training-neighbor') {
       const result = guestGalaxy.visitTrainingNeighbor()
       setHome((current) => current ? {
@@ -1312,7 +1344,7 @@ export default function MetaGalaxy({ user, userData, playSession, playRemainingS
       flash('루미의 훈련용 행성에 왕복 신호를 보냈습니다. 친구 방문 단계가 기록되었습니다.')
       return
     }
-    await loadHome(neighborUid)
+    crewTravel.start(neighborUid, neighborUid === user?.uid ? home?.ownPlanet?.planetName || '내 행성' : (home?.neighbors || []).find(entry => entry.uid === neighborUid)?.planetName || '크루 행성')
   }
 
   const setNeighborBlocked = async (neighbor, blocked) => {
@@ -2258,6 +2290,7 @@ export default function MetaGalaxy({ user, userData, playSession, playRemainingS
         </div>
       )}
       <GalaxyWorld3D
+        key={targetUid}
         planet={planet}
         frontierStory={isOwner ? frontierStory : planet.frontierStory}
         restorationPercent={frontierStory.restorationPercent}
@@ -2308,11 +2341,18 @@ export default function MetaGalaxy({ user, userData, playSession, playRemainingS
         onPurchaseBuilderUpgrade={buyBuilderUpgrade}
         onBuilderModeChange={setBuilderActive}
         onOpenMenu={openGameMenu}
+        onOpenCrewAtlas={() => openGameMenu('neighbors')}
         onMessage={flash}
         objective={todayObjective}
-        paused={Boolean(menu || arrivalOpen || objectDialogOpen || audioSettingsOpen)}
+        paused={Boolean(menu || arrivalOpen || objectDialogOpen || audioSettingsOpen || crewTravel.pending)}
         onOpenBriefing={() => setArrivalOpen(true)}
       />
+
+      {crewTravel.pending && <div className="crew-travel-screen" role="dialog" aria-modal="true" aria-label="크루 항로 이동" onKeyDown={(event) => { if (event.key === 'Tab') event.preventDefault(); if (event.key === 'Escape') { event.preventDefault(); crewTravel.cancel() } }}>
+        <span aria-hidden="true">✦</span><strong role="status">{crewTravel.pending.name} 연결 중</strong>
+        <p>방문 허가를 확인하고 목적지 한 곳만 불러옵니다. 연결이 완료되면 안전한 착륙 지점에서 시작해요.</p>
+        <button ref={crewTravelCancelRef} type="button" autoFocus onClick={crewTravel.cancel}>이동 취소 · 현재 행성에 머물기</button>
+      </div>}
 
       <div className="frontier-top-hud" aria-label="행성 상태와 보유 자원 및 탐험 시간">
         <section className="frontier-planet-hud">
@@ -2712,6 +2752,7 @@ export default function MetaGalaxy({ user, userData, playSession, playRemainingS
 
               {menu === 'neighbors' && (
                 <div className="frontier-social-menu">
+                  {!isOwner && <CrewVisitActivities planet={planet} onInspect={openObjectDialog} onReturn={() => visitNeighbor(user.uid)} onLogs={openLogs} />}
                   <div className="frontier-relay-setting">
                     <label>
                       <span><Satellite size={17} aria-hidden="true" /> 현장 탐사 릴레이 파트너</span>
@@ -2732,42 +2773,16 @@ export default function MetaGalaxy({ user, userData, playSession, playRemainingS
                   )}
 
                   {neighbors.length ? (
-                    <div className="frontier-galaxy-map">
-                      <i className="frontier-galaxy-orbit orbit-one" />
-                      <i className="frontier-galaxy-orbit orbit-two" />
-                      {neighbors.map((neighbor, index) => {
-                        const connection = getConnectionSummary(neighbor, events)
-                        const isPrivate = neighbor.visitMode === 'private' || neighbor.blocked
-                        return (
-                          <article key={neighbor.uid} className={`frontier-neighbor-card theme-${neighbor.theme}${targetUid === neighbor.uid ? ' active' : ''}${isPrivate ? ' private' : ''}`} style={{ '--route-index': index }}>
-                            <span className="frontier-neighbor-card__planet"><ThemeGlyph themeId={neighbor.theme} size={27} /><i /></span>
-                            <div className="frontier-neighbor-card__body">
-                              <small>{neighbor.displayName} · SHIP T{neighbor.shipHullTier}</small>
-                              <h3>{neighbor.planetName}</h3>
-                              <p>{neighbor.tagline}</p>
-                              <div className="frontier-neighbor-card__route">
-                                <span><HeartHandshake size={14} aria-hidden="true" /> 항로 연결도 Lv.{connection.level}</span>
-                                <i className="frontier-route-meter"><b style={{ width: `${connection.percent}%` }} /></i>
-                                <small>최근 도움 신호 {connection.signalCount}회</small>
-                              </div>
-                            </div>
-                            <div className="frontier-neighbor-card__actions">
-                              <button type="button" className="frontier-neighbor-card__cta" disabled={isPrivate} onClick={() => visitNeighbor(neighbor.uid)}>
-                                {neighbor.blocked ? <><Ban size={16} aria-hidden="true" /> 차단됨</> : isPrivate ? <><LockKeyhole size={16} aria-hidden="true" /> 휴식 중</> : targetUid === neighbor.uid ? <><Eye size={16} aria-hidden="true" /> 방문 중</> : <><Rocket size={16} aria-hidden="true" /> 워프</>}
-                              </button>
-                              {!isGuest && <button type="button" className="frontier-neighbor-card__safety" disabled={busy === `safety:block:${neighbor.uid}`} onClick={() => setNeighborBlocked(neighbor, !neighbor.blocked)}>
-                                <Ban size={14} aria-hidden="true" /> {neighbor.blocked ? '차단 해제' : '차단'}
-                              </button>}
-                              {!isGuest && !neighbor.blocked && (
-                                <button type="button" className="frontier-neighbor-card__safety report" disabled={busy === `safety:report:${neighbor.uid}`} onClick={() => reportNeighbor(neighbor)}>
-                                  <Flag size={14} aria-hidden="true" /> 신고
-                                </button>
-                              )}
-                            </div>
-                          </article>
-                        )
-                      })}
-                    </div>
+                    <FrontierCrewAtlas
+                      neighbors={neighbors.map(neighbor => ({ ...neighbor, connection: getConnectionSummary(neighbor, events) }))}
+                      currentUid={targetUid}
+                      ownName={ownPlanet.planetName}
+                      isGuest={isGuest}
+                      busy={busy || crewTravel.pending}
+                      onVisit={visitNeighbor}
+                      onBlock={setNeighborBlocked}
+                      onReport={reportNeighbor}
+                    />
                   ) : (
                     <div className="galaxy-empty-state frontier-social-empty">
                       <span className="frontier-empty-icon"><Map size={31} aria-hidden="true" /></span>

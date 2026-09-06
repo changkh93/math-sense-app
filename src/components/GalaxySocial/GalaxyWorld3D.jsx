@@ -3,6 +3,7 @@ import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { Float, Html, OrbitControls, Sparkles, Stars } from '@react-three/drei'
 import { Bot, CircleCheck, Compass, Flower2, Gem, Hammer, Image as ImageIcon, Maximize2, Minimize2, Radio, Search, Sparkles as SparklesIcon, Sprout, Wrench } from 'lucide-react'
 import * as THREE from 'three'
+import { getCrewGates } from './frontierCrewRoutes'
 import {
   FRONTIER_AUDIO_ASSETS_READY,
   getFrontierAmbienceSoundId,
@@ -3377,6 +3378,14 @@ function MissionPortal({ portal, active }) {
   )
 }
 
+function CrewRouteGates({ gates }) {
+  return gates.map(gate => <group key={gate.id} position={gate.position} rotation={[0, gate.id === 'crew-sea-gate' ? Math.PI / 2 : 0, 0]}>
+    <mesh position={[0, 1.5, 0]}><torusGeometry args={[2.4, .13, 8, 40]} /><meshStandardMaterial color={gate.color} emissive={gate.color} emissiveIntensity={.65} /></mesh>
+    <mesh position={[0, 1.5, 0]}><torusGeometry args={[2.7, .035, 6, 40]} /><meshBasicMaterial color={gate.color} /></mesh>
+    <mesh position={[0, -1, 0]}><cylinderGeometry args={[1.8, 2.1, .3, 16]} /><meshStandardMaterial color="#24444e" metalness={.5} roughness={.5} /></mesh>
+  </group>)
+}
+
 function AtmosphericBackdrop({ worldRadius, children }) {
   const group = useRef()
   useFrame(({ camera }) => {
@@ -4634,7 +4643,7 @@ function Astronaut({ travel, inputRef, interactables, blockers, structureCollide
   )
 }
 
-function FrontierScene({ travel, planet, restorationPercent = 0, beaconRepaired = false, selectedStructureId, onSelectStructure, inputRef, paused, onNearbyChange, activeMission, collectedIds, onCollect, onPlayerPositionChange, playerPosition, buildItem, buildLevel = 1, onBuildAt, onInvalidBuild, roverStatus, roverStatusLabel, roverBayApplied, dailyEventNode, remotePlayers = [], nearbyRemoteUids, localPlayerName, localSpeech, isPlanetOwner, isFirstPerson, nearby, onInteract, onInspectStructure, signalPlazaSummary, observatorySummary, greenhouseSummary, gardenSummary, builderEnabled, builderActive, builderPlots = [], activeBuilderPlotId = '', builderCellsByPlot = {}, builderInputMode, builderTool, builderLayer, builderBlockType, builderRotation, builderTargetSlot, onBuilderEdit, onBuilderCopy, onBuilderInvalidEdit, onBuilderScaleBlocked }) {
+function FrontierScene({ travel, planet, crewGatesEnabled = false, restorationPercent = 0, beaconRepaired = false, selectedStructureId, onSelectStructure, inputRef, paused, onNearbyChange, activeMission, collectedIds, onCollect, onPlayerPositionChange, playerPosition, buildItem, buildLevel = 1, onBuildAt, onInvalidBuild, roverStatus, roverStatusLabel, roverBayApplied, dailyEventNode, remotePlayers = [], nearbyRemoteUids, localPlayerName, localSpeech, isPlanetOwner, isFirstPerson, nearby, onInteract, onInspectStructure, signalPlazaSummary, observatorySummary, greenhouseSummary, gardenSummary, builderEnabled, builderActive, builderPlots = [], activeBuilderPlotId = '', builderCellsByPlot = {}, builderInputMode, builderTool, builderLayer, builderBlockType, builderRotation, builderTargetSlot, onBuilderEdit, onBuilderCopy, onBuilderInvalidEdit, onBuilderScaleBlocked }) {
   const territoryExpanded = Boolean(planet?.territoryExpanded)
   setTerritoryExpanded(territoryExpanded)
   const worldRadius = getWorldRadius(territoryExpanded)
@@ -4734,11 +4743,12 @@ function FrontierScene({ travel, planet, restorationPercent = 0, beaconRepaired 
     ? { ...node, completed: true, label: '비콘 수리 완료' }
     : node), [beaconRepaired])
 
+  const crewGates = useMemo(() => crewGatesEnabled ? getCrewGates(worldRadius) : [], [crewGatesEnabled, worldRadius])
   const nearbyPromptPos = useMemo(() => {
     if (!nearby || !nearby.position) return null
     const px = nearby.position[0] || 0
     const pz = nearby.position[2] || 0
-    const py = terrainHeight(px, pz)
+    const py = nearby.kind === 'crew-gate' ? nearby.position[1] : terrainHeight(px, pz)
     let h = isFirstPerson ? 1.0 : 2.0
     if (nearby.kind === 'structure') {
       const footprint = structureFootprint(nearby.item?.itemId || '', nearby.item?.level)
@@ -4881,7 +4891,8 @@ function FrontierScene({ travel, planet, restorationPercent = 0, beaconRepaired 
     GUIDE_NODE,
     roverNode,
     ...builderNodes,
-  ], [builderNodes, resourceInteractables, roverNode, structureColliders])
+    ...crewGates,
+  ], [builderNodes, crewGates, resourceInteractables, roverNode, structureColliders])
   const blockers = useMemo(() => layout.filter((item) => item.itemId !== 'wild_sprout').map(worldPositionFromLayout), [layout])
   const villageSlots = useMemo(() => builderEnabled ? [] : getAvailableVillageSlots(blockers), [blockers, builderEnabled])
   // 길 네트워크 노드: 구역 + 자원노드 + 마을 + 플레이어 건물. 모두 [x,z].
@@ -4960,6 +4971,7 @@ function FrontierScene({ travel, planet, restorationPercent = 0, beaconRepaired 
       </AtmosphericBackdrop>
       <FrontierMarineWorld worldRadius={worldRadius} paused={paused} playerRef={playerGroupRef} />
       <FrontierSkyWorld worldRadius={worldRadius} paused={paused} playerRef={playerGroupRef} />
+      <CrewRouteGates gates={crewGates} />
       <WorldTerrain
         palette={palette}
         territoryExpanded={territoryExpanded}
@@ -5101,7 +5113,7 @@ function TouchJoystick({ inputRef, disabled }) {
   )
 }
 
-function MiniMap({ playerPosition, nearby, dailyEventNode, objectiveTarget, objective, worldRadius = WORLD_RADIUS, expanded, onToggleExpanded }) {
+function MiniMap({ playerPosition, nearby, dailyEventNode, objectiveTarget, objective, crewGatesEnabled = false, worldRadius = WORLD_RADIUS, expanded, onToggleExpanded }) {
   const playerLeft = 50 + THREE.MathUtils.clamp(playerPosition.x / worldRadius, -1, 1) * 44
   const playerTop = 50 + THREE.MathUtils.clamp(playerPosition.z / worldRadius, -1, 1) * 44
   const targetNode = dailyEventNode || objectiveTarget
@@ -5134,6 +5146,7 @@ function MiniMap({ playerPosition, nearby, dailyEventNode, objectiveTarget, obje
       </header>
       <div className="frontier-minimap-field">
         <i className="frontier-minimap-orbit" />
+        {crewGatesEnabled && getCrewGates(worldRadius).map(gate => <span key={gate.id} className="frontier-map-zone" style={{ left: `${50 + THREE.MathUtils.clamp(gate.position[0] / worldRadius, -1, 1) * 44}%`, top: `${50 + THREE.MathUtils.clamp(gate.position[2] / worldRadius, -1, 1) * 44}%`, '--zone-color': gate.color }} title={gate.label}><i /><small>{gate.id === 'crew-sea-gate' ? '바다 항로 →' : '↑ 하늘 항로'}</small></span>)}
         {targetNode && (
           <svg className="frontier-map-event-route" viewBox="0 0 100 100" aria-hidden="true">
             <line x1={playerLeft} y1={playerTop} x2={targetLeft} y2={targetTop} />
@@ -5333,6 +5346,7 @@ export default function GalaxyWorld3D({
   paused = false,
   onOpenBriefing,
   onOpenRover,
+  onOpenCrewAtlas,
   roverStatus = 'idle',
   roverStatusLabel = '',
   roverBayApplied = false,
@@ -5750,6 +5764,7 @@ export default function GalaxyWorld3D({
     else if (nearby.kind === 'structure') onStructureMission?.(nearby.item)
     else if (nearby.kind === 'guide') onOpenBriefing?.()
     else if (nearby.kind === 'rover') onOpenRover?.()
+    else if (nearby.kind === 'crew-gate') onOpenCrewAtlas?.()
     else if (nearby.kind === 'daily') {
       const currentDailyEvent = dailyEvent?.status === 'pending'
         && dailyEvent.eventId === nearby.dailyEvent?.eventId
@@ -5760,7 +5775,7 @@ export default function GalaxyWorld3D({
     else {
       onWorldAction?.(nearby)
     }
-  }, [dailyEvent, nearby, onDailyEventComplete, onOpenBriefing, onOpenRover, onStructureMission, onWorldAction, openAstraBuilder, paused, startMission])
+  }, [dailyEvent, nearby, onDailyEventComplete, onOpenBriefing, onOpenCrewAtlas, onOpenRover, onStructureMission, onWorldAction, openAstraBuilder, paused, startMission])
 
   const inspectStructure = useCallback(() => {
     if (paused || nearby?.kind !== 'structure') return
@@ -5942,6 +5957,7 @@ export default function GalaxyWorld3D({
         }}
       >
         <FrontierScene
+          crewGatesEnabled={Boolean(onOpenCrewAtlas)}
           travel={{ ...travel, birdView: travel.birdView && !builderActive, qaCommand: import.meta.env.DEV ? qaCommand : null }}
           planet={planet}
           restorationPercent={restorationPercent}
@@ -6034,7 +6050,7 @@ export default function GalaxyWorld3D({
         position={playerPosition} worldRadius={getWorldRadius(Boolean(planet?.territoryExpanded))}
         disabled={paused} storageKey={`frontier-marine-journal-v1:${builderOwnerId}`}
         wallet={explorationWallet} ownedKits={ownedExplorationKits} onPurchaseKit={onPurchaseExplorationKit} />}
-      {!builderActive && <MiniMap playerPosition={playerPosition} nearby={nearby} dailyEventNode={dailyEventNode} objectiveTarget={objectiveTarget} objective={objective} worldRadius={getWorldRadius(Boolean(planet?.territoryExpanded))} expanded={mapExpanded} onToggleExpanded={() => setMapExpanded((current) => !current)} />}
+      {!builderActive && <MiniMap playerPosition={playerPosition} nearby={nearby} dailyEventNode={dailyEventNode} objectiveTarget={objectiveTarget} objective={objective} crewGatesEnabled={Boolean(onOpenCrewAtlas)} worldRadius={getWorldRadius(Boolean(planet?.territoryExpanded))} expanded={mapExpanded} onToggleExpanded={() => setMapExpanded((current) => !current)} />}
       {!builderActive && <button
         type="button"
         className="frontier-camera-mode-toggle"
