@@ -15,22 +15,26 @@ import { HALL_OF_FAME_LOOKBACK_DAYS, HALL_SHOWCASE_DURATION_DAYS, getFrameSurfac
 import { getCrewMothershipLevel, getEquippedCrewModules } from '../../utils/crewMothershipCatalog'
 
 function CrewLeaderboardVessel({ summary, crew, rank }) {
-  const resolvedCrew = crew || {
+  const resolvedCrew = {
     id: summary.crewId,
-    name: summary.crewName,
-    color: summary.crewColor,
-    memberCount: summary.memberCount,
-    mothershipXP: summary.mothershipXP,
+    name: summary.crewName || crew?.name,
+    color: crew?.color || summary.crewColor || summary.color || '#00f3ff',
+    memberCount: Math.max(Number(crew?.memberCount || 0), Number(summary.memberCount || 0), 1),
+    mothershipXP: Math.max(0, Number(crew?.mothershipXP || crew?.mothershipStats?.xp || summary.mothershipXP || 0)),
+    equippedMothershipModules: crew?.equippedMothershipModules || summary.equippedMothershipModules || {},
+    ownedMothershipModules: crew?.ownedMothershipModules || summary.ownedMothershipModules || [],
+    mothershipStats: crew?.mothershipStats || summary.mothershipStats || {},
+    memberIds: crew?.memberIds || summary.memberIds || [],
   }
   const level = getCrewMothershipLevel(resolvedCrew)
   const moduleCount = getEquippedCrewModules(resolvedCrew).length
-  const memberCount = Math.max(Number(resolvedCrew.memberCount || 0), Number(summary.memberCount || 0), 1)
-  const mothershipXP = Math.max(0, Number(resolvedCrew.mothershipXP || resolvedCrew.mothershipStats?.xp || summary.mothershipXP || 0))
+  const memberCount = resolvedCrew.memberCount
+  const mothershipXP = resolvedCrew.mothershipXP
   const xpBonus = mothershipXP * 10
   const weeklyScore = summary.totalWeeklyGain + xpBonus
 
   return (
-    <div className={`ranking-crew-vessel ranking-crew-vessel--${Math.min(rank, 3)}`} style={{ '--ranking-crew-accent': resolvedCrew.color || summary.crewColor || '#00f3ff' }}>
+    <div className={`ranking-crew-vessel ranking-crew-vessel--${Math.min(rank, 3)}`} style={{ '--ranking-crew-accent': resolvedCrew.color || '#00f3ff' }}>
       <div className="ranking-crew-vessel__ship">
         <CrewMothership crew={resolvedCrew} variant="leaderboard" />
       </div>
@@ -44,7 +48,7 @@ function CrewLeaderboardVessel({ summary, crew, rank }) {
   )
 }
 
-const LEADERBOARD_SESSION_KEY = 'stellar_leaderboard_cache_v3';
+const LEADERBOARD_SESSION_KEY = 'stellar_leaderboard_cache_v4';
 const LEADERBOARD_TTL_MS = 5 * 60 * 1000; // 5 minutes
 
 function assignDenseRanks(list, isTieFn) {
@@ -121,6 +125,7 @@ export default function SpaceRanking({ user, userData }) {
             setLeaderboardPayload(cached.data);
             setCrewLeaderboard(cached.data.crewLeaderboard || []);
             setHallOfFame(cached.data.hallOfFame || { bestAnswer: null, bestQuestion: null, growthStar: null });
+            setRankingCrewsById(cached.data.rankingCrewsById || {});
             setLoading(false);
             return;
           }
@@ -142,6 +147,7 @@ export default function SpaceRanking({ user, userData }) {
             setLeaderboardPayload(data);
             setCrewLeaderboard(data.crewLeaderboard || []);
             setHallOfFame(data.hallOfFame || { bestAnswer: null, bestQuestion: null, growthStar: null });
+            setRankingCrewsById(data.rankingCrewsById || {});
             try {
               sessionStorage.setItem(LEADERBOARD_SESSION_KEY, JSON.stringify({ timestamp: Date.now(), data }));
             } catch {
@@ -266,6 +272,11 @@ export default function SpaceRanking({ user, userData }) {
             totalWeeklyGain: 0,
             memberCount: 0,
             mothershipXP,
+            equippedMothershipModules: rankingCrew?.equippedMothershipModules || {},
+            ownedMothershipModules: rankingCrew?.ownedMothershipModules || [],
+            mothershipStats: rankingCrew?.mothershipStats || {},
+            memberIds: rankingCrew?.memberIds || [],
+            color: rankingCrew?.color || u.crewColor || '#00f3ff',
           };
           existing.totalSEI += u.seiData?.total || 0;
           existing.totalWeeklyGain += u.weeklyGain || 0;
@@ -288,6 +299,7 @@ export default function SpaceRanking({ user, userData }) {
           topStreak: topStreak.slice(0, 100),
           topBattle: topBattle.slice(0, 100),
           crewLeaderboard: crewLeaders,
+          rankingCrewsById: crewsById,
           hallOfFame: {
             bestAnswer: null,
             bestQuestion: null,

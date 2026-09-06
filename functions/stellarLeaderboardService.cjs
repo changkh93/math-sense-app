@@ -202,6 +202,10 @@ function cleanUserSummary(u) {
     crewId: u.crewId || null,
     crewName: u.crewName || null,
     crewColor: u.crewColor || null,
+    activeShipFamily: u.activeShipFamily || 'scout',
+    ownedShipItems: Array.isArray(u.ownedShipItems) ? u.ownedShipItems : [],
+    shipLoadouts: u.shipLoadouts || null,
+    shipCustomization: u.shipCustomization || null,
     totalBattleMatches: Number(u.totalBattleMatches || 0),
     totalBattleWins: Number(u.totalBattleWins || 0),
     totalBattleDraws: Number(u.totalBattleDraws || 0),
@@ -343,10 +347,15 @@ async function generateStellarLeaderboardData(db, helpers = {}) {
       crewId: u.crewId,
       crewName: u.crewName || rankingCrew?.name || '이름 없는 크루',
       crewColor: u.crewColor || rankingCrew?.color || '#00f3ff',
+      color: rankingCrew?.color || u.crewColor || '#00f3ff',
       totalSEI: 0,
       totalWeeklyGain: 0,
       memberCount: 0,
       mothershipXP,
+      equippedMothershipModules: rankingCrew?.equippedMothershipModules || {},
+      ownedMothershipModules: rankingCrew?.ownedMothershipModules || [],
+      mothershipStats: rankingCrew?.mothershipStats || {},
+      memberIds: rankingCrew?.memberIds || [],
     };
     existing.totalSEI += u.seiData?.total || 0;
     existing.totalWeeklyGain += u.weeklyGain || 0;
@@ -430,6 +439,7 @@ async function generateStellarLeaderboardData(db, helpers = {}) {
     topStreak: streakRanked.slice(0, 100).map(cleanUserSummary),
     topBattle: battleRanked.slice(0, 100).map(cleanUserSummary),
     crewLeaderboard: crewLeaders,
+    rankingCrewsById,
     hallOfFame,
     totalPilots: parsedUsers.length,
   };
