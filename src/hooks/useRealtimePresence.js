@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { onValue, ref } from 'firebase/database'
 import { realtimeDb } from '../firebase'
+import { normalizeRealtimePresence } from '../utils/realtimePresence'
 
 const safePathSegment = (value) => String(value || '')
   .trim()
@@ -9,59 +10,35 @@ const safePathSegment = (value) => String(value || '')
   .join('')
   .slice(0, 180)
 
-const timestampLike = (value) => {
-  const millis = Number(value || 0)
-  return millis > 0 ? { toMillis: () => millis, toDate: () => new Date(millis) } : null
-}
+export { normalizeRealtimePresence } from '../utils/realtimePresence'
 
-export function normalizeRealtimePresence(uid, value) {
-  const connections = Object.values(value?.connections || {})
-    .filter((connection) => connection && typeof connection === 'object')
-    .sort((a, b) => Number(b.updatedAtMs || 0) - Number(a.updatedAtMs || 0))
-  const active = connections[0]
-  const lastSeenMs = Number(active?.updatedAtMs || value?.lastSeenMs || 0)
-
-  if (!active) {
-    return {
-      uid,
-      liveStatus: {
-        state: 'offline',
-        lastUpdatedAt: timestampLike(lastSeenMs),
-      },
-    }
-  }
-
-  return {
-    uid,
-    ...active,
-    liveStatus: {
-      ...active,
-      state: active.state || 'online',
-      lastUpdatedAt: timestampLike(lastSeenMs),
-      enteredAt: timestampLike(active.enteredAtMs || lastSeenMs),
-    },
-  }
-}
-
-export function useAllUserPresence(enabled = true) {
-  const [presenceByUid, setPresenceByUid] = useState({})
+export function useAllUserPresenceState(enabled = true) {
+  const [result, setResult] = useState({ presenceByUid: {}, status: 'loading' })
 
   useEffect(() => {
     if (!enabled) return undefined
 
-    return onValue(ref(realtimeDb, 'userPresence'), (snapshot) => {
+    const unsubscribe = onValue(ref(realtimeDb, 'userPresence'), (snapshot) => {
       const next = {}
       Object.entries(snapshot.val() || {}).forEach(([uid, value]) => {
         next[uid] = normalizeRealtimePresence(uid, value)
       })
-      setPresenceByUid(next)
+      setResult({ presenceByUid: next, status: 'ready' })
     }, (error) => {
       console.warn('Failed to subscribe realtime presence', error)
-      setPresenceByUid({})
+      setResult({ presenceByUid: {}, status: 'error' })
     })
+    return () => {
+      unsubscribe()
+      setResult({ presenceByUid: {}, status: 'loading' })
+    }
   }, [enabled])
 
-  return enabled ? presenceByUid : {}
+  return enabled ? result : { presenceByUid: {}, status: 'loading' }
+}
+
+export function useAllUserPresence(enabled = true) {
+  return useAllUserPresenceState(enabled).presenceByUid
 }
 
 export function useUserPresence(uid, enabled = true) {

@@ -6,7 +6,8 @@ import { AlertTriangle, ArrowLeft, CalendarDays, ChevronDown, Copy, Crown, Edit3
 import { db, functions } from '../../firebase';
 import { useAuth } from '../../hooks/useAuth';
 import { useClusters } from '../../hooks/useContent';
-import { useAllUserPresence } from '../../hooks/useRealtimePresence';
+import { useAllUserPresenceState } from '../../hooks/useRealtimePresence';
+import { getConnectedStudents, countStudentsByCrew } from '../../utils/realtimePresence';
 import soundManager from '../../utils/SoundManager';
 import { copyMeetText, getGoogleMeetCode, openGoogleMeet } from '../../utils/googleMeetNavigation';
 import CrewJoinModal from './CrewJoinModal';
@@ -68,18 +69,6 @@ function getStudyInvitePreference(profile = {}) {
 }
 function isStudyInviteClosed(profile = {}) {
   return getStudyInvitePreference(profile) === 'closed';
-}
-function getTimestampMs(value) {
-  if (!value) return 0;
-  if (typeof value.toMillis === 'function') return value.toMillis();
-  if (value instanceof Date) return value.getTime();
-  return 0;
-}
-function isLiveStudent(profile = {}, now = Date.now()) {
-  const live = profile.liveStatus || {};
-  const updatedMs = getTimestampMs(live.lastUpdatedAt);
-  if (!updatedMs || now - updatedMs > 5 * 60 * 1000) return false;
-  return live.state === 'online' || live.state === 'away';
 }
 function formatLiveState(profile = {}) {
   const live = profile.liveStatus || {};
@@ -328,7 +317,7 @@ function CrewDirectoryHangar({ crew, isMyCrew, isApproved }) {
   );
 }
 
-function CrewCard({ crew, userUid, userCrewId, onClick, onlineCount = 0, founderProfile = null }) {
+function CrewCard({ crew, userUid, userCrewId, onClick, onlineCount = 0, presenceMessage = '', founderProfile = null }) {
   const leaderId = crew.leaderId || crew.leaderUid || '';
   const founderName = getProfileName(founderProfile || {}, crew.leaderName || '창설자 정보 없음');
   const founderHint = founderProfile?.publicTitle || founderProfile?.crewName || founderProfile?.publicSignature || '';
@@ -447,7 +436,7 @@ function CrewCard({ crew, userUid, userCrewId, onClick, onlineCount = 0, founder
             border: '1px solid rgba(16,185,129,0.16)'
           }}>
             <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--planet-green)', boxShadow: '0 0 8px rgba(16,185,129,0.7)' }} />
-            온라인 {onlineCount}명
+            {presenceMessage || `접속 중 ${onlineCount}명`}
           </div>
         </div>
         <div className="font-tech" style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>
@@ -891,6 +880,7 @@ function StudyInviteModal({
 }
 
 function LiveStudentDrawer({
+  presenceMessage = '',
   isOpen,
   onClose,
   students,
@@ -904,7 +894,8 @@ function LiveStudentDrawer({
   onInviteStudent,
   onOpenMyCrew,
 }) {
-  const visibleStudents = students.filter(student => student.uid !== currentUid).slice(0, 24);
+  const otherStudents = students.filter(student => student.uid !== currentUid);
+  const visibleStudents = otherStudents.slice(0, 24);
   const acceptsStudyInvites = studyInvitePreference !== 'closed';
 
   return (
@@ -956,7 +947,8 @@ function LiveStudentDrawer({
                   지금 접속 중
                 </h3>
                 <div className="font-tech" style={{ color: 'rgba(255,255,255,0.52)', fontSize: '0.78rem', marginTop: '0.25rem' }}>
-                  최근 5분 내 온라인 {visibleStudents.length}명
+                  {presenceMessage || `전체 접속 ${students.length}명 · 본인·자리비움 포함`}
+                  {!presenceMessage && <div>다른 학생 {otherStudents.length}명 · 최대 24명 표시</div>}
                 </div>
               </div>
               <button
@@ -1019,7 +1011,7 @@ function LiveStudentDrawer({
 
             {visibleStudents.length === 0 ? (
               <div className="glass-card hud-border" style={{ padding: '1rem', borderRadius: 10, color: 'var(--text-muted)' }}>
-                지금은 표시할 다른 온라인 학생이 없습니다.
+                {presenceMessage || '지금은 표시할 다른 접속 학생이 없습니다.'}
               </div>
             ) : (
               <div style={{ display: 'grid', gap: '0.55rem' }}>
@@ -1119,20 +1111,10 @@ export default function StudyCrewView({ onNavigateStore }) {
   const [selectedInviteOptionId, setSelectedInviteOptionId] = useState('');
   const [rejectedCrewFallback, setRejectedCrewFallback] = useState(null);
   const [detailView, setDetailView] = useState(false);
-  const realtimePresenceByUid = useAllUserPresence(Boolean(user?.uid) && !detailView);
-  const { crewOnlineCounts, liveStatusById } = useMemo(() => {
-    const nextCounts = {};
-    const nextStatuses = {};
-    Object.entries(realtimePresenceByUid).forEach(([uid, status]) => {
-      nextStatuses[uid] = status;
-      const live = status?.liveStatus || {};
-      if (status?.role === 'admin' || status?.role === 'parent') return;
-      const statusCrewId = status?.crewId;
-      if (!statusCrewId || live.state !== 'online') return;
-      nextCounts[statusCrewId] = (nextCounts[statusCrewId] || 0) + 1;
-    });
-    return { crewOnlineCounts: nextCounts, liveStatusById: nextStatuses };
-  }, [realtimePresenceByUid]);
+  const { presenceByUid: liveStatusById, status: presenceStatus } = useAllUserPresenceState(Boolean(user?.uid) && !detailView);
+  const connectedStudents = useMemo(() => getConnectedStudents(liveStatusById), [liveStatusById]);
+  const crewOnlineCounts = useMemo(() => countStudentsByCrew(connectedStudents), [connectedStudents]);
+  const presenceMessage = presenceStatus === 'ready' ? '' : presenceStatus === 'error' ? '연결 확인 필요' : '접속 확인 중';
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [joinTarget, setJoinTarget] = useState(null); 
   const [openFaq, setOpenFaq] = useState(null);
@@ -1276,9 +1258,7 @@ export default function StudyCrewView({ onNavigateStore }) {
   }, [clusters]);
 
   const liveStudents = useMemo(() => {
-    const now = Date.now();
-    return Object.values(liveStatusById)
-      .filter(profile => profile?.uid && profile.role !== 'admin' && profile.role !== 'parent' && isLiveStudent(profile, now))
+    return connectedStudents
       .map(profile => {
         return {
           uid: profile.uid,
@@ -1299,12 +1279,7 @@ export default function StudyCrewView({ onNavigateStore }) {
         if (aCrew !== bCrew) return aCrew - bCrew;
         return (b.profile.liveStatus?.lastUpdatedAt?.toMillis?.() || 0) - (a.profile.liveStatus?.lastUpdatedAt?.toMillis?.() || 0);
       });
-  }, [clusterLabelById, crewId, liveStatusById, user?.uid]);
-
-  const livePeerCount = useMemo(
-    () => liveStudents.filter(student => student.uid !== user?.uid).length,
-    [liveStudents, user?.uid]
-  );
+  }, [clusterLabelById, crewId, connectedStudents, user?.uid]);
 
   const openStudyActivityByPool = useMemo(() => {
     const next = {};
@@ -1579,6 +1554,7 @@ export default function StudyCrewView({ onNavigateStore }) {
           isMobile={isMobile}
         />
         <LiveStudentDrawer
+          presenceMessage={presenceMessage}
           isOpen={livePanelOpen}
           onClose={() => setLivePanelOpen(false)}
           students={liveStudents}
@@ -1671,7 +1647,7 @@ export default function StudyCrewView({ onNavigateStore }) {
                 }}
               >
                 <Radio size={18} style={{ color: 'var(--crystal-cyan)' }} />
-                지금 접속 중 {livePeerCount}명
+                {presenceMessage || `지금 접속 중 ${liveStudents.length}명`}
               </button>
             </div>
           </div>
@@ -1878,6 +1854,7 @@ export default function StudyCrewView({ onNavigateStore }) {
                     userCrewId={crewId}
                     onClick={handleCrewCardClick}
                     onlineCount={crewOnlineCounts[c.id] || 0}
+                    presenceMessage={presenceMessage}
                     founderProfile={liveStatusById[c.leaderId || c.leaderUid || ''] || null}
                   />
                 ))}
@@ -1936,6 +1913,7 @@ export default function StudyCrewView({ onNavigateStore }) {
           </div>
 
           <LiveStudentDrawer
+          presenceMessage={presenceMessage}
             isOpen={livePanelOpen}
             onClose={() => setLivePanelOpen(false)}
             students={liveStudents}
