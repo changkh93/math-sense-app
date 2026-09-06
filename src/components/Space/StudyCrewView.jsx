@@ -947,8 +947,8 @@ function LiveStudentDrawer({
                   지금 접속 중
                 </h3>
                 <div className="font-tech" style={{ color: 'rgba(255,255,255,0.52)', fontSize: '0.78rem', marginTop: '0.25rem' }}>
-                  {presenceMessage || `전체 접속 ${students.length}명 · 본인·자리비움 포함`}
-                  {!presenceMessage && <div>다른 학생 {otherStudents.length}명 · 최대 24명 표시</div>}
+                  {presenceMessage || `전체 접속 ${students.length}명 · 본인 포함`}
+                  {!presenceMessage && <div>화면을 열어 둔 학생 · 최근 5분 내 연결 확인<br />다른 학생 {otherStudents.length}명 · 최대 24명 표시</div>}
                 </div>
               </div>
               <button

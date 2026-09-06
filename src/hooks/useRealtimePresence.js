@@ -18,18 +18,33 @@ export function useAllUserPresenceState(enabled = true) {
   useEffect(() => {
     if (!enabled) return undefined
 
-    const unsubscribe = onValue(ref(realtimeDb, 'userPresence'), (snapshot) => {
+    let raw = null
+    let offset = 0
+    const publish = () => {
+      if (raw === null) return
       const next = {}
-      Object.entries(snapshot.val() || {}).forEach(([uid, value]) => {
-        next[uid] = normalizeRealtimePresence(uid, value)
+      Object.entries(raw).forEach(([uid, value]) => {
+        next[uid] = normalizeRealtimePresence(uid, value, Date.now() + offset)
       })
       setResult({ presenceByUid: next, status: 'ready' })
+    }
+    const unsubscribeOffset = onValue(ref(realtimeDb, '.info/serverTimeOffset'), snapshot => {
+      offset = Number(snapshot.val() || 0)
+      publish()
+    })
+    const timer = window.setInterval(publish, 30_000)
+    const unsubscribe = onValue(ref(realtimeDb, 'userPresence'), snapshot => {
+      raw = snapshot.val() || {}
+      publish()
     }, (error) => {
+      raw = null
       console.warn('Failed to subscribe realtime presence', error)
       setResult({ presenceByUid: {}, status: 'error' })
     })
     return () => {
       unsubscribe()
+      unsubscribeOffset()
+      window.clearInterval(timer)
       setResult({ presenceByUid: {}, status: 'loading' })
     }
   }, [enabled])
@@ -48,12 +63,18 @@ export function useUserPresence(uid, enabled = true) {
   useEffect(() => {
     if (!enabled || !safeUid) return undefined
 
-    return onValue(ref(realtimeDb, `userPresence/${safeUid}`), (snapshot) => {
-      setPresence(normalizeRealtimePresence(uid, snapshot.val() || {}))
+    let raw = {}
+    const publish = () => setPresence(normalizeRealtimePresence(uid, raw))
+    const timer = window.setInterval(publish, 30_000)
+    const unsubscribe = onValue(ref(realtimeDb, `userPresence/${safeUid}`), (snapshot) => {
+      raw = snapshot.val() || {}
+      publish()
     }, (error) => {
+      raw = {}
       console.warn('Failed to subscribe user presence', error)
       setPresence(null)
     })
+    return () => { unsubscribe(); window.clearInterval(timer) }
   }, [enabled, safeUid, uid])
 
   return enabled && safeUid ? presence : null
