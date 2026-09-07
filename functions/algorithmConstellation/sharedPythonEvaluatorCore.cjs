@@ -693,7 +693,11 @@ class SafePythonInterpreter {
       if (!insideStr) {
         if (ch === '(' || ch === '[' || ch === '{') depth++
         else if (ch === ')' || ch === ']' || ch === '}') depth--
-        else if (depth === 0 && (ch === '+' || ch === '-') && i > 0 && source[i - 1] !== 'e' && source[i - 1] !== 'E') {
+        // Scientific-notation literals are not part of the supported grammar, so
+        // every top-level + / - is an operator.  Treating any sign after the
+        // letter e/E as an exponent marker incorrectly rejected valid Python
+        // such as `base+heat` and `score-extra`.
+        else if (depth === 0 && (ch === '+' || ch === '-') && i > 0) {
           const prevStr = source.slice(lastIdx, i).trim()
           if (prevStr.length > 0) {
             parts.push({ op: currentOp, expr: prevStr })

@@ -367,4 +367,35 @@ for (const tc of MODULO_CASES) {
 }
 console.log('  -> [PASS] Python Modulo Semantics (negative operands) 100% Parity Verified')
 
+// [Matrix 8] Whitespace-independent additive parsing
+// Python does not require spaces around arithmetic operators. In particular,
+// an identifier ending in e/E must not make a following + / - look like an
+// exponent sign (for example, base+heat).
+console.log('[Matrix 8] Checking Whitespace-independent Additive Parsing Parity...')
+const NO_SPACE_ARITHMETIC_CODE = `def calculate_final_temperature(base, heat, rate, cool):
+    temperature = base+heat
+    temperature *= rate
+    temperature -= cool
+    return temperature
+`
+for (const test of [
+  { args: { base: 10, heat: 5, rate: 2, cool: 4 }, expected: 26 },
+  { args: { base: 0, heat: 3, rate: 4, cool: 2 }, expected: 10 },
+]) {
+  const clientVal = clientRunFunction(NO_SPACE_ARITHMETIC_CODE, 'calculate_final_temperature', test.args)
+  const serverRes = serverRunFunction(NO_SPACE_ARITHMETIC_CODE, 'calculate_final_temperature', test.args)
+  assert.equal(serverRes.ok, true, 'Server must accept valid Python without spaces around +')
+  assert.deepEqual(clientVal, test.expected, 'Client must evaluate base+heat correctly')
+  assert.deepEqual(serverRes.result, test.expected, 'Server must evaluate base+heat correctly')
+}
+const NO_SPACE_SUBTRACTION_CODE = `def subtract_extra(score, extra):
+    return score-extra
+`
+const clientSubtraction = clientRunFunction(NO_SPACE_SUBTRACTION_CODE, 'subtract_extra', { score: 9, extra: 4 })
+const serverSubtraction = serverRunFunction(NO_SPACE_SUBTRACTION_CODE, 'subtract_extra', { score: 9, extra: 4 })
+assert.equal(serverSubtraction.ok, true, 'Server must accept valid Python without spaces around -')
+assert.equal(clientSubtraction, 5, 'Client must evaluate score-extra correctly')
+assert.equal(serverSubtraction.result, 5, 'Server must evaluate score-extra correctly')
+console.log('  -> [PASS] Whitespace-independent Additive Parsing 100% Parity Verified')
+
 console.log('\n=== Client-Server Runtime Parity Matrix Test Passed 100%! ===\n')
