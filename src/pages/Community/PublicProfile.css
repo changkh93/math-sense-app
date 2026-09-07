@@ -1705,6 +1705,28 @@
   cursor: pointer;
 }
 
+.public-profile-deferred { min-height: 64px; }
+.public-profile-section-status {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  min-height: 64px;
+  padding: 1rem;
+  color: rgba(255,255,255,.68);
+}
+.public-profile-section-status button,
+.public-profile-state button,
+.public-profile-history-toggle button {
+  min-height: 44px;
+  padding: .65rem 1rem;
+  border: 1px solid rgba(0,243,255,.35);
+  border-radius: 12px;
+  background: rgba(0,243,255,.1);
+  color: var(--crystal-cyan);
+  font: inherit;
+  cursor: pointer;
+}
+
 @media (max-width: 780px) {
   .public-profile-shell {
     width: min(100% - 1rem, 1120px);

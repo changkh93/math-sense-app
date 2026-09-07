@@ -7,6 +7,7 @@ For an existing task, read its STATE.md and actual artifacts before continuing.
 
 | ID | Goal | Phase | State file | Next action |
 |---|---|---|---|---|
+| 20260907-profile-performance | 프로필 진입 속도·조회 비용·오류 처리 개선 | DONE (local) | [STATE](tasks/20260907-profile-performance/STATE.md) | 로컬 검증 완료, 답변 인덱스 준비 후 웹 배포 필요 |
 | 20260907-profile-photo | 프로필 사진 등록 및 공개 영역 표시 | DONE (local) | [STATE](tasks/20260907-profile-photo/STATE.md) | 로컬 구현·검증 완료, Storage 규칙 포함 운영 배포 전 |
 | 20260907-frontier-performance | 진입 멈춤·저사양 렌더링 개선 | DONE (local) | [STATE](tasks/20260907-frontier-performance/STATE.md) | 로컬 성능 비교 완료, 운영 배포 전 |
 | 20260907-frontier-crew-routes | 가벼운 크루 성도·항로·협업 방문 흐름 | DONE (local) | [STATE](tasks/20260907-frontier-crew-routes/STATE.md) | 로컬 검증 완료, 운영 배포 전 |

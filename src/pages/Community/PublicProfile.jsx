@@ -1,4 +1,5 @@
 import React from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { useNavigate, useParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { ArrowLeft, Award, BookOpen, CalendarDays, ChevronRight, Flame, LibraryBig, LoaderCircle, Map as MapIcon, MessageCircle, PenLine, Shield, Sparkles, Star, Trophy, TrendingUp, X, Zap } from 'lucide-react';
@@ -10,8 +11,10 @@ import SpaceNavbar from '../../components/Space/SpaceNavbar';
 import StarField from '../../components/Space/StarField';
 import CometBadge from '../../components/Space/CometBadge';
 import ModularShip from '../../components/Space/ModularShip';
-import CertificateAwardsBoard from '../../components/Space/CertificateAwardsBoard';
+import { useProfileSectionVisible } from '../../hooks/useProfileSectionVisible';
+import { profileQueryOptions, withProfileTimeout } from '../../utils/profileQueryOptions';
 import ProfileAvatar from '../../components/ProfileAvatar';
+import ProfileSectionBoundary from '../../components/ProfileSectionBoundary';
 import { getEffectiveStreak, getMondayKSTKey, getTodayKST } from '../../utils/streakUtils';
 import { calculateSEI } from '../../utils/rankingUtils';
 import { getBaseTheme, getFrameSurfaceStyles, getProfileFrame, isHallSpotlightActive } from '../../utils/socialUtils';
@@ -31,6 +34,17 @@ import infinityGardenImage from '../../assets/themes/infinity-garden.svg';
 import './PublicProfile.css';
 
 const MotionDiv = motion.div;
+const CertificateAwardsBoard = React.lazy(() => import('../../components/Space/CertificateAwardsBoard'));
+const EMPTY_ITEMS = [];
+
+function ProfileSectionStatus({ title, request }) {
+  return (
+    <div className="public-profile-section-status" role="status">
+      <span>{request.isError ? `${title}을 불러오지 못했습니다.` : `${title}을 불러오는 중…`}</span>
+      {request.isError && <button type="button" disabled={request.isFetching} onClick={() => request.refetch()}>다시 시도</button>}
+    </div>
+  );
+}
 const BASE_THEME_IMAGES = {
   aurora_observatory: auroraObservatoryImage,
   solar_archive: goldenArchiveImage,
@@ -154,7 +168,7 @@ function normalizeProfileBook(book = {}, id = '') {
 
 async function fetchProfileBookshelfPage({ userId, cursor = null, pageSize = PROFILE_BOOKSHELF_PREVIEW_SIZE, allowOwnerFallback = false }) {
   try {
-    const getPublicReadingBookshelf = httpsCallable(functions, 'getPublicReadingBookshelf');
+    const getPublicReadingBookshelf = httpsCallable(functions, 'getPublicReadingBookshelf', { timeout: 8_000 });
     const response = await getPublicReadingBookshelf({ userId, cursor, limit: pageSize });
     return {
       books: Array.isArray(response.data?.books) ? response.data.books.map((book) => normalizeProfileBook(book)) : [],
@@ -321,7 +335,7 @@ function ProfileBookshelf({ books = [], hasMore, isOwnProfile, onOpenLibrary, on
   );
 }
 
-function PublicBookshelfDialog({ books, hasMore, isLoadingMore, onLoadMore, onClose, isOwnProfile, onOpenLibrary }) {
+function PublicBookshelfDialog({ books, hasMore, isLoadingMore, onLoadMore, onClose, isOwnProfile, onOpenLibrary, error }) {
   React.useEffect(() => {
     const handleKeyDown = (event) => {
       if (event.key === 'Escape') onClose();
@@ -360,6 +374,7 @@ function PublicBookshelfDialog({ books, hasMore, isLoadingMore, onLoadMore, onCl
           ))}
         </div>
 
+        {error && <p role="alert">{error}</p>}
         <div className="public-profile-books-dialog-foot">
           {hasMore ? (
             <button type="button" onClick={onLoadMore} disabled={isLoadingMore}>
@@ -782,136 +797,75 @@ function buildConceptMap(history = [], refinementSignals = [], includeRefinement
 
 export default function PublicProfile() {
   const { uid } = useParams();
+  const { user, userData, loading: authLoading } = useAuth();
+  // Remount local dialog/visibility state on account or target changes. Query
+  // caches are also viewer-scoped, so another account never sees cached data.
+  return <PublicProfileContent key={`${user?.uid || ''}:${uid}`} uid={uid} user={user} userData={userData} authLoading={authLoading} />;
+}
+
+function PublicProfileContent({ uid, user, userData, authLoading }) {
   const navigate = useNavigate();
-  const { user } = useAuth();
-  const [profile, setProfile] = React.useState(null);
-  const [answers, setAnswers] = React.useState([]);
-  const [history, setHistory] = React.useState([]);
-  const [refinementSignals, setRefinementSignals] = React.useState([]);
-  const [readingBooks, setReadingBooks] = React.useState([]);
-  const [readingShelfHasMore, setReadingShelfHasMore] = React.useState(false);
-  const [readingShelfCursor, setReadingShelfCursor] = React.useState(null);
+  const isOwnProfile = user?.uid === uid;
+  const ownProfileReady = isOwnProfile && userData && !userData.dataLoadError && !userData.recoveryRequired;
+  const identity = useQuery({
+    ...profileQueryOptions(user?.uid, uid, 'identity', async () => {
+      const snapshot = await getDoc(doc(db, 'users', uid));
+      if (!snapshot.exists()) throw new Error('프로필을 찾을 수 없습니다.');
+      return { ...snapshot.data(), id: snapshot.id };
+    }),
+    enabled: Boolean(uid && user?.uid && !authLoading && !ownProfileReady),
+  });
+  const profile = ownProfileReady ? userData : identity.data;
+  const loading = !profile && !identity.isError;
+  const error = !profile && identity.isError ? identity.error.message : '';
+  const canShowProfile = Boolean(profile && user?.uid && (isOwnProfile || profile.publicProfileEnabled !== false));
+  const [bookshelfRef, bookshelfVisible] = useProfileSectionVisible(canShowProfile);
+  const [answersRef, answersVisible] = useProfileSectionVisible(canShowProfile);
+  const [awardsRef, awardsVisible] = useProfileSectionVisible(canShowProfile);
+  const [historyRequested, setHistoryRequested] = React.useState(false);
+  const bookshelf = useQuery({
+    ...profileQueryOptions(user?.uid, uid, 'bookshelf', () => fetchProfileBookshelfPage({ userId: uid, allowOwnerFallback: isOwnProfile })),
+    enabled: bookshelfVisible,
+  });
+  const answerRequest = useQuery({
+    ...profileQueryOptions(user?.uid, uid, 'answers', async () => {
+      const snap = await getDocs(query(collection(db, 'answers'), where('userId', '==', uid), orderBy('createdAt', 'desc'), limit(5)));
+      return snap.docs.map((item) => ({ ...item.data(), id: item.id })).filter((answer) => !answer.isTeacher);
+    }),
+    enabled: answersVisible,
+  });
+  const historyRequest = useQuery({
+    ...profileQueryOptions(user?.uid, uid, 'history', async () => {
+      const snap = await getDocs(collection(db, 'users', uid, 'history'));
+      return snap.docs.map((item) => ({ ...item.data(), id: item.id }));
+    }),
+    enabled: canShowProfile && isOwnProfile && historyRequested,
+  });
+  const refinementRequest = useQuery({
+    ...profileQueryOptions(user?.uid, uid, 'refinement', async () => {
+      const [incorrect, review] = await Promise.all([
+        getDocs(collection(db, 'users', uid, 'incorrect_questions')),
+        getDocs(query(collection(db, 'users', uid, 'review_marks'), where('status', '==', 'active'))),
+      ]);
+      return [
+        ...incorrect.docs.map((item) => ({ ...item.data(), id: item.id, source: 'incorrect' })),
+        ...review.docs.map((item) => ({ ...item.data(), id: item.id, source: 'review' })),
+      ];
+    }),
+    enabled: canShowProfile && isOwnProfile && historyRequested,
+  });
+  const history = historyRequest.data || EMPTY_ITEMS;
+  const refinementSignals = refinementRequest.data || EMPTY_ITEMS;
+  const answers = answerRequest.data || EMPTY_ITEMS;
+  const readingBooks = bookshelf.data?.books || EMPTY_ITEMS;
+  const readingShelfHasMore = bookshelf.data?.hasMore || false;
+  const readingShelfCursor = bookshelf.data?.nextCursor || null;
   const [isBookshelfDialogOpen, setIsBookshelfDialogOpen] = React.useState(false);
   const [dialogBooks, setDialogBooks] = React.useState([]);
   const [dialogHasMore, setDialogHasMore] = React.useState(false);
   const [dialogCursor, setDialogCursor] = React.useState(null);
   const [isLoadingMoreBooks, setIsLoadingMoreBooks] = React.useState(false);
-  const [loading, setLoading] = React.useState(true);
-  const [error, setError] = React.useState('');
-
-  React.useEffect(() => {
-    let cancelled = false;
-
-    const loadProfile = async () => {
-      if (!uid) return;
-      setLoading(true);
-      setError('');
-
-      try {
-        const profileSnap = await getDoc(doc(db, 'users', uid));
-        if (!profileSnap.exists()) {
-          if (!cancelled) {
-            setProfile(null);
-            setAnswers([]);
-            setHistory([]);
-            setReadingBooks([]);
-            setReadingShelfHasMore(false);
-            setReadingShelfCursor(null);
-            setError('프로필을 찾을 수 없습니다.');
-          }
-          return;
-        }
-
-        const profileData = { id: profileSnap.id, ...profileSnap.data() };
-        let answerItems = [];
-        let historyItems = [];
-        let refinementItems = [];
-        let readingShelfPage = { books: [], hasMore: false, nextCursor: null };
-
-        try {
-          readingShelfPage = await fetchProfileBookshelfPage({
-            userId: uid,
-            pageSize: PROFILE_BOOKSHELF_PREVIEW_SIZE,
-            allowOwnerFallback: user?.uid === uid,
-          });
-        } catch (bookshelfError) {
-          console.warn('공개 프로필 책장 조회 실패:', bookshelfError);
-        }
-
-        try {
-          const answerSnap = await getDocs(query(
-            collection(db, 'answers'),
-            where('userId', '==', uid),
-            limit(30)
-          ));
-          answerItems = answerSnap.docs
-            .map((answerDoc) => ({ id: answerDoc.id, ...answerDoc.data() }))
-            .filter((answer) => answer.isTeacher !== true)
-            .sort((a, b) => {
-              const aTime = a.createdAt?.toMillis?.() || (a.createdAt?.seconds ? a.createdAt.seconds * 1000 : 0);
-              const bTime = b.createdAt?.toMillis?.() || (b.createdAt?.seconds ? b.createdAt.seconds * 1000 : 0);
-              return bTime - aTime;
-            })
-            .slice(0, 5);
-        } catch (answerError) {
-          console.warn('공개 프로필 답변 조회 실패:', answerError);
-        }
-
-        try {
-          const historySnap = await getDocs(collection(db, 'users', uid, 'history'));
-          historyItems = historySnap.docs.map((historyDoc) => ({ id: historyDoc.id, ...historyDoc.data() }));
-        } catch (historyError) {
-          console.warn('공개 프로필 배지 이력 조회 실패:', historyError);
-        }
-
-        if (user?.uid === uid) {
-          try {
-            const [incorrectSnap, reviewSnap] = await Promise.all([
-              getDocs(collection(db, 'users', uid, 'incorrect_questions')),
-              getDocs(query(collection(db, 'users', uid, 'review_marks'), where('status', '==', 'active'))),
-            ]);
-            refinementItems = [
-              ...incorrectSnap.docs.map((signalDoc) => ({ id: signalDoc.id, ...signalDoc.data(), source: 'incorrect' })),
-              ...reviewSnap.docs.map((signalDoc) => ({ id: signalDoc.id, ...signalDoc.data(), source: 'review' })),
-            ];
-          } catch (refinementError) {
-            console.warn('공개 프로필 개념 정제 신호 조회 실패:', refinementError);
-          }
-        }
-
-        if (!cancelled) {
-          setProfile(profileData);
-          setAnswers(answerItems);
-          setHistory(historyItems);
-          setRefinementSignals(refinementItems);
-          setReadingBooks(readingShelfPage.books);
-          setReadingShelfHasMore(readingShelfPage.hasMore);
-          setReadingShelfCursor(readingShelfPage.nextCursor);
-        }
-      } catch (err) {
-        console.error('Public profile load failed:', err);
-        if (!cancelled) {
-          setError('프로필을 불러오지 못했습니다.');
-          setProfile(null);
-          setAnswers([]);
-          setHistory([]);
-          setRefinementSignals([]);
-          setReadingBooks([]);
-          setReadingShelfHasMore(false);
-          setReadingShelfCursor(null);
-        }
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    };
-
-    loadProfile();
-    return () => {
-      cancelled = true;
-    };
-  }, [uid, user?.uid]);
-
-  const isOwnProfile = user?.uid === uid;
+  const [moreBooksError, setMoreBooksError] = React.useState('');
   const mondayKey = getMondayKSTKey();
   const weeklyGain = profile?.weeklyGrowthMonday === mondayKey ? (profile?.weeklyGrowth || 0) : 0;
   const streak = profile ? getEffectiveStreak(profile) : 0;
@@ -928,21 +882,21 @@ export default function PublicProfile() {
   const heroBoxShadow = isPremiumBaseTheme
     ? `${frameTheme.glow}, 0 0 44px color-mix(in srgb, ${baseTheme.accent} 18%, transparent)`
     : frameTheme.glow;
-  const earnedBadges = profile
+  const earnedBadges = React.useMemo(() => profile
     ? mergeBadges(buildCollectionBadges(profile, history)).sort((a, b) => {
       if (a.id === profile.featuredPremiumBadgeId) return -1;
       if (b.id === profile.featuredPremiumBadgeId) return 1;
       return 0;
     })
-    : [];
+    : [], [profile, history]);
   const featuredPremiumBadge = earnedBadges.find((badge) => (
     badge.id === profile?.featuredPremiumBadgeId
     && !!badge.premiumImage
     && isBadgeUpgradeOwned(profile, badge.id)
   ));
   const conceptMap = React.useMemo(
-    () => buildConceptMap(history, refinementSignals, isOwnProfile),
-    [history, refinementSignals, isOwnProfile]
+    () => historyRequested ? buildConceptMap(history, refinementSignals, isOwnProfile) : EMPTY_ITEMS,
+    [historyRequested, history, refinementSignals, isOwnProfile]
   );
   const conceptSummary = React.useMemo(() => ({
     conquered: conceptMap.filter((concept) => concept.status === 'conquered').length,
@@ -950,8 +904,8 @@ export default function PublicProfile() {
     learning: conceptMap.filter((concept) => concept.status === 'learning').length,
   }), [conceptMap]);
   const learningStats = React.useMemo(
-    () => buildLearningStats(history, profile || {}),
-    [history, profile]
+    () => historyRequested ? buildLearningStats(history, profile || {}) : null,
+    [historyRequested, history, profile]
   );
   const displayName = getDisplayName(profile || {});
   const profileImageUrl = resolveProfileImageUrl(profile || {});
@@ -966,6 +920,7 @@ export default function PublicProfile() {
   };
 
   const handleShowAllBooks = () => {
+    setMoreBooksError('');
     setDialogBooks(readingBooks);
     setDialogHasMore(readingShelfHasMore);
     setDialogCursor(readingShelfCursor);
@@ -975,13 +930,14 @@ export default function PublicProfile() {
   const handleLoadMoreBooks = async () => {
     if (!uid || !dialogHasMore || !dialogCursor || isLoadingMoreBooks) return;
     setIsLoadingMoreBooks(true);
+    setMoreBooksError('');
     try {
-      const nextPage = await fetchProfileBookshelfPage({
+      const nextPage = await withProfileTimeout(fetchProfileBookshelfPage({
         userId: uid,
         cursor: dialogCursor,
         pageSize: PROFILE_BOOKSHELF_PAGE_SIZE,
         allowOwnerFallback: isOwnProfile,
-      });
+      }));
       setDialogBooks((current) => {
         const knownIds = new Set(current.map((book) => book.id));
         return [...current, ...nextPage.books.filter((book) => !knownIds.has(book.id))];
@@ -990,6 +946,7 @@ export default function PublicProfile() {
       setDialogCursor(nextPage.nextCursor);
     } catch (loadError) {
       console.warn('공개 프로필 전체 책장 추가 조회 실패:', loadError);
+      setMoreBooksError('책을 더 불러오지 못했습니다. 더 보기 버튼으로 다시 시도해주세요.');
     } finally {
       setIsLoadingMoreBooks(false);
     }
@@ -1020,7 +977,10 @@ export default function PublicProfile() {
         {loading ? (
           <div className="public-profile-state glass-card">탐험기지 신호를 수신 중...</div>
         ) : error ? (
-          <div className="public-profile-state glass-card">{error}</div>
+          <div className="public-profile-state glass-card" role="alert">
+            <p>{error}</p>
+            <button type="button" disabled={identity.isFetching} onClick={() => identity.refetch()}>다시 시도</button>
+          </div>
         ) : profile?.publicProfileEnabled === false && !isOwnProfile ? (
           <div className="public-profile-state glass-card">
             이 탐험기지는 공개 설정이 꺼져 있습니다.
@@ -1147,7 +1107,8 @@ export default function PublicProfile() {
 
             </section>
 
-            {(isOwnProfile || readingBooks.length > 0) && (
+            <div ref={bookshelfRef} className="public-profile-deferred">
+            {!bookshelf.data ? <ProfileSectionStatus title="책장" request={bookshelf} /> : (isOwnProfile || readingBooks.length > 0) && (
               <ProfileBookshelf
                 books={readingBooks}
                 hasMore={readingShelfHasMore}
@@ -1156,7 +1117,18 @@ export default function PublicProfile() {
                 onShowAll={handleShowAllBooks}
               />
             )}
+            </div>
 
+            {isOwnProfile && (
+              <div className="public-profile-panel public-profile-history-toggle">
+                <button type="button" aria-expanded={historyRequested} onClick={() => setHistoryRequested((value) => !value)}>
+                  {historyRequested ? '학습 통계와 개념 지도 접기' : '학습 통계와 개념 지도 보기'}
+                </button>
+                <p className="public-profile-muted">나의 전체 학습 기록을 펼쳐 확인할 수 있어요.</p>
+              </div>
+            )}
+            {isOwnProfile && historyRequested && !historyRequest.data && <ProfileSectionStatus title="학습 기록" request={historyRequest} />}
+            {isOwnProfile && historyRequested && historyRequest.data && <>
             <section className="public-profile-panel public-profile-learning-stats">
               <h2>
                 <CalendarDays size={18} />
@@ -1217,7 +1189,7 @@ export default function PublicProfile() {
                 나의 개념 지도
                 <span className="public-profile-section-count">{conceptMap.length}</span>
               </h2>
-              {conceptMap.length > 0 ? (
+              {!refinementRequest.data ? <ProfileSectionStatus title="개념 정제 기록" request={refinementRequest} /> : conceptMap.length > 0 ? (
                 <>
                   <div className="public-profile-concept-summary">
                     <span>정복 {conceptSummary.conquered}</span>
@@ -1246,8 +1218,15 @@ export default function PublicProfile() {
                 <p className="public-profile-muted">아직 공개할 개념 탐사 기록이 없습니다.</p>
               )}
             </section>
+            </>}
 
-            <CertificateAwardsBoard user={{ ...profile, uid: profile?.uid || uid || user?.uid }} />
+            <div ref={awardsRef} className="public-profile-deferred">
+              {awardsVisible ? (
+                <ProfileSectionBoundary><React.Suspense fallback={<div className="public-profile-section-status">상장을 불러오는 중…</div>}>
+                  <CertificateAwardsBoard user={{ ...profile, uid }} realtime={false} viewerId={user?.uid} />
+                </React.Suspense></ProfileSectionBoundary>
+              ) : <div className="public-profile-section-status">상장</div>}
+            </div>
 
             <section className="public-profile-panel public-profile-badge-panel">
               <h2>
@@ -1255,6 +1234,7 @@ export default function PublicProfile() {
                 획득한 배지
                 <span className="public-profile-section-count">{earnedBadges.length}</span>
               </h2>
+              {isOwnProfile && !historyRequest.data && <p className="public-profile-muted">저장된 학습 요약 기준입니다. 학습 통계를 펼치면 전체 기록의 배지도 확인합니다.</p>}
               {earnedBadges.length > 0 ? (
                 <div className="public-profile-badges" aria-label="획득한 배지 목록">
                   {earnedBadges.map((badge) => {
@@ -1263,7 +1243,7 @@ export default function PublicProfile() {
                     return (
                     <div key={badge.id} className={`public-profile-badge ${showPremium ? 'is-premium' : ''}`}>
                       {showPremium ? (
-                        <img className="public-profile-badge-premium-image" src={badge.premiumImage} alt={badge.title} />
+                        <img className="public-profile-badge-premium-image" src={badge.premiumImage} alt={badge.title} loading="lazy" decoding="async" />
                       ) : (
                         <>
                           <span>{badge.icon}</span>
@@ -1280,9 +1260,9 @@ export default function PublicProfile() {
               )}
             </section>
 
-            <section className="public-profile-panel public-profile-answers">
+            <section ref={answersRef} className="public-profile-panel public-profile-answers">
               <h2><MessageCircle size={18} /> 최근 공개 답변</h2>
-              {answers.length > 0 ? (
+              {!answerRequest.data ? <ProfileSectionStatus title="최근 답변" request={answerRequest} /> : answers.length > 0 ? (
                 <div className="public-profile-answer-list">
                   {answers.map((answer) => (
                     <button
@@ -1319,6 +1299,7 @@ export default function PublicProfile() {
 
             {isBookshelfDialogOpen && (
               <PublicBookshelfDialog
+                error={moreBooksError}
                 books={dialogBooks}
                 hasMore={dialogHasMore}
                 isLoadingMore={isLoadingMoreBooks}

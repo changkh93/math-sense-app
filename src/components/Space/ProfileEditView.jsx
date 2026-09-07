@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { motion as Motion } from 'framer-motion';
+import { useQueryClient } from '@tanstack/react-query';
 import { collection, doc, getDocs, query, serverTimestamp, updateDoc, where, writeBatch } from 'firebase/firestore';
 import { deleteObject, getDownloadURL, ref, uploadBytes } from 'firebase/storage';
 import { db, storage } from '../../firebase';
@@ -43,6 +44,7 @@ function Field({ label, children, hint }) {
 }
 
 export default function ProfileEditView({ onBack }) {
+  const queryClient = useQueryClient();
   const { user, userData } = useAuth();
   const { data: clusters, isLoading: isClustersLoading } = useClusters();
 
@@ -277,6 +279,11 @@ export default function ProfileEditView({ onBack }) {
         profileUpdatedAt: serverTimestamp()
       });
       didUpdateProfileDocument = true;
+      // Invalidate cached identity/answers after a profile or photo change.
+      queryClient.invalidateQueries({
+        queryKey: ['public-profile'],
+        predicate: (entry) => entry.queryKey[2] === user.uid,
+      });
 
       try {
         const answerSnap = await getDocs(query(collection(db, 'answers'), where('userId', '==', user.uid)));

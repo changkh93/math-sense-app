@@ -1,6 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { collection, onSnapshot, query, where } from 'firebase/firestore'
+import { collection, getDocs, onSnapshot, query, where } from 'firebase/firestore'
+import { useQuery } from '@tanstack/react-query'
+import { profileQueryOptions } from '../../utils/profileQueryOptions'
 import { Award, GraduationCap, Printer, Sparkles, Trophy, X } from 'lucide-react'
 import { db } from '../../firebase'
 import CertificatePreview from '../CertificatePreview'
@@ -30,12 +32,6 @@ function getAwardYearMonth(award = {}) {
   }
 }
 
-function getAwardMonthKey(award = {}) {
-  const { year, month } = getAwardYearMonth(award)
-  if (year && month) return `${year}.${String(month).padStart(2, '0')}`
-  return '수여월 미확인'
-}
-
 function getAwardDisplayLabel(award = {}) {
   const storedLabel = award.awardLabel || award.evaluationLabel
   if (storedLabel && !/NaN/i.test(String(storedLabel))) return storedLabel
@@ -50,11 +46,27 @@ function getAwardDisplayLabel(award = {}) {
     : '월간평가 상장'
 }
 
-export default function CertificateAwardsBoard({ user }) {
-  const [certificateAwards, setCertificateAwards] = useState([])
-  const [scholarshipAwards, setScholarshipAwards] = useState([])
-  const [loading, setLoading] = useState(true)
+export default function CertificateAwardsBoard({ user, realtime = true, viewerId }) {
+  const [liveCertificateAwards, setCertificateAwards] = useState([])
+  const [liveScholarshipAwards, setScholarshipAwards] = useState([])
+  const [loadedUserId, setLoadedUserId] = useState('')
   const [selectedAward, setSelectedAward] = useState(null)
+  const request = useQuery({
+    ...profileQueryOptions(viewerId, user?.uid, 'awards', async () => {
+      const [certificates, scholarships] = await Promise.all([
+        getDocs(query(collection(db, 'monthlyEvaluationAwards'), where('studentId', '==', user.uid))),
+        getDocs(query(collection(db, 'scholarshipAwards'), where('studentId', '==', user.uid))),
+      ])
+      return {
+        certificates: certificates.docs.map(item => ({ ...item.data(), id: item.id })),
+        scholarships: scholarships.docs.map(item => ({ ...item.data(), id: item.id })).filter(award => award.status !== 'revoked'),
+      }
+    }),
+    enabled: Boolean(!realtime && user?.uid && viewerId),
+  })
+  const certificateAwards = realtime ? liveCertificateAwards : request.data?.certificates
+  const scholarshipAwards = realtime ? liveScholarshipAwards : request.data?.scholarships
+  const loading = realtime ? loadedUserId !== user?.uid : request.isPending
 
   useEffect(() => {
     if (!selectedAward) return undefined
@@ -76,12 +88,11 @@ export default function CertificateAwardsBoard({ user }) {
   }, [selectedAward])
 
   useEffect(() => {
-    if (!user?.uid) return undefined
-    setLoading(true)
+    if (!user?.uid || !realtime) return undefined
     let certificateLoaded = false
     let scholarshipLoaded = false
     const maybeStopLoading = () => {
-      if (certificateLoaded && scholarshipLoaded) setLoading(false)
+      if (certificateLoaded && scholarshipLoaded) setLoadedUserId(user.uid)
     }
 
     const certificateQuery = query(collection(db, 'monthlyEvaluationAwards'), where('studentId', '==', user.uid))
@@ -120,22 +131,12 @@ export default function CertificateAwardsBoard({ user }) {
       unsubscribeCertificates()
       unsubscribeScholarships()
     }
-  }, [user?.uid])
+  }, [user?.uid, realtime])
 
   const awards = useMemo(() => (
-    [...certificateAwards, ...scholarshipAwards]
+    [...(certificateAwards || []), ...(scholarshipAwards || [])]
       .sort((a, b) => getAwardSortMs(b) - getAwardSortMs(a))
   ), [certificateAwards, scholarshipAwards])
-
-  const groupedAwards = useMemo(() => {
-    const groups = {}
-    awards.forEach(award => {
-      const key = getAwardMonthKey(award)
-      if (!groups[key]) groups[key] = []
-      groups[key].push(award)
-    })
-    return Object.entries(groups)
-  }, [awards])
 
   const handlePrint = () => {
     window.requestAnimationFrame(() => window.print())
@@ -173,11 +174,16 @@ export default function CertificateAwardsBoard({ user }) {
             <h3><Award size={20} /> 상장 수여 현황판</h3>
             <p>월간평가 상장과 장학증서가 월별로 기록됩니다.</p>
           </div>
-          <strong>{loading ? '...' : `${awards.length}장`}</strong>
+          <strong>{loading || (!realtime && request.isError) ? '...' : `${awards.length}장`}</strong>
         </div>
 
         {loading ? (
           <div className="certificate-awards-empty">상장 기록을 수신 중입니다.</div>
+        ) : !realtime && request.isError ? (
+          <div className="certificate-awards-empty" role="status">
+            상장 기록을 불러오지 못했습니다.{' '}
+            <button type="button" disabled={request.isFetching} onClick={() => request.refetch()}>다시 시도</button>
+          </div>
         ) : awards.length === 0 ? (
           <div className="certificate-awards-empty">아직 수여된 상장이 없습니다.</div>
         ) : (
