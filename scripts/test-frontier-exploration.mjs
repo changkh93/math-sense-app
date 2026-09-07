@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { advanceExplorationHeight, getExplorationMode, sampleExplorationWater, getExplorationRadius, getHoverpackAltitudeProgress, getHoverpackFlightStage, getMarineHabitat, getOceanFloorY, getSkyLandmarks, isSkyLandmarkReached, MARINE_SPECIES, normalizeExplorationKit, normalizeOwnedExplorationKits, resolveExplorationKitShortcut, EXPLORATION_KITS, EXPLORATION_KIT_COST, HOVERPACK_FLAME_LAYERS, FLIGHT_CEILING } from '../src/components/GalaxySocial/exploration/frontierExploration.js'
 import { setTerritoryExpanded } from '../src/components/GalaxySocial/GalaxyTerrainModel.js'
+import { getExplorationSurfaceRecovery, HOVERPACK_WATER_CLEARANCE } from '../src/components/GalaxySocial/exploration/frontierExploration.js'
 import { createCloudAtlas, getCloudBanks, getFlightCameraFov } from '../src/components/GalaxySocial/exploration/frontierSkyModel.js'
 
 setTerritoryExpanded(false)
@@ -69,6 +70,28 @@ assert.equal(getExplorationMode({ kit: 'diving', y: -.6, water }), 'diving')
 assert.equal(getExplorationMode({ kit: 'none', y: -.12, water, previous: 'swimming' }), 'swimming')
 assert.equal(getExplorationMode({ kit: 'diving', y: .38, water }), 'grounded')
 const base = { mode: 'flying', y: 2, dt: .05, floorY: 0 }
+for (const kind of ['ocean', 'river']) {
+  const wet = { kind, surfaceY: .2, floorY: -20 }
+  const hoverFloor = wet.surfaceY + HOVERPACK_WATER_CLEARANCE
+  let y = 3
+  for (let i = 0; i < 100; i++) y = advanceExplorationHeight({ y, mode: 'flying', axis: -1, dt: .05, water: wet, floorY: wet.floorY })
+  assert.ok(Math.abs(y - hoverFloor) < .0001, 'holding descend stops above water')
+  assert.equal(getExplorationSurfaceRecovery({ mode: 'flying', y, water: wet }), null)
+  for (const mode of ['flying', 'swimming']) {
+    let submerged = -12
+    assert.notEqual(getExplorationSurfaceRecovery({ mode, y: submerged, water: wet }), null)
+    assert.equal(advanceExplorationHeight({ y: submerged, mode, axis: -1, dt: 0, water: wet, floorY: -20 }), submerged)
+    for (let i = 0; i < 120; i++) {
+      const next = advanceExplorationHeight({ y: submerged, mode, axis: -1, dt: .05, water: wet, floorY: -20 })
+      assert.ok(next >= submerged - .00001, 'descent cannot override automatic resurfacing')
+      submerged = next
+    }
+    assert.equal(getExplorationSurfaceRecovery({ mode, y: submerged, water: wet }), null)
+  }
+  assert.equal(getExplorationSurfaceRecovery({ mode: 'diving', y: -12, water: wet }), null)
+  assert.ok(advanceExplorationHeight({ y: -12, mode: 'diving', axis: -1, dt: .05, water: wet, floorY: -20 }) < -12)
+  assert.equal(advanceExplorationHeight({ y: -12, mode: 'flying', axis: -1, dt: .05, water: wet, floorY: -20, blocked: () => true }), -12)
+}
 assert.equal(advanceExplorationHeight({ ...base, axis: 0 }), 2)
 assert.ok(advanceExplorationHeight({ ...base, axis: 1 }) > 2)
 assert.equal(advanceExplorationHeight({ ...base, axis: 1, dt: 0 }), 2)

@@ -53,7 +53,7 @@ import FrontierMarineWorld from './exploration/FrontierMarineWorld'
 import FrontierSkyWorld from './exploration/FrontierSkyWorld'
 import { getFlightCameraFov } from './exploration/frontierSkyModel.js'
 import { sampleFrontierCharacterMotion, applyFrontierCharacterMotion } from './exploration/frontierCharacterMotion.js'
-import { advanceExplorationHeight, getExplorationMode, getExplorationRadius, getOceanFloorY, sampleExplorationWater } from './exploration/frontierExploration.js'
+import { advanceExplorationHeight, getExplorationMode, getExplorationRadius, getOceanFloorY, sampleExplorationWater, getExplorationSurfaceRecovery, HOVERPACK_WATER_CLEARANCE } from './exploration/frontierExploration.js'
 import {
   VILLAGE_BEACON_POSITION,
   VILLAGE_SLOTS,
@@ -3985,10 +3985,16 @@ function Astronaut({ travel, inputRef, interactables, blockers, structureCollide
       else mode = 'landing'
     }
     const freeMovement = mode !== 'grounded'
+    const surfaceRecovery = getExplorationSurfaceRecovery({ mode, y: group.current.position.y, water: entryWater, scale: characterScale.current })
+    group.current.userData.surfaceRecovery = surfaceRecovery !== null
     if (mode === 'flying' && explorationMode.current !== 'flying') inputRef.current.takeoff = true
     explorationMode.current = mode
     const movementSurface = (x, z, footY, scale) => {
       if (!freeMovement) return walkHeightAt(x, z, footY, scale)
+      if (mode === 'flying') {
+        const water = sampleExplorationWater(x, z, worldRadius)
+        if (water) return Math.max(footY, water.surfaceY + HOVERPACK_WATER_CLEARANCE)
+      }
       const ground = Math.hypot(x, z) > worldRadius ? getOceanFloorY(x, z, worldRadius) : terrainHeight(x, z)
       // Allow a small bank step, but never climb the underwater island wall.
       return mode !== 'flying' && mode !== 'landing' && ground > footY && ground - footY < .72 ? ground : footY
@@ -4136,7 +4142,7 @@ function Astronaut({ travel, inputRef, interactables, blockers, structureCollide
       return false
     }
 
-    if (moving) {
+    if (moving && surfaceRecovery === null) {
       moveDirection.copy(right).multiplyScalar(moveX).addScaledVector(forward, -moveZ)
       const inputStrength = Math.min(1, moveDirection.length())
       moveDirection.normalize()
@@ -4322,9 +4328,18 @@ function Astronaut({ travel, inputRef, interactables, blockers, structureCollide
       const floorY = Math.hypot(group.current.position.x, group.current.position.z) > worldRadius
         ? getOceanFloorY(group.current.position.x, group.current.position.z, worldRadius)
         : walkHeightAt(group.current.position.x, group.current.position.z, group.current.position.y, characterScale.current)
-      group.current.position.y = advanceExplorationHeight({ y: group.current.position.y, mode, axis,
+      const beforeHeight = group.current.position.y
+      group.current.position.y = advanceExplorationHeight({ y: beforeHeight, mode, axis,
         dt: paused ? 0 : delta, water, floorY, scale: characterScale.current,
         blocked: (y) => checkObstacle(group.current.position.x, group.current.position.z, y) })
+      // A bridge/ceiling must not trap an unequipped swimmer during recovery.
+      // Reuse the existing safe-land position instead of bypassing collision.
+      if (!paused && surfaceRecovery !== null && group.current.position.y <= beforeHeight + .00001) {
+        if (lastSafePosition.current) group.current.position.copy(lastSafePosition.current)
+        else group.current.position.set(0, walkHeightAt(0, 5), 5)
+        inputRef.current.vertical = 0
+        inputRef.current.takeoff = mode === 'flying'
+      }
       if (group.current.position.y > floorY + .8) inputRef.current.takeoff = false
       groundHeight.current = group.current.position.y
       jump.current = { height: 0, velocity: 0, requested: false }

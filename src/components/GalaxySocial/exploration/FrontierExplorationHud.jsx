@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { AdditiveBlending } from 'three'
-import { EXPLORATION_KITS, HOVERPACK_FLAME_LAYERS, getHoverpackAltitudeProgress, getHoverpackFlightStage, getSkyLandmarks, isSkyLandmarkReached, normalizeOwnedExplorationKits, resolveExplorationKitShortcut } from './frontierExploration.js'
+import { EXPLORATION_KITS, HOVERPACK_FLAME_LAYERS, getHoverpackAltitudeProgress, getHoverpackFlightStage, getSkyLandmarks, isSkyLandmarkReached, normalizeOwnedExplorationKits, resolveExplorationKitShortcut, sampleExplorationWater, getExplorationSurfaceRecovery, HOVERPACK_WATER_CLEARANCE } from './frontierExploration.js'
 import './FrontierExploration.css'
 import { useFrame } from '@react-three/fiber'
 import { releaseFrontierPointerLock } from '../frontierPointerLock.js'
@@ -19,7 +19,7 @@ function HoverpackFlames({ flying, motionRef }) {
     const targetPower = motionRef?.current?.userData.flightThrust ?? .75
     power.current += (targetPower - power.current) * (1 - Math.exp(-Math.min(delta, .05) * 8))
     const flicker = Math.sin(clock.elapsedTime * 27) * .08 + Math.sin(clock.elapsedTime * 43) * .04
-    flames.current.visible = flying
+    flames.current.visible = flying && !motionRef?.current?.userData.surfaceRecovery
     flames.current.scale.set(1 - flicker * .28, power.current * (1 + flicker), 1 - flicker * .28)
   })
   return <group ref={flames} position={[0, -.39, 0]} visible={flying}>
@@ -123,6 +123,9 @@ export default function FrontierExplorationHud({
   const skyTarget = skySites.find((site) => !skyFound.includes(site.id))
   const skyNearby = !disabled && position.movementMode === 'flying' && skyTarget && isSkyLandmarkReached(position, skyTarget) ? skyTarget : null
   const flightStage = getHoverpackFlightStage(position.y)
+  const water = sampleExplorationWater(position.x, position.z, worldRadius)
+  const surfacing = getExplorationSurfaceRecovery({ mode: position.movementMode, y: position.y, water, scale: position.scale }) !== null
+  const hoverWaterGuard = travel.kit === 'hoverpack' && water && position.y <= water.surfaceY + HOVERPACK_WATER_CLEARANCE + .1
   const altitudeProgress = getHoverpackAltitudeProgress(position.y)
   const direction = (target) => {
     const dx = target.x - position.x
@@ -238,15 +241,17 @@ export default function FrontierExplorationHud({
       <p>섬 둘레의 산호 숲에서 물고기·거북·해파리를 만나보세요. 하늘에는 고도 7·11·15의 빛나는 탐험 고리가 있어요.</p>
     </section>}
     <div className="frontier-exploration__movement">
-      <span data-testid="exploration-mode">{mode} · 높이 {Number(position.y || 0).toFixed(1)}</span>
+      <span data-testid="exploration-mode">{surfacing ? '안전 자동 부상 중' : hoverWaterGuard ? '수면 위 호버링' : mode} · 높이 {Number(position.y || 0).toFixed(1)}</span>
       {(travel.flight || travel.kit === 'diving') && <>
         <HoldButton direction={1} inputRef={inputRef} disabled={disabled}>↑ 상승 <kbd>Space</kbd></HoldButton>
-        <HoldButton direction={-1} inputRef={inputRef} disabled={disabled}>↓ 하강 <kbd>C</kbd></HoldButton>
+        <HoldButton direction={-1} inputRef={inputRef} disabled={disabled || surfacing || hoverWaterGuard}>↓ 하강 <kbd>C</kbd></HoldButton>
       </>}
       <button type="button" disabled={disabled} onClick={() => setTravel((current) => ({ ...current, flight: false, birdView: false, recovery: current.recovery + 1 }))}>안전 귀환</button>
     </div>
+    {surfacing && <p className="frontier-exploration__hint" role="status">잠수복을 벗어 자동으로 떠오르는 중이에요. 수면에 도착하면 이동할 수 있어요. 위가 막혀 있으면 안전 지점으로 복귀합니다.</p>}
+    {!surfacing && hoverWaterGuard && <p className="frontier-exploration__hint" role="status">호버팩은 수면 위에서 떠 있어요. 잠수하려면 잠수복을 선택하세요. <kbd>3</kbd></p>}
     {travel.birdView && <p className="frontier-exploration__hint">드래그 회전 · 휠 확대/축소 · B 시점 복귀</p>}
-    {travel.kit === 'hoverpack' && <section className="frontier-exploration__discovery">
+    {travel.kit === 'hoverpack' && !surfacing && <section className="frontier-exploration__discovery">
       <div className="frontier-flight-stage" style={{ '--flight-stage': flightStage.color }}>
         <span>{flightStage.eyebrow}</span><strong>{flightStage.label}</strong><em>ALT {Number(position.y || 0).toFixed(1)}m</em>
         <i><b style={{ width: `${altitudeProgress}%` }} /></i>

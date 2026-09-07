@@ -13,7 +13,7 @@ export const HOVERPACK_FLAME_LAYERS = Object.freeze([
 ])
 export const EXPLORATION_KITS = Object.freeze([
   { id: 'none', label: '산책', shortcut: '1', description: '가볍게 걷고 수면에서 수영해요', cost: 0 },
-  { id: 'hoverpack', label: '호버팩', shortcut: '2', description: '이륙 후 공중에서 멈추고 자유롭게 이동해요', cost: EXPLORATION_KIT_COST, storeItemId: 'frontier_hoverpack' },
+  { id: 'hoverpack', label: '호버팩', shortcut: '2', description: '공중과 수면 위를 비행해요. 잠수는 할 수 없어요', cost: EXPLORATION_KIT_COST, storeItemId: 'frontier_hoverpack' },
   { id: 'diving', label: '잠수복', shortcut: '3', description: '오리발과 함께 바닷속을 탐험해요', cost: EXPLORATION_KIT_COST, storeItemId: 'frontier_diving_suit' },
 ])
 const EXPLORATION_KIT_SHORTCUTS = Object.freeze({
@@ -31,6 +31,16 @@ export const normalizeMovementMode = (value) => ['grounded', 'flying', 'landing'
 export const getExplorationRadius = (worldRadius) => Math.min(92, worldRadius + 60)
 export const OCEAN_FLOOR_Y = -36
 export const FLIGHT_CEILING = 18
+export const HOVERPACK_WATER_CLEARANCE = .35
+
+// Recovery is automatic and ignores descent input. Only a diving suit permits
+// deliberate movement below the surface; this also repairs old submerged saves.
+export function getExplorationSurfaceRecovery({ mode, y, water, scale = .25 }) {
+  if (!water) return null
+  const target = mode === 'flying' ? water.surfaceY + HOVERPACK_WATER_CLEARANCE
+    : mode === 'swimming' ? Math.max(water.floorY + .025, water.surfaceY - scale * 1.35) : null
+  return target !== null && y < target - .025 ? target : null
+}
 export const HOVERPACK_FLIGHT_STAGES = Object.freeze([
   Object.freeze({ id: 'launch', minY: 0, label: '기지 상공', eyebrow: 'LIFT-OFF', color: '#ffb45f', note: '추진기가 안정화됐어요. 섬의 윤곽을 내려다보며 상승해 보세요.' }),
   Object.freeze({ id: 'cloud', minY: 5, label: '구름 항로', eyebrow: 'CLOUD DECK', color: '#8feaff', note: '구름층에 진입했어요. 첫 번째 항로 고리가 가까워집니다.' }),
@@ -81,10 +91,12 @@ export function advanceExplorationHeight({ y, mode, axis = 0, dt, water, floorY,
   const input = Math.max(-1, Math.min(1, Number(axis) || 0))
   const surfaceFootY = water ? Math.max(water.floorY + .025, water.surfaceY - scale * 1.35) : floorY
   let target = y
-  if (mode === 'flying') target = Math.max(floorY + .025, Math.min(FLIGHT_CEILING, y + input * 3.2 * delta))
+  if (mode === 'flying') target = Math.max(floorY + .025, water ? water.surfaceY + HOVERPACK_WATER_CLEARANCE : -Infinity, Math.min(FLIGHT_CEILING, y + input * 3.2 * delta))
   if (mode === 'landing') target = Math.max(water ? surfaceFootY : floorY + .025, y - 2 * delta)
   if (mode === 'diving' && water) target = Math.max(water.floorY + .025, Math.min(surfaceFootY, y + input * 1.7 * delta))
   if (mode === 'swimming' && water) target = y + (surfaceFootY - y) * (1 - Math.exp(-delta * 10))
+  const recovery = getExplorationSurfaceRecovery({ mode, y, water, scale })
+  if (recovery !== null) target = Math.min(recovery, y + 3.2 * delta)
   const count = Math.max(1, Math.ceil(Math.abs(target - y) / .04))
   const step = (target - y) / count
   let result = y
