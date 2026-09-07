@@ -230,7 +230,8 @@ export default function DirectMemoMenu() {
   const [listLoading, setListLoading] = useState(false);
   const [listCursors, setListCursors] = useState({ inbox: null, sent: null, archiveInbox: null, archiveSent: null });
   const [listHasMore, setListHasMore] = useState({ inbox: false, sent: false, archive: false });
-  const [recipientId, setRecipientId] = useState('');
+  const [selectedRecipient, setSelectedRecipient] = useState(null);
+  const recipientId = selectedRecipient?.uid || '';
   const [draft, setDraft] = useState('');
   const [action, setAction] = useState('');
   const [message, setMessage] = useState('');
@@ -240,6 +241,7 @@ export default function DirectMemoMenu() {
   const menuRef = useRef(null);
   const dropdownRef = useRef(null);
   const recipientInputRef = useRef(null);
+  const textareaRef = useRef(null);
   const protectedUntilRef = useRef(0);
 
   const protectMemoInteraction = () => {
@@ -273,13 +275,7 @@ export default function DirectMemoMenu() {
       ensureOperatorRecipient([]).then((rows) => {
         if (!cancelled) {
           const defaultList = rows.filter((profile) => profile.uid !== user.uid);
-          setRecipients((prev) => {
-            const selected = prev.find((p) => p.uid === recipientId);
-            if (selected && !defaultList.some((p) => p.uid === selected.uid)) {
-              return [selected, ...defaultList];
-            }
-            return defaultList;
-          });
+          setRecipients(defaultList);
         }
       });
       return () => { cancelled = true; };
@@ -291,11 +287,12 @@ export default function DirectMemoMenu() {
         const termLower = keyword.toLowerCase();
         const usersRef = collection(db, 'users');
 
-        const [snap1, snap2, snap3, snap4] = await Promise.all([
+        const [snap1, snap2, snap3, snap4, directDocSnap] = await Promise.all([
           getDocs(query(usersRef, where('publicDisplayName', '>=', term), where('publicDisplayName', '<=', term + '\uf8ff'), limitDocs(10))),
           getDocs(query(usersRef, where('studentName', '>=', term), where('studentName', '<=', term + '\uf8ff'), limitDocs(10))),
           getDocs(query(usersRef, where('name', '>=', term), where('name', '<=', term + '\uf8ff'), limitDocs(10))),
           getDocs(query(usersRef, where('email', '>=', termLower), where('email', '<=', termLower + '\uf8ff'), limitDocs(10))),
+          getDoc(doc(db, 'users', keyword)).catch(() => null),
         ]);
 
         if (cancelled) return;
@@ -312,14 +309,15 @@ export default function DirectMemoMenu() {
           });
         });
 
-        const list = Array.from(resultMap.values()).sort((a, b) => getProfileName(a).localeCompare(getProfileName(b), 'ko'));
-        setRecipients((prev) => {
-          const selected = prev.find((p) => p.uid === recipientId);
-          if (selected && !list.some((p) => p.uid === selected.uid)) {
-            return [selected, ...list];
+        if (directDocSnap && directDocSnap.exists() && directDocSnap.id !== user.uid) {
+          const data = directDocSnap.data();
+          if (data.role !== 'parent' && (data.role !== 'admin' || data.email === OPERATOR_EMAIL)) {
+            resultMap.set(directDocSnap.id, { uid: directDocSnap.id, ...data });
           }
-          return list;
-        });
+        }
+
+        const list = Array.from(resultMap.values()).sort((a, b) => getProfileName(a).localeCompare(getProfileName(b), 'ko'));
+        setRecipients(list);
       } catch (err) {
         console.error('Failed to search recipients dynamically:', err);
         if (!cancelled) setRecipients([]);
@@ -330,7 +328,7 @@ export default function DirectMemoMenu() {
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [isOpen, recipientId, recipientSearch, user?.uid]);
+  }, [isOpen, recipientSearch, user?.uid]);
 
   useEffect(() => {
     if (!user?.uid || !isOpen || activeTab === 'compose') return undefined;
@@ -413,6 +411,7 @@ export default function DirectMemoMenu() {
     }
     return recipients.filter((recipient) => {
       const haystack = [
+        recipient.uid || '',
         recipient.publicDisplayName || '',
         recipient.studentName || '',
         recipient.name || '',
@@ -426,31 +425,25 @@ export default function DirectMemoMenu() {
       return haystack.includes(keyword);
     }).slice(0, 10);
   }, [recipients, recipientSearch]);
-  const selectedRecipient = recipients.find((recipient) => recipient.uid === recipientId);
-
-  useEffect(() => {
-    if (recipientId && !recipients.some((recipient) => recipient.uid === recipientId)) {
-      setRecipientId('');
-    }
-  }, [recipients, recipientId]);
 
   const handleRecipientSearchChange = (event) => {
     const value = event.target.value;
     setRecipientSearch(value);
     setRecipientFocused(true);
     if (selectedRecipient) {
-      setRecipientId('');
+      setSelectedRecipient(null);
     }
   };
 
   const handleSelectRecipient = (recipient) => {
-    setRecipientId(recipient.uid);
+    setSelectedRecipient(recipient);
     setRecipientSearch('');
     setRecipientFocused(false);
+    window.requestAnimationFrame(() => textareaRef.current?.focus());
   };
 
   const handleClearRecipient = () => {
-    setRecipientId('');
+    setSelectedRecipient(null);
     setRecipientSearch('');
     setRecipientFocused(false);
     window.requestAnimationFrame(() => recipientInputRef.current?.focus());
@@ -466,7 +459,7 @@ export default function DirectMemoMenu() {
       const fn = httpsCallable(functions, 'sendDirectMemo');
       const res = await fn({ recipientId, body });
       setDraft('');
-      setRecipientId('');
+      setSelectedRecipient(null);
       setRecipientSearch('');
       setActiveTab('sent');
       const data = res?.data || {};
@@ -541,30 +534,27 @@ export default function DirectMemoMenu() {
 
     let recipient = recipients.find((item) => item.uid === targetUid);
 
-    if (!recipient) {
+    if (recipient) {
+      setSelectedRecipient(recipient);
+    } else {
+      setSelectedRecipient({ uid: targetUid, displayName: '탐사원' });
       try {
         const docSnap = await getDoc(doc(db, 'users', targetUid));
         if (docSnap.exists()) {
           recipient = { uid: docSnap.id, ...docSnap.data() };
-          setRecipients((prev) => {
-            if (prev.some((item) => item.uid === targetUid)) return prev;
-            return [recipient, ...prev];
-          });
+          setSelectedRecipient(recipient);
         }
       } catch (err) {
         console.error('Failed to fetch recipient for memo:', err);
       }
     }
 
-    if (recipient) {
-      setRecipientId(recipient.uid);
-      setRecipientSearch(getProfileName(recipient));
-      setRecipientFocused(false);
-      setMessage('');
-      window.requestAnimationFrame(() => {
-        if (recipientInputRef.current) recipientInputRef.current.focus();
-      });
-    }
+    setRecipientSearch('');
+    setRecipientFocused(false);
+    setMessage('');
+    window.requestAnimationFrame(() => {
+      textareaRef.current?.focus();
+    });
   }, [recipients, user?.uid]);
 
   useEffect(() => {
@@ -583,13 +573,35 @@ export default function DirectMemoMenu() {
     return () => window.removeEventListener('directmemo:compose', handleRequest);
   }, [startComposeForUid, user?.uid]);
 
-  const handleReplyMemo = (memo) => {
+  const handleReplyMemo = async (memo) => {
+    if (!memo?.senderId || memo.senderId === user?.uid) return;
     setActiveTab('compose');
-    setRecipientId(memo.senderId);
-    setRecipientSearch(memo.senderName || '탐사원');
+    const targetUid = memo.senderId;
+
+    // 즉시 UID 기반으로 수신자를 확정 선택하여 이용자 검색이나 별도 선택 없이 바로 답장 가능하게 함
+    const initialProfile = {
+      uid: targetUid,
+      publicDisplayName: memo.senderName || '탐사원',
+      displayName: memo.senderName || '탐사원',
+    };
+    setSelectedRecipient(initialProfile);
+    setRecipientSearch('');
+    setRecipientFocused(false);
+    setMessage('');
+
     window.requestAnimationFrame(() => {
-      if (recipientInputRef.current) recipientInputRef.current.focus();
+      textareaRef.current?.focus();
     });
+
+    // 상대방이 사용자명을 변경했더라도 UID로 최신 프로필을 조회하여 갱신
+    try {
+      const docSnap = await getDoc(doc(db, 'users', targetUid));
+      if (docSnap.exists()) {
+        setSelectedRecipient({ uid: docSnap.id, ...docSnap.data() });
+      }
+    } catch (err) {
+      console.warn('Failed to fetch latest sender profile on reply:', err);
+    }
   };
 
   const handleArchiveMemo = async (memo) => {
@@ -702,7 +714,16 @@ export default function DirectMemoMenu() {
               <div className="direct-memo-kicker">LETTER BOX</div>
               <h4>1:1 편지함</h4>
             </div>
-            <button type="button" className="direct-memo-compose" onClick={() => setActiveTab('compose')}>
+            <button
+              type="button"
+              className="direct-memo-compose"
+              onClick={() => {
+                setSelectedRecipient(null);
+                setRecipientSearch('');
+                setActiveTab('compose');
+                setMessage('');
+              }}
+            >
               <PenLine size={15} /> 쓰기
             </button>
           </div>
@@ -811,11 +832,12 @@ export default function DirectMemoMenu() {
                 </div>
               </div>
               <textarea
+                ref={textareaRef}
                 value={draft}
                 onChange={(event) => setDraft(event.target.value.slice(0, MEMO_MAX_LENGTH))}
-                placeholder={recipients.length ? '이메일이 없던 시절처럼, 편지를 남겨보세요.' : '편지를 보낼 사용자를 불러오는 중입니다.'}
+                placeholder={selectedRecipient ? `${getProfileName(selectedRecipient)}님에게 편지를 남겨보세요.` : '받는 사람을 선택한 뒤 편지를 남겨보세요.'}
                 maxLength={MEMO_MAX_LENGTH}
-                disabled={!recipients.length || action === 'sending'}
+                disabled={action === 'sending'}
               />
               <div className="direct-memo-compose-footer">
                 <span>{draft.length}/{MEMO_MAX_LENGTH}</span>

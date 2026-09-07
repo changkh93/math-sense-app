@@ -392,11 +392,8 @@ service cloud.firestore {
             'name', 'motto', 'description', 'color', 'groupId', 'groupName', 'clusterId', 'clusterName',
             'scheduleDays', 'scheduleTimes', 'updatedAt'
           ])
-        ) ||
-        (
-          request.auth.uid in request.resource.data.memberIds &&
-          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['memberIds', 'memberCount', 'updatedAt'])
         )
+        // Membership is managed by authenticated server callables only.
       );
       allow delete: if isAdmin();
 

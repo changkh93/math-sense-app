@@ -421,6 +421,10 @@ function CrewRosterModal({
   todayKey,
   clusterNameMap,
   isGuest,
+  canManageMembers,
+  onRemoveMember,
+  removingUid,
+  removalMessage,
 }) {
   const [searchText, setSearchText] = useState('');
   const [selectedUid, setSelectedUid] = useState('');
@@ -484,6 +488,14 @@ function CrewRosterModal({
             </div>
           </aside>
           <main className="crew-roster-modal__detail">
+            {canManageMembers && selectedMember && !selectedMember.isGuest && selectedMember.uid !== currentUid && (
+              <button type="button" className="space-nav-link font-tech" disabled={Boolean(removingUid)}
+                onClick={() => onRemoveMember(selectedMember)}
+                style={{ color: '#fca5a5', marginBottom: '1rem' }}>
+                <LogOut size={15} /> {removingUid === selectedMember.uid ? '내보내는 중...' : '이 멤버 내보내기'}
+              </button>
+            )}
+            {removalMessage && <p role="status" className="font-tech">{removalMessage}</p>}
             {selectedMember ? (
               selectedMember.isGuest ? (
                 <GuestCrewPresenceCard guest={selectedMember} currentUid={currentUid} />
@@ -542,6 +554,8 @@ export default function CrewDetailView({ onBack }) {
   const [rosterLoading, setRosterLoading] = useState(false);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [leaveAction, setLeaveAction] = useState('');
+  const [removingUid, setRemovingUid] = useState('');
+  const [removalMessage, setRemovalMessage] = useState('');
   const [guestAccessAction, setGuestAccessAction] = useState('');
   const [guestMessage, setGuestMessage] = useState('');
   const [guestSessions, setGuestSessions] = useState([]);
@@ -569,7 +583,7 @@ export default function CrewDetailView({ onBack }) {
     [crew?.leaderId, featuredContributorId]
   );
   const rosterMembers = useMemo(() => {
-    const byId = new Map(members.filter((member) => member?.uid).map((member) => [member.uid, member]));
+    const byId = new Map(members.filter((member) => member?.uid && crewMemberIds.includes(member.uid)).map((member) => [member.uid, member]));
     crewMemberIds.forEach((uid) => {
       if (!byId.has(uid)) {
         byId.set(uid, {
@@ -1030,8 +1044,24 @@ export default function CrewDetailView({ onBack }) {
     }
   };
 
+  const handleRemoveMember = async (member) => {
+    if (!crewId || removingUid || leaveAction || crew?.leaderId !== user?.uid || member.uid === user?.uid) return;
+    const name = getMemberLabel(effectiveMemberProfiles[member.uid], getMemberLabel(member));
+    if (!window.confirm(`${name} 님을 크루에서 내보낼까요?\n크루 소속과 집중방 참여가 해제됩니다. 이번 성장 이벤트의 인원 및 보상 대상에서 제외되며, 재가입해도 이벤트 제외는 유지됩니다.`)) return;
+    setRemovingUid(member.uid);
+    setRemovalMessage('');
+    try {
+      await httpsCallable(functions, 'kickStudyCrewMember')({ crewId, targetUid: member.uid });
+      setRemovalMessage(`${name} 님을 크루에서 내보냈습니다.`);
+    } catch (err) {
+      setRemovalMessage(getFunctionsErrorMessage(err, '멤버를 내보내지 못했습니다. 잠시 후 다시 시도해주세요.'));
+    } finally {
+      setRemovingUid('');
+    }
+  };
+
   const handleLeaveCrew = async () => {
-    if (!crewId || leaveAction) return;
+    if (!crewId || leaveAction || removingUid) return;
 
     if (isLeader && !canLeaderDeleteCrew) {
       alert('리더는 다른 멤버가 모두 나간 뒤, 혼자 남았을 때만 크루를 삭제할 수 있습니다.');
@@ -1569,6 +1599,10 @@ export default function CrewDetailView({ onBack }) {
             todayKey={todayKey}
             clusterNameMap={clusterNameMap}
             isGuest={isGuest}
+            canManageMembers={!isGuest && crew?.leaderId === user?.uid}
+            onRemoveMember={handleRemoveMember}
+            removingUid={removingUid}
+            removalMessage={removalMessage}
           />
         )}
       </AnimatePresence>
@@ -1603,7 +1637,7 @@ export default function CrewDetailView({ onBack }) {
             type="button"
             className="space-nav-link font-tech"
             onClick={handleLeaveCrew}
-            disabled={leaveAction === 'leaving' || (isLeader && !canLeaderDeleteCrew)}
+            disabled={Boolean(removingUid) || leaveAction === 'leaving' || (isLeader && !canLeaderDeleteCrew)}
             style={{ borderRadius: 10, display: 'inline-flex', alignItems: 'center', gap: '0.45rem', color: '#fca5a5', opacity: leaveAction === 'leaving' || (isLeader && !canLeaderDeleteCrew) ? 0.55 : 1 }}
           >
             <LogOut size={15} />
@@ -1614,9 +1648,14 @@ export default function CrewDetailView({ onBack }) {
           {isLeader
             ? canLeaderDeleteCrew
               ? '현재 리더 혼자 남아 있어 탈퇴가 가능하며, 이 경우 크루 자체가 삭제됩니다.'
-              : '리더는 다른 크루 멤버가 모두 탈퇴한 뒤, 혼자 남았을 때만 크루를 삭제할 수 있습니다.'
+              : '전체 멤버 보기에서 멤버를 선택해 내보낼 수 있습니다. 다른 멤버를 모두 내보낸 뒤 크루를 삭제하면 다른 크루에 가입할 수 있습니다.'
             : '탈퇴하면 현재 크루에서 빠집니다. 다시 참여하려면 일반 참여 흐름으로 다시 들어와야 합니다.'}
         </div>
+        {isLeader && !canLeaderDeleteCrew && (
+          <button type="button" className="space-nav-link font-tech" onClick={() => setShowRosterModal(true)} style={{ marginTop: '0.75rem' }}>
+            <Users size={15} /> 멤버 관리 열기
+          </button>
+        )}
       </section>
 
       {message && <p className="font-tech" style={{ marginTop: '1rem', color: message.includes('실패') || message.includes('못했') ? '#f87171' : 'var(--planet-green)' }}>{message}</p>}

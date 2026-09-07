@@ -1,0 +1,14 @@
+# 20260907-crew-member-removal
+- Original goal: 크루 운영자가 비활성 멤버를 강퇴한 뒤 크루를 폐쇄하고 다른 크루에 참여할 수 있게 한다.
+- Phase: DONE (local); updated 2026-09-07
+- Coordinator/owner: Codex; local implementation, no external relay needed.
+- Baseline: be30f2a228797a42ab1e23469d4307241934e257; working tree clean at start.
+- Workspace: current math-sense-app checkout; no concurrent writer.
+- Scope: crew member UI, callable transaction, membership rules, focused tests.
+- Acceptance: only actual leader can remove another member; self/foreign member rejected; missing/inactive account removable; roster/user affiliation/active room/event lock updated; deletion available after last other member removed.
+- Dependencies: inspect → implement → tests/build → review. No packets.
+- Local changes: leader-only kickStudyCrewMember callable with transactional roster/count, matching user affiliation, remaining cached roster, active room removal/host transfer, and growth-lock forfeiture; missing users are not recreated and other crew affiliations are preserved. Roster modal exposes confirmation, pending/error feedback and management entry near crew deletion; stale cached names are filtered. Direct client membership mutation rule removed; existing joinStudyCrew callable remains the entry point. Leader deletion guard checks actual other IDs, including malformed legacy arrays.
+- Verification: test:crew-member-removal passed (7 transaction tests plus server-rendered UI checks for visibility, pending/error state and actual prop wiring); test:crew-growth 22/22 passed; node --check on index/service passed; scoped ESLint passed; diff --check passed; final npm run build passed.
+- Test boundaries: transaction tests use an in-memory Firestore double and the actual existing room helper; no live authenticated multi-account browser, Firestore rules emulator, production removal/deletion/join, or deployment executed. Build reported existing large-chunk and provisional audio warnings.
+- Acceptance: local implementation accepted. No external packets or returned artifacts.
+- Next: deploy kickStudyCrewMember, updated leaveStudyCrew, Firestore rules and web hosting together, then verify authenticated leader/member workflow in deployed environment. No item required from user for local completion.

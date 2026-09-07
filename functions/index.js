@@ -13301,6 +13301,23 @@ exports.kickStudyRoomParticipant = regionalFunctions.https.onCall(async (data, c
   return { success: true };
 });
 
+exports.kickStudyCrewMember = regionalFunctions.https.onCall(async (data, context) => {
+  const uid = await requireAuthUid(context);
+  const db = admin.firestore();
+  const { removeCrewMember } = require("./crewMemberRemoval.cjs");
+  const result = await removeCrewMember({
+    db, uid, crewId: data?.crewId, targetUid: data?.targetUid,
+    HttpsError: functions.https.HttpsError,
+    growthService: crewGrowthService,
+    clearedUserFields: buildClearedCrewUserFields,
+    removeRoomParticipant: removeParticipantFromStudyRoomTransaction,
+  });
+  await crewGrowthService.reconcileCrewGrowthEventV2(db, data.crewId).catch((err) => {
+    console.warn("Crew growth event sync after member removal failed", data.crewId, err);
+  });
+  return result;
+});
+
 exports.leaveStudyCrew = regionalFunctions.https.onCall(async (data, context) => {
   const uid = await requireAuthUid(context);
   const crewId = String(data?.crewId || "").trim();
@@ -13346,7 +13363,7 @@ exports.leaveStudyCrew = regionalFunctions.https.onCall(async (data, context) =>
     const nameRegistryRef = isLeader && nameCanonical ? crewNameRegistryRef(db, nameCanonical) : null;
     const nameRegistrySnap = nameRegistryRef ? await tx.get(nameRegistryRef) : null;
 
-    if (isLeader && memberIds.length > 1) {
+    if (isLeader && memberIds.some((memberId) => memberId !== uid)) {
       throw new functions.https.HttpsError("failed-precondition", "리더는 혼자 남았을 때만 탈퇴할 수 있습니다.");
     }
 
