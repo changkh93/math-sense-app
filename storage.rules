@@ -62,6 +62,17 @@ service firebase.storage {
       allow write: if isMemberAuth() && request.auth.uid == userId;
     }
 
+    // Public member profile photos. Each user owns their upload directory;
+    // only signed-in members can view photos shown on member profiles.
+    match /profile-images/{userId}/{fileName} {
+      allow read: if isMemberAuth();
+      allow create, update: if isMemberAuth() &&
+        request.auth.uid == userId &&
+        request.resource.size <= 2 * 1024 * 1024 &&
+        request.resource.contentType.matches('image/(jpeg|png|webp)');
+      allow delete: if isMemberAuth() && request.auth.uid == userId;
+    }
+
     // Owner-managed reference images for objects placed in a Galaxy world.
     // Other signed-in members can only read them while viewing an accessible planet.
     match /galaxy-objects/{userId}/{instanceId}/{fileName} {

@@ -11,6 +11,7 @@ import StarField from '../../components/Space/StarField';
 import SpaceNavbar from '../../components/Space/SpaceNavbar';
 import QuizPreviewModal from '../../components/Admin/QuizPreviewModal';
 import ModularShip from '../../components/Space/ModularShip';
+import ProfileAvatar from '../../components/ProfileAvatar';
 import { getActiveShipFamily } from '../../utils/shipCatalog';
 import confetti from 'canvas-confetti';
 import './QuestionDetail.css';
@@ -337,9 +338,17 @@ export default function QuestionDetail() {
     const identityCardContent = (
       <>
         {!answer.isTeacher && (
-          <div className="answer-identity-ship" aria-hidden="true">
-            <ModularShip userData={profile} size={isPathfinder ? 70 : 64} animate={false} />
-          </div>
+          profile.profileImageUrl ? (
+            <ProfileAvatar
+              src={profile.profileImageUrl}
+              displayName={displayName}
+              className="answer-identity-avatar"
+            />
+          ) : (
+            <div className="answer-identity-ship" aria-hidden="true">
+              <ModularShip userData={profile} size={isPathfinder ? 70 : 64} animate={false} />
+            </div>
+          )
         )}
         <div className="answer-identity-top">
           <span className="answer-identity-name">{displayName}</span>

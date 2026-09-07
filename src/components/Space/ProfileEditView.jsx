@@ -1,10 +1,20 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { motion as Motion } from 'framer-motion';
 import { collection, doc, getDocs, query, serverTimestamp, updateDoc, where, writeBatch } from 'firebase/firestore';
-import { db } from '../../firebase';
+import { deleteObject, getDownloadURL, ref, uploadBytes } from 'firebase/storage';
+import { db, storage } from '../../firebase';
 import { useAuth } from '../../hooks/useAuth';
 import { useClusters } from '../../hooks/useContent';
+import ProfileAvatar from '../ProfileAvatar';
 import soundManager from '../../utils/SoundManager';
+import { compressImage } from '../../utils/storageUtils';
+import {
+  PROFILE_IMAGE_ACCEPT,
+  buildProfileImageStoragePath,
+  isOwnedProfileImagePath,
+  resolveProfileImageUrl,
+  validateProfileImageFile,
+} from '../../utils/profileImageUtils';
 import {
   PROFILE_TITLES,
   getBaseTheme,
@@ -37,6 +47,11 @@ export default function ProfileEditView({ onBack }) {
   const { data: clusters, isLoading: isClustersLoading } = useClusters();
 
   const [saving, setSaving] = useState(false);
+  const [profileImageFile, setProfileImageFile] = useState(null);
+  const [profileImagePreviewUrl, setProfileImagePreviewUrl] = useState('');
+  const [profileImageRemoved, setProfileImageRemoved] = useState(false);
+  const [profileImageError, setProfileImageError] = useState('');
+  const photoInputRef = useRef(null);
   const [formData, setFormData] = useState({
     studentName: '',
     studentPhone: '',
@@ -61,14 +76,27 @@ export default function ProfileEditView({ onBack }) {
         publicSignature: formData.publicSignature,
         selectedProfileFrame: formData.selectedProfileFrame,
         selectedBaseTheme: formData.selectedBaseTheme,
+        profileImageUrl: profileImageRemoved
+          ? ''
+          : (profileImagePreviewUrl || resolveProfileImageUrl(userData, user?.photoURL)),
         crewName: userData?.crewName,
         crewRole: userData?.crewRole,
         crewColor: userData?.crewColor
       },
       formData.studentName || user?.displayName || '탐험가'
     ),
-    [formData, user?.displayName, userData]
+    [formData, profileImagePreviewUrl, profileImageRemoved, user?.displayName, user?.photoURL, userData]
   );
+
+  const visibleProfileImageUrl = profileImageRemoved
+    ? ''
+    : (profileImagePreviewUrl || resolveProfileImageUrl(userData, user?.photoURL));
+
+  useEffect(() => () => {
+    if (profileImagePreviewUrl.startsWith('blob:')) {
+      URL.revokeObjectURL(profileImagePreviewUrl);
+    }
+  }, [profileImagePreviewUrl]);
 
   useEffect(() => {
     if (!userData) return;
@@ -96,6 +124,33 @@ export default function ProfileEditView({ onBack }) {
       };
     });
   }, [userData, user]);
+
+  const handleProfileImageSelect = (event) => {
+    const file = event.target.files?.[0];
+    const validationError = validateProfileImageFile(file);
+    if (validationError) {
+      setProfileImageError(validationError);
+      setProfileImageFile(null);
+      setProfileImagePreviewUrl('');
+      event.target.value = '';
+      return;
+    }
+
+    setProfileImageError('');
+    setProfileImageFile(file);
+    setProfileImagePreviewUrl(URL.createObjectURL(file));
+    setProfileImageRemoved(false);
+    soundManager.playClick();
+  };
+
+  const handleProfileImageRemove = () => {
+    setProfileImageFile(null);
+    setProfileImagePreviewUrl('');
+    setProfileImageRemoved(true);
+    setProfileImageError('');
+    if (photoInputRef.current) photoInputRef.current.value = '';
+    soundManager.playClick();
+  };
 
 
   const handleDaySelect = (clusterId, day) => {
@@ -149,6 +204,9 @@ export default function ProfileEditView({ onBack }) {
     setSaving(true);
     soundManager.playClick();
 
+    let uploadedProfileImagePath = '';
+    let didUpdateProfileDocument = false;
+
     try {
       const cleanedParticipation = {};
       const access = userData?.clusterAccess || {};
@@ -165,6 +223,25 @@ export default function ProfileEditView({ onBack }) {
         : (userData?.publicSignature || '');
       const selectedFrame = ownedFrames.includes(formData.selectedProfileFrame) ? formData.selectedProfileFrame : ownedFrames[0];
       const selectedBaseTheme = ownedBaseThemes.includes(formData.selectedBaseTheme) ? formData.selectedBaseTheme : ownedBaseThemes[0];
+      let profileImageUrl = profileImageRemoved ? '' : (userData?.profileImageUrl || '');
+      let profileImagePath = profileImageRemoved ? '' : (userData?.profileImagePath || '');
+
+      if (profileImageFile) {
+        const optimizedImage = await compressImage(profileImageFile, {
+          maxWidth: 720,
+          maxHeight: 720,
+          quality: 0.84,
+        });
+        uploadedProfileImagePath = buildProfileImageStoragePath(user.uid);
+        const uploadedRef = ref(storage, uploadedProfileImagePath);
+        await uploadBytes(uploadedRef, optimizedImage, {
+          contentType: 'image/jpeg',
+          cacheControl: 'public,max-age=31536000,immutable',
+        });
+        profileImageUrl = await getDownloadURL(uploadedRef);
+        profileImagePath = uploadedProfileImagePath;
+      }
+
       const mergedProfileData = {
         ...userData,
         studentName: formData.studentName.trim(),
@@ -175,6 +252,8 @@ export default function ProfileEditView({ onBack }) {
         publicSignature,
         selectedProfileFrame: selectedFrame,
         selectedBaseTheme,
+        profileImageUrl,
+        profileImagePath,
         crewId: userData?.crewId || '',
         crewName: userData?.crewName || '',
         crewRole: userData?.crewRole || '',
@@ -193,28 +272,58 @@ export default function ProfileEditView({ onBack }) {
         publicSignature,
         selectedProfileFrame: selectedFrame,
         selectedBaseTheme,
+        profileImageUrl,
+        profileImagePath,
         profileUpdatedAt: serverTimestamp()
       });
+      didUpdateProfileDocument = true;
 
       try {
         const answerSnap = await getDocs(query(collection(db, 'answers'), where('userId', '==', user.uid)));
         if (!answerSnap.empty) {
-          const batch = writeBatch(db);
-          answerSnap.docs.forEach((answerDoc) => {
+          let batch = writeBatch(db);
+          let operationCount = 0;
+          for (const answerDoc of answerSnap.docs) {
             batch.update(answerDoc.ref, {
               publicProfileSnapshot: updatedProfileSnapshot
             });
-          });
-          await batch.commit();
+            operationCount += 1;
+            if (operationCount >= 450) {
+              await batch.commit();
+              batch = writeBatch(db);
+              operationCount = 0;
+            }
+          }
+          if (operationCount > 0) await batch.commit();
         }
       } catch (syncErr) {
         console.warn('답변 프로필 스냅샷 동기화 실패:', syncErr);
+      }
+
+      const previousProfileImagePath = userData?.profileImagePath || '';
+      if (
+        previousProfileImagePath &&
+        previousProfileImagePath !== profileImagePath &&
+        isOwnedProfileImagePath(previousProfileImagePath, user.uid)
+      ) {
+        try {
+          await deleteObject(ref(storage, previousProfileImagePath));
+        } catch (deleteError) {
+          console.warn('이전 프로필 사진 정리 실패:', deleteError);
+        }
       }
 
       alert('프로필이 저장되었습니다.');
       if (onBack) onBack();
     } catch (err) {
       console.error('Error saving profile:', err);
+      if (uploadedProfileImagePath && !didUpdateProfileDocument) {
+        try {
+          await deleteObject(ref(storage, uploadedProfileImagePath));
+        } catch (cleanupError) {
+          console.warn('저장 실패 후 프로필 사진 정리 실패:', cleanupError);
+        }
+      }
       alert('프로필 저장 중 오류가 발생했습니다. 다시 시도해주세요.');
     } finally {
       setSaving(false);
@@ -285,13 +394,68 @@ export default function ProfileEditView({ onBack }) {
             <section>
               <h3 className="font-tech" style={sectionTitleStyle}>🪪 공개 프로필 명함</h3>
 
+              <div className="profile-photo-editor">
+                <ProfileAvatar
+                  src={visibleProfileImageUrl}
+                  displayName={formData.publicDisplayName || formData.studentName || '탐험가'}
+                  className="profile-photo-editor__preview"
+                  loading="eager"
+                />
+                <div className="profile-photo-editor__copy">
+                  <div>
+                    <strong className="font-tech">프로필 사진</strong>
+                    <p className="font-tech">JPG, PNG, WebP · 최대 5MB · 저장할 때 자동 최적화됩니다.</p>
+                  </div>
+                  <input
+                    ref={photoInputRef}
+                    type="file"
+                    className="profile-photo-editor__input"
+                    accept={PROFILE_IMAGE_ACCEPT}
+                    onChange={handleProfileImageSelect}
+                    disabled={saving}
+                  />
+                  <div className="profile-photo-editor__actions">
+                    <button
+                      type="button"
+                      className="profile-photo-editor__button is-primary font-tech"
+                      onClick={() => photoInputRef.current?.click()}
+                      disabled={saving}
+                    >
+                      {visibleProfileImageUrl ? '사진 변경' : '사진 등록'}
+                    </button>
+                    {visibleProfileImageUrl && (
+                      <button
+                        type="button"
+                        className="profile-photo-editor__button font-tech"
+                        onClick={handleProfileImageRemove}
+                        disabled={saving}
+                      >
+                        업로드 사진 제거
+                      </button>
+                    )}
+                  </div>
+                  {profileImageFile && (
+                    <span className="profile-photo-editor__file font-tech">선택됨: {profileImageFile.name}</span>
+                  )}
+                  {profileImageError && (
+                    <p className="profile-photo-editor__error font-tech" role="alert">{profileImageError}</p>
+                  )}
+                </div>
+              </div>
+
               <div className="profile-preview-card" style={{
                 borderColor: `${publicProfile.frameAccent}55`,
                 background: publicProfile.frameBackground,
                 boxShadow: `0 0 24px ${publicProfile.frameAccent}20`
               }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap' }}>
-                  <div>
+                  <div className="profile-preview-identity">
+                    <ProfileAvatar
+                      src={visibleProfileImageUrl}
+                      displayName={publicProfile.publicDisplayName}
+                      className="profile-preview-avatar"
+                    />
+                    <div>
                     <div style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--text-bright)' }}>
                       {publicProfile.publicDisplayName}
                     </div>
@@ -306,6 +470,7 @@ export default function ProfileEditView({ onBack }) {
                           🛰️ {publicProfile.crewName}
                         </span>
                       )}
+                    </div>
                     </div>
                   </div>
                   <div className="font-tech" style={{ color: publicProfile.frameAccent, fontSize: '0.82rem' }}>

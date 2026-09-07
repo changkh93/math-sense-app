@@ -46,3 +46,4 @@ scripts/apply-western-classic-option-style-repairs.mjs
 scripts/build-western-classic-*.mjs
 scripts/inspect_uid.mjs
 scripts/repair-western-classic-integrity.mjs
+.tmp-work/

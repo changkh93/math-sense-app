@@ -142,6 +142,21 @@
   pointer-events: none;
 }
 
+.answer-identity-avatar {
+  position: absolute;
+  left: 10px;
+  top: 50%;
+  width: 48px;
+  height: 48px;
+  transform: translateY(-50%);
+  border: 1px solid rgba(0, 243, 255, 0.45);
+  border-radius: 50%;
+  color: #ffffff;
+  background: rgba(7, 15, 34, 0.88);
+  box-shadow: 0 0 14px rgba(0, 243, 255, 0.14);
+  font-size: 1rem;
+}
+
 button.answer-identity-card {
   text-align: left;
   color: inherit;

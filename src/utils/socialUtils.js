@@ -1,3 +1,5 @@
+import { resolveProfileImageUrl } from './profileImageUtils.js';
+
 // 공개 질문자의 익명 닉네임은 사용자 ID로부터 결정적으로 생성한다.
 // 장소/행동(36) x 성격(40) x 캐릭터(72) x 탐사선 번호(997)로
 // 1억 가지가 넘는 조합을 만들 수 있어
@@ -405,6 +407,7 @@ export function getPublicProfile(userData = {}, fallbackName = '탐험가') {
 
   return {
     publicDisplayName,
+    profileImageUrl: resolveProfileImageUrl(safeUserData),
     publicTitle: (safeUserData.publicTitle || '').trim(),
     publicSignature: (safeUserData.publicSignature || '').trim(),
     publicProfileEnabled: safeUserData.publicProfileEnabled !== false,
@@ -443,6 +446,7 @@ export function buildAnswerProfileSnapshot(userData = {}, fallbackName = '탐험
   const profile = getPublicProfile(userData, fallbackName);
   return {
     displayName: profile.publicDisplayName,
+    profileImageUrl: profile.profileImageUrl,
     publicTitle: profile.publicTitle,
     publicSignature: profile.publicSignature,
     profileFrameId: profile.profileFrameId,

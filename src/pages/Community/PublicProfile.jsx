@@ -11,9 +11,11 @@ import StarField from '../../components/Space/StarField';
 import CometBadge from '../../components/Space/CometBadge';
 import ModularShip from '../../components/Space/ModularShip';
 import CertificateAwardsBoard from '../../components/Space/CertificateAwardsBoard';
+import ProfileAvatar from '../../components/ProfileAvatar';
 import { getEffectiveStreak, getMondayKSTKey, getTodayKST } from '../../utils/streakUtils';
 import { calculateSEI } from '../../utils/rankingUtils';
 import { getBaseTheme, getFrameSurfaceStyles, getProfileFrame, isHallSpotlightActive } from '../../utils/socialUtils';
+import { resolveProfileImageUrl } from '../../utils/profileImageUtils';
 import { parseInlineFormatting } from '../../utils/formatUtils';
 import { buildCollectionBadges, isBadgeUpgradeOwned } from '../../utils/badgeUtils';
 import { getActiveShipFamily, getShipGrade } from '../../utils/shipCatalog';
@@ -952,6 +954,7 @@ export default function PublicProfile() {
     [history, profile]
   );
   const displayName = getDisplayName(profile || {});
+  const profileImageUrl = resolveProfileImageUrl(profile || {});
 
   const handleSendMemo = () => {
     if (!uid || isOwnProfile) return;
@@ -1034,9 +1037,13 @@ export default function PublicProfile() {
                 boxShadow: heroBoxShadow
               }}
             >
-              <div className="public-profile-avatar" style={{ borderColor: frameTheme.borderColor, color: frameTheme.accent }}>
-                {Array.from(displayName)[0] || '?'}
-              </div>
+              <ProfileAvatar
+                src={profileImageUrl}
+                displayName={displayName}
+                className="public-profile-avatar"
+                style={{ borderColor: frameTheme.borderColor, color: frameTheme.accent }}
+                loading="eager"
+              />
 
               <div className="public-profile-hero-main">
                 <div className="public-profile-kicker">나의 탐험기지</div>

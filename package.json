@@ -44,6 +44,7 @@
     "test:frontier-character-motion": "node scripts/test-frontier-character-motion.mjs",
     "test:frontier-story": "node scripts/test-frontier-story-utils.mjs",
     "test:guest-galaxy": "node scripts/test-guest-galaxy-data.mjs",
+    "test:profile-image": "node scripts/test-profile-image-utils.mjs",
     "test:lumi-rover": "node functions/galaxyGame.rover.test.cjs && node functions/galaxyGame.story.test.cjs && node scripts/test-guest-galaxy-data.mjs && node scripts/test-lumi-rover-contract.mjs",
     "test:workbook-draft": "node scripts/test-workbook-draft-utils.mjs",
     "test:workbook-interactions": "node scripts/test-workbook-interactions.mjs",

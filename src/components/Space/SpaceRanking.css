@@ -197,6 +197,21 @@
   transition: transform .25s ease, filter .25s ease;
 }
 
+.ranking-pilot-avatar {
+  position: absolute;
+  right: -5px;
+  bottom: -5px;
+  z-index: 2;
+  width: 34px;
+  height: 34px;
+  border: 2px solid color-mix(in srgb, var(--ranking-ship-accent) 64%, #ffffff);
+  border-radius: 50%;
+  color: #ffffff;
+  background: #0b1023;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.48);
+  font-size: 0.75rem;
+}
+
 .ranking-pilot-ship .modular-ship * { animation: none !important; }
 .ranking-row:hover .ranking-pilot-ship { border-color: color-mix(in srgb, var(--ranking-ship-accent) 52%, transparent); filter: brightness(1.12); }
 .ranking-row:hover .ranking-pilot-ship .modular-ship { transform: translateY(-3px) scale(1.04); filter: drop-shadow(0 10px 13px color-mix(in srgb, var(--ranking-ship-accent) 36%, rgba(0,0,0,.5))); }
@@ -315,6 +330,7 @@
   .ranking-pilot-cell { gap: .45rem; }
   .ranking-pilot-ship { flex-basis: 58px; width: 58px; height: 58px; border-radius: 13px 13px 18px 18px; }
   .ranking-pilot-ship .modular-ship { width: 56px !important; height: 56px !important; }
+  .ranking-pilot-avatar { width: 28px; height: 28px; right: -3px; bottom: -3px; }
   .ranking-crew-vessel { grid-template-columns: 82px minmax(0,1fr) auto; gap: .35rem; padding-right: .48rem; }
   .crew-mothership--leaderboard { width: 80px; height: 52px; min-height: 52px; }
   .ranking-crew-vessel__copy small:first-of-type { display: none; }

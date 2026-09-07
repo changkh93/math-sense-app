@@ -3,10 +3,11 @@
  * @param {File} file - The original image file
  * @param {Object} options - Compression options
  * @param {number} options.maxWidth - Maximum width in pixels
+ * @param {number} options.maxHeight - Maximum height in pixels
  * @param {number} options.quality - JPEG quality (0 to 1)
  * @returns {Promise<Blob>} - Compressed image blob
  */
-export const compressImage = (file, { maxWidth = 1024, quality = 0.8 } = {}) => {
+export const compressImage = (file, { maxWidth = 1024, maxHeight = Infinity, quality = 0.8 } = {}) => {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.readAsDataURL(file);
@@ -18,14 +19,15 @@ export const compressImage = (file, { maxWidth = 1024, quality = 0.8 } = {}) => 
         let width = img.width;
         let height = img.height;
 
-        // Resize logic
-        if (width > maxWidth) {
-          height = (maxWidth / width) * height;
-          width = maxWidth;
+        // Preserve aspect ratio while constraining both axes when requested.
+        const scale = Math.min(1, maxWidth / width, maxHeight / height);
+        if (scale < 1) {
+          width = Math.round(width * scale);
+          height = Math.round(height * scale);
         }
 
-        canvas.width = width;
-        canvas.height = height;
+        canvas.width = Math.max(1, width);
+        canvas.height = Math.max(1, height);
 
         const ctx = canvas.getContext('2d');
         ctx.drawImage(img, 0, 0, width, height);

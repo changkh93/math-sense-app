@@ -7915,8 +7915,11 @@ function getProfileFrameMeta(frameId = "starter") {
 function buildAnswerProfileSnapshotForUser(userData = {}) {
   const displayName = getDisplayNameFromUser(userData);
   const frame = getProfileFrameMeta(userData.selectedProfileFrame || "starter");
+  const rawProfileImageUrl = String(userData.profileImageUrl || userData.avatarUrl || userData.photoURL || "").trim();
+  const profileImageUrl = /^https?:\/\//i.test(rawProfileImageUrl) ? rawProfileImageUrl : "";
   return {
     displayName,
+    profileImageUrl,
     publicTitle: String(userData.publicTitle || "").trim(),
     publicSignature: String(userData.publicSignature || "").trim(),
     profileFrameId: frame.id,
@@ -13483,4 +13486,3 @@ exports.refreshStellarLeaderboard = regionalFunctions.https.onCall(async () => {
     throw new functions.https.HttpsError("internal", "Failed to refresh leaderboard");
   }
 });
-

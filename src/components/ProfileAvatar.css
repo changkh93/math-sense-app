@@ -1,0 +1,27 @@
+.profile-avatar {
+  position: relative;
+  display: inline-grid;
+  flex: 0 0 auto;
+  place-items: center;
+  overflow: hidden;
+  isolation: isolate;
+  background: linear-gradient(135deg, rgba(0, 243, 255, 0.24), rgba(124, 58, 237, 0.3));
+}
+
+.profile-avatar__fallback {
+  position: relative;
+  z-index: 0;
+  color: currentColor;
+  font-weight: 900;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.profile-avatar__image {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}

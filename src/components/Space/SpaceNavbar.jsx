@@ -16,6 +16,7 @@ import CrewMothership from './CrewMothership';
 import CrewGuestTrialModal from './CrewGuestTrialModal';
 import { getEffectiveStreak } from '../../utils/streakUtils';
 import { getCrewMothershipLevel } from '../../utils/crewMothershipCatalog';
+import { resolveProfileImageUrl } from '../../utils/profileImageUtils';
 import './SpaceNavbar.css';
 
 const LIVE_SUPPORT_LINKS = [
@@ -294,13 +295,7 @@ export default function SpaceNavbar({ currentView, onViewChange }) {
     || user?.email?.split('@')?.[0]
     || '탐사원';
   const profileInitial = Array.from(String(profileDisplayName).trim())[0] || '?';
-  const isGoogleAuthAccount = user?.providerData?.some(provider => provider.providerId === 'google.com');
-  const rawProfilePhoto = user?.photoURL || (!isGoogleAuthAccount
-    ? (userData?.photoURL || userData?.profileImageUrl || userData?.avatarUrl || '')
-    : '');
-  const profilePhotoUrl = /^https?:\/\//.test(String(rawProfilePhoto)) || /^data:image\//.test(String(rawProfilePhoto))
-    ? rawProfilePhoto
-    : '';
+  const profilePhotoUrl = resolveProfileImageUrl(userData, user?.photoURL);
   const shouldShowProfilePhoto = Boolean(profilePhotoUrl) && !isProfileImageFailed;
 
   const handleToggleMobileMore = () => {
@@ -487,8 +482,16 @@ export default function SpaceNavbar({ currentView, onViewChange }) {
               transition: 'all 0.3s ease'
             }}
           >
-            {user?.photoURL ? (
-              <img src={user.photoURL} alt="Profile" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+            {shouldShowProfilePhoto ? (
+              <img
+                src={profilePhotoUrl}
+                alt=""
+                onError={() => setIsProfileImageFailed(true)}
+                onLoad={(event) => {
+                  if (!event.currentTarget.naturalWidth) setIsProfileImageFailed(true);
+                }}
+                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+              />
             ) : (
               <div style={{ width: '100%', height: '100%', background: 'var(--crystal-cyan)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#000', fontWeight: 'bold' }}>
                 {profileInitial}
