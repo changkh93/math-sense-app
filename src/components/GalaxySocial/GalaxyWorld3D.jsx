@@ -51,6 +51,7 @@ import { subscribeFrontierPointerLock } from './frontierPointerLock.js'
 import FrontierExplorationHud, { ExplorationEquipment, SwimFin } from './exploration/FrontierExplorationHud'
 import FrontierMarineWorld from './exploration/FrontierMarineWorld'
 import FrontierSkyWorld from './exploration/FrontierSkyWorld'
+import { getFlightCameraFov } from './exploration/frontierSkyModel.js'
 import { sampleFrontierCharacterMotion, applyFrontierCharacterMotion } from './exploration/frontierCharacterMotion.js'
 import { advanceExplorationHeight, getExplorationMode, getExplorationRadius, getOceanFloorY, sampleExplorationWater } from './exploration/frontierExploration.js'
 import {
@@ -3401,10 +3402,8 @@ function AtmosphericBackdrop({ worldRadius, children }) {
 function DistantWorlds({ palette }) {
   return (
     <group>
-      <mesh position={[-30, 17, -42]}><sphereGeometry args={[7, 32, 20]} /><meshStandardMaterial color={palette.groundDeep} roughness={.85} /></mesh>
-      <mesh position={[-30, 17, -42]} rotation={[1.05, 0, .3]}><torusGeometry args={[10, .12, 8, 64]} /><meshBasicMaterial color={palette.accent} transparent opacity={.24} /></mesh>
-      <mesh position={[36, 11, -48]}><sphereGeometry args={[4.2, 28, 18]} /><meshStandardMaterial color="#5a4b86" roughness={.86} /></mesh>
-      <mesh position={[8, 28, -58]}><sphereGeometry args={[2.1, 20, 14]} /><meshStandardMaterial color="#a6785d" roughness={.9} /></mesh>
+      <mesh position={[-30, 22, -62]}><sphereGeometry args={[3.8, 28, 18]} /><meshStandardMaterial color="#adb7c4" emissive="#36465a" emissiveIntensity={.25} roughness={.95} fog={false} /></mesh>
+      <mesh position={[-30, 22, -62]} rotation={[1.05, 0, .3]}><torusGeometry args={[5.8, .045, 6, 64]} /><meshBasicMaterial color={palette.accent} transparent opacity={.18} depthWrite={false} fog={false} /></mesh>
     </group>
   )
 }
@@ -4318,6 +4317,8 @@ function Astronaut({ travel, inputRef, interactables, blockers, structureCollide
         + (inputRef.current.vertical || 0) + (state.clock.elapsedTime < qaVertical.current.until ? qaVertical.current.axis : 0)))
       if (verticalIntent < 0) inputRef.current.takeoff = false
       const axis = paused ? 0 : verticalIntent || (inputRef.current.takeoff ? 1 : 0)
+      // Local visual intensity only; never added to presence or a reward payload.
+      group.current.userData.flightThrust = Math.abs(axis) > .1 || sprinting ? 1 : locomoting ? .85 : .6
       const floorY = Math.hypot(group.current.position.x, group.current.position.z) > worldRadius
         ? getOceanFloorY(group.current.position.x, group.current.position.z, worldRadius)
         : walkHeightAt(group.current.position.x, group.current.position.z, group.current.position.y, characterScale.current)
@@ -4419,9 +4420,11 @@ function Astronaut({ travel, inputRef, interactables, blockers, structureCollide
         controls.current.minDistance = getThirdPersonMinDistance(characterScale.current)
         controls.current.maxDistance = THIRD_PERSON_MAX_DISTANCE
       }
-      if (activeCamera.fov !== 48 || activeCamera.near !== DEFAULT_CAMERA_NEAR) {
+      const targetFov = getFlightCameraFov({ flying: mode === 'flying', moving, sprinting, birdView: travel.birdView })
+      const nextFov = THREE.MathUtils.damp(activeCamera.fov, targetFov, 4, Math.min(delta, .05))
+      if (Math.abs(activeCamera.fov - targetFov) > .01 || activeCamera.near !== DEFAULT_CAMERA_NEAR) {
         activeCamera.near = DEFAULT_CAMERA_NEAR
-        activeCamera.fov = 48
+        activeCamera.fov = Math.abs(nextFov - targetFov) < .01 ? targetFov : nextFov
         activeCamera.updateProjectionMatrix()
       }
       if (controls.current && orbitCamera) {
@@ -4604,7 +4607,7 @@ function Astronaut({ travel, inputRef, interactables, blockers, structureCollide
       />}
       <group ref={group} position={[0, walkHeightAt(0, 5), 5]} scale={CHARACTER_SCALE}>
         <group ref={body} visible={builderOverview || !isFirstPerson}>
-          <ExplorationEquipment kit={travel.kit} flying={travel.flight} />
+          <ExplorationEquipment kit={travel.kit} flying={travel.flight} motionRef={group} />
           <mesh position={[0, 1.2, 0]} scale={[.92, 1, .8]} castShadow><capsuleGeometry args={[.39, .72, 8, 14]} /><meshStandardMaterial color="#e8f2f3" roughness={.34} metalness={.08} /></mesh>
           <mesh position={[0, 1.18, .35]}><boxGeometry args={[.5, .42, .08]} /><meshStandardMaterial color="#253e54" metalness={.5} roughness={.25} /></mesh>
           <mesh position={[0, 1.18, .405]}><boxGeometry args={[.28, .08, .035]} /><meshStandardMaterial color="#7cf2bd" emissive="#2a9b71" emissiveIntensity={1.5} toneMapped={false} /></mesh>
@@ -4969,11 +4972,10 @@ function FrontierScene({ travel, planet, budget, crewGatesEnabled = false, resto
       <ambientLight intensity={.24} />
       <AtmosphericBackdrop worldRadius={worldRadius}>
         <Stars radius={72} depth={34} count={720} factor={2.2} saturation={.18} fade speed={.08} />
-        <Sparkles count={Math.round(24 + restorationProgress * .7)} scale={[48, 20, 48]} position={[0, 9, 0]} size={1.25} color={palette.particle} speed={.12} />
         <DistantWorlds palette={palette} />
       </AtmosphericBackdrop>
       <FrontierMarineWorld worldRadius={worldRadius} paused={paused} playerRef={playerGroupRef} budget={budget} />
-      <FrontierSkyWorld worldRadius={worldRadius} paused={paused} playerRef={playerGroupRef} />
+      <FrontierSkyWorld worldRadius={worldRadius} paused={paused} playerRef={playerGroupRef} budget={budget} />
       <CrewRouteGates gates={crewGates} />
       <WorldTerrain
         groundTextureSize={budget.groundTextureSize}

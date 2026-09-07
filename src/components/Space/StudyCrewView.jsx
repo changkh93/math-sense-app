@@ -1747,7 +1747,7 @@ export default function StudyCrewView({ onNavigateStore }) {
                 <h3 className="font-title" style={{ margin: '0.45rem 0 0.55rem', fontSize: isMobile ? '1.4rem' : '1.85rem', color: 'white' }}>친구와 함께 공부하고 크루를 키워보세요 🚀</h3>
                 <p className="font-tech" style={{ margin: 0, color: 'rgba(255,255,255,0.78)', lineHeight: 1.6, fontSize: '0.9rem' }}>
                   친구가 게스트 패스로 <strong>2회 함께 참여해 총 10분 활동</strong>하면 1명 인정!<br />
-                  <strong>20명 달성 시 +1,000광석</strong>, <strong>40명 달성 시 +4,000광석</strong>(누적 5,000광석)이 정회원 전원에게 지급됩니다.
+                  <strong>10명 달성 시 +500광석</strong>, <strong>20명 달성 시 +1,000광석</strong>, <strong>40명 달성 시 +4,000광석</strong>(누적 5,500광석)이 정회원 전원에게 지급됩니다.
                 </p>
               </div>
               <div style={{ minWidth: isMobile ? '100%' : 270 }}>
@@ -1755,27 +1755,31 @@ export default function StudyCrewView({ onNavigateStore }) {
                   <span>우리 크루 인원</span>
                   <span style={{ fontSize: '1.1rem', color: '#67e8f9' }}>{growthEvent?.eligibleCount ?? (hasCrew ? '…' : 0)} <span style={{ fontSize: '0.8rem', color: 'rgba(255,255,255,0.6)' }}>/ 40명</span></span>
                 </div>
-                {/* 20명 & 40명 2단계 마일스톤 게이지 */}
+                {/* 10명 & 20명 & 40명 3단계 마일스톤 게이지 */}
                 <div style={{ position: 'relative', height: 12, borderRadius: 999, background: 'rgba(255,255,255,0.12)', overflow: 'hidden', marginBottom: 6 }}>
                   <div style={{ width: `${Math.min(100, ((growthEvent?.eligibleCount || 0) / 40) * 100)}%`, height: '100%', background: 'linear-gradient(90deg, #22d3ee 0%, #a855f7 50%, #eab308 100%)', transition: 'width .4s ease' }} />
-                  {/* 20명 마일스톤 핀 */}
+                  {/* 10명 · 20명 마일스톤 핀 */}
+                  <div style={{ position: 'absolute', left: '25%', top: 0, bottom: 0, width: 2, background: 'rgba(255,255,255,0.45)' }} />
                   <div style={{ position: 'absolute', left: '50%', top: 0, bottom: 0, width: 2, background: 'rgba(255,255,255,0.45)' }} />
                 </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.72rem', color: '#cbd5e1', marginBottom: 6 }} className="font-tech">
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.72rem', color: '#cbd5e1', marginBottom: 6, gap: 4 }} className="font-tech">
                   <span>시작</span>
-                  <span style={{ color: (growthEvent?.eligibleCount || 0) >= 20 ? '#86efac' : '#fde047', fontWeight: 700 }}>20명 (+1,000💎)</span>
+                  <span style={{ color: (growthEvent?.eligibleCount || 0) >= 10 ? '#86efac' : '#fde047', fontWeight: 700 }}>10명 (+500💎)</span>
+                  <span style={{ color: (growthEvent?.eligibleCount || 0) >= 20 ? '#86efac' : '#e2e8f0', fontWeight: 700 }}>20명 (+1,000💎)</span>
                   <span style={{ color: (growthEvent?.eligibleCount || 0) >= 40 ? '#86efac' : '#e2e8f0', fontWeight: 700 }}>40명 (+4,000💎)</span>
                 </div>
                 <div className="font-tech" style={{ color: growthEvent?.rewarded ? '#86efac' : (growthEvent?.neededForNextTarget > 0 ? '#fde047' : 'rgba(255,255,255,0.58)'), fontSize: '0.74rem', marginTop: 4 }}>
                   {growthEvent?.tiers?.t40?.status === 'rewarded'
-                    ? '40명 달성 확정 · 총 5,000광석 지급 완료'
+                    ? '40명 달성 확정 · 총 5,500광석 지급 완료'
                     : growthEvent?.tiers?.t20?.status === 'rewarded'
                       ? `20명 완료(+1,000💎)! 다음 40명 목표까지 ${Math.max(0, 40 - (growthEvent?.eligibleCount || 0))}명 남음`
-                      : growthEvent?.verificationEndsAtMs
-                        ? `목표 달성 · 고정 명단 ${growthEvent.snapshotRetainedCount || 0}명 48시간 검증 중`
-                        : growthEvent
-                          ? `다음 목표까지 앞으로 ${growthEvent.neededForNextTarget ?? Math.max(0, 20 - (growthEvent.eligibleCount || 0))}명 · 활동 게스트 ${growthEvent.activeGuestCount || 0}명`
-                          : hasCrew ? '진행도를 불러오는 중…' : '크루에 참여하면 진행도가 표시됩니다'}
+                      : growthEvent?.tiers?.t10?.status === 'rewarded'
+                        ? `10명 완료(+500💎)! 다음 20명 목표까지 ${Math.max(0, 20 - (growthEvent?.eligibleCount || 0))}명 남음`
+                        : growthEvent?.verificationEndsAtMs
+                          ? `목표 달성 · 고정 명단 ${growthEvent.snapshotRetainedCount || 0}명 48시간 검증 중`
+                          : growthEvent
+                            ? `다음 목표까지 앞으로 ${growthEvent.neededForNextTarget ?? Math.max(0, 10 - (growthEvent.eligibleCount || 0))}명 · 활동 게스트 ${growthEvent.activeGuestCount || 0}명`
+                            : hasCrew ? '진행도를 불러오는 중…' : '크루에 참여하면 진행도가 표시됩니다'}
                 </div>
               </div>
             </div>
@@ -1802,7 +1806,7 @@ export default function StudyCrewView({ onNavigateStore }) {
                     <ol className="font-tech" style={{ color: 'rgba(255,255,255,0.85)', lineHeight: 1.8, paddingLeft: 20, marginBottom: 0, fontSize: '0.88rem' }}>
                       <li><strong>초대 패스 선물</strong>: 내 크루의 GUEST ACCESS에서 친구에게 초대 링크를 보냅니다.</li>
                       <li><strong>친구와 2회 함께 공부</strong>: 친구가 크루 대기룸/집중방에 2회 참여하고 총 10분 활동하면 1명 인정됩니다. (배틀 불필요!)</li>
-                      <li><strong>크루 성장 보급</strong>: 20명 달성 시 1,000광석, 40명 달성 시 +4,000광석(누적 5,000광석) 보급!</li>
+                      <li><strong>크루 성장 보급</strong>: 10명 달성 시 500광석, 20명 달성 시 +1,000광석, 40명 달성 시 +4,000광석(누적 5,500광석) 보급!</li>
                     </ol>
                   </div>
                   <div style={{ padding: 16, borderRadius: 14, background: 'rgba(0,0,0,0.22)' }}>

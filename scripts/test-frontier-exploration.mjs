@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
-import { advanceExplorationHeight, getExplorationMode, sampleExplorationWater, getExplorationRadius, getMarineHabitat, getOceanFloorY, MARINE_SPECIES, normalizeExplorationKit, normalizeOwnedExplorationKits, resolveExplorationKitShortcut, EXPLORATION_KITS, EXPLORATION_KIT_COST, HOVERPACK_FLAME_LAYERS, FLIGHT_CEILING } from '../src/components/GalaxySocial/exploration/frontierExploration.js'
+import { advanceExplorationHeight, getExplorationMode, sampleExplorationWater, getExplorationRadius, getHoverpackAltitudeProgress, getHoverpackFlightStage, getMarineHabitat, getOceanFloorY, getSkyLandmarks, isSkyLandmarkReached, MARINE_SPECIES, normalizeExplorationKit, normalizeOwnedExplorationKits, resolveExplorationKitShortcut, EXPLORATION_KITS, EXPLORATION_KIT_COST, HOVERPACK_FLAME_LAYERS, FLIGHT_CEILING } from '../src/components/GalaxySocial/exploration/frontierExploration.js'
 import { setTerritoryExpanded } from '../src/components/GalaxySocial/GalaxyTerrainModel.js'
+import { createCloudAtlas, getCloudBanks, getFlightCameraFov } from '../src/components/GalaxySocial/exploration/frontierSkyModel.js'
 
 setTerritoryExpanded(false)
 const water = sampleExplorationWater(23, 0, 20)
@@ -24,6 +25,40 @@ assert.equal(resolveExplorationKitShortcut('Digit1'), 'none')
 assert.equal(resolveExplorationKitShortcut('Numpad2'), 'hoverpack')
 assert.equal(resolveExplorationKitShortcut('Digit3'), 'diving')
 assert.equal(resolveExplorationKitShortcut('KeyH'), null)
+assert.equal(getHoverpackFlightStage(0).id, 'launch')
+assert.equal(getHoverpackFlightStage(5).id, 'cloud')
+assert.equal(getHoverpackFlightStage(10).id, 'stratosphere')
+assert.equal(getHoverpackFlightStage(15).id, 'orbit')
+assert.equal(getHoverpackAltitudeProgress(-4), 0)
+assert.equal(getHoverpackAltitudeProgress(FLIGHT_CEILING), 100)
+assert.equal(getHoverpackAltitudeProgress(99), 100)
+assert.equal(getHoverpackAltitudeProgress(NaN), 0)
+assert.equal(getHoverpackAltitudeProgress('invalid'), 0)
+assert.equal(getFlightCameraFov({ flying: false, moving: true }), 48)
+assert.equal(getFlightCameraFov({ flying: true }), 52)
+assert.equal(getFlightCameraFov({ flying: true, moving: true }), 54)
+assert.equal(getFlightCameraFov({ flying: true, moving: true, sprinting: true }), 57)
+assert.equal(getFlightCameraFov({ flying: true, birdView: true }), 48)
+const cloudAtlas = createCloudAtlas()
+assert.equal(cloudAtlas.data.length, cloudAtlas.width * cloudAtlas.height * 4)
+assert.deepEqual(createCloudAtlas().data, cloudAtlas.data, 'cloud appearance is stable across scene mounts')
+const { width, height, data } = cloudAtlas
+for (let y = 0; y < height; y++) for (let x = 0; x < width; x++) {
+  if ([0, width / 2 - 1, width / 2, width - 1].includes(x) || [0, height / 2 - 1, height / 2, height - 1].includes(y)) {
+    assert.equal(data[(y * width + x) * 4 + 3], 0, 'every atlas tile has transparent boundaries')
+  }
+}
+const opaquePixels = data.filter((value, index) => index % 4 === 3 && value > 180).length
+assert.ok(opaquePixels > width * height * .08 && opaquePixels < width * height * .5)
+for (const count of [12, 18, 24]) {
+  const banks = getCloudBanks(20, count)
+  assert.equal(banks.length, count)
+  assert.ok(banks.every((bank) => Math.hypot(bank.x, bank.z) >= 22 && bank.y > 5 && bank.y < 9))
+}
+const skyRoute = getSkyLandmarks(20)
+assert.deepEqual(skyRoute.map((site) => site.order), [1, 2, 3])
+assert.ok(isSkyLandmarkReached({ x: skyRoute[0].x, y: skyRoute[0].y, z: skyRoute[0].z }, skyRoute[0]))
+assert.equal(isSkyLandmarkReached({ x: skyRoute[0].x + 3, y: skyRoute[0].y, z: skyRoute[0].z }, skyRoute[0]), false)
 assert.deepEqual(HOVERPACK_FLAME_LAYERS.map((layer) => layer.color), ['#ff3d0d', '#ff9b24', '#fff0a3'])
 assert.ok(HOVERPACK_FLAME_LAYERS.every((layer) => layer.height > 0 && layer.radius > 0 && layer.opacity > 0 && layer.opacity <= 1))
 assert.equal(getExplorationMode({ kit: 'none', flight: true, y: 3, water }), 'grounded')
@@ -64,6 +99,11 @@ assert.match(hudSource, /aria-keyshortcuts=\{kit\.shortcut\}/)
 assert.match(hudSource, /event\.code === 'KeyG'/)
 assert.match(hudSource, /flight: kit === 'hoverpack'/, 'selecting or purchasing the hoverpack launches immediately')
 assert.doesNotMatch(hudSource, /안전 착륙|aria-keyshortcuts="H"/, 'hoverpack has no redundant landing toggle')
+assert.match(hudSource, /빛의 중심을 통과하면 자동 기록됩니다/)
+const skySource = readFileSync(new URL('../src/components/GalaxySocial/exploration/FrontierSkyWorld.jsx', import.meta.url), 'utf8')
+assert.match(skySource, /function FlightAtmosphere/)
+assert.doesNotMatch(skySource, /HighAltitudeMotes|SkyRay|OrbitalPromises|SkyRouteRibbon/, 'no following particles, ambiguous fauna or decorative destinations')
+assert.match(skySource, /budget\?\.groundTextureSize <= 96/, 'sky density follows the existing low-spec preset')
 const worldSource = readFileSync(new URL('../src/components/GalaxySocial/GalaxyWorld3D.jsx', import.meta.url), 'utf8')
 assert.doesNotMatch(worldSource, /event\.code === 'KeyH'/, 'H landing toggle is removed')
 setTerritoryExpanded(false)

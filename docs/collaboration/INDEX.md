@@ -7,6 +7,9 @@ For an existing task, read its STATE.md and actual artifacts before continuing.
 
 | ID | Goal | Phase | State file | Next action |
 |---|---|---|---|---|
+| 20260907-hoverpack-experience | 저비용 절차형 고공 비행·링 탐사 경험 개선 | DONE (local, revised) | [STATE](tasks/20260907-hoverpack-experience/STATE.md) | 추종 입자·모호한 비행체 제거, 구름·카메라 재구성 및 실화면 검증; 운영 배포 전 |
+| 20260907-kakao-business-channel | 기존 카카오톡 채널을 메타센스 마케팅·상담 채널로 개선 | WAITING_EXTERNAL | [STATE](tasks/20260907-kakao-business-channel/STATE.md) | 기본 설정·운영 관계 안내 완료; 이름 유지 확정, 사업자 심사 증빙은 별도 필요 |
+| 20260907-official-marketing-channels | 네이버 블로그·인스타그램 비즈니스 공식 계정 신규 개설 | DONE | [STATE](tasks/20260907-official-marketing-channels/STATE.md) | 외부 링크 확인 완료, 둘시네 운영 관계 소개 반영 |
 | 20260907-profile-performance | 프로필 진입 속도·조회 비용·오류 처리 개선 | DONE (local) | [STATE](tasks/20260907-profile-performance/STATE.md) | 로컬 검증 완료, 답변 인덱스 준비 후 웹 배포 필요 |
 | 20260907-profile-photo | 프로필 사진 등록 및 공개 영역 표시 | DONE (local) | [STATE](tasks/20260907-profile-photo/STATE.md) | 로컬 구현·검증 완료, Storage 규칙 포함 운영 배포 전 |
 | 20260907-frontier-performance | 진입 멈춤·저사양 렌더링 개선 | DONE (local) | [STATE](tasks/20260907-frontier-performance/STATE.md) | 로컬 성능 비교 완료, 운영 배포 전 |

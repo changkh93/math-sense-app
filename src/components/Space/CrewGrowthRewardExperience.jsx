@@ -12,6 +12,11 @@ const REACTIONS = [
   { id: 'thanks', emoji: '💎', label: '함께해서 고마워요' },
 ];
 
+const TIER_LABELS = { 10: 'CREW 10', 20: 'CREW 20', 40: 'CREW 40' };
+const TIER_REWARDS = { 10: 500, 20: 1000, 40: 4000 };
+const tierLabel = (target) => TIER_LABELS[Number(target)] || 'CREW 20';
+const tierReward = (target) => TIER_REWARDS[Number(target)] || 500;
+
 function formatCountdown(ms) {
   const totalSeconds = Math.max(0, Math.floor(ms / 1000));
   const days = Math.floor(totalSeconds / 86400);
@@ -172,8 +177,8 @@ export default function CrewGrowthRewardExperience({
           <div className="crew-growth-voyage__heading">
             <div className="crew-growth-voyage__icon">{rewarded ? <Gift size={22} /> : <Rocket size={22} />}</div>
             <div>
-              <span className="font-tech">{rewarded ? 'SUPPLY SHIP · ARRIVED' : finalApproach ? 'FINAL APPROACH' : `${progress?.target === 40 ? 'CREW 40' : 'CREW 20'} · VERIFICATION FLIGHT`}</span>
-              <strong className="font-title">{rewarded ? `${progress?.target === 40 ? 'CREW 40' : 'CREW 20'} 보급선 도착 완료` : awaitingSupply ? '검증 완료 · 보급품 적재 중' : '48시간 항해 카운트다운'}</strong>
+              <span className="font-tech">{rewarded ? 'SUPPLY SHIP · ARRIVED' : finalApproach ? 'FINAL APPROACH' : `${tierLabel(progress?.target)} · VERIFICATION FLIGHT`}</span>
+              <strong className="font-title">{rewarded ? `${tierLabel(progress?.target)} 보급선 도착 완료` : awaitingSupply ? '검증 완료 · 보급품 적재 중' : '48시간 항해 카운트다운'}</strong>
             </div>
             <div className="crew-growth-voyage__roster font-tech"><ShieldCheck size={14} /> 고정 승무원 {progress?.snapshotRetainedCount || 0} / {progress?.snapshotEligibleCount || progress?.target || 20}</div>
           </div>
@@ -209,7 +214,7 @@ export default function CrewGrowthRewardExperience({
                 )}
               </div>
               <div className="crew-growth-voyage__history font-tech">
-                항해 기록 · {formatArrivalTime(progress?.rewardedAtMs)} · 정식 승무원 {rewardedMemberCount}명 · 총 {((progress?.reward || celebration?.amount || 1000) * rewardedMemberCount).toLocaleString('ko-KR')}광석 지급
+                항해 기록 · {formatArrivalTime(progress?.rewardedAtMs)} · 정식 승무원 {rewardedMemberCount}명 · 총 {((progress?.reward || celebration?.amount || tierReward(progress?.target)) * rewardedMemberCount).toLocaleString('ko-KR')}광석 지급
               </div>
             </>
           )}
@@ -246,9 +251,9 @@ export default function CrewGrowthRewardExperience({
               ) : (
                 <>
                   <Motion.div className="crew-growth-ceremony__gem" initial={{ scale: 0.35, rotate: -18 }} animate={{ scale: [0.35, 1.18, 1], rotate: 0 }}>
-                    <Gem size={42} /><strong>+{celebration.amount || (celebration.target === 40 ? 4000 : 1000)}</strong><span className="font-tech">광석</span>
+                    <Gem size={42} /><strong>+{celebration.amount || tierReward(celebration.target)}</strong><span className="font-tech">광석</span>
                   </Motion.div>
-                  <h3 className="font-title">{celebration.target === 40 ? 'CREW 40' : 'CREW 20'} 항해 성공!</h3>
+                  <h3 className="font-title">{tierLabel(celebration.target)} 항해 성공!</h3>
                   <p>{celebration.rewardedMemberCount || celebration.target || 20}명의 승무원이 함께 만든 기록입니다. 이 순간은 크루 항해 기록에 영구 보존됩니다.</p>
                   <div className="crew-growth-ceremony__reaction-title font-tech">우리 크루에게 마음 보내기</div>
                   <div className="crew-growth-ceremony__reactions">

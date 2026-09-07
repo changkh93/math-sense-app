@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1920" height="600" viewBox="0 0 1920 600"><rect width="1920" height="600" fill="#f6f5f0"/><defs><linearGradient id="line"><stop stop-color="#00bed6"/><stop offset="1" stop-color="#8b5cf6"/></linearGradient></defs><rect x="100" y="92" width="120" height="120" rx="32" fill="#10182e"/><svg x="105" y="95" width="110" height="110" viewBox="0 0 500 500">
+  <defs>
+    <linearGradient id="orbit-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#00f3ff"/>
+      <stop offset="50%" stop-color="#8b5cf6"/>
+      <stop offset="100%" stop-color="#00ff88"/>
+    </linearGradient>
+    <filter id="glow" x="-25%" y="-25%" width="150%" height="150%">
+      <feGaussianBlur stdDeviation="10" result="blur"/>
+      <feComposite in="SourceGraphic" in2="blur" operator="over"/>
+    </filter>
+  </defs>
+
+  <!-- Background Space -->
+  <rect width="500" height="500" fill="transparent"/>
+
+  <!-- Orbital 'M' Structure - Centered at x=250 -->
+  <g transform="translate(0, 80)" filter="url(#glow)">
+    <path 
+      d="M 60,320 
+         C 60,150 160,50 210,120 
+         C 230,150 250,280 250,310
+         C 250,280 270,150 300,120
+         C 350,50 440,150 440,320"
+      fill="none" 
+      stroke="url(#orbit-grad)" 
+      stroke-width="28"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+    />
+    
+    <!-- Orbit Rings / Stars Accent -->
+    <ellipse cx="250" cy="200" rx="210" ry="90" fill="none" stroke="rgba(0, 243, 255, 0.25)" stroke-width="4" transform="rotate(-12 250 200)" />
+    <circle cx="210" cy="120" r="10" fill="#00f3ff"/>
+    <circle cx="300" cy="120" r="10" fill="#00ff88"/>
+    <circle cx="60" cy="320" r="14" fill="#8b5cf6"/>
+    <circle cx="440" cy="320" r="10" fill="#00f3ff"/>
+    <circle cx="250" cy="310" r="16" fill="#ffffff"/>
+  </g>
+
+</svg><g fill="#10182e" font-family="Apple SD Gothic Neo, sans-serif"><text x="254" y="176" font-size="70" font-weight="800">메타센스</text><text x="100" y="326" font-size="68" font-weight="700">AI 시대, 스스로 배우는 힘</text><text x="103" y="408" font-size="32">질문하고, 판단하고, 자기 말로 설명하는 공부</text><text x="104" y="520" font-size="26" fill="#46516b">초등수학 · 파이썬 · 고전읽기</text><text x="1650" y="520" font-size="26">msense.me</text></g><path d="M1300 345 C1350 160 1500 160 1530 320 S1730 420 1810 200" fill="none" stroke="url(#line)" stroke-width="4"/><circle cx="1300" cy="345" r="11" fill="#00bed6"/><circle cx="1810" cy="200" r="11" fill="#8b5cf6"/></svg>

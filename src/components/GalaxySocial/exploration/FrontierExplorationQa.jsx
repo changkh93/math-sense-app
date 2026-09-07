@@ -18,7 +18,8 @@ export default function FrontierExplorationQa() {
   const [command, setCommand] = useState(null)
   const send = (value) => setCommand({ ...value, id: Date.now() })
   return (
-    <main style={{ position: 'fixed', inset: 0 }}>
+    <main className="frontier-exploration-qa" style={{ position: 'fixed', inset: 0 }}>
+      <style>{'.frontier-exploration-qa .qa-controls button { font: 11px system-ui; padding: 5px 7px; min-height: 28px; border-radius: 5px; margin: 2px; }'}</style>
       <GalaxyWorld3D
         planet={planet}
         restorationPercent={60}
@@ -33,6 +34,7 @@ export default function FrontierExplorationQa() {
         paused={paused}
       />
       <div
+        className="qa-controls"
         style={{
           position: 'absolute',
           top: 10,
@@ -86,6 +88,12 @@ export default function FrontierExplorationQa() {
         </button>
         <button onClick={() => send({ position: [-10, 7, 1] })}>
           구름 정원 테스트
+        </button>
+        <button onClick={() => send({ position: [7, 11, -7] })}>
+          성층권 항로 테스트
+        </button>
+        <button onClick={() => send({ position: [5, 15, 7] })}>
+          저궤도 전망 테스트
         </button>
         <button onClick={() => send({ x: 1, duration: 3 })}>옆 이동 3초</button>
         <button onClick={() => send({ z: -1, duration: 3 })}>전진 3초</button>

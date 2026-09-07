@@ -10762,14 +10762,10 @@ exports.getCrewGrowthEventProgress = regionalFunctions.https.onCall(async (data,
     activeGuestCount: eventV2.activeGuestCount || 0,
   };
   const tiers = eventV2.tiers || {};
-  const tier20 = tiers.t20 || {};
-  const tier40 = tiers.t40 || {};
-  const isT20Rewarded = tier20.status === "rewarded";
-
-  const nextTierId = isT20Rewarded ? "t40" : "t20";
-  const currentActiveTier = isT20Rewarded ? tier40 : tier20;
-  const currentTarget = isT20Rewarded ? 40 : 20;
-  const currentReward = isT20Rewarded ? 4000 : 1000;
+  const nextTierId = crewGrowthPolicy.TIER_ORDER.find((id) => tiers[id]?.status !== "rewarded") || "t40";
+  const currentActiveTier = tiers[nextTierId] || {};
+  const currentTarget = crewGrowthPolicy.TIERS[nextTierId].target;
+  const currentReward = crewGrowthPolicy.TIERS[nextTierId].reward;
 
   const userLock = userLockSnap.exists ? userLockSnap.data() : null;
   const userLockedToThisCrew = userLock?.originCrewId === crewId && userLock?.status === "active";
@@ -10788,36 +10784,24 @@ exports.getCrewGrowthEventProgress = regionalFunctions.https.onCall(async (data,
     eventExcludedMemberCount: progressV2.eventExcludedMemberCount,
     activeGuestCount: progressV2.activeGuestCount,
     pendingGuestCount: eventV2.pendingGuestCount || 0,
-    tiers: {
-      t20: {
-        target: 20,
-        reward: 1000,
-        status: tier20.status || "collecting",
-        achievedAtMs: Number(tier20.achievedAtMs || 0),
-        verificationEndsAtMs: Number(tier20.verificationEndsAtMs || 0),
-        rewarded: tier20.status === "rewarded",
-        rewardedAtMs: Number(tier20.rewardedAtMs || 0),
-        snapshotRetainedCount: Number(tier20.snapshotRetainedCount || 0),
-        snapshotEligibleCount: Number(tier20.snapshotEligibleCount || 20),
-        rewardedMemberCount: Array.isArray(tier20.rewardedMemberIds) ? tier20.rewardedMemberIds.length : 0,
-        openedMemberCount: Array.isArray(tier20.openedMemberIds) ? tier20.openedMemberIds.length : 0,
-        reactionCounts: tier20.reactionCounts || {},
-      },
-      t40: {
-        target: 40,
-        reward: 4000,
-        status: tier40.status || "collecting",
-        achievedAtMs: Number(tier40.achievedAtMs || 0),
-        verificationEndsAtMs: Number(tier40.verificationEndsAtMs || 0),
-        rewarded: tier40.status === "rewarded",
-        rewardedAtMs: Number(tier40.rewardedAtMs || 0),
-        snapshotRetainedCount: Number(tier40.snapshotRetainedCount || 0),
-        snapshotEligibleCount: Number(tier40.snapshotEligibleCount || 40),
-        rewardedMemberCount: Array.isArray(tier40.rewardedMemberIds) ? tier40.rewardedMemberIds.length : 0,
-        openedMemberCount: Array.isArray(tier40.openedMemberIds) ? tier40.openedMemberIds.length : 0,
-        reactionCounts: tier40.reactionCounts || {},
-      },
-    },
+    tiers: Object.fromEntries(crewGrowthPolicy.TIER_ORDER.map((tierId) => {
+      const state = tiers[tierId] || {};
+      const meta = crewGrowthPolicy.TIERS[tierId];
+      return [tierId, {
+        target: meta.target,
+        reward: meta.reward,
+        status: state.status || "collecting",
+        achievedAtMs: Number(state.achievedAtMs || 0),
+        verificationEndsAtMs: Number(state.verificationEndsAtMs || 0),
+        rewarded: state.status === "rewarded",
+        rewardedAtMs: Number(state.rewardedAtMs || 0),
+        snapshotRetainedCount: Number(state.snapshotRetainedCount || 0),
+        snapshotEligibleCount: Number(state.snapshotEligibleCount || meta.target),
+        rewardedMemberCount: Array.isArray(state.rewardedMemberIds) ? state.rewardedMemberIds.length : 0,
+        openedMemberCount: Array.isArray(state.openedMemberIds) ? state.openedMemberIds.length : 0,
+        reactionCounts: state.reactionCounts || {},
+      }];
+    })),
     // V1 호환 필드 (기존 컴포넌트 즉각 호환용)
     achievedAtMs: Number(currentActiveTier.achievedAtMs || 0),
     verificationEndsAtMs: Number(currentActiveTier.verificationEndsAtMs || 0),
@@ -10845,7 +10829,7 @@ function serializeCrewGrowthCelebration(claim = {}, crew = {}, tierId = "t20") {
     tierId: claim.tierId || tierId,
     crewId: claim.crewId || "",
     crewName: claim.crewName || crew.name || "스터디 크루",
-    amount: Number(claim.amount || (tierId === "t40" ? crewGrowthPolicy.REWARD_T2 : crewGrowthPolicy.REWARD_T1)),
+    amount: Number(claim.amount || crewGrowthPolicy.TIERS[tierId]?.reward || crewGrowthPolicy.REWARD_T1),
     rewardedAtMs: Number(claim.rewardedAtMs || timestampMillis(claim.rewardedAt)),
     opened: Boolean(claim.openedAt || Number(claim.openedAtMs || 0) > 0),
     openedAtMs: Number(claim.openedAtMs || timestampMillis(claim.openedAt)),
@@ -10884,8 +10868,8 @@ exports.getCrewGrowthRewardCelebration = regionalFunctions.https.onCall(async (d
   const uid = await requireAuthUid(context);
   const tierId = cleanId(data?.tierId, 20);
   if (tierId) return loadCrewGrowthCelebration(uid, tierId);
-  // The next goal may already be t40 while the member's t20 box is unopened.
-  const claims = await Promise.all(["t20", "t40"].map(id =>
+  // The next goal may already be a higher tier while an unopened box remains.
+  const claims = await Promise.all(crewGrowthPolicy.TIER_ORDER.map(id =>
     crewGrowthService.getRewardClaimRef(admin.firestore(), id, uid).get()));
   const available = claims.filter(snap => snap.exists).map(snap => snap.data());
   const selected = available.find(claim => !claim.openedAt && !claim.openedAtMs) || available.at(-1);

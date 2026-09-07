@@ -31,6 +31,28 @@ export const normalizeMovementMode = (value) => ['grounded', 'flying', 'landing'
 export const getExplorationRadius = (worldRadius) => Math.min(92, worldRadius + 60)
 export const OCEAN_FLOOR_Y = -36
 export const FLIGHT_CEILING = 18
+export const HOVERPACK_FLIGHT_STAGES = Object.freeze([
+  Object.freeze({ id: 'launch', minY: 0, label: '기지 상공', eyebrow: 'LIFT-OFF', color: '#ffb45f', note: '추진기가 안정화됐어요. 섬의 윤곽을 내려다보며 상승해 보세요.' }),
+  Object.freeze({ id: 'cloud', minY: 5, label: '구름 항로', eyebrow: 'CLOUD DECK', color: '#8feaff', note: '구름층에 진입했어요. 첫 번째 항로 고리가 가까워집니다.' }),
+  Object.freeze({ id: 'stratosphere', minY: 9.5, label: '구름 위 항로', eyebrow: 'ABOVE CLOUDS', color: '#9ea9ff', note: '구름 위로 올라왔어요. 섬의 윤곽과 멀리 떠 있는 천체를 둘러보세요.' }),
+  Object.freeze({ id: 'orbit', minY: 13.5, label: '하늘 전망대', eyebrow: 'SKY VISTA', color: '#d9b8ff', note: '가장 높은 항로에 도달했어요. 아래로 펼쳐진 프론티어를 감상해 보세요.' }),
+])
+
+export function getHoverpackFlightStage(y = 0) {
+  const height = Number.isFinite(Number(y)) ? Number(y) : 0
+  return HOVERPACK_FLIGHT_STAGES.reduce((current, stage) => height >= stage.minY ? stage : current, HOVERPACK_FLIGHT_STAGES[0])
+}
+
+export const getHoverpackAltitudeProgress = (y = 0) => Math.round(Math.max(0, Math.min(1, (Number.isFinite(Number(y)) ? Number(y) : 0) / FLIGHT_CEILING)) * 100)
+
+export function isSkyLandmarkReached(position, landmark, radius = 1.9) {
+  if (!position || !landmark) return false
+  return Math.hypot(
+    Number(position.x || 0) - landmark.x,
+    Number(position.y || 0) - landmark.y,
+    Number(position.z || 0) - landmark.z,
+  ) <= radius
+}
 
 export function sampleExplorationWater(x, z, worldRadius, distantOcean = false) {
   const radius = Math.hypot(x, z)
@@ -94,8 +116,8 @@ export function getMarineHabitat(index, worldRadius) {
 export function getSkyLandmarks(worldRadius) {
   const r = worldRadius * .5
   return [
-    { id: 'cloud-garden', name: '구름 정원', x: -r, y: 7, z: 1, color: '#b6ffe4', note: '구름 사이에 꽃처럼 떠 있는 작은 빛을 만났어요.' },
-    { id: 'wind-arch', name: '바람의 문', x: r * .7, y: 11, z: -r * .7, color: '#ffe4a1', note: '금빛 고리를 통과하며 섬의 새로운 풍경을 발견했어요.' },
-    { id: 'aurora-nest', name: '별빛 쉼터', x: r * .5, y: 15, z: r * .7, color: '#d6b8ff', note: '하늘 가오리와 함께 가장 높은 풍경을 바라봐요.' },
+    { id: 'cloud-garden', order: 1, name: '구름 정원', callSign: 'CLOUD-01', x: -r, y: 7, z: 1, color: '#9dffe1', note: '첫 항로 통과 · 구름 사이에서 섬 전체가 하나의 작은 개척지처럼 보여요.' },
+    { id: 'wind-arch', order: 2, name: '바람의 문', callSign: 'WIND-02', x: r * .7, y: 11, z: -r * .7, color: '#ffd878', note: '두 번째 항로 통과 · 다음은 고도 15의 별빛 쉼터예요.' },
+    { id: 'aurora-nest', order: 3, name: '별빛 쉼터', callSign: 'SKY-03', x: r * .5, y: 15, z: r * .7, color: '#c9a9ff', note: '최종 항로 통과 · 세 지점을 모두 방문했어요. 이제 섬과 바다 위를 자유롭게 비행해 보세요.' },
   ]
 }

@@ -2,6 +2,8 @@
 "use strict";
 
 const CAMPAIGN_ID = "crew_growth_v2_2026";
+const TARGET_T0 = 10;
+const REWARD_T0 = 500;
 const TARGET_T1 = 20;
 const REWARD_T1 = 1000;
 const TARGET_T2 = 40;
@@ -20,6 +22,12 @@ const HEARTBEAT_MAX_CREDIT_SEC = 75; // 75초 상한
 const HEARTBEAT_MIN_INTERVAL_MS = 15000; // 15초 최소 간격
 
 const TIERS = {
+  t10: {
+    id: "t10",
+    target: TARGET_T0,
+    reward: REWARD_T0,
+    label: "CREW 10",
+  },
   t20: {
     id: "t20",
     target: TARGET_T1,
@@ -33,6 +41,10 @@ const TIERS = {
     label: "CREW 40",
   },
 };
+
+// 티어는 항상 낮은 목표부터 순차 개방된다. 각 티어는 바로 아래 티어가 지급된 후에만 활성화된다.
+const TIER_ORDER = ["t10", "t20", "t40"];
+const PREVIOUS_TIER_ID = { t20: "t10", t40: "t20" };
 
 /**
  * 게스트의 총 유효 세션 수 계산 (완료된 세션 + 현재 활성 세션의 유효 여부)
@@ -194,13 +206,19 @@ function isMemberEligibleForCrewGrowth(lockRecord = {}, crewId = "", nowMs = Dat
 }
 
 /**
- * Tier별 보상액 계산 (멱등성: Tier 1은 1000, Tier 2는 4000, 소급 없음)
+ * Tier별 보상액 계산 (멱등성: 티어당 고정액, 소급 없음)
  */
 function calculateTierRewardAmount(tierId, { hasTierClaim = false } = {}) {
   if (hasTierClaim) return 0;
-  if (tierId === "t20") return REWARD_T1;
-  if (tierId === "t40") return REWARD_T2;
-  return 0;
+  return TIERS[tierId]?.reward || 0;
+}
+
+/**
+ * 티어의 순차 개방 조건: 바로 아래 티어가 지급 완료 상태여야 한다.
+ */
+function isTierUnlocked(tierId, tiers = {}) {
+  const previousTierId = PREVIOUS_TIER_ID[tierId];
+  return !previousTierId || tiers[previousTierId]?.status === "rewarded";
 }
 
 /**
@@ -212,7 +230,7 @@ function evaluateTierState({
   eligibleCount = 0,
   nowMs = Date.now(),
 }) {
-  const target = TIERS[tierId]?.target || (tierId === "t40" ? TARGET_T2 : TARGET_T1);
+  const target = TIERS[tierId]?.target ?? TARGET_T1;
   const status = currentTierState.status || "collecting";
 
   if (status === "rewarded") {
@@ -264,6 +282,8 @@ function evaluateTierState({
 
 module.exports = {
   CAMPAIGN_ID,
+  TARGET_T0,
+  REWARD_T0,
   TARGET_T1,
   REWARD_T1,
   TARGET_T2,
@@ -278,10 +298,13 @@ module.exports = {
   HEARTBEAT_MAX_CREDIT_SEC,
   HEARTBEAT_MIN_INTERVAL_MS,
   TIERS,
+  TIER_ORDER,
+  PREVIOUS_TIER_ID,
   getGuestQualifiedSessionCount,
   isCrewGrowthGuestEligibleV2,
   processGuestHeartbeat,
   isMemberEligibleForCrewGrowth,
   calculateTierRewardAmount,
+  isTierUnlocked,
   evaluateTierState,
 };

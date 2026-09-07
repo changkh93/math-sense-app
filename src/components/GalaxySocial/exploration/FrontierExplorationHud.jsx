@@ -1,6 +1,6 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { AdditiveBlending } from 'three'
-import { EXPLORATION_KITS, HOVERPACK_FLAME_LAYERS, getSkyLandmarks, normalizeOwnedExplorationKits, resolveExplorationKitShortcut } from './frontierExploration.js'
+import { EXPLORATION_KITS, HOVERPACK_FLAME_LAYERS, getHoverpackAltitudeProgress, getHoverpackFlightStage, getSkyLandmarks, isSkyLandmarkReached, normalizeOwnedExplorationKits, resolveExplorationKitShortcut } from './frontierExploration.js'
 import './FrontierExploration.css'
 import { useFrame } from '@react-three/fiber'
 import { releaseFrontierPointerLock } from '../frontierPointerLock.js'
@@ -11,13 +11,16 @@ export function SwimFin() {
   </mesh>
 }
 
-function HoverpackFlames({ flying }) {
+function HoverpackFlames({ flying, motionRef }) {
   const flames = useRef()
-  useFrame(({ clock }) => {
+  const power = useRef(.65)
+  useFrame(({ clock }, delta) => {
     if (!flames.current) return
+    const targetPower = motionRef?.current?.userData.flightThrust ?? .75
+    power.current += (targetPower - power.current) * (1 - Math.exp(-Math.min(delta, .05) * 8))
     const flicker = Math.sin(clock.elapsedTime * 27) * .08 + Math.sin(clock.elapsedTime * 43) * .04
     flames.current.visible = flying
-    flames.current.scale.set(1 - flicker * .28, 1 + flicker, 1 - flicker * .28)
+    flames.current.scale.set(1 - flicker * .28, power.current * (1 + flicker), 1 - flicker * .28)
   })
   return <group ref={flames} position={[0, -.39, 0]} visible={flying}>
     {[-.46, .46].map((x) => <group key={x} position={[x, 0, 0]}>
@@ -36,12 +39,18 @@ function HoverpackFlames({ flying }) {
   </group>
 }
 
-export function ExplorationEquipment({ kit = 'none', flying = false }) {
+export function ExplorationEquipment({ kit = 'none', flying = false, motionRef }) {
   if (kit === 'hoverpack') return <group position={[0, 1.24, -.58]}>
+    <mesh position={[0, .08, .09]} scale={[1, 1.15, .7]}><boxGeometry args={[.62, .72, .22]} /><meshStandardMaterial color="#24384b" metalness={.72} roughness={.24} /></mesh>
+    <mesh position={[0, .13, -.04]}><boxGeometry args={[.34, .32, .08]} /><meshStandardMaterial color="#8cf4db" emissive="#1a836f" emissiveIntensity={1.1} toneMapped={false} /></mesh>
     {[-.46, .46].map((x) => <group key={x} position={[x, 0, 0]}>
-      <mesh><cylinderGeometry args={[.19, .24, .78, 8]} /><meshStandardMaterial color="#62cbd5" metalness={.5} roughness={.4} /></mesh>
+      <mesh castShadow><cylinderGeometry args={[.18, .23, .82, 12]} /><meshStandardMaterial color="#6fc9d3" metalness={.78} roughness={.2} /></mesh>
+      <mesh position={[0, .28, 0]} rotation={[Math.PI / 2, 0, 0]}><torusGeometry args={[.19, .035, 6, 16]} /><meshStandardMaterial color="#d8f7f4" metalness={.9} roughness={.12} /></mesh>
+      <mesh position={[0, -.47, 0]}><cylinderGeometry args={[.12, .17, .18, 12]} /><meshStandardMaterial color="#313d4e" metalness={.88} roughness={.2} /></mesh>
+      <mesh position={[x < 0 ? -.18 : .18, .05, .02]} rotation={[0, 0, x < 0 ? .32 : -.32]}><boxGeometry args={[.08, .5, .28]} /><meshStandardMaterial color="#ffbf68" emissive="#8b4318" emissiveIntensity={.5} /></mesh>
     </group>)}
-    <HoverpackFlames flying={flying} />
+    <mesh position={[0, -.3, .03]} rotation={[Math.PI / 2, 0, 0]}><torusGeometry args={[.31, .035, 6, 18]} /><meshStandardMaterial color="#778aa0" metalness={.84} roughness={.2} /></mesh>
+    <HoverpackFlames flying={flying} motionRef={motionRef} />
   </group>
   if (kit === 'diving') return <group>
     <mesh position={[0, 1.24, -.62]}><capsuleGeometry args={[.25, .52, 4, 8]} /><meshStandardMaterial color="#ffd48d" roughness={.5} /></mesh>
@@ -79,10 +88,16 @@ export default function FrontierExplorationHud({
   const [skyFound, setSkyFound] = useState(() => {
     try {
       const value = JSON.parse(localStorage.getItem(`${storageKey}:sky`) || '[]')
-      return Array.isArray(value) ? value.filter((id) => getSkyLandmarks(worldRadius).some((site) => site.id === id)) : []
+      return Array.isArray(value) ? [...new Set(value.filter((id) => getSkyLandmarks(worldRadius).some((site) => site.id === id)))] : []
     } catch { return [] }
   })
   const [notice, setNotice] = useState('')
+  useEffect(() => {
+    if (!notice) return undefined
+    const timer = window.setTimeout(() => setNotice(''), 5000)
+    return () => window.clearTimeout(timer)
+  }, [notice])
+  const flightStageSeen = useRef('launch')
   const ownedKitIds = normalizeOwnedExplorationKits([...ownedKits, ...sessionOwnedKits])
   useEffect(() => {
     const reset = () => { inputRef.current.vertical = 0 }
@@ -104,22 +119,37 @@ export default function FrontierExplorationHud({
     window.addEventListener('keydown', closePanel, true)
     return () => window.removeEventListener('keydown', closePanel, true)
   }, [open])
-  const skySites = getSkyLandmarks(worldRadius)
-  const skyNearby = position.movementMode === 'flying' && skySites.find((site) => Math.hypot(position.x - site.x, position.y - site.y, position.z - site.z) < 2)
+  const skySites = useMemo(() => getSkyLandmarks(worldRadius), [worldRadius])
   const skyTarget = skySites.find((site) => !skyFound.includes(site.id))
+  const skyNearby = !disabled && position.movementMode === 'flying' && skyTarget && isSkyLandmarkReached(position, skyTarget) ? skyTarget : null
+  const flightStage = getHoverpackFlightStage(position.y)
+  const altitudeProgress = getHoverpackAltitudeProgress(position.y)
   const direction = (target) => {
     const dx = target.x - position.x
     const dz = target.z - position.z
     if (Math.abs(dx) <= 1 && Math.abs(dz) <= 1) return '바로 여기'
     return `${Math.abs(dz) > 1 ? dz > 0 ? '남' : '북' : ''}${Math.abs(dx) > 1 ? dx > 0 ? '동' : '서' : ''}쪽`
   }
-  const recordSky = () => {
-    if (!skyNearby || skyFound.includes(skyNearby.id)) return
-    const next = [...skyFound, skyNearby.id]
+  const nearbySkyId = skyNearby?.id || ''
+  useEffect(() => {
+    if (!nearbySkyId || skyFound.includes(nearbySkyId)) return
+    const site = skySites.find((item) => item.id === nearbySkyId)
+    if (!site) return
+    const next = [...skyFound, site.id]
     setSkyFound(next)
-    setNotice(skyNearby.note)
-    try { localStorage.setItem(`${storageKey}:sky`, JSON.stringify(next)) } catch { setNotice('이번 탐험 동안 발견 기록을 보관해요.') }
-  }
+    setNotice(site.note)
+    try { localStorage.setItem(`${storageKey}:sky`, JSON.stringify(next)) } catch { setNotice(`${site.note} · 이번 탐험 동안만 기록됩니다.`) }
+  }, [nearbySkyId, skyFound, skySites, storageKey])
+  useEffect(() => {
+    if (travel.kit !== 'hoverpack' || position.movementMode !== 'flying') {
+      flightStageSeen.current = 'launch'
+      return
+    }
+    if (flightStage.id === flightStageSeen.current) return
+    flightStageSeen.current = flightStage.id
+    if (nearbySkyId) return
+    setNotice(`${flightStage.label} 진입 · ${flightStage.note}`)
+  }, [flightStage, nearbySkyId, position.movementMode, travel.kit])
   const chooseKit = (kit) => setTravel((current) => ({
     ...current, kit, flight: kit === 'hoverpack',
     recovery: current.recovery,
@@ -217,9 +247,16 @@ export default function FrontierExplorationHud({
     </div>
     {travel.birdView && <p className="frontier-exploration__hint">드래그 회전 · 휠 확대/축소 · B 시점 복귀</p>}
     {travel.kit === 'hoverpack' && <section className="frontier-exploration__discovery">
-      <strong>구름 위 탐험 · {skyFound.length}/3</strong>
-      <p>{skyTarget ? `${skyTarget.name} · ${direction(skyTarget)} ${Math.round(Math.hypot(position.x - skyTarget.x, position.z - skyTarget.z))}m · 목표 높이 ${skyTarget.y}` : '세 하늘 명소를 모두 발견했어요. 구름 사이에서 잠시 쉬어가요.'}</p>
-      {skyNearby && <button type="button" disabled={disabled || skyFound.includes(skyNearby.id)} onClick={recordSky}>{skyFound.includes(skyNearby.id) ? '발견 완료' : '풍경 기록하기'} · {skyNearby.name}</button>}
+      <div className="frontier-flight-stage" style={{ '--flight-stage': flightStage.color }}>
+        <span>{flightStage.eyebrow}</span><strong>{flightStage.label}</strong><em>ALT {Number(position.y || 0).toFixed(1)}m</em>
+        <i><b style={{ width: `${altitudeProgress}%` }} /></i>
+      </div>
+      <div className="frontier-flight-route" aria-label={`고공 항로 ${skyFound.length}/3 완료`}>
+        {skySites.map((site) => <span key={site.id} className={skyFound.includes(site.id) ? 'complete' : skyTarget?.id === site.id ? 'current' : ''} title={site.name}><i />{site.order}</span>)}
+      </div>
+      <strong>고공 항로 · {skyFound.length}/3</strong>
+      <p>{skyTarget ? `${skyTarget.name} · ${direction(skyTarget)} ${Math.round(Math.hypot(position.x - skyTarget.x, position.z - skyTarget.z))}m · 고도 ${skyTarget.y}` : '항로 완주 · 이제 자유롭게 풍경을 둘러보세요.'}</p>
+      <small>빛의 중심을 통과하면 자동 기록됩니다.</small>
     </section>}
     {notice && <p className="frontier-exploration__hint" role="status">{notice}</p>}
   </aside>

@@ -1,8 +1,8 @@
 "use strict";
 
 const { FieldValue, Timestamp } = require("firebase-admin/firestore");
-const { CAMPAIGN_ID, TIERS, MEMBER_MIN_TENURE_MS, isCrewGrowthGuestEligibleV2,
-  isMemberEligibleForCrewGrowth, evaluateTierState } = require("./crewGrowthEventPolicy.cjs");
+const { CAMPAIGN_ID, TIERS, TIER_ORDER, MEMBER_MIN_TENURE_MS, isCrewGrowthGuestEligibleV2,
+  isMemberEligibleForCrewGrowth, isTierUnlocked, evaluateTierState } = require("./crewGrowthEventPolicy.cjs");
 const ids = (values) => [...new Set((values || []).filter(Boolean))];
 const memberIds = (crew) => ids([crew.leaderId, ...(crew.memberIds || [])]);
 const liveMember = (user, crewId) => user && user.crewId === crewId && !user.isDeleted && user.status !== "deleted" && !user.deletedAt;
@@ -85,8 +85,8 @@ async function reconcileCrewGrowthEventV2(db, crewId, { allowReward = false, now
     const tiers = { ...(previous.tiers || {}) };
     const wakeups = [...progress.futureEligibility];
     if (progress.crew.status === "approved") {
-      for (const tierId of ["t20", "t40"]) {
-        if (tierId === "t40" && tiers.t20?.status !== "rewarded") break;
+      for (const tierId of TIER_ORDER) {
+        if (!isTierUnlocked(tierId, tiers)) break;
         const current = tiers[tierId] || {};
         const retained = retainedSnapshot(current, progress);
         const evaluation = evaluateTierState({ tierId, currentTierState: current,
@@ -110,7 +110,7 @@ async function reconcileCrewGrowthEventV2(db, crewId, { allowReward = false, now
       campaignId: CAMPAIGN_ID, schemaVersion: 2, eligibleMemberCount: progress.eventEligibleMemberCount,
       memberCount: progress.memberCount, excludedMemberCount: progress.eventExcludedMemberCount,
       activeGuestCount: progress.activeGuestCount, pendingGuestCount: progress.pendingGuests.length,
-      eligibleCount: progress.eligibleCount, nextTierId: tiers.t20?.status === "rewarded" ? "t40" : "t20", tiers,
+      eligibleCount: progress.eligibleCount, nextTierId: TIER_ORDER.find((id) => tiers[id]?.status !== "rewarded") || "t40", tiers,
     };
     const nextAt = progress.crew.status === "approved" && wakeups.length ? Math.min(...wakeups.filter((n) => n > 0)) : 0;
     const comparable = { ...previous };
@@ -148,7 +148,7 @@ async function payoutTierReward(db, crewId, tierId, { nowMs = Date.now(), record
     if (!crew || crew.status !== "approved" || config.rewardEnabled === false) return;
     const state = crew.growthEventV2?.tiers?.[tierId];
     if (state?.status !== "verifying" || !state.verificationEndsAtMs || nowMs < state.verificationEndsAtMs) return;
-    if (tierId === "t40" && crew.growthEventV2?.tiers?.t20?.status !== "rewarded") return;
+    if (!isTierUnlocked(tierId, crew.growthEventV2?.tiers || {})) return;
     const snapshotMembers = ids(state.snapshotMemberIds);
     const snapshotGuests = ids(state.snapshotGuestUids);
     const [users, locks, claims, guests] = await Promise.all([
