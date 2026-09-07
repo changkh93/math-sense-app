@@ -5,6 +5,7 @@ const {
   isCrewGrowthGuestEligibleV2,
   isMemberEligibleForCrewGrowth,
   calculateTierRewardAmount,
+  isTierUnlocked,
   evaluateTierState,
   GUEST_MIN_SESSION_GAP_MS,
   MEMBER_MIN_TENURE_MS,
@@ -177,6 +178,10 @@ test("isMemberEligibleForCrewGrowth checks originCrewId and 48h tenure", () => {
 });
 
 test("calculateTierRewardAmount: idempotent tier payout without retroactive catchup", () => {
+  // Tier 0 payout
+  assert.equal(calculateTierRewardAmount("t10", { hasTierClaim: false }), 500);
+  assert.equal(calculateTierRewardAmount("t10", { hasTierClaim: true }), 0);
+
   // Tier 1 payout
   assert.equal(calculateTierRewardAmount("t20", { hasTierClaim: false }), 1000);
   assert.equal(calculateTierRewardAmount("t20", { hasTierClaim: true }), 0);
@@ -184,6 +189,16 @@ test("calculateTierRewardAmount: idempotent tier payout without retroactive catc
   // Tier 2 payout: always 4000 (no +1000 retroactive)
   assert.equal(calculateTierRewardAmount("t40", { hasTierClaim: false }), 4000);
   assert.equal(calculateTierRewardAmount("t40", { hasTierClaim: true }), 0);
+});
+
+test("isTierUnlocked: each tier opens only after the previous tier is rewarded", () => {
+  assert.equal(isTierUnlocked("t10", {}), true);
+  assert.equal(isTierUnlocked("t20", {}), false);
+  assert.equal(isTierUnlocked("t20", { t10: { status: "verifying" } }), false);
+  assert.equal(isTierUnlocked("t20", { t10: { status: "rewarded" } }), true);
+  assert.equal(isTierUnlocked("t40", { t10: { status: "rewarded" } }), false);
+  assert.equal(isTierUnlocked("t40", { t10: { status: "rewarded" }, t20: { status: "verifying" } }), false);
+  assert.equal(isTierUnlocked("t40", { t10: { status: "rewarded" }, t20: { status: "rewarded" } }), true);
 });
 
 test("evaluateTierState: handles transition between collecting and verifying", () => {
