@@ -7,6 +7,7 @@ For an existing task, read its STATE.md and actual artifacts before continuing.
 
 | ID | Goal | Phase | State file | Next action |
 |---|---|---|---|---|
+| 20260907-workbook-completion-report | 분수 나눗셈 워크북 완료 체크 제보 조사 | DONE (local fix) | [STATE](tasks/20260907-workbook-completion-report/STATE.md) | 완료 문서를 무시하던 카드 판정 수정, 회귀검사·빌드 통과; 웹 배포 전 |
 | 20260907-lumi-runtime-recovery | 루미 신호 개수·정답 판정 수정과 엔진 복구 안내 | DONE (local) | [STATE](tasks/20260907-lumi-runtime-recovery/STATE.md) | 실제 브라우저 정답·숨은 조건 통과, 지연 복구 및 빌드 검증; 운영 배포 전 |
 | 20260907-code-trace-enter-scroll | 코드 트레이스 Enter 후 줄 시작 복귀 | DONE (local) | [STATE](tasks/20260907-code-trace-enter-scroll/STATE.md) | 사용자 Chrome 탭에서 문서 끝 Enter 3회 및 커서 가시성 확인, 운영 배포 전 |
 | 20260907-hoverpack-water | 호버팩 수면 보호·장비 변경 자동 부상 | DONE (local) | [STATE](tasks/20260907-hoverpack-water/STATE.md) | 수면 제한·수중 전환 브라우저 검증 및 빌드 완료, 운영 배포 전 |

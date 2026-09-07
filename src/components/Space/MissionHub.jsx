@@ -11,6 +11,7 @@ import { useCodeExercises } from '../../hooks/useContent'
 import { calculateGrowthUpdates } from '../../utils/rankingUtils'
 import { isRadarActive } from '../../utils/streakUtils'
 import { getEmbeddablePdfUrl, normalizePdfUrl } from '../../utils/pdfUrlUtils'
+import { getMissionCardCompletion } from '../../utils/missionCardCompletion'
 import { isCodeTraceProgressComplete } from '../../utils/codeTraceProgressUtils'
 import {
   getVideoCompletionMetrics,
@@ -1336,6 +1337,7 @@ export default function MissionHub({
 
   // ─── Learning Progress (Firestore) ───
   const [learningProgress, setLearningProgressState] = useState(null)
+  const [completionProgressSnapshot, setCompletionProgressSnapshot] = useState(null)
   const [loadingProgress, setLoadingProgress] = useState(true)
   const initialProgressRef = useRef(null) // Immutable snapshot from initial getDoc (not affected by auto-save)
   const learningProgressRef = useRef(null) // Latest doc for save-time clamps (avoids stale interval closures)
@@ -1371,6 +1373,7 @@ export default function MissionHub({
       // Switch to onSnapshot for real-time reactivity (fixes stale state issues)
       unsubscribe = onSnapshot(progressRef, (snap) => {
         if (cancelled) return
+        setCompletionProgressSnapshot({ userId, unitId, data: snap.exists() ? snap.data() : null })
         if (snap.exists()) {
           const data = snap.data()
           applyLearningProgress(data)
@@ -3051,8 +3054,11 @@ export default function MissionHub({
   const txAllCompleted = txTotalCount > 0 && txCompletedCount === txTotalCount
   const txAnyCompleted = txCompletedCount > 0
   
-  const quizCompleted = bestScores[unitId] !== undefined
-  const workbookCompleted = bestScores[`${unitId}_workbook`] !== undefined
+  const cardCompletion = getMissionCardCompletion({
+    userId, unitId, bestScores, progressSnapshot: completionProgressSnapshot,
+  })
+  const quizCompleted = cardCompletion.quiz.completed
+  const workbookCompleted = cardCompletion.workbook.completed
   const codeTraceCompleted = isCodeTraceProgressComplete(
     learningProgress?.codeTrace,
     codeExercises.map(exercise => exercise?.id || exercise?.docId || '').filter(Boolean)
@@ -3197,7 +3203,7 @@ export default function MissionHub({
                   </p>
                   {workbookCompleted && (
                     <span className="font-tech" style={{ color: 'var(--neon-blue)', fontSize: '0.8rem', marginTop: '0.5rem' }}>
-                      BEST: {bestScores[`${unitId}_workbook`]}점
+                      {cardCompletion.workbook.bestScore === null ? '학습 완료' : `BEST: ${cardCompletion.workbook.bestScore}점`}
                     </span>
                   )}
                 </motion.div>
@@ -3263,7 +3269,7 @@ export default function MissionHub({
                   </p>
                   {quizCompleted && (
                     <span className="font-tech" style={{ color: 'var(--star-gold)', fontSize: '0.8rem', marginTop: '0.5rem' }}>
-                      BEST: {bestScores[unitId]}점
+                      {cardCompletion.quiz.bestScore === null ? '학습 완료' : `BEST: ${cardCompletion.quiz.bestScore}점`}
                     </span>
                   )}
                 </motion.div>
