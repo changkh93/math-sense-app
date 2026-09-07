@@ -1047,7 +1047,14 @@ function CodeTraceEditor({
       view.dispatch({
         changes: { from: selection.from, to: selection.to, insert: insertion },
         selection: EditorSelection.cursor(nextCursor),
-        effects: EditorView.scrollIntoView(nextCursor, { x: 'start', y: 'nearest' }),
+      });
+      // 현재 CodeMirror는 변경과 함께 전달한 스크롤 위치를 변경 전 문서
+      // 길이로 제한한다. 새 줄 생성 후 별도로 요청해야 이전 줄 끝으로 가지 않는다.
+      view.dispatch({
+        effects: EditorView.scrollIntoView(
+          EditorSelection.range(nextCursor - nextIndent.length, nextCursor),
+          { x: 'start', xMargin: 16, y: 'nearest' },
+        ),
       });
       soundManager.playClick();
       latestRef.current.onLinePulse?.(latestRef.current.lineCombo);
@@ -1324,6 +1331,16 @@ export default function CodeTracePlayer({
     () => detectIndentUnit(requiredAnswerCode),
     [requiredAnswerCode]
   );
+  const answerCode = getModeCode({ ...exercise, answerCode: requiredAnswerCode }, mode, visibleLines);
+  const totalLines = normalizeNewlines(requiredAnswerCode || '').split('\n').length;
+  const answerLines = useMemo(() => {
+    return normalizeNewlines(answerCode || '').split('\n');
+  }, [answerCode]);
+  const visibleAnswerLineCount = Math.max(1, answerLines.length);
+  const currentStudentLineNumber = useMemo(() => {
+    const codeBeforeCursor = studentCode.slice(0, studentSelection.start);
+    return normalizeNewlines(codeBeforeCursor).split('\n').length;
+  }, [studentCode, studentSelection.start]);
   // 현재 세트의 입력을 빈 상태로 되돌림 (초기화 버튼). 초안도 함께 비움.
   const resetExercise = () => {
     if (currentExerciseId) {
@@ -1789,16 +1806,6 @@ export default function CodeTracePlayer({
     }
   };
 
-  const answerCode = getModeCode({ ...exercise, answerCode: requiredAnswerCode }, mode, visibleLines);
-  const totalLines = normalizeNewlines(requiredAnswerCode || '').split('\n').length;
-  const answerLines = useMemo(() => {
-    return normalizeNewlines(answerCode || '').split('\n');
-  }, [answerCode]);
-  const visibleAnswerLineCount = Math.max(1, answerLines.length);
-  const currentStudentLineNumber = useMemo(() => {
-    const codeBeforeCursor = studentCode.slice(0, studentSelection.start);
-    return normalizeNewlines(codeBeforeCursor).split('\n').length;
-  }, [studentCode, studentSelection.start]);
   const codePanelHeight = Math.min(
     CODE_PANEL_MAX_HEIGHT,
     Math.max(

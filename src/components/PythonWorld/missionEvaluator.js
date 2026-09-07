@@ -614,7 +614,7 @@ export function evaluateMissionAttempt({
 }) {
   const worldGoalPassed = hasReachedGoal(mission, runtimeResult)
   const conceptEvidence = getConceptEvidence(mission, runtimeResult)
-  const basePassed = worldGoalPassed && conceptEvidence.passed
+  const basePassed = worldGoalPassed && conceptEvidence.passed && !runtimeResult?.error
 
   const requiredVariants = Array.isArray(mission?.hiddenVariants) ? mission.hiddenVariants : []
   const hasVariants = requiredVariants.length > 0
@@ -662,6 +662,7 @@ export function evaluateMissionAttempt({
   }
 
   const failureReason =
+    (runtimeResult?.error ? translatePythonError(runtimeResult.error) : '') ||
     goalEvaluation.failureReason ||
     conceptMissingMsg ||
     (conceptEvidence.missingMustCall?.length > 0 ? `필수 함수 호출 누락: ${conceptEvidence.missingMustCall.join(', ')}()를 호출하세요.` : '') ||
@@ -828,7 +829,7 @@ export function getDetailedGoalEvaluation(mission, runtimeResult) {
 export function evaluateMissionRun(mission, runtimeResult, hiddenPassed = null) {
   const worldGoalPassed = hasReachedGoal(mission, runtimeResult)
   const conceptEvidence = getConceptEvidence(mission, runtimeResult)
-  const basePassed = worldGoalPassed && conceptEvidence.passed
+  const basePassed = worldGoalPassed && conceptEvidence.passed && !runtimeResult?.error
 
   const requiredVariants = Array.isArray(mission?.hiddenVariants) ? mission.hiddenVariants : []
   const hasVariants = requiredVariants.length > 0
@@ -844,6 +845,7 @@ export function evaluateMissionRun(mission, runtimeResult, hiddenPassed = null) 
 
   const goalEvaluation = getDetailedGoalEvaluation(mission, runtimeResult)
   const failureReason =
+    (runtimeResult?.error ? translatePythonError(runtimeResult.error) : '') ||
     goalEvaluation.failureReason ||
     (conceptEvidence.missingMustCall?.length > 0 ? `필수 함수 호출 누락: ${conceptEvidence.missingMustCall.join(', ')}()를 호출하세요.` : '') ||
     (conceptEvidence.missingMustUse?.length > 0 ? `필수 개념 미사용: '${conceptEvidence.missingMustUse.join(', ')}'을(를) 코드에 사용하세요.` : '') ||

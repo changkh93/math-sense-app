@@ -2035,3 +2035,10 @@
 }
 
 
+
+.python-lab__runtime-notice { display: flex; align-items: center; gap: 12px; padding: 12px 14px; background: #172839; border-bottom: 1px solid #496279; color: #dae8f6; font-size: .8rem; }
+.python-lab__runtime-notice > div { flex: 1; min-width: 0; }
+.python-lab__runtime-notice p { margin: 5px 0 0; line-height: 1.5; }
+.python-lab__runtime-notice button { flex-shrink: 0; padding: 8px 10px; color: #d8fff5; background: #174b47; border: 1px solid #59bba4; border-radius: 6px; cursor: pointer; }
+.python-lab__runtime-notice button:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+@media (max-width: 600px) { .python-lab__runtime-notice { flex-wrap: wrap; } }

@@ -54,7 +54,7 @@ function getNextRunSlot(unitId, missionId) {
   }
 }
 
-export function formatPythonMemoryValue(val) {
+function formatPythonMemoryValue(val) {
   if (val === null || val === undefined) return 'None'
   if (typeof val === 'boolean') return val ? 'True' : 'False'
   if (typeof val === 'number') return String(val)
@@ -409,7 +409,6 @@ export default function PythonMissionLab({ unit, missionSet, initialMissionIndex
       onStatus: ({ status }) => setRuntimeStatus(status),
     })
     runtimeRef.current = runtime
-    runtime.load().then(() => setRuntimeStatus('ready')).catch(() => setRuntimeStatus('error'))
     return () => {
       clearInterval(autoplayRef.current)
       runtime.dispose()
@@ -708,6 +707,7 @@ export default function PythonMissionLab({ unit, missionSet, initialMissionIndex
     const startedAt = performance.now()
     try {
       const primaryResult = await runtimeRef.current.run({ mission, code, inputValues })
+      if (runIdRef.current !== runId) return
       const friendlyPrimary = primaryResult.error
         ? { ...primaryResult, error: { ...primaryResult.error, friendlyMessage: translatePythonError(primaryResult.error) } }
         : { ...primaryResult }
@@ -716,7 +716,7 @@ export default function PythonMissionLab({ unit, missionSet, initialMissionIndex
       let hiddenPassed = null
       const initialEvaluation = evaluateMissionRun(mission, friendlyPrimary, hiddenPassed)
 
-      if (initialEvaluation.worldGoalPassed && initialEvaluation.conceptPassed && variants.length > 0) {
+      if (initialEvaluation.basePassed && variants.length > 0) {
         hiddenPassed = true
         for (const variant of variants) {
           const variantMission = getMissionVariant(mission, variant)
@@ -725,6 +725,7 @@ export default function PythonMissionLab({ unit, missionSet, initialMissionIndex
             code,
             inputValues: variant.inputValues || inputValues,
           })
+          if (runIdRef.current !== runId) return
           const variantEvaluation = evaluateMissionRun(variantMission, variantResult, true)
           if (!variantEvaluation.worldGoalPassed || !variantEvaluation.conceptPassed || variantResult.error) {
             hiddenPassed = false
@@ -792,6 +793,8 @@ export default function PythonMissionLab({ unit, missionSet, initialMissionIndex
     } catch (error) {
       if (runIdRef.current !== runId) return
       setRunning(false)
+      // Infrastructure failures are recoverable connection issues, not student attempts.
+      if (error.name === 'PythonRuntimeError' || error.name === 'AbortError') return
       const fallbackEvaluation = {
         completed: false,
         cleared: false,
@@ -815,8 +818,6 @@ export default function PythonMissionLab({ unit, missionSet, initialMissionIndex
     setPlaying(false)
     runtimeRef.current?.stop()
     setRunning(false)
-    setRuntimeStatus('loading')
-    runtimeRef.current?.load().catch(() => setRuntimeStatus('error'))
   }
 
   const updateCode = useCallback((nextCode) => {
@@ -931,19 +932,8 @@ export default function PythonMissionLab({ unit, missionSet, initialMissionIndex
           >
             {soundMuted ? '🔇' : '🔊'}
           </button>
-          <div
-            className={`python-lab__runtime python-lab__runtime--${runtimeStatus}`}
-            onClick={() => {
-              if (runtimeStatus === 'error') {
-                setRuntimeStatus('loading')
-                runtimeRef.current?.stop('재연결')
-                runtimeRef.current?.load().then(() => setRuntimeStatus('ready')).catch(() => setRuntimeStatus('error'))
-              }
-            }}
-            style={{ cursor: runtimeStatus === 'error' ? 'pointer' : 'default' }}
-            title={runtimeStatus === 'error' ? '엔진을 다시 연결하려면 클릭하세요.' : ''}
-          >
-            <span /> {runtimeStatus === 'ready' ? 'PYTHON READY' : runtimeStatus === 'error' ? '⚠️ RUNTIME ERROR (클릭하여 재연결)' : 'PYTHON LOADING'}
+          <div className={`python-lab__runtime python-lab__runtime--${runtimeStatus}`}>
+            <span /> {runtimeStatus === 'ready' ? 'PYTHON READY' : runtimeStatus === 'error' ? 'PYTHON 연결 필요' : 'PYTHON LOADING'}
           </div>
         </div>
       </header>
@@ -1252,12 +1242,28 @@ export default function PythonMissionLab({ unit, missionSet, initialMissionIndex
                     className="is-run"
                     onClick={runMission}
                     disabled={running}
-                    title={runtimeStatus === 'loading' ? 'Python 엔진을 준비 중입니다. 클릭하면 즉시 로드 후 실행됩니다.' : '작성한 파이썬 코드를 실행합니다.'}
+                    title={runtimeStatus !== 'ready' ? 'Python 엔진 준비가 끝나면 실행합니다.' : '작성한 파이썬 코드를 실행합니다.'}
                   >
-                    {runtimeStatus === 'loading' ? '⏳ RUN' : '▶ RUN'}
+                    {runtimeStatus !== 'ready' ? '⏳ RUN' : '▶ RUN'}
                   </button>}
             </div>
           </div>
+          {(runtimeStatus === 'slow' || runtimeStatus === 'error' || (running && runtimeStatus === 'loading')) && (
+            <div className="python-lab__runtime-notice" role="status" aria-live="polite">
+              <div>
+                <strong>{runtimeStatus === 'error' ? 'Python 엔진에 연결하지 못했어요.' : runtimeStatus === 'slow' ? 'Python 엔진 준비가 평소보다 오래 걸리고 있어요.' : 'Python 엔진 준비 후 자동으로 실행할게요.'}</strong>
+                <p>{runtimeStatus === 'error'
+                  ? '코드 오류로 판정된 것은 아니에요. 인터넷 연결을 확인한 뒤 다시 연결해 주세요. 작성한 코드는 유지됩니다.'
+                  : runtimeStatus === 'slow'
+                    ? `첫 실행은 시간이 걸릴 수 있어요. ${running ? '준비가 끝나면 자동으로 실행합니다.' : '조금 더 기다려도 괜찮아요.'} 계속 지연되면 다시 연결해 주세요.`
+                    : '잠시 기다려 주세요. STOP으로 실행 대기를 취소할 수 있어요.'}</p>
+                {runtimeStatus === 'error' && <p>재연결도 실패하면 네트워크나 확장 프로그램이 실행에 필요한 파일을 차단하는지 확인해 주세요.</p>}
+              </div>
+              {(runtimeStatus === 'slow' || runtimeStatus === 'error') && (
+                <button type="button" onClick={stopMission}>다시 연결</button>
+              )}
+            </div>
+          )}
           {scaffold.allowQuickInsert === true && suggestedTokens.length > 0 && !isViewOnly && (
             <div className="python-lab__quick-chips" aria-label="추천 문자열 및 코드 칩">
               <span className="python-lab__quick-chips-label">💡 원클릭 입력:</span>

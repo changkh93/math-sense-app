@@ -934,7 +934,8 @@ def _run_mission(payload_json, code):
 
         @property
         def signal_count(self):
-            count = len(state.signals) if state.signals else len([item for item in state.objects if not item["collected"]])
+            # Physical signals are separate from the sample text list in world.signals.
+            count = len([item for item in state.objects if item["kind"] == "signal" and not item["collected"]])
             emit("sensor_read", sensor="signal_count", value=count)
             return count
 

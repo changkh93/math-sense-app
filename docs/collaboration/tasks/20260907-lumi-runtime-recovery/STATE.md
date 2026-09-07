@@ -1,0 +1,17 @@
+# LUMI runtime recovery
+- Original goal: 검토된 정답이 통과하지 않는 원인 확인, 과도한 방해 없이 지연 안내·복구 제공.
+- Phase: DONE (local) / 2026-09-07
+- Owner: Codex (local; no external handoff needed for this bounded fix).
+- Baseline: 466191e01c6e627abb012e8cebd56ecff6869092
+- Workspace: current math-sense-app checkout. Existing changes: CodeTracePlayer.jsx, collaboration INDEX.md and code-trace-enter-scroll record; preserve all.
+- Allowed scope: PythonRuntimeClient.js, PythonMissionLab.jsx/css, focused runtime tests and this task record.
+- Acceptance: sample solution passes base/hidden mission; load budget separate from execution; delayed non-modal guidance and retry; retain code; infrastructure failures do not persist failed attempts; cancel/dispose cannot release stale executions.
+- Finding: run deadline was 10s including engine load; preload load duplicated; timeout automatically restarted engine and misclassified as loop error.
+- Changes: shared preload promise, 15s notice/60s load limit, 10s execution limit after readiness, explicit recovery, generation guards, transport-error exclusion from attempt persistence.
+- User supplied analysis: reviewed as evidence; no tool logs accepted as verified. Screenshot indicates loading/empty trace, but does not establish network/CDN cause.
+- Additional reproduced root cause: signal_count preferred the default text-data signals list (ALPHA/BETA/GAMMA) and stayed 3 after all physical objects were collected. Both base and hidden runs raised ValueError. Previous phase17 assertions only checked basePassed, which ignored runtime errors.
+- Final fixes: count remaining physical signal objects; require error-free results for basePassed in both evaluator entry points; surface runtime errors before hidden-map failure; skip hidden execution for failed base results. Phase17 now explicitly checks error=null for every official solution and hidden variant.
+- Verification: test-lumi-runtime-recovery.mjs passed (fake clock/worker: 15s notice, 60s load failure, 10s execution deadline after readiness, dedup, retry, cancel/dispose, worker failure). test-lumi-signal-collection.mjs passed (exact supplied code; readings 3→2→1→0 and 4→3→2→1→0; false-positive evaluator guard). Strengthened phase17 suite passed all 60 missions and hidden variants. Focused new JS lint and git diff --check passed. Final npm run build passed (existing asset-license notices and bundle-size warning).
+- Browser verification: isolated localhost fixture with persistencePolicy=none; no learning record/reward writes. Observed ordinary waiting, 15s non-modal notice/button, simulated worker failure recovery notice, retry with editor code preserved. Then real Pyodide executed the exact user code; base and hidden results both error=null; final UI showed ★★★ FIELD VERIFIED and all conditions achieved. Temporary fixture and browser tab removed.
+- Limits: screenshot cannot establish original network/CDN failure; original production session/network was not inspected. Mobile-specific layout not separately tested. No production deployment performed.
+- Next: production web deployment needed for live users; no external relay or user input needed for completed local fix.

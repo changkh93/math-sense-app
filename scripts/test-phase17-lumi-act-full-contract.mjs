@@ -232,13 +232,15 @@ for (const m of allOfficialMissions) {
   assert.ok(solution, `Mission ${m.id} must have official solution`)
 
   // Base test
-  const { evalResult } = await runPythonCode(m, solution)
+  const { evalResult, runtimeResult: solutionResult } = await runPythonCode(m, solution)
+  assert.equal(solutionResult.error, null, `${m.id}: solution must terminate without a runtime error: ${JSON.stringify(solutionResult.error)}`)
   assert.equal(evalResult.basePassed, true, `Mission ${m.id} solution must pass base goals! Reason: ${evalResult.failureReason}`)
 
   // Hidden Variants test
   const variants = m.hiddenVariants || []
   for (const variant of variants) {
-    const { evalResult: variantResult } = await runPythonCode(m, solution, variant)
+    const { evalResult: variantResult, runtimeResult: variantRuntime } = await runPythonCode(m, solution, variant)
+    assert.equal(variantRuntime.error, null, `${m.id}/${variant.id}: hidden solution must terminate without errors: ${JSON.stringify(variantRuntime.error)}`)
     assert.equal(variantResult.basePassed, true, `Mission ${m.id} solution must pass variant ${variant.id || 'anonymous'}! Reason: ${variantResult.failureReason}`)
   }
 }

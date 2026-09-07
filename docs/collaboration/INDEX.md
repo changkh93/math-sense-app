@@ -7,6 +7,8 @@ For an existing task, read its STATE.md and actual artifacts before continuing.
 
 | ID | Goal | Phase | State file | Next action |
 |---|---|---|---|---|
+| 20260907-lumi-runtime-recovery | 루미 신호 개수·정답 판정 수정과 엔진 복구 안내 | DONE (local) | [STATE](tasks/20260907-lumi-runtime-recovery/STATE.md) | 실제 브라우저 정답·숨은 조건 통과, 지연 복구 및 빌드 검증; 운영 배포 전 |
+| 20260907-code-trace-enter-scroll | 코드 트레이스 Enter 후 줄 시작 복귀 | DONE (local) | [STATE](tasks/20260907-code-trace-enter-scroll/STATE.md) | 사용자 Chrome 탭에서 문서 끝 Enter 3회 및 커서 가시성 확인, 운영 배포 전 |
 | 20260907-hoverpack-water | 호버팩 수면 보호·장비 변경 자동 부상 | DONE (local) | [STATE](tasks/20260907-hoverpack-water/STATE.md) | 수면 제한·수중 전환 브라우저 검증 및 빌드 완료, 운영 배포 전 |
 | 20260907-crew-member-removal | 크루 리더 멤버 강퇴 및 폐쇄 흐름 | DONE (local) | [STATE](tasks/20260907-crew-member-removal/STATE.md) | 서버·UI 검사 및 빌드 완료, 함수·규칙·웹 배포 전 |
 | 20260907-hoverpack-experience | 저비용 절차형 고공 비행·링 탐사 경험 개선 | DONE (local, revised) | [STATE](tasks/20260907-hoverpack-experience/STATE.md) | 추종 입자·모호한 비행체 제거, 구름·카메라 재구성 및 실화면 검증; 운영 배포 전 |
