@@ -25,6 +25,7 @@ import {
   hasCompleteQuizQuestionSet,
   isMatchingQuizSessionOwner,
   shouldStartQuizSessionInitialization,
+  restoreQuizRound,
 } from '../../utils/quizSessionGuards'
 import { writeQuizProgressSnapshot } from '../../utils/quizSessionPersistence'
 import { createSustainedBlurGuard } from '../../utils/quizFocusGuard'
@@ -62,6 +63,7 @@ const getQuizClientInstanceId = () => {
 const getQuizSessionStateFingerprint = (session = {}) => JSON.stringify({
   sessionId: session?.sessionId || '',
   currentIdx: Number(session?.currentIdx || 0),
+  currentQuestionIds: session?.currentQuestionIds || [],
   isResultMode: session?.isResultMode === true,
   answers: Object.entries(session?.userAnswers || {})
     .sort(([left], [right]) => left.localeCompare(right))
@@ -305,6 +307,7 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
     shouldPersist: !reSolveMode && !isResultMode,
     session: {
       currentIdx,
+      currentQuestionIds: currentQuestions.map(question => question.id),
       userAnswers: pendingResult?.userAnswers || userAnswers,
       comboCount: pendingResult?.combo ?? comboCount,
       sessionCrystals: pendingResult?.sessionCrystals ?? sessionCrystals,
@@ -359,6 +362,7 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
           }
 
           let targetCurrentIdx = 0
+          let targetCurrentQuestionIds = []
           let targetUserAnswers = {}
           let targetSessionCrystals = 0
           let targetComboCount = 0
@@ -384,6 +388,7 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
                 targetSessionId = session.sessionId || targetSessionId
                 // 문항 수가 달라졌더라도 최대한 기존 진행도를 살려서 로드합니다.
                 targetCurrentIdx = session.currentIdx || 0
+                targetCurrentQuestionIds = Array.isArray(session.currentQuestionIds) ? session.currentQuestionIds : []
                 targetUserAnswers = session.userAnswers || {}
                 targetSessionCrystals = session.sessionCrystals || 0
                 targetComboCount = session.comboCount || 0
@@ -463,12 +468,18 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
             activeQuestions = checkpointQuestions.length > 0 ? checkpointQuestions : selected
             const checkpointIndex = activeQuestions.findIndex(question => question.id === checkpointQuestionId)
             targetCurrentIdx = checkpointIndex >= 0 ? checkpointIndex : 0
+            targetCurrentQuestionIds = activeQuestions.map(question => question.id)
           }
 
-          if (targetCurrentIdx < 0 || targetCurrentIdx >= activeQuestions.length) {
-            const firstUnansweredIdx = activeQuestions.findIndex(q => !targetUserAnswers[q.id])
-            targetCurrentIdx = firstUnansweredIdx >= 0 ? firstUnansweredIdx : 0
-          }
+          const restoredRound = restoreQuizRound({
+            questions: selected, answers: targetUserAnswers,
+            currentQuestionIds: targetCurrentQuestionIds.length ? targetCurrentQuestionIds : activeQuestions.map(question => question.id),
+            currentIdx: targetCurrentIdx,
+            isResultMode: targetIsResultMode,
+          })
+          activeQuestions = restoredRound.questions
+          targetCurrentIdx = restoredRound.currentIdx
+          targetIsResultMode = restoredRound.isResultMode
 
           if (!isCurrentInitialization()) return
 
@@ -500,6 +511,7 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
                   // In particular, a smaller Dark Matter batch must not retain
                   // answers from previous batches, including on the result page.
                   currentIdx: targetCurrentIdx,
+                  currentQuestionIds: activeQuestions.map(question => question.id),
                   userAnswers: targetUserAnswers,
                   sessionCrystals: targetSessionCrystals,
                   comboCount: targetComboCount,
@@ -543,7 +555,7 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
 
           const restoredAnswerCount = Object.keys(targetUserAnswers).length
           if (user?.uid && restoredAnswerCount > 0) {
-            setSessionGuardMessage(`이전 진행 ${restoredAnswerCount}/${selected.length}문항을 복구했습니다. 현재 탭에서 이어서 진행합니다.`)
+            setSessionGuardMessage(`답안 ${restoredAnswerCount}/${selected.length}개를 복구했습니다. ${restoredRound.remainingCount > 0 ? `미완료 ${restoredRound.remainingCount}문항을 이어서 진행합니다.` : '모든 문항을 마쳐 결과를 표시합니다.'}`)
           }
 
           initializedRef.current = guardKey;
@@ -694,6 +706,7 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
 
   const saveProgressSession = async ({
     nextIdxForSave,
+    nextCurrentQuestionIds,
     nextUserAnswers,
     nextCombo,
     nextSessionCrystals,
@@ -710,6 +723,7 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
         const progressRef = doc(db, 'users', user.uid, 'learning_progress', quizData.unitId)
         const sessionObj = {
           currentIdx: nextIdxForSave,
+          currentQuestionIds: nextCurrentQuestionIds || currentQuestions.map(question => question.id),
           userAnswers: nextUserAnswers,
           comboCount: nextCombo,
           sessionCrystals: nextSessionCrystals,
@@ -1132,6 +1146,7 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
 
       const saved = await saveProgressSession({
         nextIdxForSave: 0,
+        nextCurrentQuestionIds: unansweredQuestions.map(question => question.id),
         nextUserAnswers: answers,
         nextCombo: comboCount,
         nextSessionCrystals: sessionCrystals,
@@ -1196,6 +1211,8 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
 
     const saved = await saveProgressSession({
       nextIdxForSave,
+      nextCurrentQuestionIds: !hasNextInCurrentRound && shouldEnterDeferredRound
+        ? pendingDeferredQuestions.map(question => question.id) : currentQuestions.map(question => question.id),
       nextUserAnswers: pending.userAnswers,
       nextCombo: pending.combo,
       nextSessionCrystals: pending.sessionCrystals,
@@ -1540,6 +1557,8 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
 
       const saved = await saveProgressSession({
         nextIdxForSave,
+        nextCurrentQuestionIds: !hasNextInCurrentRound && pendingDeferredQuestions.length > 0
+          ? pendingDeferredQuestions.map(question => question.id) : currentQuestions.map(question => question.id),
         nextUserAnswers: userAnswers,
         nextCombo: comboCount,
         nextSessionCrystals: sessionCrystals,
@@ -2554,7 +2573,8 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
                 color: 'var(--text-muted)', 
                 fontSize: '0.8rem',
               }}>
-                {currentIdx + 1} / {currentQuestions.length}
+                현재 문항 {currentIdx + 1} / {currentQuestions.length}
+                {` · 전체 답안 ${allSessionQuestions.filter(question => userAnswers[question.id]).length}/${originalTotal}`}
                 {!reSolveMode && !isDeferredRound && deferredQuestionIds.size > 0 ? ` · 표시 ${deferredQuestionIds.size}` : ''}
               </span>
             </div>

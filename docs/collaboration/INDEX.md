@@ -7,7 +7,8 @@ For an existing task, read its STATE.md and actual artifacts before continuing.
 
 | ID | Goal | Phase | State file | Next action |
 |---|---|---|---|---|
-| 20260908-learning-save-stability | 학습 기록 저장·완료 체크 안정화 | ACTIVE (release pending) | [STATE](tasks/20260908-learning-save-stability/STATE.md) | 운영 집계 인덱스 누락 확인·복구; 빈 답안 유실 재현 및 저장·집계 프로세스 수정/검증, 함수·규칙·웹 배포 전 |
+| 20260908-agora-index | 스텔라 아고라 목록·답변 인덱스 오류 복구 | DONE | [STATE](tasks/20260908-agora-index/STATE.md) | 목록·답변 인덱스 READY; 제보 글 답변 1건 조회 성공 |
+| 20260908-learning-save-stability | 학습 기록 저장·완료 체크 안정화 | ACTIVE (release pending) | [STATE](tasks/20260908-learning-save-stability/STATE.md) | 운영 인덱스 복구; 워크북 유실·집계·퀴즈 16/20 복구 위치 오류 수정/검증, 함수·규칙·웹 배포 전 |
 | 20260908-youtube-author-brand | 유튜브 공식 전환·네 채널 수학감각 저자 소개 | WAITING_USER | [STATE](tasks/20260908-youtube-author-brand/STATE.md) | 직접 수정·게시 완료; Instagram 모바일 외부 링크2개 추가 대기 |
 | 20260908-marketing-day01 | 100일 마케팅 1일차 실행 | ACTIVE | [STATE](tasks/20260908-marketing-day01/STATE.md) | 3채널 발행·댓글2·팔로우1 완료; 매일 계획·일지 예약 설정, 실제 접수 검증·오후 마감 남음 |
 | 20260907-workbook-completion-report | 분수 나눗셈 워크북 완료 체크 제보 조사 | DONE (local fix) | [STATE](tasks/20260907-workbook-completion-report/STATE.md) | 완료 문서를 무시하던 카드 판정 수정, 회귀검사·빌드 통과; 웹 배포 전 |

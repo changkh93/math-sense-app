@@ -2,6 +2,24 @@ export const getUnansweredQuizQuestions = (questions = [], answers = {}) => (
   questions.filter(question => question?.id && !answers?.[question.id])
 )
 
+// A cursor belongs to a particular round, not necessarily the full question set.
+// Keep graded answers awaiting a reaction locked; never reopen finished answers.
+export const restoreQuizRound = ({ questions = [], answers = {}, currentQuestionIds = [], currentIdx = 0, isResultMode = false } = {}) => {
+  const byId = new Map(questions.map(question => [question.id, question]))
+  const orderedIds = [...new Set([...currentQuestionIds, ...questions.map(question => question.id)])]
+    .filter(id => byId.has(id))
+  const previousIds = currentQuestionIds.length ? currentQuestionIds : questions.map(question => question.id)
+  const currentId = previousIds[currentIdx]
+  const remaining = orderedIds.filter(id => !answers[id]?.reactionId).map(id => byId.get(id))
+  const restoredIdx = remaining.findIndex(question => question.id === currentId)
+  return {
+    questions: remaining.length ? remaining : questions,
+    currentIdx: Math.max(0, restoredIdx),
+    isResultMode: questions.length > 0 && (remaining.length === 0 || (isResultMode && questions.every(question => answers[question.id]))),
+    remainingCount: remaining.length,
+  }
+}
+
 export const hasCompleteQuizQuestionSet = (questions = [], expectedTotal = 0) => (
   Number.isInteger(expectedTotal) &&
   expectedTotal > 0 &&

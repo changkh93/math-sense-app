@@ -198,3 +198,51 @@ assert.doesNotMatch(quizViewSource, /\}, \[quizData, hasRadar, isRadarBonus, use
 assert.match(spaceHomeSource, /validateQuizCompletionSnapshot\(\{/)
 
 console.log('quiz session guard tests passed')
+
+// Incident shape: 16 saved answers, stale cursor at 2/20, reward 31 remains.
+// The cursor cannot turn already completed answers back into editable questions.
+const { restoreQuizRound } = await import('../src/utils/quizSessionGuards.js')
+const incidentQuestions = Array.from({ length: 20 }, (_, i) => ({ id: `q${i + 1}` }))
+const remainingIds = ['q10', 'q14', 'q17', 'q19']
+const incidentAnswers = Object.fromEntries(incidentQuestions.filter(q => !remainingIds.includes(q.id))
+  .map(q => [q.id, { reactionId: 'understood', isCorrect: q.id !== 'q6' }]))
+const beforeRestore = structuredClone(incidentAnswers)
+const restored = restoreQuizRound({ questions: incidentQuestions, answers: incidentAnswers, currentIdx: 1 })
+assert.deepEqual(restored.questions.map(q => q.id), remainingIds)
+assert.equal(restored.currentIdx, 0)
+assert.equal(restored.remainingCount, 4)
+assert.deepEqual(incidentAnswers, beforeRestore, 'restoring must not erase or regrade any of the 16 saved answers')
+assert.equal(restored.isResultMode, false)
+const inRound = restoreQuizRound({ questions: incidentQuestions, answers: incidentAnswers, currentQuestionIds: remainingIds, currentIdx: 2 })
+assert.equal(inRound.questions[inRound.currentIdx].id, 'q17', 'restore cursor against the saved round IDs')
+const pendingAnswers = { ...incidentAnswers, q10: { isCorrect: true } }
+const pendingRound = restoreQuizRound({ questions: incidentQuestions, answers: pendingAnswers, currentQuestionIds: remainingIds, currentIdx: 0 })
+assert.equal(pendingRound.questions[pendingRound.currentIdx].id, 'q10', 'graded answer awaiting a reaction must remain on its locked feedback screen')
+const completed = Object.fromEntries(incidentQuestions.map(q => [q.id, { isCorrect: true, reactionId: 'understood' }]))
+assert.equal(restoreQuizRound({ questions: incidentQuestions, answers: completed, currentIdx: 1 }).isResultMode, true)
+assert.equal(restoreQuizRound({ questions: incidentQuestions, answers: {}, currentIdx: 0 }).questions.length, 20)
+const changedSet = restoreQuizRound({ questions: incidentQuestions.slice(0, 3), answers: incidentAnswers, currentQuestionIds: ['removed', 'q2'], currentIdx: 0 })
+assert.ok(changedSet.questions.every(q => ['q1','q2','q3'].includes(q.id)))
+assert.match(quizViewSource, /currentQuestionIds: activeQuestions\.map/)
+assert.match(quizViewSource, /currentQuestionIds: nextCurrentQuestionIds \|\| currentQuestions\.map/)
+console.log('quiz round restore regression passed: 16 preserved answers, four remaining questions, exact round cursor and pending feedback')
+
+// Execute the component's actual normalization block, not only the helper.
+const { default: vm } = await import('node:vm')
+const normalizeStart = quizViewSource.indexOf('          const selected = [...quizData.questions]')
+const normalizeEnd = quizViewSource.indexOf('          if (!isCurrentInitialization()) return', normalizeStart)
+const initContext = {
+  quizData: { questions: incidentQuestions }, targetUserAnswers: structuredClone(incidentAnswers),
+  targetCurrentIdx: 1, targetCurrentQuestionIds: [], targetEverWrong: [], targetReviewMarks: [],
+  targetDeferredQuestionIds: [], targetIsDeferredRound: false, targetIsResultMode: false,
+  targetSessionId: 'test', targetSessionCrystals: 31, targetComboCount: 0, targetShieldsUsed: 0,
+  user: { uid: 'synthetic' }, quizClientInstanceIdRef: { current: 'test-tab' },
+  readPendingAnswerCheckpoint: () => null, shuffleArray: options => options, restoreQuizRound,
+}
+vm.createContext(initContext)
+vm.runInContext(quizViewSource.slice(normalizeStart, normalizeEnd) + '\nglobalThis.activeIds = activeQuestions.map(q => q.id)', initContext)
+assert.deepEqual(Array.from(initContext.activeIds), remainingIds)
+assert.equal(initContext.targetCurrentIdx, 0)
+assert.equal(Object.keys(initContext.targetUserAnswers).length, 16)
+assert.equal(initContext.targetSessionCrystals, 31)
+console.log('actual quiz initializer preserves 16 answers / 31 crystals and resumes the four unfinished questions')

@@ -48,3 +48,12 @@
 - Lint: changed workbook/util and new server/test files pass with suitable Node/ESM settings. functions/index.js has 15 existing CommonJS-environment errors, 0 newly introduced diagnostics; repository browser-only lint configuration is not suitable for that server file.
 - Release state: ACTIVE (release pending). Additive production index repair performed; new web/functions/rules code remains undeployed. Other pending repository releases make a full web/rules deployment broader than this change alone.
 - Production index verification: all six added COLLECTION indexes READY; after propagation, the previously failing unitId query succeeded at 2026-09-08T09:13:41.512Z (18:13 KST), returning 8 existing history records. No synthetic production history was written to provoke the trigger.
+
+## 성하린 퀴즈 복구 위치 제보 (2026-09-08, latest)
+- Request: ‘03 유리수와 순환소수’에서 16/20 복구 안내와 2/20 화면 불일치 확인. Same learning-integrity goal; no external relay and no new production writes.
+- Source evidence: point-in-time reads at 17:30/17:35 KST match screenshot: answers=16, currentIdx=1, originalTotal=20, sessionCrystals=31, retryCount=3. All 16 answers include reactionId; missing questions 10/14/17/19. Current completion at 17:43:52.897 KST: 16 correct /20, score80, quizCompleted=true; draft cleared normally.
+- Root cause: positional cursor restored against full question list without saved round IDs or reconciliation against already completed answers. Valid-range stale index opens answered question; old reaction-based lock only protects answers awaiting reaction. See ROOT-CAUSE.md appendix.
+- Fix: round IDs persisted across checkpoints/transitions/focus snapshots; restore excludes completed answers and retains pending graded feedback; original answer maps/counters preserved; current-round location and full-set answer counts labeled separately.
+- Files owned this phase: SpaceQuizView.jsx, quizSessionGuards.js, test-quiz-session-guards.mjs, this task record/index. Preserved already staged changes from prior work and all marketing edits; did not alter staging.
+- Tests: quiz-session suite PASS including actual initializer execution for synthetic 16-answer/31-crystal incident; frontend build PASS. No production UI impersonation or data rollback. Code release pending with previous stability changes.
+- Private evidence only in /tmp/metasense-harin-*.json, mode0600. No raw answers in repository fixtures.
