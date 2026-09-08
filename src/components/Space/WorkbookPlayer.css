@@ -839,3 +839,13 @@
     height: 20px;
   }
 }
+
+.workbook-persistence-status {
+  min-height: 1.4em;
+  padding: 0.25rem 1rem;
+  color: #b6eaf2;
+  font-size: 0.8rem;
+  text-align: center;
+}
+.workbook-persistence-status span { margin: 0 0.5rem; }
+.workbook-persistence-status button { margin-left: 0.5rem; }

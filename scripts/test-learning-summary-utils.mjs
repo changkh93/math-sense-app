@@ -211,7 +211,7 @@ const fieldVariants = [
 for (const variant of fieldVariants) {
   const comp = extractProgressCompletion({ missionLab: variant })
   assert.equal(comp.missionLab, true, `필드 변형 ${JSON.stringify(variant)} 은 missionLab=true 로 판정되어야 함`)
-  assert.deepEqual(getLearningProgressCompletion({ missionLab: variant }), comp)
+  assert.deepEqual(getLearningProgressCompletion({ missionLab: variant }), { quiz: false, workbook: false, ...comp })
 }
 assert.equal(mergeUnitProgressCompletion({ u: { quiz: true } }, { u: { text: true } }).u.quiz, true)
 
@@ -244,32 +244,21 @@ for (const lastCheckedMs of [NaN, Infinity, 'invalid', now + 60000]) {
   assert.equal(shouldCheckLearningSummaryFreshness({ summary: { schemaVersion: 3 }, lastCheckedMs, nowMs: now }), true)
 }
 
-// ─── 8. Incremental cost/freshness contracts ───
+// ─── 8. Production wiring / bounded incremental reads ───
 const functionsSource = readFileSync(new URL('../functions/index.js', import.meta.url), 'utf8')
-const incrementalSource = functionsSource.slice(
-  functionsSource.indexOf('exports.syncLearningSummary'),
-  functionsSource.indexOf('const LEADERBOARD_CACHE_TTL_MS')
-)
-assert.doesNotMatch(
-  incrementalSource,
-  /collection\("learning_progress"\)/,
-  'normal history-triggered summary updates must not add a learning_progress read'
-)
-assert.doesNotMatch(
-  incrementalSource,
-  /summaryRef\.get\(\)/,
-  'normal history-triggered summary updates must not read the summary before the transaction'
-)
-assert.match(
-  incrementalSource,
-  /!freshSnap\.exists \|\| freshSnap\.data\(\)\?\.schemaVersion !== LEARNING_SUMMARY_SCHEMA_VERSION/,
-  'missing or outdated summaries discovered in the transaction must fall back to a full rebuild'
-)
-const freshnessSource = functionsSource.slice(
-  functionsSource.indexOf('exports.getOrRebuildLearningSummary'),
-  functionsSource.indexOf('exports.syncLearningSummary')
-)
-assert.match(freshnessSource, /orderBy\("timestamp", "desc"\)\.limit\(1\)/)
-assert.match(freshnessSource, /latestHistoryMs > summaryUpdatedMs/)
+const serviceSource = readFileSync(new URL('../functions/learningSummaryService.cjs', import.meta.url), 'utf8')
+assert.match(functionsSource, /learningSummaryService.sync\(change, context\)/)
+assert.match(functionsSource, /failurePolicy: true/)
+assert.match(serviceSource, /refs.history.where\('unitId', '==', unitId\)/,
+  'ordinary events must keep reads scoped to affected units')
+assert.match(serviceSource, /tx.get\(refs.progress.doc\(unitId\)\)/,
+  'the authoritative completion document must supplement affected-unit history')
+assert.match(serviceSource, /summary.syncVersion !== SYNC_VERSION/)
+assert.match(serviceSource, /receipt.*generation/s)
+const freshnessSource = functionsSource.slice(functionsSource.indexOf('exports.getOrRebuildLearningSummary'), functionsSource.indexOf('exports.syncLearningSummary'))
+assert.match(freshnessSource, /!data\?\.validateFreshness/)
+assert.match(freshnessSource, /learningSummaryService.rebuild\(uid\)/)
+assert.doesNotMatch(freshnessSource, /latestHistoryMs > summaryUpdatedMs/,
+  'timestamps and counts alone cannot prove summary completeness')
 
 console.log('✅ All learning summary v3 domain and integrity tests passed!')

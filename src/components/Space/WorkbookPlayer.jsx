@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { motion as Motion, AnimatePresence, useDragControls } from 'framer-motion';
 import { BlockMath, InlineMath } from 'react-katex';
-import { deleteField, doc, getDoc, serverTimestamp, setDoc } from 'firebase/firestore';
+import { deleteField, doc, getDocFromServer, runTransaction, serverTimestamp } from 'firebase/firestore';
 import soundManager from '../../utils/SoundManager';
 import MathKeypad from './MathKeypad';
 import WorkbookInteraction from './WorkbookInteraction';
@@ -17,12 +17,12 @@ const PEN_COLORS = [
 ];
 import { ArrowLeft, ArrowRight, Sparkles, MousePointerClick, Pencil, Eraser, Trash2 } from 'lucide-react';
 import { createParticleBurst, shakeScreen } from './ParticleEffects';
-import { parseInlineFormatting, sanitizeLaTeX } from '../../utils/formatUtils';
 import { auth, db } from '../../firebase';
+import { onAuthStateChanged } from 'firebase/auth';
+import { assertWorkbookWriteAllowed, createWorkbookSaveQueue, hasWorkbookWork, resolveWorkbookRestore, workbookSessionToken } from '../../utils/workbookPersistence';
 import { areElementaryAnswersEquivalent, splitFractionDisplayValue } from '../../utils/elementaryMathAnswer';
 import { shuffleWorkbookOptions } from '../../utils/workbookOptionUtils';
 import { resolveWorkbookInputMode } from '../../utils/workbookInputModeUtils';
-import { isWorkbookMathDisplayValue, normalizeWorkbookMathForKatex, parseWorkbookSimpleFraction } from '../../utils/workbookMathDisplayUtils';
 import {
   WORKBOOK_GRADABLE_TYPES,
   WORKBOOK_INTERACTION_TYPES,
@@ -75,6 +75,14 @@ const serializeWorkbookResponse = (value) => {
 };
 
 const WorkbookPlayer = ({ pages, unitId, unitTitle, studentProfile = {}, onComplete, onPageReward, onClose, previewMode = false }) => {
+  const [userId, setUserId] = useState(() => auth.currentUser?.uid || null);
+  useEffect(() => onAuthStateChanged(auth, currentUser => setUserId(currentUser?.uid || null)), []);
+  const [restoreError, setRestoreError] = useState('');
+  const [restoreAttempt, setRestoreAttempt] = useState(0);
+  const [saveStatus, setSaveStatus] = useState({ state: 'idle' });
+  const saveQueueRef = useRef(null);
+  const savedContentRef = useRef(null);
+  const acceptCheckpointRef = useRef(null);
   const [currentPageIndex, setCurrentPageIndex] = useState(0);
   const [answers, setAnswers] = useState({}); // { id: value }
   const [checkedElements, setCheckedElements] = useState({}); // { id: { isCorrect, isChecked } }
@@ -113,9 +121,9 @@ const WorkbookPlayer = ({ pages, unitId, unitTitle, studentProfile = {}, onCompl
   const currentPage = pages[currentPageIndex];
   const workbookSignature = useMemo(() => (pages || []).map(page => page.id).join('|'), [pages]);
   const progressStorageKey = useMemo(() => {
-    const uid = auth.currentUser?.uid || 'anonymous';
+    const uid = userId || 'anonymous';
     return `smart_workbook_progress_v2_${uid}_${unitId || 'unknown'}`;
-  }, [unitId]);
+  }, [unitId, userId]);
 
   useEffect(() => {
     if (previewMode) {
@@ -124,6 +132,7 @@ const WorkbookPlayer = ({ pages, unitId, unitTitle, studentProfile = {}, onCompl
     }
     let cancelled = false;
     setProgressHydrated(false);
+    setRestoreError('');
 
     const applySession = (session) => {
       if (!session || session.workbookSignature !== workbookSignature) return false;
@@ -147,30 +156,93 @@ const WorkbookPlayer = ({ pages, unitId, unitTitle, studentProfile = {}, onCompl
         localSession = JSON.parse(localStorage.getItem(progressStorageKey) || 'null');
       } catch { /* ignore malformed local progress */ }
 
-      const uid = auth.currentUser?.uid;
+      const uid = userId;
+      if (!uid || !unitId) {
+        if (!cancelled) setRestoreError('로그인 정보를 확인한 뒤 다시 시도해 주세요.');
+        return;
+      }
       if (uid && unitId) {
         try {
-          const snap = await getDoc(doc(db, 'users', uid, 'learning_progress', unitId));
+          const snap = await getDocFromServer(doc(db, 'users', uid, 'learning_progress', unitId));
           if (snap.exists()) serverSession = snap.data()?.workbookSession || null;
         } catch (error) {
-          console.warn('Workbook progress restore failed; using local progress.', error);
+          console.warn('Workbook progress restore failed.', error);
+          if (!cancelled) setRestoreError('저장된 기록을 확인하지 못했습니다. 연결을 확인하고 다시 시도해 주세요.');
+          return;
         }
       }
       if (cancelled) return false;
-      const latestSession = [localSession, serverSession]
-        .filter(session => session?.workbookSignature === workbookSignature)
-        .sort((a, b) => Number(b.savedAtMs || 0) - Number(a.savedAtMs || 0))[0];
+      if (hasWorkbookWork(serverSession) && serverSession.workbookSignature !== workbookSignature) {
+        setRestoreError('교재가 변경되어 이전 기록을 안전하게 불러올 수 없습니다. 선생님께 문의해 주세요.');
+        return;
+      }
+      const { session: latestSession, conflict } = resolveWorkbookRestore(localSession, serverSession, workbookSignature);
+      if (conflict) {
+        try { localStorage.setItem(`${progressStorageKey}_conflict`, JSON.stringify(localSession)); }
+        catch {
+          setRestoreError('다른 기기의 기록과 충돌했습니다. 이 기기의 답안을 보관하지 못해 불러오기를 중단했습니다. 선생님께 문의해 주세요.');
+          return;
+        }
+      }
       const restored = applySession(latestSession);
+      if (!restored) applySession({ workbookSignature });
+      let expectedToken = workbookSessionToken(serverSession);
+      const progressRef = doc(db, 'users', uid, 'learning_progress', unitId);
+      const queue = createWorkbookSaveQueue({
+        initialSession: serverSession,
+        saveLocal: session => {
+          session.baseToken = expectedToken;
+          localStorage.setItem(progressStorageKey, JSON.stringify(session));
+        },
+        saveRemote: async session => {
+          if (auth.currentUser?.uid !== uid) throw new Error('로그인 계정이 바뀌어 저장을 중단했습니다.');
+          await runTransaction(db, async transaction => {
+            const snapshot = await transaction.get(progressRef);
+            const remote = snapshot.data()?.workbookSession || null;
+            assertWorkbookWriteAllowed(remote, expectedToken, session);
+            transaction.set(progressRef, {
+              workbookSession: session,
+              workbookSessionUpdatedAt: serverTimestamp(),
+            }, { mergeFields: ['workbookSession', 'workbookSessionUpdatedAt'] });
+          });
+          expectedToken = workbookSessionToken(session);
+        },
+        onStatus: status => {
+          if (cancelled) return;
+          setSaveStatus(status);
+          if (status.state === 'saved') { setPauseError(''); setPageRewardError(''); }
+        },
+      });
+      saveQueueRef.current = queue;
+      acceptCheckpointRef.current = session => {
+        expectedToken = workbookSessionToken(session);
+        queue.acceptCommitted(session);
+      };
+      savedContentRef.current = null;
+      if (latestSession && workbookSessionToken(latestSession) !== expectedToken) {
+        queue.stage(latestSession);
+        void queue.flush().catch(() => {});
+      }
+      if (!latestSession || workbookSessionToken(latestSession) === expectedToken) {
+        setSaveStatus({ state: conflict ? 'restored-conflict' : latestSession ? 'saved' : 'idle' });
+      }
       setProgressHydrated(true);
       return restored;
     };
 
     hydrate();
-    return () => { cancelled = true; };
-  }, [previewMode, progressStorageKey, unitId, workbookSignature, pages.length]);
+    return () => {
+      cancelled = true;
+      clearTimeout(autosaveTimerRef.current);
+      const queue = saveQueueRef.current;
+      saveQueueRef.current = null;
+      acceptCheckpointRef.current = null;
+      void queue?.flush().catch(() => {});
+    };
+  }, [previewMode, progressStorageKey, unitId, userId, workbookSignature, pages.length, restoreAttempt]);
 
   useEffect(() => {
-    if (previewMode || !progressHydrated || !unitId || isResultMode) return undefined;
+    if (previewMode || !progressHydrated || !unitId || !saveQueueRef.current) return undefined;
     const session = {
       schemaVersion: 1,
       workbookSignature,
@@ -186,25 +258,37 @@ const WorkbookPlayer = ({ pages, unitId, unitTitle, studentProfile = {}, onCompl
       pageActualRewardsPaid,
       savedAtMs: Date.now(),
     };
-    localStorage.setItem(progressStorageKey, JSON.stringify(session));
+    const content = JSON.stringify({ ...session, savedAtMs: 0 });
+    if (savedContentRef.current === null) {
+      savedContentRef.current = content;
+      return undefined; // Opening a workbook must never write an empty session.
+    }
+    if (savedContentRef.current === content) return undefined;
+    savedContentRef.current = content;
+    session.revision = crypto.randomUUID();
+    saveQueueRef.current.stage(session);
     clearTimeout(autosaveTimerRef.current);
-    autosaveTimerRef.current = setTimeout(async () => {
-      const uid = auth.currentUser?.uid;
-      if (!uid) return;
-      try {
-        await setDoc(doc(db, 'users', uid, 'learning_progress', unitId), {
-          workbookSession: session,
-          workbookSessionUpdatedAt: serverTimestamp(),
-        }, { merge: true });
-      } catch (error) {
-        console.warn('Workbook server autosave failed; local progress is preserved.', error);
-      }
+    autosaveTimerRef.current = setTimeout(() => {
+      void saveQueueRef.current?.flush().catch(() => {});
     }, 700);
     return () => clearTimeout(autosaveTimerRef.current);
   }, [answers, attemptCounts, checkedElements, checkedPages, currentPageIndex, firstAttemptCorrect, isResultMode, pageActualRewardsPaid, pageBaseRewardsPaid, previewMode, progressHydrated, progressStorageKey, sessionCrystals, unitId, workbookSignature, wrongAnswerHistory]);
 
+  useEffect(() => {
+    const flush = () => { void saveQueueRef.current?.flush().catch(() => {}); };
+    const onHidden = () => { if (document.visibilityState === 'hidden') flush(); };
+    window.addEventListener('online', flush);
+    window.addEventListener('pagehide', flush);
+    document.addEventListener('visibilitychange', onHidden);
+    return () => {
+      window.removeEventListener('online', flush);
+      window.removeEventListener('pagehide', flush);
+      document.removeEventListener('visibilitychange', onHidden);
+    };
+  }, []);
+
   const handlePauseWorkbook = async () => {
-    if (savingPause || savingPageReward) return;
+    if (savingPause || savingPageReward || !progressHydrated) return;
     if (previewMode) {
       onClose();
       return;
@@ -256,19 +340,16 @@ const WorkbookPlayer = ({ pages, unitId, unitTitle, studentProfile = {}, onCompl
         savedAtMs: Date.now(),
       };
 
-      localStorage.setItem(progressStorageKey, JSON.stringify(session));
-      const uid = auth.currentUser?.uid;
-      if (uid && unitId) {
-        await setDoc(doc(db, 'users', uid, 'learning_progress', unitId), {
-          workbookSession: session,
-          workbookSessionUpdatedAt: serverTimestamp(),
-        }, { merge: true });
-      }
+      if (!saveQueueRef.current || auth.currentUser?.uid !== userId) throw new Error('로그인 정보를 확인해 주세요.');
+      session.revision = crypto.randomUUID();
+      // Opening and immediately closing an untouched workbook is not a reset.
+      if (hasWorkbookWork(session)) saveQueueRef.current.stage(session);
+      await saveQueueRef.current.flush();
       soundManager.playClick();
       onClose();
     } catch (error) {
       console.error('Workbook pause save failed', error);
-      setPauseError('서버 저장에 실패했습니다. 이 기기의 진행 기록은 유지됩니다. 다시 시도해주세요.');
+      setPauseError(error.message || '서버 저장에 실패했습니다. 화면을 닫지 말고 다시 시도해 주세요.');
     } finally {
       setSavingPause(false);
     }
@@ -327,6 +408,8 @@ const WorkbookPlayer = ({ pages, unitId, unitTitle, studentProfile = {}, onCompl
     let anyWrong = false;
     const wrongElementIds = [];
     const newCheckedElements = { ...checkedElements };
+    const newFirstAttemptCorrect = { ...firstAttemptCorrect };
+    const newWrongAnswerHistory = { ...wrongAnswerHistory };
     const rect = e.currentTarget.getBoundingClientRect();
     const pageAttempt = (attemptCounts[currentPageIndex] || 0) + 1;
 
@@ -337,14 +420,11 @@ const WorkbookPlayer = ({ pages, unitId, unitTitle, studentProfile = {}, onCompl
         const isCorrect = checkAnswer(el.id, el);
         newCheckedElements[el.id] = { isCorrect, isChecked: true };
         if (pageAttempt === 1) {
-          setFirstAttemptCorrect(prev => ({ ...prev, [el.id]: isCorrect }));
+          newFirstAttemptCorrect[el.id] = isCorrect;
         }
         if (!isCorrect) {
           wrongElementIds.push(el.id);
-          setWrongAnswerHistory(prev => ({
-            ...prev,
-            [el.id]: [...(prev[el.id] || []), serializeWorkbookResponse(answers[el.id])].slice(-5),
-          }));
+          newWrongAnswerHistory[el.id] = [...(newWrongAnswerHistory[el.id] || []), serializeWorkbookResponse(answers[el.id])].slice(-5);
         }
 
         // Play particle effect roughly at center of button or random area
@@ -379,8 +459,23 @@ const WorkbookPlayer = ({ pages, unitId, unitTitle, studentProfile = {}, onCompl
     if (!previewMode && onPageReward) {
       setSavingPageReward(true);
       setPageRewardError('');
+      setActiveInputId(null);
+      setShowKeypad(false);
       try {
+        clearTimeout(autosaveTimerRef.current);
+        await saveQueueRef.current?.flush();
+        const workbookCheckpoint = {
+          schemaVersion: 1, workbookSignature, currentPageIndex, answers,
+          checkedElements: newCheckedElements,
+          checkedPages: { ...checkedPages, [currentPageIndex]: true },
+          attemptCounts: { ...attemptCounts, [currentPageIndex]: pageAttempt },
+          firstAttemptCorrect: newFirstAttemptCorrect, wrongAnswerHistory: newWrongAnswerHistory,
+          sessionCrystals: Math.max(0, sessionCrystals + localCorrect - localWrong * 2),
+          pageBaseRewardsPaid, pageActualRewardsPaid, savedAtMs: Date.now(), revision: crypto.randomUUID(),
+        };
         const rewardOutcome = await onPageReward({
+          workbookCheckpoint,
+          expectedWorkbookToken: workbookSessionToken(saveQueueRef.current?.getSession()),
           type: 'workbook_page',
           unitId,
           unitTitle,
@@ -395,8 +490,15 @@ const WorkbookPlayer = ({ pages, unitId, unitTitle, studentProfile = {}, onCompl
           baseCrystalsEarned: pageBaseReward,
         });
         if (rewardOutcome?.ok === false) throw rewardOutcome.error || new Error('페이지 보상 저장에 실패했습니다.');
-        setPageBaseRewardsPaid(prev => prev + pageBaseReward);
-        setPageActualRewardsPaid(prev => prev + Math.max(0, Number(rewardOutcome?.actualReward) || 0));
+        if (rewardOutcome?.workbookCheckpoint) {
+          const committed = rewardOutcome.workbookCheckpoint;
+          acceptCheckpointRef.current?.(committed);
+          setPageBaseRewardsPaid(committed.pageBaseRewardsPaid);
+          setPageActualRewardsPaid(committed.pageActualRewardsPaid);
+        } else {
+          setPageBaseRewardsPaid(prev => prev + pageBaseReward);
+          setPageActualRewardsPaid(prev => prev + Math.max(0, Number(rewardOutcome?.actualReward) || 0));
+        }
       } catch (error) {
         console.error('Workbook page reward save failed', error);
         setPageRewardError('페이지 학습과 광석을 저장하지 못했습니다. 네트워크를 확인하고 다시 눌러주세요.');
@@ -408,6 +510,8 @@ const WorkbookPlayer = ({ pages, unitId, unitTitle, studentProfile = {}, onCompl
 
     setSessionCrystals(prev => Math.max(0, prev + (localCorrect * 1) - (localWrong * 2)));
 
+    setFirstAttemptCorrect(newFirstAttemptCorrect);
+    setWrongAnswerHistory(newWrongAnswerHistory);
     setCheckedElements(newCheckedElements);
     setCheckedPages(prev => ({ ...prev, [currentPageIndex]: true }));
     setAttemptCounts(prev => ({ ...prev, [currentPageIndex]: pageAttempt }));
@@ -477,6 +581,10 @@ const WorkbookPlayer = ({ pages, unitId, unitTitle, studentProfile = {}, onCompl
     setSavingCompletion(true);
     setCompletionError('');
     try {
+      clearTimeout(autosaveTimerRef.current);
+      const completionQueue = saveQueueRef.current;
+      await completionQueue?.flush();
+      const completedSessionToken = workbookSessionToken(completionQueue?.getSession());
       const outcome = await onComplete({
         score: score100,
         totalCount: globalTotalInputs,
@@ -491,13 +599,27 @@ const WorkbookPlayer = ({ pages, unitId, unitTitle, studentProfile = {}, onCompl
         unpaidSessionCrystals,
       });
       if (outcome?.ok === false) throw outcome.error || new Error('결과 저장에 실패했습니다.');
-      localStorage.removeItem(progressStorageKey);
-      const uid = auth.currentUser?.uid;
-      if (uid && unitId) {
-        await setDoc(doc(db, 'users', uid, 'learning_progress', unitId), {
-          workbookSession: deleteField(),
-          workbookSessionUpdatedAt: serverTimestamp(),
-        }, { merge: true });
+      completionQueue?.stop();
+      const uid = userId;
+      if (uid && unitId && auth.currentUser?.uid === uid) {
+        try {
+          const cleared = await runTransaction(db, async transaction => {
+            const ref = doc(db, 'users', uid, 'learning_progress', unitId);
+            const snap = await transaction.get(ref);
+            const remote = snap.data()?.workbookSession;
+            // A concurrently opened workbook must not be removed by this completion.
+            if (workbookSessionToken(remote) !== completedSessionToken) return false;
+            transaction.set(ref, { workbookSession: deleteField(), workbookSessionUpdatedAt: serverTimestamp() },
+              { mergeFields: ['workbookSession', 'workbookSessionUpdatedAt'] });
+            return true;
+          });
+          try {
+            const cached = JSON.parse(localStorage.getItem(progressStorageKey) || 'null');
+            if (cleared && workbookSessionToken(cached) === completedSessionToken) localStorage.removeItem(progressStorageKey);
+          } catch { /* result already committed */ }
+        } catch (error) {
+          console.warn('Workbook completed; draft cleanup failed.', error);
+        }
       }
       soundManager.playWarp();
     } catch (error) {
@@ -574,6 +696,14 @@ const WorkbookPlayer = ({ pages, unitId, unitTitle, studentProfile = {}, onCompl
         <button className="hud-btn secondary" onClick={onClose}>돌아가기</button>
       </div>
     );
+  }
+
+  if (!previewMode && !progressHydrated) {
+    return <div className="workbook-player-empty" role="status">
+      <p>{restoreError || '저장된 학습 기록을 불러오고 있습니다…'}</p>
+      {restoreError && <button className="hud-btn" onClick={() => setRestoreAttempt(n => n + 1)}>다시 불러오기</button>}
+      <button className="hud-btn secondary" onClick={onClose}>돌아가기</button>
+    </div>;
   }
 
   // --- Final Results View Mode ---
@@ -683,7 +813,7 @@ const WorkbookPlayer = ({ pages, unitId, unitTitle, studentProfile = {}, onCompl
   };
 
   return (
-    <div className={`workbook-player-container fade-in ${showKeypad && activeInputId && inputMode === 'math' ? 'keypad-open' : ''}`}>
+    <div inert={savingPause || savingPageReward ? true : undefined} className={`workbook-player-container fade-in ${showKeypad && activeInputId && inputMode === 'math' ? 'keypad-open' : ''}`}>
       {/* Floating Gain/Loss Markers */}
       <AnimatePresence>
         {floatingMarkers.map(m => (
@@ -710,8 +840,15 @@ const WorkbookPlayer = ({ pages, unitId, unitTitle, studentProfile = {}, onCompl
         ))}
       </AnimatePresence>
 
+      {!previewMode && <div className="workbook-persistence-status" role="status" aria-live="polite">
+        {saveStatus.state === 'restored-conflict' ? '다른 기기의 최신 기록을 불러왔습니다. 이 기기의 답안은 별도로 보관했습니다.' :
+          saveStatus.state === 'saved' ? '서버 저장 완료' :
+          saveStatus.state === 'saving' || saveStatus.state === 'pending' ? '저장 중…' :
+          saveStatus.state === 'error' ? (saveStatus.localSaved ? '이 기기에 보관됨 · 서버 저장 필요' : '저장하지 못했습니다. 화면을 닫지 마세요.') : ''}
+        {saveStatus.state === 'error' && <><span>{saveStatus.message}</span><button onClick={() => { void saveQueueRef.current?.flush().catch(() => {}); }}>저장 재시도</button></>}
+      </div>}
       <div className="workbook-header hud-border glass-card">
-        <button className="back-btn" onClick={onClose}>✕</button>
+        <button className="back-btn" onClick={previewMode ? onClose : handlePauseWorkbook} disabled={savingPause || savingPageReward} aria-label="저장하고 닫기">✕</button>
         <span className="font-title unit-title">{unitTitle || '스마트 워크북'}</span>
         <div className="workbook-header-actions">
           <div className="workbook-pen-toolbar" role="toolbar" aria-label="학습/판서 도구">

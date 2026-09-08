@@ -1,5 +1,7 @@
 # 메타센스 카카오톡 채널
 
+> 이 문서는 개설 당시 이력입니다. 최신 상태는 POSITIONING.md와 ../daily/ 날짜별 기록을 우선합니다.
+
 공개 주소: https://pf.kakao.com/_xfxkGDn
 상담 주소: https://pf.kakao.com/_xfxkGDn/chat
 

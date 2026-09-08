@@ -1,0 +1,160 @@
+// Frozen production save/hydrate path before the 2026-09-08 fix. Synthetic regression only.
+  useEffect(() => {
+    if (previewMode) {
+      setProgressHydrated(true);
+      return undefined;
+    }
+    let cancelled = false;
+    setProgressHydrated(false);
+
+    const applySession = (session) => {
+      if (!session || session.workbookSignature !== workbookSignature) return false;
+      setCurrentPageIndex(Math.min(Math.max(0, Number(session.currentPageIndex) || 0), Math.max(0, pages.length - 1)));
+      setAnswers(session.answers || {});
+      setCheckedElements(session.checkedElements || {});
+      setCheckedPages(session.checkedPages || {});
+      setAttemptCounts(session.attemptCounts || {});
+      setFirstAttemptCorrect(session.firstAttemptCorrect || {});
+      setWrongAnswerHistory(session.wrongAnswerHistory || {});
+      setSessionCrystals(Math.max(0, Number(session.sessionCrystals) || 0));
+      setPageBaseRewardsPaid(Math.max(0, Number(session.pageBaseRewardsPaid) || 0));
+      setPageActualRewardsPaid(Math.max(0, Number(session.pageActualRewardsPaid) || 0));
+      return true;
+    };
+
+    const hydrate = async () => {
+      let localSession = null;
+      let serverSession = null;
+      try {
+        localSession = JSON.parse(localStorage.getItem(progressStorageKey) || 'null');
+      } catch { /* ignore malformed local progress */ }
+
+      const uid = auth.currentUser?.uid;
+      if (uid && unitId) {
+        try {
+          const snap = await getDoc(doc(db, 'users', uid, 'learning_progress', unitId));
+          if (snap.exists()) serverSession = snap.data()?.workbookSession || null;
+        } catch (error) {
+          console.warn('Workbook progress restore failed; using local progress.', error);
+        }
+      }
+      if (cancelled) return false;
+      const latestSession = [localSession, serverSession]
+        .filter(session => session?.workbookSignature === workbookSignature)
+        .sort((a, b) => Number(b.savedAtMs || 0) - Number(a.savedAtMs || 0))[0];
+      const restored = applySession(latestSession);
+      setProgressHydrated(true);
+      return restored;
+    };
+
+    hydrate();
+    return () => { cancelled = true; };
+  }, [previewMode, progressStorageKey, unitId, workbookSignature, pages.length]);
+
+  useEffect(() => {
+    if (previewMode || !progressHydrated || !unitId || isResultMode) return undefined;
+    const session = {
+      schemaVersion: 1,
+      workbookSignature,
+      currentPageIndex,
+      answers,
+      checkedElements,
+      checkedPages,
+      attemptCounts,
+      firstAttemptCorrect,
+      wrongAnswerHistory,
+      sessionCrystals,
+      pageBaseRewardsPaid,
+      pageActualRewardsPaid,
+      savedAtMs: Date.now(),
+    };
+    localStorage.setItem(progressStorageKey, JSON.stringify(session));
+    clearTimeout(autosaveTimerRef.current);
+    autosaveTimerRef.current = setTimeout(async () => {
+      const uid = auth.currentUser?.uid;
+      if (!uid) return;
+      try {
+        await setDoc(doc(db, 'users', uid, 'learning_progress', unitId), {
+          workbookSession: session,
+          workbookSessionUpdatedAt: serverTimestamp(),
+        }, { merge: true });
+      } catch (error) {
+        console.warn('Workbook server autosave failed; local progress is preserved.', error);
+      }
+    }, 700);
+    return () => clearTimeout(autosaveTimerRef.current);
+  }, [answers, attemptCounts, checkedElements, checkedPages, currentPageIndex, firstAttemptCorrect, isResultMode, pageActualRewardsPaid, pageBaseRewardsPaid, previewMode, progressHydrated, progressStorageKey, sessionCrystals, unitId, workbookSignature, wrongAnswerHistory]);
+
+  const handlePauseWorkbook = async () => {
+    if (savingPause || savingPageReward) return;
+    if (previewMode) {
+      onClose();
+      return;
+    }
+
+    setSavingPause(true);
+    setPauseError('');
+    clearTimeout(autosaveTimerRef.current);
+    try {
+      let nextPageBaseRewardsPaid = pageBaseRewardsPaid;
+      let nextPageActualRewardsPaid = pageActualRewardsPaid;
+      const unpaidLegacyBase = Math.max(0, sessionCrystals - pageBaseRewardsPaid);
+      if (unpaidLegacyBase > 0 && onPageReward) {
+        const rewardOutcome = await onPageReward({
+          type: 'workbook_page',
+          rewardScope: 'legacy_session',
+          unitId,
+          unitTitle,
+          workbookSignature,
+          pageId: '__legacy_session__',
+          pageIndex: currentPageIndex,
+          pageNumber: currentPageIndex + 1,
+          pageAttempt: 1,
+          correctCount: 0,
+          wrongCount: 0,
+          totalCount: 0,
+          baseCrystalsEarned: unpaidLegacyBase,
+        });
+        if (rewardOutcome?.ok === false) throw rewardOutcome.error || new Error('기존 세션 보상 정산에 실패했습니다.');
+        nextPageBaseRewardsPaid += unpaidLegacyBase;
+        nextPageActualRewardsPaid += Math.max(0, Number(rewardOutcome?.actualReward) || 0);
+        setPageBaseRewardsPaid(nextPageBaseRewardsPaid);
+        setPageActualRewardsPaid(nextPageActualRewardsPaid);
+      }
+
+      const session = {
+        schemaVersion: 1,
+        workbookSignature,
+        currentPageIndex,
+        answers,
+        checkedElements,
+        checkedPages,
+        attemptCounts,
+        firstAttemptCorrect,
+        wrongAnswerHistory,
+        sessionCrystals,
+        pageBaseRewardsPaid: nextPageBaseRewardsPaid,
+        pageActualRewardsPaid: nextPageActualRewardsPaid,
+        savedAtMs: Date.now(),
+      };
+
+      localStorage.setItem(progressStorageKey, JSON.stringify(session));
+      const uid = auth.currentUser?.uid;
+      if (uid && unitId) {
+        await setDoc(doc(db, 'users', uid, 'learning_progress', unitId), {
+          workbookSession: session,
+          workbookSessionUpdatedAt: serverTimestamp(),
+        }, { merge: true });
+      }
+      soundManager.playClick();
+      onClose();
+    } catch (error) {
+      console.error('Workbook pause save failed', error);
+      setPauseError('서버 저장에 실패했습니다. 이 기기의 진행 기록은 유지됩니다. 다시 시도해주세요.');
+    } finally {
+      setSavingPause(false);
+    }
+  };
+
+
+globalThis.pause = handlePauseWorkbook;

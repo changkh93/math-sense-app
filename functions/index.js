@@ -261,148 +261,37 @@ function getKSTWeekMondayString(date = new Date()) {
   return getKSTDateString(new Date(kstMidnightUtcMs - (mondayOffset * 24 * 60 * 60 * 1000)));
 }
 
-const {
-  LEARNING_SUMMARY_SCHEMA_VERSION,
-  LEARNING_SUMMARY_MAX_DAYS,
-  historyTimestampMs,
-  historyActivityType,
-  applyHistoryToDailyStats,
-  buildUnitLearningSummary,
-  buildLearningSummaryFromScratch,
-} = require("./learningSummaryDomain.cjs"); // eslint-disable-line no-undef -- Cloud Functions runs in CommonJS.
-
-async function rebuildLearningSummary(uid) {
-  const db = admin.firestore();
-  const [historySnap, progressSnap] = await Promise.all([
-    db.collection("users").doc(uid).collection("history").get(),
-    db.collection("users").doc(uid).collection("learning_progress").get(),
-  ]);
-  const summary = {
-    ...buildLearningSummaryFromScratch(historySnap.docs, progressSnap.docs),
-    updatedAt: FieldValue.serverTimestamp(),
-  };
-  await db.collection("learningSummaries").doc(uid).set(summary);
-  return { ...summary, updatedAt: null };
-}
-
-exports.getOrRebuildLearningSummary = costOptimizedDataFunctions.https.onCall(async (_data, context) => {
-  const uid = await requireAuthUid(context);
-  const db = admin.firestore();
-  const historyRef = db.collection("users").doc(uid).collection("history");
-  const summaryRef = admin.firestore().collection("learningSummaries").doc(uid);
-  const summarySnap = await summaryRef.get();
-  if (summarySnap.exists && summarySnap.data()?.schemaVersion === LEARNING_SUMMARY_SCHEMA_VERSION) {
-    const summary = summarySnap.data() || {};
-    const summaryUpdatedMs = summary.updatedAt?.toMillis ? summary.updatedAt.toMillis() : 0;
-    const nowMs = Date.now();
-    // Fast-path: if summary was updated within 60s, return immediately without extra count queries
-    if (summaryUpdatedMs > 0 && (nowMs - summaryUpdatedMs) < 60 * 1000) {
-      return { ready: true, rebuilt: false, cached: true };
-    }
-    const [latestHistorySnap, historyCountSnap] = await Promise.all([
-      historyRef.orderBy("timestamp", "desc").limit(1).get(),
-      historyRef.count().get(),
-    ]);
-    const actualCount = historyCountSnap.data().count;
-    const latestHistoryMs = latestHistorySnap.empty
-      ? 0
-      : historyTimestampMs(latestHistorySnap.docs[0].data());
-    const isStale = (
-      (summary.totalHistoryCount ?? 0) !== actualCount ||
-      latestHistoryMs > summaryUpdatedMs
-    );
-    if (!isStale) return { ready: true, rebuilt: false };
-  }
-  await rebuildLearningSummary(uid);
-  return { ready: true, rebuilt: true, reason: summarySnap.exists ? "stale" : "missing" };
+const { LEARNING_SUMMARY_SCHEMA_VERSION, historyTimestampMs } = require('./learningSummaryDomain.cjs');
+const { SYNC_VERSION, createLearningSummaryService } = require('./learningSummaryService.cjs');
+const learningSummaryService = createLearningSummaryService({
+  db: admin.firestore(),
+  serverTimestamp: () => FieldValue.serverTimestamp(),
+  eventTimestamp: value => {
+    if (!value) return null;
+    // Preserve RFC3339 sub-millisecond precision when deciding whether a full
+    // rebuild already includes an event (not the function's delivery time).
+    const parsed = Date.parse(value);
+    if (!Number.isFinite(parsed)) return null;
+    const fraction = String(value).match(/\.(\d+)Z$/)?.[1] || '';
+    return new admin.firestore.Timestamp(Math.floor(parsed / 1000), Number(fraction.padEnd(9, '0').slice(0, 9)));
+  },
 });
 
-exports.syncLearningSummary = costOptimizedDataFunctions.firestore
-  .document("users/{uid}/history/{historyId}")
-  .onWrite(async (change, context) => {
-    const uid = context.params.uid;
-    const before = change.before.exists ? change.before.data() : null;
-    const after = change.after.exists ? change.after.data() : null;
-    const db = admin.firestore();
-    const summaryRef = db.collection("learningSummaries").doc(uid);
-    const affectedUnitIds = Array.from(new Set([before?.unitId, after?.unitId].filter(Boolean)));
-    const historyDocsByUnit = new Map();
+exports.getOrRebuildLearningSummary = costOptimizedDataFunctions.https.onCall(async (data, context) => {
+  const uid = await requireAuthUid(context);
+  const summary = (await admin.firestore().collection('learningSummaries').doc(uid).get()).data();
+  if (summary?.schemaVersion === LEARNING_SUMMARY_SCHEMA_VERSION && summary.syncVersion === SYNC_VERSION && !data?.validateFreshness) {
+    return { ready: true, rebuilt: false, cached: true };
+  }
+  // Explicit reconciliation is independent of timestamp/count heuristics: a
+  // recent unrelated event or an in-place history edit must not hide omissions.
+  return learningSummaryService.rebuild(uid);
+});
 
-    await Promise.all(affectedUnitIds.map(async (unitId) => {
-      const historySnap = await db
-        .collection("users")
-        .doc(uid)
-        .collection("history")
-        .where("unitId", "==", unitId)
-        .get();
-      historyDocsByUnit.set(unitId, historySnap.docs.map((doc) => doc.data()));
-    }));
-
-    let needsRebuild = false;
-    await db.runTransaction(async (transaction) => {
-      needsRebuild = false;
-      const freshSnap = await transaction.get(summaryRef);
-      if (!freshSnap.exists || freshSnap.data()?.schemaVersion !== LEARNING_SUMMARY_SCHEMA_VERSION) {
-        needsRebuild = true;
-        return;
-      }
-      const fresh = freshSnap.data() || {};
-      const dailyMap = new Map((fresh.daily || []).map((row) => [row.date, { ...row }]));
-      applyHistoryToDailyStats(dailyMap, before, -1);
-      applyHistoryToDailyStats(dailyMap, after, 1);
-
-      const unitsById = new Map((fresh.units || []).map((row) => [row.unitId, row]));
-      affectedUnitIds.forEach((unitId) => {
-        const existingUnit = unitsById.get(unitId) || null;
-        const next = buildUnitLearningSummary(
-          unitId,
-          historyDocsByUnit.get(unitId) || [],
-          null,
-          existingUnit
-        );
-        if (next) unitsById.set(unitId, next);
-        else unitsById.delete(unitId);
-      });
-
-      const stats = {
-        quizAttempts: 0,
-        quizScoreSum: 0,
-        perfectAttempts: 0,
-        workbookAttempts: 0,
-        workbookScoreSum: 0,
-        workbookPerfectAttempts: 0,
-        darkMatterRecovered: 0,
-        ...(fresh.stats || {}),
-      };
-      const applyStats = (data, direction) => {
-        if (!data) return;
-        const type = historyActivityType(data);
-        if (type === "quiz") {
-          stats.quizAttempts += direction;
-          stats.quizScoreSum += direction * Number(data.score || 0);
-          if (Number(data.score) === 100) stats.perfectAttempts += direction;
-        } else if (type === "workbook") {
-          stats.workbookAttempts += direction;
-          stats.workbookScoreSum += direction * Number(data.score || 0);
-          if (Number(data.score) === 100) stats.workbookPerfectAttempts += direction;
-        }
-        if (String(data.unitId || "").includes("dark_matter") && Number(data.score || 0) >= 80) stats.darkMatterRecovered += direction;
-      };
-      applyStats(before, -1);
-      applyStats(after, 1);
-
-      transaction.set(summaryRef, {
-        schemaVersion: LEARNING_SUMMARY_SCHEMA_VERSION,
-        totalHistoryCount: Math.max(0, Number(fresh.totalHistoryCount || 0) + (after ? 1 : 0) - (before ? 1 : 0)),
-        daily: Array.from(dailyMap.values()).sort((a, b) => a.date.localeCompare(b.date)).slice(-LEARNING_SUMMARY_MAX_DAYS),
-        units: Array.from(unitsById.values()),
-        stats,
-        updatedAt: FieldValue.serverTimestamp(),
-      });
-    });
-    if (needsRebuild) await rebuildLearningSummary(uid);
-    return null;
-  });
+exports.syncLearningSummary = regionalFunctions.runWith({
+  maxInstances: 3, memory: '256MB', timeoutSeconds: 60, failurePolicy: true,
+}).firestore.document('users/{uid}/history/{historyId}')
+  .onWrite((change, context) => learningSummaryService.sync(change, context));
 
 const LEADERBOARD_CACHE_TTL_MS = 10 * 60 * 1000;
 

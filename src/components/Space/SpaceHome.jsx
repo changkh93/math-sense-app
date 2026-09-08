@@ -4,7 +4,7 @@ import { useQueries } from '@tanstack/react-query'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { auth, googleProvider, db, functions } from '../../firebase'
 import { signInWithEmailAndPassword, signOut } from 'firebase/auth'
-import { collection, serverTimestamp, query, orderBy, onSnapshot, doc, where, getDocs, getDoc, writeBatch, increment, limit, runTransaction, Timestamp, updateDoc } from 'firebase/firestore'
+import { collection, documentId, serverTimestamp, query, orderBy, onSnapshot, doc, where, getDocs, getDoc, writeBatch, increment, limit, runTransaction, Timestamp, updateDoc } from 'firebase/firestore'
 import { useClusters, useRegions, useRegion, useChapters, useChapter, useUnits, useUnit, useQuizzes } from '../../hooks/useContent'
 import { useAuth } from '../../hooks/useAuth'
 import { usePresence } from '../../hooks/usePresence'
@@ -41,7 +41,8 @@ import { calculateGrowthUpdates } from '../../utils/rankingUtils'
 import { normalizeNotificationLink } from '../../utils/socialUtils'
 import { StreakCelebrationModal, StreakToast } from './StreakCelebration'
 import { getAttendanceDockingStatus } from '../../utils/attendanceUtils'
-import { mergeSummaryWithRecentHistory, shouldCheckLearningSummaryFreshness } from '../../utils/learningSummaryUtils'
+import { prepareWorkbookPageCheckpoint } from '../../utils/workbookPersistence'
+import { getLearningProgressCompletion, mergeUnitProgressCompletion, mergeSummaryWithRecentHistory, shouldCheckLearningSummaryFreshness } from '../../utils/learningSummaryUtils'
 import { checkWebGLSupport } from '../../utils/webglSupport'
 import {
   consumeGoogleRedirect,
@@ -1295,6 +1296,33 @@ function SpaceHome() {
     return Array.from(ids).sort()
   }, [units, chapterUnitResults])
 
+  // Subscribe only to units in the visible region. Summary triggers can lag or
+  // omit a completed modality; the source progress documents remain authoritative.
+  const completionScopeKey = JSON.stringify(quizAvailabilityUnitIds);
+  const [sourceCompletion, setSourceCompletion] = useState(null);
+  useEffect(() => {
+    if (!user?.uid) return undefined;
+    let active = true;
+    const scopeUserId = user.uid;
+    const ids = JSON.parse(completionScopeKey);
+    const subscriptions = chunkArray(ids, 30).map((chunk, index) => onSnapshot(
+      query(collection(db, 'users', scopeUserId, 'learning_progress'), where(documentId(), 'in', chunk)),
+      snapshot => {
+        if (!active) return;
+        const data = Object.fromEntries(snapshot.docs.map(row => [row.id, getLearningProgressCompletion(row.data())]));
+        setSourceCompletion(previous => ({
+          userId: scopeUserId, scopeKey: completionScopeKey,
+          chunks: { ...(previous?.userId === scopeUserId && previous?.scopeKey === completionScopeKey ? previous.chunks : {}), [index]: data },
+        }));
+      }, error => console.warn('Unit completion subscription failed:', error)
+    ));
+    return () => { active = false; subscriptions.forEach(unsubscribe => unsubscribe()); };
+  }, [completionScopeKey, user?.uid]);
+  const sourceCompletionMap = useMemo(() => (
+    sourceCompletion?.userId === user?.uid && sourceCompletion?.scopeKey === completionScopeKey
+      ? Object.assign({}, ...Object.values(sourceCompletion.chunks)) : {}
+  ), [completionScopeKey, sourceCompletion, user?.uid]);
+
   const quizAvailabilityChunks = useMemo(
     () => chunkArray(quizAvailabilityUnitIds, 10),
     [quizAvailabilityUnitIds]
@@ -1927,7 +1955,7 @@ function SpaceHome() {
       }
     })
 
-    const progressMap = historyProgressMap
+    const progressMap = mergeUnitProgressCompletion(historyProgressMap, sourceCompletionMap)
 
     if (effectiveHistory.length === 0) {
       regions?.forEach(r => statusMap[r.id] = 'not_started')
@@ -1960,7 +1988,7 @@ function SpaceHome() {
     }
 
     return { explorationStatus: statusMap, recentRegionId: lastRegionId, bestScores: scores, unitProgressMap: progressMap }
-  }, [effectiveHistory, regions, selectedClusterId])
+  }, [effectiveHistory, regions, selectedClusterId, sourceCompletionMap])
 
   // Calculate chapter progress dynamically from Firestore data
   const chapterProgress = useMemo(() => {
@@ -2595,9 +2623,18 @@ function SpaceHome() {
         const freshProgressData = progressSnap.exists() ? progressSnap.data() : {}
         const rewardAttempts = freshProgressData.workbookPageRewardAttempts || {}
         const existingReward = rewardAttempts[rewardKey]
+        const persistCheckpoint = (reward) => {
+          const checkpoint = prepareWorkbookPageCheckpoint(pageResult, freshProgressData.workbookSession, reward)
+          if (checkpoint) transaction.set(progressDocRef, {
+            workbookSession: checkpoint, workbookSessionUpdatedAt: serverTimestamp(),
+          }, { mergeFields: ['workbookSession', 'workbookSessionUpdatedAt'] })
+          return checkpoint
+        }
         if (existingReward) {
+          const workbookCheckpoint = persistCheckpoint({ baseAmount: existingReward.baseAmount || 0, actualReward: existingReward.amount || 0 })
           return {
             duplicate: true,
+            workbookCheckpoint,
             actualReward: Math.max(0, Number(existingReward.amount) || 0),
             baseAmount: Math.max(0, Number(existingReward.baseAmount) || baseAmount),
           }
@@ -2611,6 +2648,7 @@ function SpaceHome() {
             })
           : null
         const actualReward = rewardMultiplierMeta?.amount || 0
+        const workbookCheckpoint = persistCheckpoint({ baseAmount, actualReward })
         const streakCalc = calculateStreakUpdate(freshUserData)
         const streakUpdates = streakCalc.streakUpdate || {}
         const growthUpdates = calculateGrowthUpdates(freshUserData, actualReward)
@@ -2713,7 +2751,7 @@ function SpaceHome() {
         }
         transaction.update(userDocRef, userUpdates)
 
-        return { duplicate: false, actualReward, baseAmount, rewardMultiplierMeta }
+        return { duplicate: false, actualReward, baseAmount, rewardMultiplierMeta, workbookCheckpoint }
       })
 
       if (!outcome.duplicate && outcome.actualReward > 0) soundManager.playCrystal()

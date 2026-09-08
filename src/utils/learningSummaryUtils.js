@@ -64,6 +64,8 @@ export function getLearningProgressCompletion(progress = {}) {
   )
 
   return {
+    quiz: progress.quizCompleted === true,
+    workbook: progress.workbookCompleted === true,
     text: progress.logRead === true,
     video: Object.values(progress.videoProgress || {}).some(
       (tx) => tx && typeof tx === 'object' && tx.completed === true
@@ -75,7 +77,7 @@ export function getLearningProgressCompletion(progress = {}) {
 export function mergeUnitProgressCompletion(historyProgressMap, progressCompletionMap) {
   const merged = { ...historyProgressMap }
   Object.entries(progressCompletionMap).forEach(([unitId, completion]) => {
-    const completedTypes = ['text', 'video', 'missionLab'].filter((type) => completion[type] === true)
+    const completedTypes = ['quiz', 'workbook', 'text', 'video', 'missionLab'].filter((type) => completion[type] === true)
     if (completedTypes.length === 0) return
     merged[unitId] = {
       quiz: false, video: false, text: false, workbook: false, codeTrace: false, missionLab: false,

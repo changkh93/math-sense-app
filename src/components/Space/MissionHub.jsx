@@ -4221,6 +4221,7 @@ export default function MissionHub({
       <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', zIndex: 2000, background: '#050a19' }}>
         <Suspense fallback={<MissionModeFallback label="워크북을 불러오고 있습니다..." />}>
           <WorkbookPlayer
+            key={`${userId}:${unitId}`}
             pages={activeUnit?.workbookPages || []}
             unitId={unitId}
             unitTitle={activeUnit?.title}

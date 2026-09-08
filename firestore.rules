@@ -201,6 +201,25 @@ service cloud.firestore {
              collectionId == 'algorithmProgress';
     }
 
+    // Empty maps in a legacy merge:true save erase the whole answer map. Protect
+    // persisted work even while an old browser bundle is still open.
+    function preservesWorkbookSession() {
+      let oldSession = resource.data.get('workbookSession', {});
+      let nextSession = request.resource.data.get('workbookSession', {});
+      let oldHasWork = oldSession is map && (
+        oldSession.get('currentPageIndex', 0) > 0 ||
+        oldSession.get('answers', {}).size() > 0 ||
+        oldSession.get('checkedPages', {}).size() > 0
+      );
+      let nextHasWork = nextSession is map && (
+        nextSession.get('currentPageIndex', 0) > 0 ||
+        nextSession.get('answers', {}).size() > 0 ||
+        nextSession.get('checkedPages', {}).size() > 0
+      );
+      return !oldHasWork || nextHasWork ||
+        (!('workbookSession' in request.resource.data) && request.resource.data.get('workbookCompleted', false) == true);
+    }
+
     function isValidAgoraUpvoteToggle() {
       let oldVotes = resource.data.upvotedBy;
       let newVotes = request.resource.data.upvotedBy;
@@ -598,7 +617,12 @@ service cloud.firestore {
           isAdmin() ||
           isLinkedParentOf(userId)
         );
-        allow update, delete: if isAuth() && (
+        allow update: if isAuth() && (
+          !isServerManagedUserSubcollection(collectionId) &&
+          (request.auth.uid == userId || isAdmin()) &&
+          (isAdmin() || collectionId != 'learning_progress' || preservesWorkbookSession())
+        );
+        allow delete: if isAuth() && (
           !isServerManagedUserSubcollection(collectionId) &&
           (request.auth.uid == userId || isAdmin())
         );
