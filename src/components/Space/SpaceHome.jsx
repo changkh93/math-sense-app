@@ -63,6 +63,8 @@ import '../../styles/space-theme.css'
 const SpaceQuizView = lazy(() => import('./SpaceQuizView'))
 const Planet3D = lazy(() => import('./Planet3D'))
 const SpaceScene = lazy(() => import('./SpaceScene'))
+const ElementaryPlanetExplorer = lazy(() => import('./ElementaryPlanetExplorer'))
+const CoursePlanetExplorer = lazy(() => import('./CoursePlanetExplorer'))
 const MissionHub = lazy(() => import('./MissionHub'))
 const SpaceDashboard = lazy(() => import('./SpaceDashboard'))
 const SpaceCollection = lazy(() => import('./SpaceCollection'))
@@ -84,6 +86,7 @@ const PythonProtocolHub = lazy(() => import('../PythonWorld/PythonProtocolHub'))
 const AlgorithmConstellationHub = lazy(() => import('../AlgorithmConstellation/client/hub/AlgorithmConstellationHub'))
 const ReadingLibraryView = lazy(() => import('./ReadingLibrary/ReadingLibraryView'))
 import { isWesternClassicCluster, filterWesternClassicRegions } from '../../constants/westernClassicNavigation'
+import { isCourseExplorerCluster } from './coursePlanetCatalog'
 
 function SpaceViewFallback() {
   return (
@@ -4475,7 +4478,100 @@ function SpaceHome() {
         )}
         {currentView === 'planet' && selectedClusterId && (
           <>
-            {!selectedRegionId ? (
+            {!selectedRegionId && selectedClusterId === 'cluster_elementary' && is2DMode ? (
+              <Suspense fallback={<div role="status" style={{ padding: 40 }}>행성 지도를 준비하고 있어요…</div>}>
+                <ElementaryPlanetExplorer
+                  regions={regions}
+                  loading={loadingRegions}
+                  error={errorRegions}
+                  onRetry={refetchRegions}
+                  is2DMode={is2DMode}
+                  canUse3D={!isMobile}
+                  onToggleMode={toggle2DMode}
+                  onBack={activeClusters.length > 1 ? () => { selectCluster(null); soundManager.playClick(); } : undefined}
+                  onEnterFrontier={requestGalaxyEntry}
+                  regionAccess={userData?.regionAccess}
+                  explorationStatus={explorationStatus}
+                  recentRegionId={recentRegionId}
+                  darkMatterCount={darkMatterCount}
+                  onSelectRegion={(id) => {
+                    const region = regions?.find(item => item.id === id);
+                    if (!region) return;
+                    if (region.isPrivate) {
+                      const access = userData?.regionAccess?.[id];
+                      if (access === 'suspended') {
+                        alert('이 행성에 대한 접근이 일시정지되었습니다. 선생님께 문의하세요.');
+                        return;
+                      }
+                      if (access !== 'active' && access !== 'completed') {
+                        setPendingRegion(region);
+                        soundManager.playClick();
+                        return;
+                      }
+                    }
+                    selectRegion(id);
+                    soundManager.playWarp();
+                  }}
+                  onSelectStation={(id) => {
+                    if (id === 'archive') {
+                      setAssignmentHubInitialDate(null);
+                      switchRootView('assignment_hub');
+                    } else if (id === 'notebook') switchRootView('mistake_notebook');
+                    else if (id === 'dark') startDarkMatterMode('learning');
+                    else if (id === 'refinery') startDarkMatterMode('refinery');
+                    soundManager.playWarp();
+                  }}
+                />
+              </Suspense>
+            ) : !selectedRegionId && is2DMode && isCourseExplorerCluster(selectedClusterId) ? (
+              <Suspense fallback={<div role="status" style={{ padding: 40 }}>행성 목록을 준비하고 있어요…</div>}>
+                <CoursePlanetExplorer
+                  clusterId={selectedClusterId}
+                  regions={regions}
+                  loading={loadingRegions}
+                  error={errorRegions}
+                  onRetry={refetchRegions}
+                  canUse3D={!isMobile}
+                  onToggleMode={toggle2DMode}
+                  onBack={activeClusters.length > 1 ? () => { selectCluster(null); soundManager.playClick(); } : undefined}
+                  onEnterFrontier={requestGalaxyEntry}
+                  regionAccess={userData?.regionAccess}
+                  explorationStatus={explorationStatus}
+                  recentRegionId={recentRegionId}
+                  darkMatterCount={darkMatterCount}
+                  onSelectRegion={(id) => {
+                    const region = regions?.find(item => item.id === id)
+                    if (!region) return
+                    if (region.isPrivate) {
+                      const access = userData?.regionAccess?.[id]
+                      if (access === 'suspended') {
+                        alert('이 행성에 대한 접근이 일시정지되었습니다. 선생님께 문의하세요.')
+                        return
+                      }
+                      if (access !== 'active' && access !== 'completed') {
+                        setPendingRegion(region)
+                        soundManager.playClick()
+                        return
+                      }
+                    }
+                    selectRegion(id)
+                    soundManager.playWarp()
+                  }}
+                  onSelectStation={(id) => {
+                    if (id === 'archive') {
+                      setAssignmentHubInitialDate(null)
+                      switchRootView('assignment_hub')
+                    } else if (id === 'notebook') switchRootView('mistake_notebook')
+                    else if (id === 'dark') startDarkMatterMode('learning')
+                    else if (id === 'refinery') startDarkMatterMode('refinery')
+                    else if (id === 'reading_library') switchRootView('reading_library')
+                    else if (id === 'lumi_protocol') switchRootView('lumi_protocol')
+                    else if (id === 'algorithm_constellation') switchRootView('algorithm_constellation')
+                    soundManager.playWarp()
+                  }}
+                />
+              </Suspense>
+            ) : !selectedRegionId ? (
               // Region Selection (Overlay only)
               <div style={{ 
                 position: is2DMode ? 'relative' : 'absolute', 

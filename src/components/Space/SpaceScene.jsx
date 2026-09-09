@@ -1,68 +1,45 @@
 import React, { useRef, useMemo, useState, useEffect, Suspense } from 'react'
-import { Canvas, useThree, useFrame } from '@react-three/fiber'
-import { Stars, CameraControls, Environment, Float, Html } from '@react-three/drei'
+import { Canvas, useFrame } from '@react-three/fiber'
+import { AdaptiveDpr, Stars, CameraControls, Float, Html } from '@react-three/drei'
 import * as THREE from 'three'
 import PlanetMesh from './PlanetMesh'
+import { getMiddleMathPlanetStyle, getPythonPlanetStyle } from './planetCourseStyles'
 import { checkWebGLSupport } from '../../utils/webglSupport'
 import { isWesternClassicCluster, filterWesternClassicRegions } from '../../constants/westernClassicNavigation'
 
-const MIDDLE_MATH_PLANET_STYLES = [
-  { planetType: 'middle_math_core', planetColor: '#59c8ff' },
-  { planetType: 'middle_math_analytics', planetColor: '#8f64ff' },
-  { planetType: 'middle_math_geometry', planetColor: '#b08cff' },
-  { planetType: 'middle_math_exam', planetColor: '#ffbf66' }
-]
-
-function getMiddleMathPlanetStyle(region, index) {
-  const title = region?.title || ''
-
-  if (title.includes('수와 연산') || title.includes('문자와 식')) {
-    return { planetType: 'middle_math_numbers_expressions', planetColor: '#22d3ee' }
-  }
-  if (title.includes('내신기출') || title.includes('기출문제')) {
-    return { planetType: 'middle_math_school_exam', planetColor: '#fb7185' }
-  }
-  if (title.includes('기본개념')) {
-    return { planetType: 'middle_math_core', planetColor: '#59c8ff' }
-  }
-  if (title.includes('함수') || title.includes('확률') || title.includes('통계')) {
-    return { planetType: 'middle_math_functions_statistics', planetColor: '#2dd4bf' }
-  }
-  if (title.includes('기하')) {
-    return { planetType: 'middle_math_absolute_geometry', planetColor: '#86efac' }
-  }
-  if (title.includes('평가') || title.includes('모의')) {
-    return { planetType: 'middle_math_exam', planetColor: '#ffbe72' }
-  }
-
-  return MIDDLE_MATH_PLANET_STYLES[index % MIDDLE_MATH_PLANET_STYLES.length]
+const SPIRAL_CONFIG = {
+  radiusStep: 4,
+  angleStep: 1.2,
+  yStep: -1.8,
+  initialRadius: 2,
+  yOffset: -3,
 }
 
-const PYTHON_PLANET_STYLES = [
-  { planetType: 'python_foundation', planetColor: '#63b3ff' },
-  { planetType: 'python_advanced', planetColor: '#34d3ff' },
-  { planetType: 'python_data', planetColor: '#7f8cff' },
-  { planetType: 'python_project', planetColor: '#b159ff' }
+const ELEMENTARY_OVERVIEW_POSITIONS = [
+  [8.4, -3.2, -0.5],
+  [2.4, -5.8, -3.8],
+  [-3.8, -6.3, -0.5],
+  [-8.3, -3.9, -2.5],
+  [-1.3, -3.2, -5.2],
+  [7.5, -7.1, -3.5],
+  [0, -11, -5.8],
 ]
 
-function getPythonPlanetStyle(region, index) {
-  const title = region?.title || ''
+const MIDDLE_MATH_OVERVIEW_POSITIONS = [
+  [7, -3, -2],
+  [4, -7.8, -2],
+  [-4, -7.8, -2],
+  [-7, -3.5, -2],
+  [0, -3.2, -3],
+  [0, -9.8, -3],
+]
 
-  if (title.includes('수학') || title.includes('기초') || title.includes('입문')) {
-    return { planetType: 'python_foundation', planetColor: '#63b3ff' }
-  }
-  if (title.includes('심화') || title.includes('반복') || title.includes('함수') || title.includes('클래스') || title.includes('알고리즘')) {
-    return { planetType: 'python_advanced', planetColor: '#34d3ff' }
-  }
-  if (title.includes('데이터') || title.includes('시각화') || title.includes('분석') || title.includes('pandas') || title.includes('matplotlib')) {
-    return { planetType: 'python_data', planetColor: '#7f8cff' }
-  }
-  if (title.includes('게임') || title.includes('프로젝트') || title.includes('turtle') || title.includes('창작')) {
-    return { planetType: 'python_project', planetColor: '#b159ff' }
-  }
-
-  return PYTHON_PLANET_STYLES[index % PYTHON_PLANET_STYLES.length]
-}
+const PYTHON_OVERVIEW_POSITIONS = [
+  [6.5, -3, -2],
+  [4, -7.2, -2],
+  [-4, -7.2, -2],
+  [-6.5, -4.6, -2],
+]
 
 function getWesternClassicPlanetStyle(region) {
   const title = region?.title || ''
@@ -84,7 +61,7 @@ function WarpStars({ active }) {
     <Stars 
       radius={100} 
       depth={50} 
-      count={5000} 
+      count={3200}
       factor={4} 
       saturation={0} 
       fade 
@@ -97,8 +74,7 @@ function WarpStars({ active }) {
  * Smooth FOV transition
  */
 function CameraFOV({ isBoosting }) {
-  const { camera } = useThree()
-  useFrame((state, delta) => {
+  useFrame(({ camera }, delta) => {
     const targetFov = isBoosting ? 70 : 45
     camera.fov = THREE.MathUtils.lerp(camera.fov, targetFov, delta * 5)
     camera.updateProjectionMatrix()
@@ -131,46 +107,48 @@ function SceneContent({
   darkMatterCount = 0
 }) {
   const controlsRef = useRef()
-  const { camera } = useThree()
   const [warpActive, setWarpActive] = useState(false)
   
   const isClassic = isWesternClassicCluster(clusterId);
+  const isElementary = clusterId === 'cluster_elementary' || clusterId === '초등수학'
+  const isMiddleMath = clusterId === 'middle-math' || clusterId === '중등수학'
+  const isPython = clusterId === 'python' || clusterId === '파이썬'
   const displayedRegions = useMemo(() => {
     return isClassic ? filterWesternClassicRegions(regions, clusterId) : regions;
   }, [regions, clusterId, isClassic]);
 
   // Spiral Layout Configuration
-  const spiralConfig = {
-    radiusStep: 4,   
-    angleStep: 1.2,  
-    yStep: -1.8,     // Increased vertical spacing slightly
-    initialRadius: 2,
-    yOffset: -3      // Shift everything down
-  }
-
   // Calculate positions
   const planetPositions = useMemo(() => {
     if (!displayedRegions) return []
     return displayedRegions.map((region, i) => {
-      const angle = i * spiralConfig.angleStep
-      const radius = spiralConfig.initialRadius + (i * 0.5) // 점차 넓어짐
-      
-      // Spiral Position (X, Z plane mainly, with Y for depth)
-      const x = Math.cos(angle) * radius * 3
-      const z = Math.sin(angle) * radius * 2 - (i * 2) 
-      const y = i * spiralConfig.yStep + spiralConfig.yOffset
+      const angle = i * SPIRAL_CONFIG.angleStep
+      const radius = SPIRAL_CONFIG.initialRadius + (i * 0.5)
+      const curatedPosition = isElementary
+        ? ELEMENTARY_OVERVIEW_POSITIONS[i]
+        : isMiddleMath
+          ? MIDDLE_MATH_OVERVIEW_POSITIONS[i]
+          : isPython
+            ? PYTHON_OVERVIEW_POSITIONS[i]
+            : null
+
+      // Elementary keeps a curated open constellation; other clusters retain
+      // the extensible spiral for arbitrary region counts.
+      const x = curatedPosition?.[0] ?? Math.cos(angle) * radius * 3
+      const y = curatedPosition?.[1] ?? i * SPIRAL_CONFIG.yStep + SPIRAL_CONFIG.yOffset
+      const z = curatedPosition?.[2] ?? Math.sin(angle) * radius * 2 - (i * 2)
 
       // Planet Type Logic
       let planetType = 'default'
       let planetColor = '#4a90e2'
       
-      if (region.title?.includes('월간평가')) {
+      if (isElementary && region.title?.includes('월간평가')) {
         planetType = 'elementary_monthly_evaluation'; planetColor = '#6d8dff'
-      } else if (region.clusterId === 'middle-math' || region.clusterId === '중등수학') {
+      } else if (isMiddleMath || region.clusterId === 'middle-math' || region.clusterId === '중등수학') {
         const middleMathStyle = getMiddleMathPlanetStyle(region, i)
         planetType = middleMathStyle.planetType
         planetColor = middleMathStyle.planetColor
-      } else if (region.clusterId === 'python' || region.clusterId === '파이썬' || region.title?.includes('파이썬')) {
+      } else if (isPython || region.clusterId === 'python' || region.clusterId === '파이썬' || region.title?.includes('파이썬')) {
         const pythonStyle = getPythonPlanetStyle(region, i)
         planetType = pythonStyle.planetType
         planetColor = pythonStyle.planetColor
@@ -203,7 +181,7 @@ function SceneContent({
         isLocked: false // Unlocking all planets as requested
       }
     })
-  }, [displayedRegions])
+  }, [displayedRegions, isElementary, isMiddleMath, isPython])
 
   // Camera Animation & Warp Logic
   useEffect(() => {
@@ -211,7 +189,7 @@ function SceneContent({
       const targetPlanet = planetPositions.find(p => p.id === selectedRegionId)
       if (targetPlanet) {
         // Warp Start
-        setWarpActive(true)
+        queueMicrotask(() => setWarpActive(true))
         
         // Fly to planet
         const [x, y, z] = targetPlanet.position
@@ -222,13 +200,15 @@ function SceneContent({
         )
         
         // Warp End after transition
-        setTimeout(() => setWarpActive(false), 1000)
+        const timeout = setTimeout(() => setWarpActive(false), 1000)
+        return () => clearTimeout(timeout)
       }
     } else if (controlsRef.current) {
       // Reset View (Overview) - Lower target to keep planets in bottom 2/3 of screen
-      controlsRef.current.setLookAt(0, 8, 20, 0, -5, 0, true)
+      if (isElementary) controlsRef.current.setLookAt(0, 8, 24, 0, -4.5, -2, true)
+      else controlsRef.current.setLookAt(0, 8, 20, 0, -5, 0, true)
     }
-  }, [selectedRegionId, planetPositions])
+  }, [selectedRegionId, planetPositions, isElementary])
 
   return (
     <>
@@ -237,13 +217,15 @@ function SceneContent({
       <pointLight position={[-10, -10, -5]} intensity={0.5} color="#00d4ff" />
       
       <CameraFOV isBoosting={isBoosting} />
+      <AdaptiveDpr pixelated />
       <WarpStars active={warpActive || isBoosting} />
       
       <CameraControls 
         ref={controlsRef} 
         minDistance={2} 
-        maxDistance={50} 
-        smoothTime={0.8}
+        maxDistance={80}
+        smoothTime={0.55}
+        dollyToCursor
       />
 
       {planetPositions.map((planet, idx) => (
@@ -599,18 +581,17 @@ function SceneContent({
 }
 
 function Line({ start, end }) {
-  const ref = useRef()
-  useMemo(() => {
-    const geometry = new THREE.BufferGeometry().setFromPoints([
+  const geometry = useMemo(() => (
+    new THREE.BufferGeometry().setFromPoints([
       new THREE.Vector3(...start), 
       new THREE.Vector3(...end)
     ])
-    return geometry
-  }, [start, end])
+  ), [start, end])
+
+  useEffect(() => () => geometry.dispose(), [geometry])
 
   return (
-    <line>
-      <bufferGeometry attach="geometry" setFromPoints={[new THREE.Vector3(...start), new THREE.Vector3(...end)]} />
+    <line geometry={geometry}>
       <lineBasicMaterial attach="material" color="#00d4ff" transparent opacity={0.1} />
     </line>
   )
@@ -654,14 +635,7 @@ class CanvasErrorBoundary extends React.Component {
 
 export default function SpaceScene(props) {
   const fov = props.isBoosting ? 60 : 45;
-  const [hasWebGL, setHasWebGL] = useState(true);
-
-  useEffect(() => {
-    if (!checkWebGLSupport()) {
-      console.warn('[SpaceScene] WebGL not supported on this device.');
-      setHasWebGL(false);
-    }
-  }, []);
+  const [hasWebGL, setHasWebGL] = useState(() => checkWebGLSupport());
 
   if (!hasWebGL) {
     // WebGL 지원 안됨 - 빈 배경 (SpaceHome에서 2D 모드로 강제 전환할 수 있도록 처리)
@@ -680,7 +654,9 @@ export default function SpaceScene(props) {
       <CanvasErrorBoundary>
         <Canvas
           camera={{ position: [0, 5, 15], fov: fov }}
-          gl={{ antialias: true, alpha: true, failIfMajorPerformanceCaveat: false }}
+          dpr={[1, 1.5]}
+          performance={{ min: 0.55, debounce: 250 }}
+          gl={{ antialias: true, alpha: true, powerPreference: 'high-performance', failIfMajorPerformanceCaveat: false }}
           onCreated={({ gl }) => {
             const canvas = gl.domElement;
             const handleContextRestored = () => {
@@ -696,6 +672,25 @@ export default function SpaceScene(props) {
           <SceneContent {...props} />
         </Canvas>
       </CanvasErrorBoundary>
+      <div
+        className="font-tech"
+        style={{
+          position: 'absolute',
+          right: 28,
+          bottom: 28,
+          padding: '7px 12px',
+          border: '1px solid rgba(155, 207, 231, 0.14)',
+          borderRadius: 999,
+          background: 'rgba(3, 9, 24, 0.48)',
+          color: 'rgba(205, 226, 240, 0.68)',
+          fontSize: 11,
+          letterSpacing: '.02em',
+          pointerEvents: 'none',
+          backdropFilter: 'blur(8px)',
+        }}
+      >
+        드래그로 둘러보기 · 휠로 확대/축소
+      </div>
     </div>
   )
 }

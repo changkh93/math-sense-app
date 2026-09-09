@@ -7,6 +7,9 @@ For an existing task, read its STATE.md and actual artifacts before continuing.
 
 | ID | Goal | Phase | State file | Next action |
 |---|---|---|---|---|
+| 20260909-course-2d-explorers | 중등수학·파이썬·고전 읽기 2D 행성 화면 개선 | DONE (local; not deployed) | [STATE](tasks/20260909-course-2d-explorers/STATE.md) | 구현·회귀·반응형 Chromium QA 완료; 요청 시 배포 후 운영 검증 |
+| 20260909-course-planet-identities | 초등 월간평가·중등수학·파이썬 개별 3D 행성 고유화 | DONE (local; not deployed) | [STATE](tasks/20260909-course-planet-identities/STATE.md) | 11개 고유 표면·실루엣과 군집 배치 구현, 브라우저·빌드 검증 완료 |
+| 20260909-elementary-planet-ui | 초등수학 3D 행성·2D 목록 및 성능 개선 | DONE (local; not deployed) | [STATE](tasks/20260909-elementary-planet-ui/STATE.md) | 기존 무한 우주 탐색 복원, 평면 스프라이트 제거·구체화·최적화 완료 |
 | 20260909-mid3-sem2-exams1-4 | 중3 2학기 중간 1~4회 작성·등록 | DONE | [STATE](tasks/20260909-mid3-sem2-exams1-4/STATE.md) | Codex 직접100문항·그림78개 등록 및 DB/이미지 검증 완료 |
 | 20260909-mid2-sem2-exams1-4 | 중2 2학기 중간 1~4회 작성·등록 | DONE | [STATE](tasks/20260909-mid2-sem2-exams1-4/STATE.md) | Codex 직접 80문항·그림71개 등록, DB전체필드 및 이미지 HTTP/해시 검증 완료 |
 | 20260909-mid1-sem2-exams2-4 | 중1 2학기 중간 2~4회 75문항 생성·등록 | DONE | [STATE](tasks/20260909-mid1-sem2-exams2-4/STATE.md) | Codex 직접75문항·이미지53개 등록, DB전체필드·이미지HTTP/해시 검증 완료 |

@@ -1,31 +1,11 @@
-import { useRef, useMemo, useEffect, Suspense, useState } from 'react'
+import { useRef, useMemo, useEffect, useLayoutEffect, Suspense, useState } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { Sphere, useTexture, Float, Html } from '@react-three/drei'
 import * as THREE from 'three'
 import ModularShip from './ModularShip'
 import { getActiveShipFamily, normalizeShipLoadout } from '../../utils/shipCatalog'
-
-const IMAGE_PLANET_TYPES = new Set([
-  'middle_math_core',
-  'middle_math_analytics',
-  'middle_math_geometry',
-  'middle_math_exam',
-  'middle_math_numbers_expressions',
-  'middle_math_absolute_geometry',
-  'middle_math_functions_statistics',
-  'middle_math_school_exam',
-  'elementary_mistake_notebook',
-  'elementary_monthly_evaluation',
-  'python_foundation',
-  'python_advanced',
-  'python_data',
-  'python_project',
-  'algorithm_constellation',
-  'western_classic_neverland',
-  'western_classic_nobel',
-  'western_classic_heritage',
-  'reading_library'
-])
+import { createProceduralPlanetTexture, getProceduralPlanetStyle } from './planetProceduralSurface'
+import { getPlanetSignatureProfile } from './planetCourseStyles'
 
 function getTexturePathForPlanetType(planetType) {
   if (planetType === 'forest') return '/assets/planets/forest.png'
@@ -37,25 +17,6 @@ function getTexturePathForPlanetType(planetType) {
   if (planetType === 'dark_matter') return '/assets/planets/dark-matter.webp'
   if (planetType === 'stellar_archive') return '/assets/planets/stellar-archive.webp'
   if (planetType === 'dark_matter_refinery') return '/assets/planets/dark-matter-refinery.webp'
-  if (planetType === 'middle_math_core') return '/assets/planets/middle-math-core.png'
-  if (planetType === 'middle_math_analytics') return '/assets/planets/middle-math-analytics.png'
-  if (planetType === 'middle_math_geometry') return '/assets/planets/middle-math-geometry.png'
-  if (planetType === 'middle_math_exam') return '/assets/planets/middle-math-exam.png'
-  if (planetType === 'middle_math_numbers_expressions') return '/assets/planets/middle-math-numbers-expressions.webp'
-  if (planetType === 'middle_math_absolute_geometry') return '/assets/planets/middle-math-absolute-geometry.webp'
-  if (planetType === 'middle_math_functions_statistics') return '/assets/planets/middle-math-functions-statistics.webp'
-  if (planetType === 'middle_math_school_exam') return '/assets/planets/middle-math-school-exam.webp'
-  if (planetType === 'elementary_mistake_notebook') return '/assets/planets/elementary-mistake-notebook.webp'
-  if (planetType === 'elementary_monthly_evaluation') return '/assets/planets/elementary-monthly-evaluation.webp'
-  if (planetType === 'python_foundation') return '/assets/planets/python-foundation.png'
-  if (planetType === 'python_advanced') return '/assets/planets/python-advanced.png'
-  if (planetType === 'python_data') return '/assets/planets/python-data.png'
-  if (planetType === 'python_project') return '/assets/planets/python-project.png'
-  if (planetType === 'algorithm_constellation') return '/assets/planets/algorithm-constellation.png'
-  if (planetType === 'western_classic_neverland') return '/assets/planets/western-classic-neverland.webp'
-  if (planetType === 'western_classic_nobel') return '/assets/planets/western-classic-nobel.webp'
-  if (planetType === 'western_classic_heritage') return '/assets/planets/western-classic-heritage.webp'
-  if (planetType === 'reading_library') return '/assets/planets/reading-library.webp'
   return null
 }
 
@@ -69,7 +30,7 @@ function TexturePlanetMaterial({ texturePath, isLocked, planetType }) {
     preparedTexture.colorSpace = THREE.SRGBColorSpace
     preparedTexture.wrapS = THREE.RepeatWrapping
     preparedTexture.wrapT = THREE.ClampToEdgeWrapping
-    preparedTexture.anisotropy = 8
+    preparedTexture.anisotropy = 4
     preparedTexture.needsUpdate = true
     return preparedTexture
   }, [loadedTexture])
@@ -110,87 +71,23 @@ function TexturePlanetMaterial({ texturePath, isLocked, planetType }) {
  * 절차적 텍스처(Canvas)를 사용하는 행성 재질
  */
 function ProceduralPlanetMaterial({ planetTexture, color, isLocked, planetType }) {
+  const style = getProceduralPlanetStyle(planetType, color)
   return (
     <meshStandardMaterial
-      map={planetTexture} // CanvasTexture
-      roughness={isLocked ? 0.9 : 0.8}
-      metalness={isLocked ? 0.8 : (planetType === 'crystal' ? 0.6 : 0.1)}
-      emissive={isLocked ? '#000000' : (planetType === 'lava' ? '#ff4500' : '#000000')}
-      emissiveIntensity={isLocked ? 0 : (planetType === 'lava' ? 0.3 : 0)}
-      color={isLocked ? '#555555' : color}
+      map={planetTexture}
+      roughness={isLocked ? 0.9 : 0.76}
+      metalness={isLocked ? 0.5 : (style.metalness || 0.05)}
+      emissive={isLocked ? '#000000' : (style.emissive || '#000000')}
+      emissiveIntensity={isLocked ? 0 : (style.emissiveIntensity || 0)}
+      color={isLocked ? '#555555' : '#ffffff'}
     />
-  )
-}
-
-/**
- * 완성형 이미지 행성을 3D 장면 안에 그대로 보이게 하는 스프라이트 렌더러
- */
-function ImageSpritePlanet({ texturePath, size, isLocked, planetType }) {
-  const activeTexture = useTexture(texturePath)
-
-  const spriteTexture = useMemo(() => {
-    const image = activeTexture?.image
-    if (!image || typeof document === 'undefined') return activeTexture
-
-    const canvas = document.createElement('canvas')
-    canvas.width = image.width
-    canvas.height = image.height
-
-    const ctx = canvas.getContext('2d')
-    ctx.drawImage(image, 0, 0)
-
-    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height)
-    const { data, width, height } = imageData
-    const cx = width / 2
-    const cy = height / 2
-    const baseRadius = Math.min(width, height) * 0.39
-    const featherRadius = Math.min(width, height) * 0.10
-
-    for (let i = 0; i < data.length; i += 4) {
-      const x = (i / 4) % width
-      const y = Math.floor(i / 4 / width)
-      const dx = x - cx
-      const dy = y - cy
-      const distance = Math.sqrt((dx * dx) + (dy * dy))
-      const radialAlpha = THREE.MathUtils.clamp(
-        1 - ((distance - baseRadius) / featherRadius),
-        0,
-        1
-      )
-
-      const brightness = Math.max(data[i], data[i + 1], data[i + 2]) / 255
-      const backgroundFloor = planetType?.startsWith('elementary_') ? 0.12 : 0.06
-      const glowAlpha = THREE.MathUtils.clamp((brightness - backgroundFloor) / 0.22, 0, 1)
-      data[i + 3] = Math.round(Math.max(radialAlpha, glowAlpha) * 255)
-    }
-
-    ctx.putImageData(imageData, 0, 0)
-
-    const processedTexture = new THREE.CanvasTexture(canvas)
-    processedTexture.colorSpace = THREE.SRGBColorSpace
-    processedTexture.needsUpdate = true
-    return processedTexture
-  }, [activeTexture, planetType])
-
-  return (
-    <sprite scale={[size * 2.55, size * 2.55, 1]}>
-      <spriteMaterial
-        map={spriteTexture}
-        transparent
-        opacity={isLocked ? 0.42 : 1}
-        color={isLocked ? '#8893a8' : '#ffffff'}
-        depthWrite={false}
-      />
-    </sprite>
   )
 }
 
 /**
  * 재질 선택기 (Suspense Wrapper)
  */
-function PlanetMaterialKey({ planetType, planetTexture, color, isLocked }) {
-  const texturePath = useMemo(() => getTexturePathForPlanetType(planetType), [planetType])
-
+function PlanetMaterialKey({ planetType, planetTexture, texturePath, color, isLocked }) {
   if (texturePath) {
     return (
       <TexturePlanetMaterial 
@@ -238,6 +135,180 @@ function HologramRing({ size, color }) {
   )
 }
 
+function OrbitNodes({ size, radius, count, color, shape = 'sphere', offset = 0 }) {
+  const meshRef = useRef()
+
+  useLayoutEffect(() => {
+    if (!meshRef.current) return
+    const dummy = new THREE.Object3D()
+    for (let index = 0; index < count; index += 1) {
+      const angle = offset + (index / count) * Math.PI * 2
+      dummy.position.set(Math.cos(angle) * radius, Math.sin(angle) * radius, 0)
+      dummy.rotation.set(angle * 0.35, angle, -angle * 0.2)
+      dummy.updateMatrix()
+      meshRef.current.setMatrixAt(index, dummy.matrix)
+    }
+    meshRef.current.instanceMatrix.needsUpdate = true
+  }, [count, offset, radius])
+
+  return (
+    <instancedMesh ref={meshRef} args={[null, null, count]}>
+      {shape === 'cube' ? (
+        <boxGeometry args={[size * 0.11, size * 0.11, size * 0.11]} />
+      ) : shape === 'diamond' ? (
+        <octahedronGeometry args={[size * 0.085, 0]} />
+      ) : (
+        <sphereGeometry args={[size * 0.065, 8, 6]} />
+      )}
+      <meshBasicMaterial color={color} toneMapped={false} />
+    </instancedMesh>
+  )
+}
+
+function SignatureOrbit({
+  size,
+  color,
+  radius = 1.38,
+  tilt = [Math.PI / 2, 0, 0],
+  nodes = 0,
+  nodeShape = 'sphere',
+  opacity = 0.72,
+  offset = 0,
+}) {
+  const orbitRadius = size * radius
+  return (
+    <group rotation={tilt}>
+      <mesh>
+        <torusGeometry args={[orbitRadius, size * 0.015, 6, 48]} />
+        <meshBasicMaterial color={color} transparent opacity={opacity} toneMapped={false} depthWrite={false} />
+      </mesh>
+      {nodes > 0 && (
+        <OrbitNodes
+          size={size}
+          radius={orbitRadius}
+          count={nodes}
+          color={color}
+          shape={nodeShape}
+          offset={offset}
+        />
+      )}
+    </group>
+  )
+}
+
+function SignatureShell({ size, color, shape = 'icosahedron', scale = 1.17 }) {
+  return (
+    <mesh scale={scale}>
+      {shape === 'octahedron' ? (
+        <octahedronGeometry args={[size, 1]} />
+      ) : (
+        <icosahedronGeometry args={[size, 1]} />
+      )}
+      <meshBasicMaterial
+        color={color}
+        wireframe
+        transparent
+        opacity={0.34}
+        toneMapped={false}
+        depthWrite={false}
+      />
+    </mesh>
+  )
+}
+
+function PlanetSignature({ size, profile }) {
+  const groupRef = useRef()
+
+  useFrame((_, delta) => {
+    if (groupRef.current) groupRef.current.rotation.y += delta * 0.16
+  })
+
+  if (!profile) return null
+  const { ornament, primary, secondary } = profile
+
+  return (
+    <group ref={groupRef}>
+      {ornament === 'calendar_crown' && (
+        <>
+          <SignatureOrbit size={size} color={primary} radius={1.36} nodes={12} nodeShape="diamond" tilt={[1.18, 0.18, 0.2]} />
+          <SignatureOrbit size={size} color={secondary} radius={1.52} nodes={4} tilt={[0.52, 0.28, -0.48]} opacity={0.5} offset={0.38} />
+        </>
+      )}
+      {ornament === 'axiom_meridians' && (
+        <>
+          <SignatureOrbit size={size} color={primary} radius={1.12} tilt={[0, 0, 0]} opacity={0.42} />
+          <SignatureOrbit size={size} color={secondary} radius={1.14} tilt={[0, Math.PI / 3, 0]} opacity={0.4} />
+          <SignatureOrbit size={size} color={primary} radius={1.16} tilt={[Math.PI / 2, 0, 0]} nodes={3} opacity={0.5} />
+        </>
+      )}
+      {ornament === 'abacus_orbit' && (
+        <>
+          <SignatureOrbit size={size} color={primary} radius={1.38} nodes={10} nodeShape="sphere" tilt={[1.32, 0.1, -0.3]} />
+          <SignatureOrbit size={size} color={secondary} radius={1.23} nodes={5} nodeShape="diamond" tilt={[0.34, 0.74, 0.22]} opacity={0.55} offset={0.3} />
+        </>
+      )}
+      {ornament === 'data_orbits' && (
+        <>
+          <SignatureOrbit size={size} color={primary} radius={1.32} nodes={7} nodeShape="cube" tilt={[1.05, 0.3, 0.5]} />
+          <SignatureOrbit size={size} color={secondary} radius={1.48} nodes={4} tilt={[0.25, 0.8, -0.5]} opacity={0.58} offset={0.55} />
+        </>
+      )}
+      {ornament === 'polyhedron_shell' && (
+        <>
+          <SignatureShell size={size} color={primary} />
+          <SignatureOrbit size={size} color={secondary} radius={1.42} nodes={3} nodeShape="diamond" tilt={[0.92, 0.38, -0.2]} opacity={0.62} />
+        </>
+      )}
+      {ornament === 'trial_moons' && (
+        <>
+          <SignatureOrbit size={size} color={primary} radius={1.48} nodes={4} nodeShape="sphere" tilt={[1.18, 0.14, -0.32]} />
+          <SignatureOrbit size={size} color={secondary} radius={1.27} nodes={3} nodeShape="diamond" tilt={[0.36, 0.62, 0.42]} opacity={0.5} />
+        </>
+      )}
+      {ornament === 'shield_satellites' && (
+        <>
+          <SignatureShell size={size} color={primary} shape="octahedron" scale={1.13} />
+          <SignatureOrbit size={size} color={secondary} radius={1.5} nodes={6} nodeShape="diamond" tilt={[1.22, 0.2, 0.24]} />
+        </>
+      )}
+      {ornament === 'binary_orbit' && (
+        <>
+          <SignatureOrbit size={size} color={primary} radius={1.35} nodes={8} nodeShape="cube" tilt={[1.24, 0.08, -0.25]} />
+          <SignatureOrbit size={size} color={secondary} radius={1.18} nodes={2} nodeShape="sphere" tilt={[0.28, 0.75, 0.45]} opacity={0.56} offset={0.8} />
+        </>
+      )}
+      {ornament === 'quantum_cage' && (
+        <>
+          <SignatureShell size={size} color={primary} shape="octahedron" scale={1.12} />
+          <SignatureOrbit size={size} color={secondary} radius={1.34} nodes={3} tilt={[0.4, 0.8, 0.25]} />
+          <SignatureOrbit size={size} color={primary} radius={1.4} tilt={[1.18, 0.15, -0.48]} opacity={0.48} />
+        </>
+      )}
+      {ornament === 'data_network' && (
+        <>
+          <SignatureOrbit size={size} color={primary} radius={1.32} nodes={6} nodeShape="sphere" tilt={[0.38, 0.72, -0.18]} />
+          <SignatureOrbit size={size} color={secondary} radius={1.46} nodes={5} nodeShape="cube" tilt={[1.18, 0.2, 0.52]} opacity={0.58} offset={0.42} />
+        </>
+      )}
+      {ornament === 'arcade_satellites' && (
+        <>
+          <SignatureShell size={size} color={secondary} shape="octahedron" scale={1.1} />
+          <SignatureOrbit size={size} color={primary} radius={1.48} nodes={5} nodeShape="cube" tilt={[1.08, 0.32, -0.34]} />
+        </>
+      )}
+      {ornament === 'prime_knot' && (
+        <>
+          <mesh rotation={[0.62, 0.25, 0.2]}>
+            <torusKnotGeometry args={[size * 1.28, size * 0.022, 72, 6, 2, 3]} />
+            <meshBasicMaterial color={primary} transparent opacity={0.72} toneMapped={false} depthWrite={false} />
+          </mesh>
+          <SignatureOrbit size={size} color={secondary} radius={1.48} nodes={5} nodeShape="diamond" tilt={[1.25, 0.12, -0.3]} opacity={0.55} />
+        </>
+      )}
+    </group>
+  )
+}
+
 /**
  * 떠다니는 수학 기호 (Hover 시 표시)
  */
@@ -262,10 +333,12 @@ function FloatingFormulas({ size, color }) {
         const x = Math.cos(angle) * radius
         const z = Math.sin(angle) * radius
         
+        const verticalOffset = ((((i * 37) % 11) / 10) - 0.5) * size
+
         return (
           <Html
             key={i}
-            position={[x, (Math.random() - 0.5) * size, z]}
+            position={[x, verticalOffset, z]}
             center
             style={{
               color: color,
@@ -366,109 +439,30 @@ export default function PlanetMesh({
 }) {
   const meshRef = useRef()
   const cloudsRef = useRef()
-  const groupRef = useRef()
   const [hovered, setHovered] = useState(false)
+  const signatureProfile = useMemo(() => getPlanetSignatureProfile(planetType), [planetType])
 
   const adjustedColor = useMemo(() => {
     if (status === 'not_started') return color // Don't dim too much
     return color
   }, [color, status])
+  const texturePath = useMemo(() => getTexturePathForPlanetType(planetType), [planetType])
 
-  // 행성 텍스처 (타입별 색상 조합) - 즉시 생성되는 절차적 텍스처 (로딩 중 폴백용)
-  const planetTexture = useMemo(() => {
-    const canvas = document.createElement('canvas')
-    canvas.width = 512
-    canvas.height = 256
-    const ctx = canvas.getContext('2d')
-    
-    let baseColor = adjustedColor
-    let secondaryColor = new THREE.Color(adjustedColor).offsetHSL(0, 0, 0.1).getStyle()
-    
-    if (planetType === 'forest') {
-      baseColor = '#4ade80' // Brighter Green
-      secondaryColor = '#166534'
-    } else if (planetType === 'lava') {
-      baseColor = '#ff4500'
-      secondaryColor = '#1a1a1a'
-    } else if (planetType === 'ice') {
-      baseColor = '#ffffff'
-      secondaryColor = '#81d4fa'
-    } else if (planetType === 'crystal') {
-      baseColor = '#9c27b0'
-      secondaryColor = '#e1f5fe'
-    } else if (planetType === 'ocean') {
-      baseColor = '#0077be'
-      secondaryColor = '#00d4ff'
-    } else if (planetType === 'castle') {
-      baseColor = '#ffd700'
-      secondaryColor = '#8b4513'
-    } else if (planetType === 'cloud') {
-      baseColor = '#a7ffeb'
-      secondaryColor = '#e0f2f1'
-    } else if (planetType === 'middle_math_core') {
-      baseColor = '#4aa8ff'
-      secondaryColor = '#123b7a'
-    } else if (planetType === 'middle_math_analytics') {
-      baseColor = '#7c4dff'
-      secondaryColor = '#09183b'
-    } else if (planetType === 'middle_math_geometry') {
-      baseColor = '#8d63ff'
-      secondaryColor = '#16102f'
-    } else if (planetType === 'middle_math_exam') {
-      baseColor = '#b05cff'
-      secondaryColor = '#240021'
-    } else if (planetType === 'python_foundation') {
-      baseColor = '#2f8fff'
-      secondaryColor = '#08132d'
-    } else if (planetType === 'python_advanced') {
-      baseColor = '#2cc7ff'
-      secondaryColor = '#071a2f'
-    } else if (planetType === 'python_data') {
-      baseColor = '#6a7dff'
-      secondaryColor = '#140c35'
-    } else if (planetType === 'python_project') {
-      baseColor = '#a043ff'
-      secondaryColor = '#1a0028'
-    } else if (planetType === 'dark_matter') {
-      baseColor = '#1a0033'
-      secondaryColor = '#6b21a8'
-    } else if (planetType === 'stellar_archive') {
-      baseColor = '#071729'
-      secondaryColor = '#d88914'
-    } else if (planetType === 'dark_matter_refinery') {
-      baseColor = '#111015'
-      secondaryColor = '#f59e0b'
-    }
+  // Deterministic equirectangular data is generated once. This avoids the old
+  // square-image sprite processing and gives every rotating world a full back side.
+  const planetTexture = useMemo(
+    () => texturePath ? null : createProceduralPlanetTexture(planetType, adjustedColor),
+    [adjustedColor, planetType, texturePath],
+  )
 
-    const gradient = ctx.createLinearGradient(0, 0, 512, 256)
-    gradient.addColorStop(0, baseColor)
-    gradient.addColorStop(0.5, secondaryColor)
-    gradient.addColorStop(1, baseColor)
-    ctx.fillStyle = gradient
-    ctx.fillRect(0, 0, 512, 256)
-    
-    for (let i = 0; i < 60; i++) {
-      ctx.beginPath()
-      ctx.arc(
-        Math.random() * 512,
-        Math.random() * 256,
-        Math.random() * 40 + 5,
-        0,
-        Math.PI * 2
-      )
-      ctx.fillStyle = `rgba(255, 255, 255, ${Math.random() * 0.1})`
-      ctx.fill()
-    }
-    
-    return new THREE.CanvasTexture(canvas)
-  }, [adjustedColor, planetType])
+  useEffect(() => () => planetTexture?.dispose(), [planetTexture])
 
-  useFrame(() => {
-    if (groupRef.current) {
-      groupRef.current.rotation.y += speed
+  useFrame((_, delta) => {
+    if (meshRef.current) {
+      meshRef.current.rotation.y += speed * 60 * Math.min(delta, 0.05)
     }
     if (cloudsRef.current) {
-      cloudsRef.current.rotation.y += speed * 0.8
+      cloudsRef.current.rotation.y += speed * 48 * Math.min(delta, 0.05)
     }
   })
 
@@ -483,12 +477,8 @@ export default function PlanetMesh({
     if (props.onPointerOut) props.onPointerOut(e)
   }
 
-  const texturePath = useMemo(() => getTexturePathForPlanetType(planetType), [planetType])
-  const usesImageSprite = texturePath && IMAGE_PLANET_TYPES.has(planetType)
-
   return (
     <group 
-      ref={groupRef} 
       {...props}
       onPointerOver={handlePointerOver}
       onPointerOut={handlePointerOut}
@@ -496,12 +486,12 @@ export default function PlanetMesh({
     >
       {/* Golden Aura for Completed Planets */}
       {status === 'completed' && (
-        <mesh scale={[1.4, 1.4, 1.4]}>
-          <sphereGeometry args={[size, 32, 32]} />
+        <mesh scale={[1.22, 1.22, 1.22]}>
+          <sphereGeometry args={[size, 24, 16]} />
           <meshBasicMaterial 
             color="#ffd700" 
             transparent 
-            opacity={0.15} 
+            opacity={0.08}
             side={THREE.BackSide} 
           />
         </mesh>
@@ -510,53 +500,39 @@ export default function PlanetMesh({
       {/* Floating Sparkles for Completed Planets */}
       {status === 'completed' && <ExplorationSuccessParticles size={size} />}
 
-      <Float speed={1.5} rotationIntensity={0.1} floatIntensity={0.2}>
-        {usesImageSprite ? (
-          <Suspense fallback={null}>
-            <ImageSpritePlanet
-              texturePath={texturePath}
-              size={size}
-              isLocked={isLocked}
-              planetType={planetType}
-            />
-          </Suspense>
-        ) : (
-          <Sphere args={[size, 64, 64]}>
-            <Suspense fallback={
-              <meshStandardMaterial map={planetTexture} roughness={0.8} />
-            }>
-              <PlanetMaterialKey
-                planetType={planetType} 
-                planetTexture={planetTexture} 
-                color={adjustedColor} 
-                isLocked={isLocked} // Removed '|| status === "not_started"'
-              />
-            </Suspense>
-          </Sphere>
-        )}
-      </Float>
-      
-
-      
-      {!usesImageSprite && (
-        <Sphere args={[size * 1.05, 32, 32]}>
-          <meshBasicMaterial
-            color={isLocked ? '#000000' : (planetType === 'lava' ? '#ff4500' : 
-                   planetType === 'forest' ? '#4ade80' : 
-                   planetType === 'castle' ? '#fbbf24' : 
-                   planetType === 'ice' ? '#00d4ff' :
-                   planetType === 'middle_math_core' ? '#68d9ff' :
-                   planetType === 'middle_math_analytics' ? '#a56bff' :
-                   planetType === 'middle_math_geometry' ? '#b98dff' :
-                   planetType === 'middle_math_exam' ? '#ffb357' : color)}
-            transparent
-            opacity={isLocked ? 0.5 : 0.25} // Increased opacity for better aura
-            side={THREE.BackSide}
+      <Sphere ref={meshRef} args={[size, 48, 32]}>
+        <Suspense fallback={<meshStandardMaterial color={adjustedColor} roughness={0.8} />}>
+          <PlanetMaterialKey
+            planetType={planetType}
+            planetTexture={planetTexture}
+            texturePath={texturePath}
+            color={adjustedColor}
+            isLocked={isLocked}
           />
-        </Sphere>
-      )}
+        </Suspense>
+      </Sphere>
+
+      {!isLocked && signatureProfile && <PlanetSignature size={size} profile={signatureProfile} />}
+
+      <Sphere args={[size * 1.045, 32, 20]}>
+        <meshBasicMaterial
+          color={isLocked ? '#000000' : (planetType === 'lava' ? '#ff4500' :
+                 planetType === 'forest' ? '#4ade80' :
+                 planetType === 'castle' ? '#fbbf24' :
+                 planetType === 'ice' ? '#00d4ff' :
+                 planetType === 'middle_math_core' ? '#68d9ff' :
+                 planetType === 'middle_math_analytics' ? '#a56bff' :
+                 planetType === 'middle_math_geometry' ? '#b98dff' :
+                 planetType === 'middle_math_exam' ? '#ffb357' :
+                                 signatureProfile?.atmosphere || color)}
+          transparent
+          opacity={isLocked ? 0.3 : 0.15}
+          side={THREE.BackSide}
+          depthWrite={false}
+        />
+      </Sphere>
       
-      {(!isLocked && !usesImageSprite && (planetType === 'default' || planetType === 'cloud')) && (
+      {(!isLocked && (planetType === 'default' || planetType === 'cloud')) && (
         <Sphere ref={cloudsRef} args={[size * 1.02, 32, 32]}>
           <meshBasicMaterial
             color="white"
@@ -604,9 +580,10 @@ function ExplorationSuccessParticles({ size }) {
   const positions = useMemo(() => {
     const pos = []
     for (let i = 0; i < count; i++) {
-      const r = size * (1.2 + Math.random() * 0.5)
-      const theta = Math.random() * Math.PI * 2
-      const phi = Math.random() * Math.PI
+      const fraction = (i * 0.61803398875) % 1
+      const r = size * (1.2 + fraction * 0.5)
+      const theta = i * 2.39996322973
+      const phi = Math.acos(1 - (2 * (i + 0.5) / count))
       pos.push([
         r * Math.sin(phi) * Math.cos(theta),
         r * Math.sin(phi) * Math.sin(theta),

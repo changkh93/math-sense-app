@@ -1,0 +1,18 @@
+# 초등 월간평가·중등수학·파이썬 행성 고유화
+- ID: 20260909-course-planet-identities
+- Goal: 초등 월간평가와 중등수학·파이썬 군집의 개별 행성을 주제별로 멋지고 독특한 저부하 3D 행성으로 개선.
+- Phase: DONE (local; not deployed)
+- Updated: 2026-09-09
+- Coordinator/owner: Codex; 로컬 직접 구현 및 검증. 외부 작업 없음.
+- Baseline: 52e5181fcd9bae6ab9ff7b2c241c73c415c56500
+- Initial dirty state: 직전 `20260909-elementary-planet-ui` 작업의 검증된 미커밋 변경이 존재하며 본 작업은 그 위에서 이어짐. 다른 사용자 변경은 발견되지 않음.
+- Workspace: 현재 math-sense-app 체크아웃. 단일 작성자.
+- Scope: `SpaceScene`, `PlanetMesh`, 절차형 표면/고유 장식 프로필, 합성 데이터 QA와 회귀 검사. 접근 제어·학습 데이터·배포는 제외.
+- Acceptance: 초등 월간평가 1개, 중등 6개, 파이썬 4개가 각각 안정적인 고유 타입을 가지며 표면과 3D 실루엣으로 구별됨. 기존 회전·확대·드래그·클릭 이동 유지. 단일 캔버스와 낮은 메시 복잡도 유지. 2D 모드와 다른 군집 회귀 없음.
+- Investigation: 정사각형 이미지를 제거한 뒤 일부 타입이 비슷한 절차형 패턴만 사용. 파이썬 수학은 `수학` 문자열이 입문 분기에 먼저 잡혀 `python_foundation`으로 잘못 분류됨. 실제 region ID 기반 매핑과 타입별 저폴리 장식이 필요.
+- Packets: 없음. 로컬 완료 가능.
+- Changes: 실제 region ID와 제목 폴백을 함께 쓰는 고유 타입 매핑 추가. 초등 월간평가 1개, 중등 6개, 파이썬 4개에 서로 다른 색상·절차형 표면·대기색·3D 장식을 적용. 월간평가 달력 왕관, 중등 공리 경선/주판 궤도/함수 데이터 궤도/다면체 껍질/평가 위성/시험 방패, 파이썬 이진 궤도/프로젝트 큐브/양자 케이지/소수 매듭으로 실루엣을 구분. 파이썬 수학의 입문 타입 오분류 수정. 중등과 파이썬 초기 배치를 군집별로 정리.
+- Performance: 행성 본체는 기존 48×32 구체와 256×128 절차형 텍스처 유지. 장식 고리는 48 세그먼트, 껍질은 저단계 다면체, 반복 위성 노드는 instancedMesh로 합쳐 렌더링. 전체 장면은 기존 단일 Canvas·DPR 1–1.5·AdaptiveDpr 유지.
+- Checks: `npm run test:course-planets`, `npm run test:elementary-planets`, `npm run test:space-landing`, `npm run test:access-control`, 대상 ESLint, `git diff --check`, `npm run build` 통과. Chromium에서 세 군집 단일 캔버스, 자전, 확대, 리소스/런타임 오류 부재를 검증. 1초 스모크 측정은 초등 60.7fps, 중등 60.2fps, 파이썬 60.4fps. 세 군집 스크린샷 시각 검토 완료.
+- Final verification: 로컬 브라우저 세션의 합성 데이터와 로컬 하드웨어에서 완료. 실제 운영 데이터 화면과 저사양 실기기의 장시간 프레임 프로파일은 배포 후 확인 범위.
+- Next: 사용자가 요청하면 배포 후 실제 계정과 저사양 기기에서 확인.

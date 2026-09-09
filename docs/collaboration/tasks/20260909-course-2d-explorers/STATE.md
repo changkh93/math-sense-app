@@ -1,0 +1,17 @@
+# 중등수학·파이썬·고전 읽기 2D 행성 화면 정리
+- ID: 20260909-course-2d-explorers
+- Goal: 초등수학과 같은 완성도로 중등수학·파이썬·고전 읽기 군집의 2D 뷰를 개선하고 정리.
+- Phase: DONE (local; not deployed)
+- Updated: 2026-09-09
+- Coordinator/owner: Codex; 로컬 직접 구현 및 검증. 외부 작업 없음.
+- Baseline: 52e5181fcd9bae6ab9ff7b2c241c73c415c56500
+- Initial dirty state: 직전 두 행성 UI 작업의 검증된 미커밋 변경 위에서 이어짐. 해당 변경을 보존하며 본 작업 범위만 추가.
+- Workspace: 현재 math-sense-app 체크아웃. 단일 작성자.
+- Scope: 중등수학·파이썬·고전 읽기 군집의 2D 첫 화면, 프레젠테이션 카탈로그, SpaceHome 연결, 합성 데이터 QA. 3D 구현·학습 데이터·접근 정책·배포는 변경하지 않음.
+- Acceptance: 세 군집 모두 일관된 헤더/보기 전환/진행 요약/행성 카드/학습 스테이션/모바일 레이아웃 제공. 군집별 문구·색상·행성 이미지와 전용 경로(파이썬 루미/알고리즘, 고전 나의 책장) 구분. 기존 지역 접근 신청·일시정지·완료·최근 학습 및 이동 동작 유지. 2D에서 WebGL 생성 없음.
+- Investigation: 기존 세 군집 2D는 SpaceHome 내부의 큰 인라인 스타일 블록으로 구성되어 정보 위계와 반응형 간격이 불균일하고 유지보수가 어려움. 고전은 3개 정규 지역과 책장 경로를 보존해야 함.
+- Packets: 없음. 로컬 완료 가능.
+- Changes: 공용 `CoursePlanetExplorer`와 군집별 카탈로그를 추가하고 `SpaceHome`의 중등수학·파이썬·고전 읽기 2D 분기에 연결. 군집별 표제·색상·행성 카드·학습 스테이션을 구성하고, 완료/최근 학습/참여 신청/이용 일시정지 상태와 기존 이동 동작을 유지. 파이썬은 루미 프로토콜·생각의 항로, 고전 읽기는 나의 책장을 포함. 2D 전용 화면은 WebGL/canvas를 생성하지 않음. 후속 피드백에 따라 불투명 원본 이미지의 검은 사각 배경을 screen 합성과 원형 가장자리 마스크로 카드 배경에 자연스럽게 제거.
+- Checks: `npm run test:course-2d`, `npm run test:course-planets`, `npm run test:elementary-planets`, `npm run test:space-landing`, `npm run test:access-control` 통과. 대상 ESLint 오류 0(기존 `SpaceHome` Hook 의존성 경고 2개만 유지). `npm run build` 통과. 합성 데이터 Chromium QA에서 세 군집의 행성·스테이션 수, 접근 상태, 320–1440px 무가로오버플로, 무 WebGL, 런타임/리소스 오류 없음을 확인. `git diff --check` 통과.
+- Limitations: 합성 데이터 기반 로컬 QA까지 완료. 배포 후 실제 인증 계정·운영 데이터·실기기 확인은 아직 수행하지 않음.
+- Next: 요청 시 배포하고 운영 환경에서 세 군집의 계정별 접근 상태와 이동 경로를 최종 점검.

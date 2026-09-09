@@ -1,0 +1,19 @@
+# 초등수학 행성 첫 화면 개선
+- ID: 20260909-elementary-planet-ui
+- Goal: 실제 자전하는 3D 행성, 깔끔한 2D 화면, 낮은 렌더링 부하.
+- Phase: DONE (local implementation; not deployed)
+- Updated: 2026-09-09
+- Coordinator/owner: Codex; 직접 구현 및 검증. 별도 외부 의존성 없음.
+- Baseline: 52e5181fcd9bae6ab9ff7b2c241c73c415c56500
+- Initial dirty state: 없음 (fsmonitor IPC 오류 우회 후 확인).
+- Workspace: 현재 math-sense-app 체크아웃. 단일 작성자. 다른 작업 기록 보존.
+- Scope: 초등수학 군집 첫 페이지 전용 구성, SpaceHome 연결, 관련 검증.
+- Acceptance: 기존의 무한 우주 공간과 드래그/확대·축소 탐색 유지, 평면 스프라이트 없는 구체/자전, 읽기 쉬운 초기 배치와 2D 목록, 기존 접근/학습 이동 보존, 단일 캔버스·적응형 DPR·GPU 정리·오류 폴백.
+- Investigation: 기존 SpaceScene의 일부 행성 유형이 정사각형 개념 이미지를 스프라이트로 표시해 평면처럼 보였고, 모든 화면에 고정 카드형 장면을 적용하면 사용자가 원한 우주 탐험성이 사라짐. 원래 SpaceScene을 3D의 기준으로 유지하고 행성 렌더러만 개선하는 방향으로 수정.
+- Packets: 없음. 로컬 작업으로 완료 가능한 범위.
+- Changes: 데스크톱 3D는 기존 전체 화면 SpaceScene과 별 배경, CameraControls, 행성 선택 워프를 복원. 정사각형 이미지 스프라이트를 제거하고 모든 행성을 48×32 구체 메시로 통일했으며, 이미지가 없던 특수 행성에는 결정적 256×128 절차형 구면 텍스처를 적용. 초등 군집의 초기 배치를 넓혀 라벨을 정리하고 2D 모드만 반응형 카드 목록으로 개선. 완료·최근·참여 신청·이용 일시정지 표시 및 기존 이동 경로 유지.
+- Performance: 전체 우주에 WebGL 캔버스 1개만 사용. DPR을 1–1.5로 제한하고 AdaptiveDpr를 적용했으며 별 수를 3,200개로 조정. delta 기반 자전, 절차형 텍스처/연결선 geometry dispose, 저해상도 대기권 메시, `powerPreference: high-performance`를 적용. 2D 모드는 WebGL을 생성하지 않으며 컨텍스트 손실 시 폴백을 제공.
+- Checks: `npm run test:elementary-planets`, `npm run test:space-landing`, `npm run test:access-control`, 대상 ESLint(오류 0; SpaceHome 기존 Hook 의존성 경고 2건), `git diff --check`, `npm run build` 통과. 실제 Chromium 합성 데이터 검사에서 2D 무-WebGL, 320–1440px 레이아웃, 단일 3D 캔버스, 무한 공간 장면, 구체 자전, 휠 확대·축소, 드래그 궤도 이동, WebGL 손실 폴백을 검증. 3D 초기 화면·확대 탐색·모바일 2D 시각 검토 완료.
+- User correction: 카드형 3D 지도가 기존의 무한 우주 탐사감과 확대·축소를 제거해 의도와 달랐음. 3D는 원래 전체 화면 우주와 카메라 탐색을 유지하고, 평면 스프라이트·비효율만 실제 구체와 경량 렌더링으로 교체해야 함. 새 카드 화면은 2D 전용으로 제한.
+- Final verification: 수정 방향 구현과 재검증 완료. 프로덕션 인증 데이터와 실제 저사양 기기의 장시간 프레임 프로파일은 이번 로컬 합성 데이터 검증 범위에 포함하지 않음.
+- Next: 사용자가 요청하면 배포 후 실기기에서 최종 확인.
