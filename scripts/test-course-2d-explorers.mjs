@@ -47,7 +47,7 @@ assert.equal(classicWorld.subtitle, 'Nobel Literature')
 assert.match(classicWorld.image, /western-classic-nobel/)
 
 assert.deepEqual(getCourseStations('middle-math').map((station) => station.id), ['archive', 'notebook', 'dark', 'refinery'])
-assert.deepEqual(getCourseStations('python').map((station) => station.id), ['lumi_protocol', 'algorithm_constellation', 'archive', 'notebook', 'dark', 'refinery'])
+assert.deepEqual(getCourseStations('python').map((station) => station.id), ['python_game_studio', 'lumi_protocol', 'algorithm_constellation', 'archive', 'notebook', 'dark', 'refinery'])
 assert.deepEqual(getCourseStations('western-classic').map((station) => station.id), ['reading_library', 'archive', 'dark'])
 
 const privateRegion = { id: 'private', isPrivate: true }

@@ -1,3 +1,4 @@
+import { initialAssignmentCluster } from './assignmentNavigation'
 import { lazy, useState, useEffect, Suspense, useMemo, useRef, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import { useQueries } from '@tanstack/react-query'
@@ -82,6 +83,7 @@ const StudyStreamRoomView = lazy(() => import('./StudyStreamRoomView'))
 const CrystalLedger = lazy(() => import('./CrystalLedger'))
 const loadMetaGalaxy = () => import('../GalaxySocial/MetaGalaxy')
 const MetaGalaxy = lazy(loadMetaGalaxy)
+const PythonGameStudioPage = lazy(() => import('../PythonGameStudio/PythonGameStudioPage'))
 const PythonProtocolHub = lazy(() => import('../PythonWorld/PythonProtocolHub'))
 const AlgorithmConstellationHub = lazy(() => import('../AlgorithmConstellation/client/hub/AlgorithmConstellationHub'))
 const ReadingLibraryView = lazy(() => import('./ReadingLibrary/ReadingLibraryView'))
@@ -602,7 +604,7 @@ function RegionPlanetVisual({ imageSrc, title, icon, isMobile, isLocked }) {
 
 const REFINERY_CAUSE_IDS = ['concept_gap', 'equation_setup', 'missed_condition', 'calculation_error', 'no_checking']
 const LOGIN_NOTICE_KEY = 'metasenseLoginNotice'
-const ROOT_VIEWS = new Set(['planet', 'galaxy', 'battle', 'dashboard', 'ranking', 'store', 'crew', 'journey', 'ledger', 'profile', 'assignment_hub', 'mistake_notebook', 'lumi_protocol', 'algorithm_constellation', 'reading_library'])
+const ROOT_VIEWS = new Set(['planet', 'galaxy', 'battle', 'dashboard', 'ranking', 'store', 'crew', 'journey', 'ledger', 'profile', 'assignment_hub', 'mistake_notebook', 'lumi_protocol', 'algorithm_constellation', 'reading_library', 'python_game_studio'])
 
 function getRequestedRootView(location) {
   const requestedView = location.state?.view || new URLSearchParams(location.search).get('view')
@@ -782,7 +784,7 @@ function SpaceHome() {
   // A new NAV landing always starts at Multi-Verse. Learning coordinates are
   // persisted only after an explicit selection so in-app navigation can keep
   // its context without silently reopening the last (often elementary) cluster.
-  const [selectedClusterId, setSelectedClusterId] = useState(null);
+  const [selectedClusterId, setSelectedClusterId] = useState(() => initialAssignmentCluster(currentView, location, sessionStorage.getItem('metasense_cluster_id')));
   const [assignmentHubInitialDate, setAssignmentHubInitialDate] = useState(null);
   
   // --- 2D Mode Setup ---
@@ -1199,7 +1201,7 @@ function SpaceHome() {
   ]);
 
   useEffect(() => {
-    if (loadingClusters) return;
+    if (!canLoadCourseCatalog || loadingClusters || errorClusters || !clusters) return;
 
     // 1. Validate if the currently selected cluster still exists in activeClusters
     if (selectedClusterId && activeClusters.length > 0) {
@@ -1217,6 +1219,9 @@ function SpaceHome() {
 
   }, [
     activeClusters,
+    canLoadCourseCatalog,
+    clusters,
+    errorClusters,
     clearMissionSelection,
     loadingClusters,
     selectedClusterId,
@@ -3986,6 +3991,10 @@ function SpaceHome() {
     )
   }
 
+  if (currentView === 'python_game_studio') {
+    return <Suspense fallback={<SpaceViewFallback />}><PythonGameStudioPage onBack={() => switchRootView('planet')} /></Suspense>
+  }
+
   if (currentView === 'lumi_protocol') {
     return (
       <div className="space-bg" style={{ height: '100dvh', maxHeight: '100dvh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
@@ -4325,6 +4334,12 @@ function SpaceHome() {
         <CrewMothershipFlyby crewId={userData.crewId} />
       )}
 
+      {currentView === 'planet' && selectedClusterId === 'python' && !selectedRegionId && !is2DMode && !isMobile && (
+        <button type="button" className="space-btn cosmic-btn" style={{ position: 'fixed', right: 24, bottom: 28, zIndex: 50 }} onClick={() => window.open('/python-game-studio', '_blank', 'noopener,noreferrer')}>
+          ⌘ 게임 스튜디오 열기
+        </button>
+      )}
+
       {/* Scan line removed */}
       
       {/* Navigation */}
@@ -4567,6 +4582,7 @@ function SpaceHome() {
                     else if (id === 'reading_library') switchRootView('reading_library')
                     else if (id === 'lumi_protocol') switchRootView('lumi_protocol')
                     else if (id === 'algorithm_constellation') switchRootView('algorithm_constellation')
+                    else if (id === 'python_game_studio') window.open('/python-game-studio', '_blank', 'noopener,noreferrer')
                     soundManager.playWarp()
                   }}
                 />

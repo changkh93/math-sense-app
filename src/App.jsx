@@ -49,6 +49,9 @@ const Signup = lazy(() => import('./pages/Signup'))
 const Terms = lazy(() => import('./pages/Terms'))
 const ReferralPolicy = lazy(() => import('./pages/ReferralPolicy'))
 const CrewGuestInvite = lazy(() => import('./pages/CrewGuestInvite'))
+const PythonGameStudioPage = lazy(() => import('./components/PythonGameStudio/PythonGameStudioPage'))
+const PythonGameStudioDev = import.meta.env.DEV ? lazy(() => import('./components/PythonGameStudio/PythonGameStudio')) : null
+
 const AlgorithmConstellationHub = lazy(() => import('./components/AlgorithmConstellation/client/hub/AlgorithmConstellationHub'))
 
 const FrontierExplorationQa = import.meta.env.DEV
@@ -118,6 +121,8 @@ function App() {
           element={<AlgorithmConstellationDevHub />}
         />
       )}
+      <Route path="/python-game-studio" element={<PythonGameStudioPage />} />
+      {PythonGameStudioDev && <Route path="/dev/python-game-studio" element={<PythonGameStudioDev />} />}
       <Route path="/algorithm-constellation" element={
         <PrivateRoute>
           <AlgorithmConstellationHub />

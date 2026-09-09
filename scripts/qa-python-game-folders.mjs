@@ -1,0 +1,48 @@
+import assert from 'node:assert/strict'
+import { readFile } from 'node:fs/promises'
+import { createRequire } from 'node:module'
+const { chromium } = createRequire(import.meta.url)(process.env.PLAYWRIGHT_MODULE || 'playwright')
+const browser = await chromium.launch({ headless: true, ...(process.env.CHROME_PATH ? { executablePath: process.env.CHROME_PATH } : {}) })
+const page = await browser.newPage(); page.setDefaultTimeout(15000)
+const folder = path => page.locator(`[data-kind="folder"][data-path="${path}"]`)
+const file = path => page.locator(`[data-kind="file"][data-path="${path}"]`)
+const rows = () => page.evaluate(async () => (await import('/src/components/PythonGameStudio/projectStore.js')).listDrafts('local-preview'))
+async function createFolder(path) {
+  await page.getByTitle('프로젝트 최상위 폴더 선택', { exact: true }).click()
+  await page.getByRole('button', { name: '폴더 만들기', exact: true }).click()
+  await page.getByLabel('이름', { exact: true }).fill(path)
+  await page.getByRole('button', { name: '확인', exact: true }).click()
+  await folder(path).waitFor()
+}
+try {
+  await page.goto(process.env.GAME_STUDIO_QA_URL || 'http://127.0.0.1:5179/dev/python-game-studio'); await page.locator('.cm-content').waitFor()
+  await createFolder('assets'); await createFolder('assets/images'); await createFolder('empty/nested')
+  await folder('assets/images').click()
+  await page.locator('input[type=file][multiple]:not([webkitdirectory])').setInputFiles({ name: 'hero.png', mimeType: 'image/png', buffer: await readFile(new URL('../public/python-game-examples/knight.png', import.meta.url)) })
+  await file('assets/images/hero.png').waitFor()
+  await folder('assets').click()
+  await page.getByRole('button', { name: 'Python 파일 추가', exact: true }).click()
+  assert.equal(await page.getByLabel('이름', { exact: true }).inputValue(), 'helper.py')
+  await page.getByRole('button', { name: '확인', exact: true }).click(); await file('assets/helper.py').waitFor()
+  console.log('PASS nested folders, selected-folder image upload and Python file creation')
+  await file('main.py').click(); await page.locator('.cm-content').click()
+  await page.keyboard.insertText('import os\nprint("EMPTY_FOLDER",os.path.isdir("empty/nested"))\nprint("IMAGE_EXISTS",os.path.isfile("assets/images/hero.png"))\n')
+  await page.getByRole('button', { name: '실행', exact: true }).click()
+  await page.waitForFunction(() => document.querySelector('.pgs-console pre')?.textContent.includes('IMAGE_EXISTS True'), null, { timeout: 90000 })
+  assert.match(await page.locator('.pgs-console pre').innerText(), /EMPTY_FOLDER True/)
+  await page.reload(); await page.locator('.cm-content').waitFor(); await folder('empty/nested').waitFor()
+  assert.ok((await rows())[0].project.folders.includes('empty/nested'))
+  console.log('PASS empty directories exist in Python and survive reload')
+  await page.getByRole('button', { name: '폴더 만들기', exact: true }).click(); await page.getByLabel('이름', { exact: true }).fill('main.py')
+  await page.getByRole('button', { name: '확인', exact: true }).click()
+  await page.getByRole('dialog', { name: '프로젝트 파일 편집' }).getByRole('alert').filter({ hasText: '파일과 폴더 이름이 겹칩니다' }).waitFor()
+  await page.getByRole('button', { name: '취소', exact: true }).click()
+  const event = page.waitForEvent('download'); await page.getByRole('button', { name: '프로젝트 다운로드', exact: true }).click(); const download = await event
+  const buffer = await readFile(await download.path()); const exported = JSON.parse(buffer)
+  assert.ok(exported.folders.includes('empty/nested'))
+  await page.getByRole('button', { name: '내 프로젝트', exact: true }).click()
+  await page.locator('input[accept=".json,.mspygame.json,.py"]').setInputFiles({ name: download.suggestedFilename(), buffer })
+  await page.waitForFunction(() => document.querySelector('.pgs-notice')?.textContent.includes('새 사본으로 가져왔습니다'))
+  assert.deepEqual((await rows())[0].project.folders, exported.folders)
+  console.log('PASS name collisions rejected and empty folders survive backup restoration')
+} finally { await browser.close() }

@@ -7,6 +7,8 @@ For an existing task, read its STATE.md and actual artifacts before continuing.
 
 | ID | Goal | Phase | State file | Next action |
 |---|---|---|---|---|
+| 20260909-python-game-studio-implementation | pygame 온라인 IDE·업로드·메타센스 통합 구현 | DONE (local MVP) | [STATE](tasks/20260909-python-game-studio-implementation/STATE.md) | 실행기 과다 콘솔 로그 정리·Chrome 실행/출력 검증 완료; 과제 인덱스 운영 READY, 웹 배포 전 |
+| 20260909-python-game-studio-design | pygame 온라인 IDE 가능성·메타센스 통합 설계 | DONE (design only) | [STATE](tasks/20260909-python-game-studio-design/STATE.md) | 초기 구현은 python-game-studio-implementation 기록 참조 |
 | 20260909-course-2d-explorers | 중등수학·파이썬·고전 읽기 2D 행성 화면 개선 | DONE (local; not deployed) | [STATE](tasks/20260909-course-2d-explorers/STATE.md) | 구현·회귀·반응형 Chromium QA 완료; 요청 시 배포 후 운영 검증 |
 | 20260909-course-planet-identities | 초등 월간평가·중등수학·파이썬 개별 3D 행성 고유화 | DONE (local; not deployed) | [STATE](tasks/20260909-course-planet-identities/STATE.md) | 11개 고유 표면·실루엣과 군집 배치 구현, 브라우저·빌드 검증 완료 |
 | 20260909-elementary-planet-ui | 초등수학 3D 행성·2D 목록 및 성능 개선 | DONE (local; not deployed) | [STATE](tasks/20260909-elementary-planet-ui/STATE.md) | 기존 무한 우주 탐색 복원, 평면 스프라이트 제거·구체화·최적화 완료 |

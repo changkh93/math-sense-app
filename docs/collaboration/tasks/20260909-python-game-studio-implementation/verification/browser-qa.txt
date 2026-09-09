@@ -1,0 +1,29 @@
+PASS mouse, Korean console, opaque-origin DOM/storage isolation
+PASS synchronous infinite-loop recovery
+PASS errors and editor navigation
+PASS reload draft recovery
+PASS PNG, optional TTF/MP3 upload, OGG conversion and rendering
+PASS monster round start, keyboard movement, safe zone, collision, game-over and restart
+restart 1/20
+restart 2/20
+restart 3/20
+restart 4/20
+restart 5/20
+restart 6/20
+restart 7/20
+restart 8/20
+restart 9/20
+restart 10/20
+restart 11/20
+restart 12/20
+restart 13/20
+restart 14/20
+restart 15/20
+restart 16/20
+restart 17/20
+restart 18/20
+restart 19/20
+restart 20/20
+PASS 20 fresh-runtime runs, no residual iframe
+PASS narrow viewport no horizontal document overflow
+PASS no uncaught browser exceptions

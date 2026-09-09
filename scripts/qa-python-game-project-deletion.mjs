@@ -1,0 +1,55 @@
+import assert from 'node:assert/strict'
+import { createRequire } from 'node:module'
+const { chromium } = createRequire(import.meta.url)(process.env.PLAYWRIGHT_MODULE || 'playwright')
+const browser = await chromium.launch({ headless: true, ...(process.env.CHROME_PATH ? { executablePath: process.env.CHROME_PATH } : {}) })
+const context = await browser.newContext()
+context.setDefaultTimeout(10000)
+const page = await context.newPage()
+const url = process.env.GAME_STUDIO_QA_URL || 'http://127.0.0.1:5179/dev/python-game-studio'
+const rows = () => page.evaluate(async () => (await import('/src/components/PythonGameStudio/projectStore.js')).listDrafts('local-preview'))
+const library = () => page.getByRole('button', { name: '내 프로젝트', exact: true }).click()
+const remove = async name => {
+  await page.getByRole('button', { name: `${name} 프로젝트 삭제`, exact: true }).click()
+  await page.getByRole('alertdialog').getByRole('button', { name: '삭제', exact: true }).click()
+  await page.getByRole('alertdialog').waitFor({ state: 'hidden' })
+}
+try {
+  await page.goto(url); await page.locator('.cm-content').waitFor()
+  await page.getByLabel('프로젝트 이름', { exact: true }).fill('FIRST')
+  await library()
+  assert.equal(await page.getByRole('button', { name: '프로젝트 가져오기' }).count(), 1)
+  assert.equal(await page.locator('input[accept=".json,.mspygame.json,.py"]').count(), 1)
+  await page.getByRole('button', { name: 'FIRST 프로젝트 삭제', exact: true }).click()
+  await page.getByRole('alertdialog').getByRole('button', { name: '취소', exact: true }).click()
+  assert.equal((await rows()).length, 1)
+  await page.getByRole('button', { name: '새 프로젝트', exact: true }).click()
+  await page.getByLabel('이름', { exact: true }).fill('SECOND')
+  await page.getByRole('button', { name: '확인', exact: true }).click()
+  await page.waitForFunction(() => document.querySelector('input[aria-label="프로젝트 이름"]')?.value === 'SECOND')
+  await library(); await remove('FIRST')
+  assert.deepEqual((await rows()).map(r => r.project.title), ['SECOND'])
+  assert.equal(await page.getByLabel('프로젝트 이름', { exact: true }).inputValue(), 'SECOND')
+  console.log('PASS import available, deletion cancellation, inactive project deletion')
+  const stale = await context.newPage(); await stale.goto(url); await stale.locator('.cm-content').waitFor()
+  const deletedId = (await rows())[0].project.id
+  await page.evaluate(async () => {
+    const store = await import('/src/components/PythonGameStudio/projectStore.js')
+    const project = (await store.listDrafts('local-preview'))[0].project
+    await store.saveDraft('different-user', { ...project, title: 'OTHER USER' })
+  })
+  await remove('SECOND')
+  await page.waitForTimeout(800)
+  assert.equal((await rows()).some(r => r.project.id === deletedId), false)
+  assert.equal(await page.getByLabel('프로젝트 이름', { exact: true }).inputValue(), '나의 첫 게임')
+  await page.getByRole('button', { name: '프로젝트 목록 닫기' }).click()
+  assert.equal((await page.locator('.cm-content').innerText()).trim(), '')
+  await page.reload(); await page.locator('.cm-content').waitFor()
+  assert.equal((await rows()).some(r => r.project.id === deletedId), false)
+  assert.equal(await page.evaluate(async () => (await (await import('/src/components/PythonGameStudio/projectStore.js')).listDrafts('different-user')).length), 1)
+  console.log('PASS active/last project deletion, blank replacement, reload, user isolation')
+  await stale.getByLabel('프로젝트 이름', { exact: true }).fill('STALE EDIT')
+  await stale.waitForTimeout(800)
+  assert.equal((await rows()).some(r => r.project.id === deletedId), false)
+  assert.ok((await rows()).some(r => r.project.title.includes('STALE EDIT')))
+  console.log('PASS stale tab preserves edits in a separate copy without restoring deleted project')
+} finally { await browser.close() }

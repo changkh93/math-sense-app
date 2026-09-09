@@ -1,0 +1,376 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>MetaSense Game Runner</title>
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline' 'unsafe-eval' https://pygame-web.github.io; connect-src https://pygame-web.github.io; style-src 'unsafe-inline'; img-src blob: data:; media-src blob: data: https://pygame-web.github.io; worker-src blob:;">
+<style>
+html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#080f20;color:#dbeafe;font:14px system-ui}body{display:grid;place-items:center}#canvas{max-width:100%;max-height:100%;object-fit:contain;outline:none}#canvas3d,#stdout,#transfer,#html{display:none!important}#start{position:absolute;inset:0;display:grid;place-content:center;text-align:center;background:#080f20ee;gap:14px}button{font:inherit;background:#83f3cd;border:0;border-radius:12px;padding:14px 24px;cursor:pointer;color:#08271f}#note{max-width:320px;line-height:1.6}#start[hidden],#audio-note[hidden]{display:none}#audio-note{position:absolute;bottom:16px;max-width:90%;padding:8px 12px;border-radius:8px;background:#182438dd;color:#dbeafe;font-size:12px;pointer-events:none}
+</style>
+<script id="studio-console-policy">
+// Pygbag 0.9 overwrites config.quiet and logs its bootstrap source/configuration.
+// Limit filtering to this isolated runner and known routine messages. Python
+// stdout/tracebacks use StudioOutput + MessagePort, not this browser console.
+(()=>{
+ let diagnostics=false;
+ window.studioSetRuntimeDiagnostics=enabled=>{diagnostics=enabled===true;};
+ const routineLogs=new Set([
+  'script?','AUTOSTART','interpreter=','orig_argv','sys.argv: ',
+  'docurl=','srcurl=','data-os=','data-python=','script: id=','code : ',
+  'PyMain: running in main thread, faking onCustomMessage',
+  'Begin.cross_file.fetch','End.cross_file.fetch','focus set',
+ ]);
+ const routineWarnings=new Set(['VM.prerun','VM.postrun Begin','VM.postrun End','======= IFRAME =========','TODO: user defined canvas']);
+ function isRoutine(level,args){
+  const [message,detail]=args;
+  // These are caught capability probes, with fallbacks, in upstream onload().
+  // Other SecurityErrors and all unhandled errors must remain visible.
+  if((level==='warn'||level==='error')&&message==='FIXME:'&&detail?.name==='SecurityError'){
+   return /Failed to read a named property '(hash|blanker)' from '(Location|Window)': Blocked a frame/.test(detail.message);
+  }
+  // Optional BrowserFS is unused; this runner writes to Emscripten's own FS.
+  if(level==='error'&&message==='PyMain: BrowserFS not found'&&args.length===1)return true;
+  if(level==='info'&&message==='[sixel image]'&&args.length===1)return true;
+  if(level==='warn')return routineWarnings.has(message)
+   ||(message==='Connection:'&&['Wired','Cellular','2G'].includes(detail))
+   ||(message==='NO ume unlocker, safari =='&&typeof detail==='boolean')
+   ||(typeof message==='string'&&/^== FLAGS : is_mobile\((true|false)\) dev=(true|false) debug_user=(true|false) debug_mobile=(true|false) ==$/.test(message.trim()))
+   ||(message==='Loading python interpreter from'&&detail===window.config?.executable);
+  if(level!=='log')return false;
+  if(routineLogs.has(message))return true;
+  if(message==='cross_file.fetch')return Number.isInteger(detail)&&detail>=200&&detail<300;
+  if(message==='Location of')return detail==='pythons.js'&&args[2]==='overrides script';
+  if(typeof message==='string'&&message.trim()==='main.js:')return typeof detail==='string'&&/^locate(Data|File): /.test(detail);
+  if(typeof message!=='string')return false;
+  if(/^config\.[a-zA-Z0-9_]+ =$/.test(message)&&args.length===2)return true;
+  // Only the exact current config dump, never arbitrary JSON or student text.
+  return message.startsWith('{"cdn":')&&message===JSON.stringify(window.config);
+ }
+ for(const level of ['log','info','debug','warn','error']){
+  const original=console[level].bind(console);
+  console[level]=(...args)=>{
+   // Logging must still work if a future runtime changes the config shape.
+   if(!diagnostics){try{if(isRoutine(level,args))return;}catch{/* Forward unrecognized data. */}}
+   original(...args);
+  };
+ }
+})();
+</script>
+<script>
+window.config={cdn:'https://pygame-web.github.io/archives/0.9/',executable:'https://pygame-web.github.io/archives/0.9/cpython312/main.js',user_canvas:1,user_canvas_managed:1,gui_divider:1,ume_block:0,can_close:0,autorun:1,quiet:true};
+window.studioCommand='';window.studioEngineReady=false;window.studioActiveRun=null;
+window.studioTakeCommand=()=>{const command=window.studioCommand;window.studioCommand='';return command;};
+window.studioEmitEncoded=(type,data,runId)=>window.studioEmit(type,new TextDecoder().decode(Uint8Array.from(atob(data),c=>c.charCodeAt(0))),runId);
+window.custom_onload=function(){window.python=window.Module;window.Module.vt.xterm={write:()=>{}};};
+window.alert=function(text){window.studioEmit?.('ERROR',String(text));};
+(()=>{
+let port=null,sessionId=null,sent=0,windowStart=performance.now();
+window.studioEmit=(type,text='',runId=window.studioActiveRun)=>{
+ if(!port)return;
+ if(performance.now()-windowStart>1000){sent=0;windowStart=performance.now();}
+ if((type==='STDOUT'||type==='STDERR')&&++sent>100)return;
+ port.postMessage({protocolVersion:2,sessionId,runId,type,text:String(text).slice(0,8192)});
+ if(type==='READY'||type==='ENGINE_READY')document.getElementById('start').hidden=true;
+ if(type==='ERROR'||type==='EXIT'||type==='STOPPED'){document.getElementById('start').hidden=true;document.getElementById('audio-note').hidden=true;}
+};
+const hello = setInterval(()=>{if(!port)parent.postMessage({type:'RUNNER_HELLO',protocolVersion:2},'*');},250);
+window.addEventListener('message',function connect(event){
+ if(event.source!==parent||event.data?.type!=='CONNECT'||event.data.protocolVersion!==2||port||!event.ports[0])return;
+ clearInterval(hello);port=event.ports[0];sessionId=event.data.sessionId;
+ port.onmessage=({data})=>{
+ if(data.sessionId!==sessionId||data.protocolVersion!==2||!['RUN','STOP'].includes(data.type))return;
+ window.studioCommand=JSON.stringify(data).replace(/[\u007f-\uffff]/g,c=>'\\u'+c.charCodeAt(0).toString(16).padStart(4,'0'));
+ };
+ port.start();window.studioEmit('CONNECTED');if(window.studioEngineReady)window.studioEmit('ENGINE_READY');
+});
+// Audio can be suspended by browser policy. It never gates Python execution.
+const audioContexts=new Set();
+window.studioResetPresentation=()=>{
+ window.studioActiveRun=null;
+ document.getElementById('canvas').width=document.getElementById('canvas').width;
+ for(const context of audioContexts)context.studioSoundRequested=false;
+ document.getElementById('audio-note').hidden=true;
+};
+function updateAudioNote(){
+ const note=document.getElementById('audio-note');
+ if(note)note.hidden=![...audioContexts].some(context=>context.studioSoundRequested&&context.state==='suspended');
+}
+for(const name of ['AudioContext','webkitAudioContext']){
+ const NativeContext=window[name];
+ if(!NativeContext)continue;
+ window[name]=class extends NativeContext{
+  constructor(...args){
+   super(...args);audioContexts.add(this);
+   this.addEventListener('statechange',updateAudioNote);
+  }
+  createBufferSource(...args){
+   const source=super.createBufferSource(...args),start=source.start.bind(source);
+   source.start=(...values)=>{this.studioSoundRequested=true;const result=start(...values);updateAudioNote();return result;};
+   return source;
+  }
+ };
+}
+function resumeAudio(event){
+ if(!event.isTrusted)return;
+ for(const context of audioContexts)if(context.state==='suspended')context.resume().catch(()=>{});
+}
+document.addEventListener('pointerdown',resumeAudio);
+document.addEventListener('keydown',resumeAudio);
+window.addEventListener('DOMContentLoaded',()=>{
+ document.getElementById('canvas').addEventListener('contextmenu',e=>e.preventDefault());
+ document.addEventListener('keydown',e=>{if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight',' '].includes(e.key))e.preventDefault();});
+});
+window.addEventListener('error',e=>window.studioEmit('ERROR',e.message));
+window.addEventListener('unhandledrejection',e=>window.studioEmit('ERROR',e.reason?.message||e.reason));
+})();
+</script>
+<script type="module" id="site" data-python="python3.12" data-os="snd,gui" src="https://pygame-web.github.io/archives/0.9/pythons.js">
+import asyncio
+import platform
+import sys
+import os
+import json
+import base64
+import traceback
+import time
+import ast
+import shutil
+import importlib
+import types
+import gc
+
+ROOT = '/tmp/studio'
+ORIGINAL_RUN = asyncio.run
+ORIGINAL_STDOUT, ORIGINAL_STDERR = sys.stdout, sys.stderr
+ORIGINAL_PATH = list(sys.path)
+ORIGINAL_MAIN = sys.modules.get('__main__')
+ORIGINAL_ARGV = list(sys.argv)
+ORIGINAL_ENV = dict(os.environ)
+ORIGINAL_DONT_WRITE = sys.dont_write_bytecode
+active = None
+pygame_ready = False
+
+def emit(kind, text='', run_id=None):
+    platform.window.studioEmitEncoded(kind, base64.b64encode(str(text).encode('utf-8')).decode('ascii'), run_id)
+
+def report(error, run_id):
+    if not isinstance(error, (SystemExit, asyncio.CancelledError)):
+        emit('ERROR', ''.join(traceback.format_exception(error)), run_id)
+
+class StudioOutput:
+    def __init__(self, kind, run_id): self.kind, self.run_id = kind, run_id
+    def write(self, text):
+        if text: emit(self.kind, str(text), self.run_id)
+        return len(text)
+    def flush(self): pass
+    def isatty(self): return False
+
+def uses_pygame(project):
+    for item in project['files']:
+        if not item['path'].lower().endswith('.py'): continue
+        try:
+            tree = ast.parse(base64.b64decode(item['data']).decode('utf-8'))
+        except (SyntaxError, UnicodeError):
+            continue
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Import) and any(alias.name.split('.')[0] == 'pygame' for alias in node.names): return True
+            if isinstance(node, ast.ImportFrom) and (node.module or '').split('.')[0] == 'pygame': return True
+            if isinstance(node, ast.Call) and ((isinstance(node.func, ast.Name) and node.func.id == '__import__') or (isinstance(node.func, ast.Attribute) and node.func.attr == 'import_module')): return True
+    return False
+
+class FrameCallFinder(ast.NodeVisitor):
+    def __init__(self, call_paths): self.call_paths, self.found = call_paths, False
+    def visit_FunctionDef(self, node): pass
+    def visit_AsyncFunctionDef(self, node): pass
+    def visit_ClassDef(self, node): pass
+    def visit_Lambda(self, node): pass
+    def visit_Call(self, node):
+        parts, value = [], node.func
+        while isinstance(value, ast.Attribute):
+            parts.insert(0, value.attr); value = value.value
+        if isinstance(value, ast.Name):
+            parts.insert(0, value.id)
+            if tuple(parts) in self.call_paths: self.found = True
+        self.generic_visit(node)
+
+class BrowserGameLoops(ast.NodeTransformer):
+    def __init__(self, call_paths, yield_name):
+        self.call_paths, self.yield_name, self.changed = call_paths, yield_name, False
+    # Existing async code and synchronous helper definitions retain their own semantics.
+    def visit_FunctionDef(self, node): return node
+    def visit_AsyncFunctionDef(self, node): return node
+    def visit_ClassDef(self, node): return node
+    def visit_Lambda(self, node): return node
+    def visit_While(self, node):
+        finder = FrameCallFinder(self.call_paths)
+        finder.visit(node)
+        if not finder.found: return self.generic_visit(node)
+        pause = ast.Expr(value=ast.Await(value=ast.Call(func=ast.Name(id=self.yield_name, ctx=ast.Load()), args=[], keywords=[])))
+        node.body.insert(0, ast.copy_location(pause, node))
+        self.changed = True
+        # One yield per outer game iteration; do not slow each event in nested loops.
+        return node
+    visit_For = visit_While
+
+def compile_project(source, filename, namespace):
+    tree = ast.parse(source, filename=filename)
+    # Resolve common pygame imports without guessing from text/comments/strings.
+    aliases = {}
+    for node in tree.body:
+        if isinstance(node, ast.Import):
+            for alias in node.names:
+                if alias.name == 'pygame': aliases[alias.asname or 'pygame'] = ('pygame',)
+        elif isinstance(node, ast.ImportFrom) and node.level == 0 and (node.module or '').startswith('pygame'):
+            for alias in node.names:
+                if alias.name != '*': aliases[alias.asname or alias.name] = tuple(node.module.split('.')) + (alias.name,)
+    frame_paths = [('pygame','display','update'), ('pygame','display','flip'), ('pygame','event','get'), ('pygame','event','poll')]
+    call_paths = { (name,) + path[len(prefix):] for name, prefix in aliases.items() for path in frame_paths if path[:len(prefix)] == prefix }
+    yield_name = '__metasense_frame_yield_' + str(id(namespace))
+    transformer = BrowserGameLoops(call_paths, yield_name)
+    tree = transformer.visit(tree)
+    if transformer.changed:
+        namespace[yield_name] = lambda: asyncio.sleep(0)
+    return compile(ast.fix_missing_locations(tree), filename, 'exec', flags=ast.PyCF_ALLOW_TOP_LEVEL_AWAIT)
+
+def cancel_user_callbacks(loop):
+    for queue_name in ('_scheduled', '_ready'):
+        for handle in list(getattr(loop, queue_name, ())):
+            callback = getattr(handle, '_callback', None)
+            code = getattr(callback, '__code__', None)
+            if code and code.co_filename.startswith(ROOT + '/'):
+                handle.cancel()
+
+async def stop_current():
+    global active
+    if active is None: return True
+    context = active
+    context['deadline'] = time.monotonic() + .5
+    sys.settrace(context['trace'])
+    # Include tasks spawned by student helpers, not only asyncio.run(main()).
+    pending = {task for task in asyncio.all_tasks() if task not in context['baseline_tasks'] and task is not asyncio.current_task()}
+    for task in pending: task.cancel()
+    if pending:
+        _, unfinished = await asyncio.wait(pending, timeout=.25)
+        if unfinished:
+            emit('RESET_REQUIRED', '실행 작업을 정리하고 있습니다.', context['id'])
+            return False
+    sys.settrace(None)
+    cancel_user_callbacks(asyncio.get_running_loop())
+    pygame = sys.modules.get('pygame')
+    if pygame is not None:
+        pygame.quit()
+    asyncio.run = ORIGINAL_RUN
+    sys.stdout, sys.stderr = ORIGINAL_STDOUT, ORIGINAL_STDERR
+    sys.path[:] = ORIGINAL_PATH
+    sys.argv[:] = ORIGINAL_ARGV
+    sys.modules['__main__'] = ORIGINAL_MAIN
+    sys.dont_write_bytecode = ORIGINAL_DONT_WRITE
+    os.environ.clear(); os.environ.update(ORIGINAL_ENV)
+    # Drop project imports even when the same path/mtime is reused on the next run.
+    for name, module in list(sys.modules.items()):
+        filename = str(getattr(module, '__file__', '') or '')
+        if filename.startswith(ROOT + '/'):
+            sys.modules.pop(name, None)
+    for path in list(sys.path_importer_cache):
+        if str(path).startswith(ROOT): sys.path_importer_cache.pop(path, None)
+    importlib.invalidate_caches()
+    os.chdir('/tmp')
+    if os.path.exists(ROOT): shutil.rmtree(ROOT)
+    context['namespace'].clear()
+    active = None
+    platform.window.studioResetPresentation()
+    gc.collect()
+    return True
+
+async def start_project(command):
+    global active, pygame_ready
+    run_id, project = command['runId'], command['project']
+    os.makedirs(ROOT, exist_ok=True)
+    for folder in project.get('folders', []):
+        if folder.startswith('/') or '\\' in folder or any(p in ('', '.', '..') for p in folder.split('/')):
+            raise ValueError('Invalid project folder')
+        os.makedirs(ROOT + '/' + folder, exist_ok=True)
+    for item in project['files']:
+        path = item['path']
+        if path.startswith('/') or '\\' in path or any(p in ('', '.', '..') for p in path.split('/')):
+            raise ValueError('Invalid project path')
+        full = ROOT + '/' + path
+        os.makedirs(os.path.dirname(full), exist_ok=True)
+        with open(full, 'wb') as output: output.write(base64.b64decode(item['data']))
+    if not pygame_ready and uses_pygame(project):
+        await shell.preload_code('import pygame', loaderhome='/tmp')
+        pygame_ready = True
+    # An updated Run/Stop supersedes a slow first package preparation.
+    if platform.window.studioCommand:
+        os.chdir('/tmp'); shutil.rmtree(ROOT)
+        return
+    os.chdir(ROOT)
+    sys.path[:] = [ROOT] + ORIGINAL_PATH
+    sys.dont_write_bytecode = True
+    source_path = ROOT + '/' + project['entrypoint']
+    sys.argv[:] = [source_path]
+    module = types.ModuleType('__main__')
+    module.__file__ = source_path
+    sys.modules['__main__'] = module
+    namespace = module.__dict__
+    context = {'id': run_id, 'namespace': namespace, 'baseline_tasks': set(asyncio.all_tasks()), 'tasks': [], 'deadline': time.monotonic() + 2, 'failed': False}
+    active = context
+    platform.window.studioActiveRun = run_id
+    sys.stdout, sys.stderr = StudioOutput('STDOUT', run_id), StudioOutput('STDERR', run_id)
+    def trace(frame, event, arg):
+        if event == 'line' and frame.f_code.co_filename.startswith(ROOT + '/') and time.monotonic() > context['deadline']:
+            raise RuntimeError('반복문이 화면을 멈췄습니다. 게임 루프에 await asyncio.sleep(0)을 넣어 주세요.')
+        return trace
+    context['trace'] = trace
+    async def watch(coroutine):
+        try:
+            await coroutine
+        except BaseException as error:
+            if not isinstance(error, (SystemExit, asyncio.CancelledError)):
+                context['failed'] = True
+                report(error, run_id)
+        # The session driver owns cleanup and EXIT; old tasks cannot exit a newer run.
+    def game_run(coroutine, *args, **kwargs):
+        task = asyncio.create_task(watch(coroutine))
+        context['tasks'].append(task)
+        return task
+    asyncio.run = game_run
+    emit('READY', run_id=run_id)
+    emit('RUNNING', run_id=run_id)
+    sys.settrace(trace)
+    try:
+        with open(source_path, encoding='utf-8') as source:
+            result = eval(compile_project(source.read(), source_path, namespace), namespace)
+            if asyncio.iscoroutine(result): game_run(result)
+    except BaseException as error:
+        context['failed'] = True
+        sys.settrace(None)
+        report(error, run_id)
+
+async def studio_boot():
+    global active
+    platform.window.studioEngineReady = True
+    emit('ENGINE_READY')
+    while True:
+        raw = str(platform.window.studioTakeCommand())
+        if raw:
+            command = json.loads(raw)
+            try:
+                if not await stop_current(): return
+                if command['type'] == 'RUN':
+                    await start_project(command)
+                else:
+                    emit('STOPPED', run_id=command['runId'])
+            except BaseException as error:
+                sys.settrace(None)
+                report(error, command['runId'])
+                if not await stop_current(): return
+        if active:
+            active['deadline'] = time.monotonic() + 2
+            if active['failed'] or all(task.done() for task in active['tasks']):
+                run_id = active['id']
+                if not await stop_current(): return
+                emit('EXIT', run_id=run_id)
+        await asyncio.sleep(.01)
+
+ORIGINAL_RUN(studio_boot())
+</script></head>
+<body><canvas id="canvas" width="1200" height="700" tabindex="0"></canvas><div id="start"><div id="note">Python 실행 환경을 준비하고 있습니다.<br>첫 실행에는 시간이 조금 걸릴 수 있습니다.</div></div><div id="audio-note" hidden>소리를 들으려면 게임 화면을 클릭하세요.</div></body></html>

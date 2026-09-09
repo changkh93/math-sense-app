@@ -1,0 +1,6 @@
+{"firstRunMs":1498,"warmMedianMs":406,"warmMaxMs":439,"engineRequests":["https://pygame-web.github.io/archives/0.9/cpython312/main.js","https://pygame-web.github.io/archives/0.9/cpython312/main.wasm"]}
+PASS 20 warm runs, one engine, no stale globals/files
+PASS changed helper module reloads and removed helper is unavailable
+PASS five pygame display/audio starts and stops on the same engine
+PASS stop cancels background tasks and timers without engine reload
+PASS infinite-loop error recovery retains ready engine

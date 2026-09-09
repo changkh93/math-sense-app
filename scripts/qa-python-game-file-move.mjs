@@ -1,0 +1,61 @@
+import assert from 'node:assert/strict'
+import { readFile } from 'node:fs/promises'
+import { createRequire } from 'node:module'
+const { chromium } = createRequire(import.meta.url)(process.env.PLAYWRIGHT_MODULE || 'playwright')
+const browser = await chromium.launch({ headless: true, ...(process.env.CHROME_PATH ? { executablePath: process.env.CHROME_PATH } : {}) })
+const page = await browser.newPage({ viewport: { width: 1440, height: 960 } }); page.setDefaultTimeout(15000)
+const errors = []; page.on('pageerror', error => errors.push(error.message))
+const folder = path => page.locator(`[data-kind="folder"][data-path="${path}"]`)
+const file = path => page.locator(`[data-kind="file"][data-path="${path}"]`)
+const root = () => page.getByTitle('프로젝트 최상위 폴더 선택', { exact: true })
+const rows = () => page.evaluate(async () => (await import('/src/components/PythonGameStudio/projectStore.js')).listDrafts('local-preview'))
+async function createFolder(path) {
+  await root().click(); await page.getByRole('button', { name: '폴더 만들기', exact: true }).click()
+  await page.getByLabel('이름', { exact: true }).fill(path)
+  await page.getByRole('button', { name: '확인', exact: true }).click(); await folder(path).waitFor()
+}
+async function move(destination) {
+  await page.getByRole('button', { name: '이동', exact: true }).click()
+  await page.getByLabel('이동할 폴더').selectOption(destination)
+  await page.getByRole('button', { name: '확인', exact: true }).click()
+}
+try {
+  await page.goto(process.env.GAME_STUDIO_QA_URL || 'http://127.0.0.1:5179/dev/python-game-studio'); await page.locator('.cm-content').waitFor()
+  await page.locator('.cm-content').click(); await page.keyboard.insertText('print("MOVE_OK")\n')
+  await createFolder('images'); await createFolder('assets/nested')
+  await file('main.py').dragTo(folder('images')); await file('images/main.py').waitFor()
+  assert.match(await page.locator('.cm-content').innerText(), /MOVE_OK/)
+  assert.equal(await file('images/main.py').locator('small').innerText(), '기본')
+  await file('images/main.py').dragTo(root()); await file('main.py').waitFor()
+  console.log('PASS native file drag to folder and root, source text and entrypoint preserved')
+  await root().click()
+  const bytes = [...await readFile(new URL('../public/python-game-examples/knight.png', import.meta.url))]
+  const transfer = await page.evaluateHandle(bytes => { const dt = new DataTransfer(); dt.items.add(new File([new Uint8Array(bytes)], 'hero.png', { type: 'image/png' })); return dt }, bytes)
+  await folder('assets/nested').dispatchEvent('dragover', { dataTransfer: transfer })
+  assert.equal(await folder('assets/nested').locator('..').evaluate(el => el.classList.contains('pgs-drop-target')), true)
+  await folder('assets/nested').dispatchEvent('drop', { dataTransfer: transfer }); await transfer.dispose()
+  await file('assets/nested/hero.png').waitFor(); assert.equal(await file('hero.png').count(), 0)
+  await move('images'); await file('images/hero.png').waitFor()
+  await move(''); await file('hero.png').waitFor()
+  console.log('PASS external file drop targets hovered folder; move menu supports folders and root')
+  await file('main.py').click(); await move('assets/nested'); await file('assets/nested/main.py').waitFor()
+  await root().click()
+  await page.locator('input[type=file][multiple]:not([webkitdirectory])').setInputFiles({ name: 'main.py', mimeType: 'text/plain', buffer: Buffer.from('print("ROOT_UNCHANGED")') })
+  await file('main.py').waitFor(); await move('assets/nested')
+  await page.getByRole('dialog').getByRole('alert').filter({ hasText: '같은 이름의 파일' }).waitFor()
+  await page.getByRole('button', { name: '취소', exact: true }).click()
+  await file('main.py').dragTo(folder('assets/nested'))
+  await page.locator('.pgs-notice').filter({ hasText: '같은 이름의 파일' }).waitFor()
+  await page.getByRole('button', { name: '내 프로젝트', exact: true }).click()
+  const saved = (await rows())[0].project
+  assert.equal(saved.entrypoint, 'assets/nested/main.py')
+  assert.equal(saved.files.find(f => f.path === 'main.py').text, 'print("ROOT_UNCHANGED")')
+  assert.equal(saved.files.find(f => f.path === saved.entrypoint).text, 'print("MOVE_OK")\n')
+  assert.equal(saved.files.find(f => f.path === 'hero.png').data, Buffer.from(bytes).toString('base64'))
+  await page.reload(); await file('assets/nested/main.py').waitFor(); await file('main.py').waitFor()
+  await page.getByRole('button', { name: '실행', exact: true }).click()
+  await page.waitForFunction(() => document.querySelector('.pgs-console pre')?.textContent.includes('MOVE_OK'), null, { timeout: 90000 })
+  await page.screenshot({ path: '/tmp/metasense-pygame-file-move.png' })
+  assert.deepEqual(errors, [])
+  console.log('PASS collisions preserve both files; paths/assets survive reload and moved entrypoint runs')
+} finally { await browser.close() }

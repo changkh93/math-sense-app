@@ -69,13 +69,14 @@ const COMMON_STATIONS = {
   dark: { id: 'dark', title: '다크 매터', topic: '복습할 문제', color: '#bca5f5', image: '/assets/planets/elementary/dark.webp', showsCount: true },
   refinery: { id: 'refinery', title: '다크매터 정제소', topic: '오답 정제하기', color: '#e2b18c', image: '/assets/planets/elementary/refinery.webp', showsCount: true },
   reading_library: { id: 'reading_library', title: '나의 책장', topic: '독서 기록과 작품 보관', color: '#67ddbd', image: '/assets/planets/reading-library.webp' },
+  python_game_studio: { id: 'python_game_studio', title: '게임 스튜디오', topic: 'Python으로 나만의 게임 만들기', color: '#83f3cd', icon: '⌘' },
   lumi_protocol: { id: 'lumi_protocol', title: '루미 프로토콜', topic: '20개의 파이썬 미션', color: '#62ebd5', icon: '△' },
   algorithm_constellation: { id: 'algorithm_constellation', title: '생각의 항로', topic: '알고리즘 사고력 훈련', color: '#9ba7ff', image: '/assets/planets/algorithm-constellation.png' },
 }
 
 const STATION_KEYS = {
   middle: ['archive', 'notebook', 'dark', 'refinery'],
-  python: ['lumi_protocol', 'algorithm_constellation', 'archive', 'notebook', 'dark', 'refinery'],
+  python: ['python_game_studio', 'lumi_protocol', 'algorithm_constellation', 'archive', 'notebook', 'dark', 'refinery'],
   classic: ['reading_library', 'archive', 'dark'],
 }
 

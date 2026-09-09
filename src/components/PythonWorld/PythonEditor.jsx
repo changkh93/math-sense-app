@@ -5,6 +5,8 @@ import { python } from '@codemirror/lang-python'
 import { closeBrackets, closeBracketsKeymap } from '@codemirror/autocomplete'
 import { EditorView, Decoration, keymap, lineNumbers, highlightActiveLineGutter } from '@codemirror/view'
 
+import { studioSyntax } from './studioSyntax'
+
 const setExecutionLine = StateEffect.define()
 
 const executionLineField = StateField.define({
@@ -25,7 +27,7 @@ const executionLineField = StateField.define({
   provide: (field) => EditorView.decorations.from(field),
 })
 
-const PythonEditor = forwardRef(function PythonEditor({ value, onChange, activeLine, readOnly = false }, ref) {
+const PythonEditor = forwardRef(function PythonEditor({ value, onChange, activeLine, readOnly = false, colorful = false }, ref) {
   const hostRef = useRef(null)
   const viewRef = useRef(null)
   const onChangeRef = useRef(onChange)
@@ -71,11 +73,19 @@ const PythonEditor = forwardRef(function PythonEditor({ value, onChange, activeL
       })
       view.focus()
     },
+    revealLine: (lineNumber) => {
+      const view = viewRef.current
+      if (!view) return
+      const line = view.state.doc.line(Math.max(1, Math.min(lineNumber, view.state.doc.lines)))
+      view.dispatch({ selection: { anchor: line.from }, effects: EditorView.scrollIntoView(line.from, { y: 'center' }) })
+      view.focus()
+    },
     focus: () => {
       viewRef.current?.focus()
     },
   }), [])
 
+  const initialColorfulRef = useRef(colorful)
   const initialValueRef = useRef(value || '')
   const initialReadOnlyRef = useRef(readOnly)
 
@@ -95,6 +105,7 @@ const PythonEditor = forwardRef(function PythonEditor({ value, onChange, activeL
           highlightActiveLineGutter(),
           history(),
           python(),
+          ...(initialColorfulRef.current ? studioSyntax : []),
           closeBrackets(),
           executionLineField,
           editableCompartmentRef.current.of(EditorView.editable.of(!initialReadOnlyRef.current)),

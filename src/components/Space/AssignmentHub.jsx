@@ -32,6 +32,7 @@ import ReadingBookFormModal from './ReadingLibrary/ReadingBookFormModal';
 import ReadingShareComposer from '../Community/ReadingLounge/ReadingShareComposer';
 import './ReadingLibrary/ReadingLibrary.css';
 
+const GameStudioAttachmentPicker = lazy(() => import('../PythonGameStudio/GameStudioAttachmentPicker'));
 const MotionDiv = motion.div;
 const WeeklyGrowthLoopDrawer = lazy(() => import('./WeeklyGrowthLoop/WeeklyGrowthLoopDrawer'));
 const ASSIGNMENT_MISSING_GRACE_MS = 12 * 60 * 60 * 1000;
@@ -1268,9 +1269,10 @@ function SubmissionPanel({ clusterId, regionId, dateStr, assignment, warnings = 
   const [files, setFiles] = useState([]);
   const [uploadProgress, setUploadProgress] = useState({}); // { fileName: percentage }
   const [existingAttachments, setExistingAttachments] = useState(assignment?.attachments || []);
-  const [attachmentMode, setAttachmentMode] = useState(null); // 'link' or 'file' or null
+  const [attachmentMode, setAttachmentMode] = useState(null); // 'link', 'file', 'studio' or null
   const [isDragging, setIsDragging] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isAddingStudio, setIsAddingStudio] = useState(false);
   const [draftStatus, setDraftStatus] = useState('');
   const [feedbackReaction, setFeedbackReaction] = useState(assignment?.feedbackReaction || assignment?.feedbackResponse?.reaction || '');
   const [feedbackComment, setFeedbackComment] = useState(assignment?.feedbackComment || assignment?.feedbackResponse?.comment || '');
@@ -1724,6 +1726,7 @@ function SubmissionPanel({ clusterId, regionId, dateStr, assignment, warnings = 
   };
 
   const handleSubmit = async () => {
+    if (isAddingStudio) return;
     if (isClassic) {
       if (!readingBookId) {
         alert("읽은 책을 선택해 주세요. 등록된 책이 없다면 '+ 새 책 등록' 버튼을 눌러 먼저 책을 등록해 주세요.");
@@ -1773,7 +1776,7 @@ function SubmissionPanel({ clusterId, regionId, dateStr, assignment, warnings = 
 
       const uploadPromises = files.map(file => {
         return new Promise((resolve, reject) => {
-          const storagePath = `assignments/${user.uid}/${Date.now()}_${file.name}`;
+          const storagePath = `assignments/${user.uid}/${Date.now()}_${crypto.randomUUID()}_${file.name}`;
           const extension = file.name.split('.').pop().toLowerCase();
           const isTextFile = ['py', 'txt', 'js', 'json', 'csv', 'md'].includes(extension) || file.type.startsWith('text/');
           
@@ -2487,7 +2490,7 @@ function SubmissionPanel({ clusterId, regionId, dateStr, assignment, warnings = 
           )}
 
           {/* Attachment Type Selector */}
-          <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem' }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '1rem' }}>
             <button 
               type="button" 
               className={`space-btn ${attachmentMode === 'link' ? 'active' : ''}`}
@@ -2508,9 +2511,16 @@ function SubmissionPanel({ clusterId, regionId, dateStr, assignment, warnings = 
               }}
               style={{ flex: 1, fontSize: '0.8rem', padding: '0.6rem', background: attachmentMode === 'file' ? 'rgba(0, 243, 255, 0.2)' : '' }}
             >
-              📁 파일 추가
+              📁 내 컴퓨터 파일 추가
             </button>
           </div>
+
+          {['python', '파이썬'].includes(clusterId) && user?.uid && <div style={{ marginBottom: '1rem' }}>
+            <button type="button" className="space-btn" disabled={isSubmitting || isAddingStudio} onClick={() => setAttachmentMode(attachmentMode === 'studio' ? null : 'studio')} style={{ width: '100%' }}>⌘ 게임 스튜디오에서 추가</button>
+          </div>}
+          {attachmentMode === 'studio' && ['python', '파이썬'].includes(clusterId) && user?.uid && <Suspense fallback={<p>스튜디오 목록을 준비하고 있습니다…</p>}>
+            <GameStudioAttachmentPicker key={`${user.uid}:${dateStr}`} uid={user.uid} disabled={isSubmitting} onBusyChange={setIsAddingStudio} onAdd={added => { handleFileSelect({ target: { files: added } }); setAttachmentMode(null); }} />
+          </Suspense>}
 
           {/* Dynamic Input Area */}
           <AnimatePresence mode="wait">
@@ -2604,7 +2614,7 @@ function SubmissionPanel({ clusterId, regionId, dateStr, assignment, warnings = 
             <button 
               className="space-btn cosmic-btn" 
               onClick={handleSubmit}
-              disabled={isSubmitting || content.trim().length < 10}
+              disabled={isSubmitting || isAddingStudio || content.trim().length < 10}
               style={{ minWidth: '140px' }}
             >
               {isSubmitting ? '전송 중...' : (assignment ? '수정 후 전송' : '전송 (TRANSMIT)')}

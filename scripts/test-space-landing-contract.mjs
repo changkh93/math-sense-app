@@ -1,13 +1,13 @@
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
+import { initialAssignmentCluster } from '../src/components/Space/assignmentNavigation.js'
 
 const source = readFileSync(new URL('../src/components/Space/SpaceHome.jsx', import.meta.url), 'utf8')
 
-assert.match(
-  source,
-  /const \[selectedClusterId, setSelectedClusterId\] = useState\(null\)/,
-  'NAV must start without a selected cluster so Multi-Verse is rendered',
-)
+assert.equal(initialAssignmentCluster('planet', { search: '' }, 'python'), null, 'NAV must start at Multi-Verse')
+assert.equal(initialAssignmentCluster('assignment_hub', { search: '' }, 'python'), 'python', 'Archive refresh must restore its course')
+assert.match(source, /useState\(\(\) => initialAssignmentCluster\(currentView, location, sessionStorage\.getItem\('metasense_cluster_id'\)\)\)/)
+assert.match(source, /if \(!canLoadCourseCatalog \|\| loadingClusters \|\| errorClusters \|\| !clusters\) return;/, 'Restored course must not be erased before auth and catalog load')
 
 assert.match(
   source,

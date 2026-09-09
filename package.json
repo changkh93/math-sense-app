@@ -76,7 +76,9 @@
     "video:render:docu": "remotion render video/index.jsx MetasenseDocuBrandFilm out/metasense-docu-brand-film-raw.mp4 --codec=h264 --pixel-format=yuv420p",
     "video:still:docu": "remotion still video/index.jsx MetasenseDocuBrandFilm out/metasense-docu-brand-film-still.png --frame=2250",
     "video:render:source-promo": "remotion render video/index.jsx MetasenseSourceBrandFilm out/metasense-source-brand-film.mp4 --codec=h264 --pixel-format=yuv420p",
-    "video:still:source-promo": "remotion still video/index.jsx MetasenseSourceBrandFilm out/metasense-source-brand-film-still.png --frame=1000"
+    "video:still:source-promo": "remotion still video/index.jsx MetasenseSourceBrandFilm out/metasense-source-brand-film-still.png --frame=1000",
+    "test:python-game-studio": "node --test scripts/test-python-game-studio.mjs scripts/test-python-game-console.mjs",
+    "dev:python-game-runner": "node scripts/serve-python-game-runner.mjs"
   },
   "dependencies": {
     "@codemirror/commands": "^6.10.4",
@@ -85,6 +87,7 @@
     "@codemirror/state": "^6.7.1",
     "@codemirror/view": "^6.43.6",
     "@google/genai": "^1.42.0",
+    "@lezer/highlight": "^1.2.3",
     "@react-three/drei": "^10.7.7",
     "@react-three/fiber": "^9.5.0",
     "@remotion/cli": "^4.0.471",
@@ -110,7 +113,8 @@
     "react-sketch-canvas": "^6.2.0",
     "recharts": "^3.7.0",
     "remotion": "^4.0.471",
-    "three": "^0.182.0"
+    "three": "^0.182.0",
+    "wasm-media-encoders": "0.7.0"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",
