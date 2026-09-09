@@ -1,0 +1,13 @@
+{
+  "project": "math-sense-1f6a8",
+  "bucket": "math-sense-1f6a8.firebasestorage.app",
+  "unitId": "reg_1781420075936_chap_1781420191007_unit_1788876975928",
+  "title": "1학년 2학기 중간 4회",
+  "parentChapterId": "reg_1781420075936_chap_1781420191007",
+  "existingQuizCount": 0,
+  "plannedQuizCount": 25,
+  "plannedImageCount": 18,
+  "questionsSHA256": "5b3a73258928d7c5da63717930dd96a9562b106c579906b88f8966fc7f5a0b42",
+  "existingQuizIds": [],
+  "writes": 0
+}

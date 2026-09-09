@@ -1,5 +1,4 @@
 import { useNavigate } from 'react-router-dom';
-import Footer from '../components/common/Footer';
 
 const PrivacyPolicy = () => {
   const navigate = useNavigate();
@@ -86,7 +85,6 @@ const PrivacyPolicy = () => {
           <p style={{ fontWeight: 900, color: '#ffffff', marginTop: '1rem' }}>Powered by Meta Sense</p>
         </div>
       </div>
-      <Footer />
     </div>
   );
 };

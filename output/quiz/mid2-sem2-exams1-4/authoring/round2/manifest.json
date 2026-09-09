@@ -1,0 +1,283 @@
+{
+  "round": 2,
+  "unitId": "reg_1781420075936_chap_1781420235224_unit_1788901191909",
+  "sourceTitle": "중2 2학기 중간 실전모의고사 02",
+  "questions": [
+    {
+      "number": 1,
+      "correctOptionNumbers": [
+        2
+      ],
+      "imagePath": "assets/q01.png",
+      "sourceImagePath": "assets/source-q01.png",
+      "replaced": false,
+      "replacementReason": "",
+      "verification": "$\\angle B=\\angle C=65^\\circ$이고 $BD=CE$, $BF=CD$이므로 $\\triangle BDF\\cong\\triangle CED$입니다. $\\angle BDF=\\angle CED$이고 $\\angle CED+\\angle CDE=115^\\circ$입니다. 따라서 $\\angle FDE=180^\\circ-115^\\circ=65^\\circ$입니다.",
+      "sourcePage": 1,
+      "sourceCorrectOptionNumbers": [
+        2
+      ]
+    },
+    {
+      "number": 2,
+      "correctOptionNumbers": [
+        3
+      ],
+      "imagePath": null,
+      "sourceImagePath": "assets/source-q02.png",
+      "replaced": false,
+      "replacementReason": "",
+      "verification": "내심은 내부에 있고 세 변까지의 거리가 같으므로 보기 $1,4$는 참입니다. 접선은 접점의 반지름과 수직이므로 보기 $2$도 참입니다. 이등변삼각형의 대칭축은 꼭지각의 이등분선이므로 두 중심은 이 직선 위에 있습니다. 그러나 둔각이등변삼각형의 외심은 외부에 있어 보기 $3$이 거짓입니다.",
+      "sourcePage": 1,
+      "sourceCorrectOptionNumbers": [
+        3
+      ]
+    },
+    {
+      "number": 3,
+      "correctOptionNumbers": [
+        4
+      ],
+      "imagePath": "assets/q03.png",
+      "sourceImagePath": "assets/source-q03.png",
+      "replaced": false,
+      "replacementReason": "",
+      "verification": "$\\triangle ABE$와 $\\triangle CDF$에서 $AB=CD$, $\\angle BAE=\\angle DCF$, $\\angle ABE=\\angle CDF$이므로 합동입니다. 또 $BE=AB$, $FD=CD$입니다. 따라서 $AB=FD$, $AE=CF$입니다. $AD=BC$, $FD=BE$를 빼면 $AF=EC$이고 대응각으로 $\\angle BEA=\\angle DFC$입니다. $\\angle BEA=\\frac12\\angle BAD$이므로 $\\angle AEC=180^\\circ-\\frac12\\angle BAD$입니다. 일반적으로 $\\angle BAD$와 같지 않아 보기 $4$가 거짓입니다.",
+      "sourcePage": 1,
+      "sourceCorrectOptionNumbers": [
+        4
+      ]
+    },
+    {
+      "number": 4,
+      "correctOptionNumbers": [
+        2,
+        5
+      ],
+      "imagePath": null,
+      "sourceImagePath": "assets/source-q04.png",
+      "replaced": true,
+      "replacementReason": "원문의 될 수 없는은 직사각형도 가능한 보기 2와 충돌하므로 조건만으로 보장할 수 없는으로 명확히 수정.",
+      "verification": "보기 $1$은 정의입니다. 보기 $3$은 $AD\\parallel BC$와 $AD=BC$를 주므로 충분합니다. 보기 $4$는 엇각의 역으로 두 쌍의 대변이 평행합니다. 보기 $2$는 직각사다리꼴도 가능하여 충분하지 않습니다. 보기 $5$는 마주 보는 변의 길이가 달라 평행사변형이 아닙니다.",
+      "sourcePage": 1,
+      "sourceCorrectOptionNumbers": [
+        2,
+        5
+      ]
+    },
+    {
+      "number": 5,
+      "correctOptionNumbers": [
+        4
+      ],
+      "imagePath": null,
+      "sourceImagePath": "assets/source-q05.png",
+      "replaced": false,
+      "replacementReason": "",
+      "verification": "수직인 대각선은 마름모, 한 직각은 직사각형을 보장하므로 보기 $1,2$는 참입니다. 보기 $3$은 $OB=OC$이고 대각선이 서로 이등분하므로 $BD=AC$입니다. 따라서 직사각형입니다. 대각선의 길이가 같다는 조건은 마름모가 아니라 직사각형을 보장합니다. 두 성질을 모두 만족하면 정사각형이므로 보기 $4$만 틀립니다.",
+      "sourcePage": 1,
+      "sourceCorrectOptionNumbers": [
+        4
+      ]
+    },
+    {
+      "number": 6,
+      "correctOptionNumbers": [
+        4
+      ],
+      "imagePath": "assets/q06.png",
+      "sourceImagePath": "assets/source-q06.png",
+      "replaced": false,
+      "replacementReason": "",
+      "verification": "$OB=OC$이므로 $\\angle OCB=10^\\circ$, $\\angle BOC=160^\\circ$입니다. $\\angle ABO=20^\\circ+10^\\circ=30^\\circ$이고 $OA=OB$이므로 $\\angle BAO=30^\\circ$, $\\angle AOB=120^\\circ$입니다. 그림에서 $\\angle AOC=160^\\circ-120^\\circ=40^\\circ$이므로 $\\angle OAC=\\angle ACO=70^\\circ$입니다. 따라서 $A=100^\\circ$, $C=70^\\circ-10^\\circ=60^\\circ$여서 보기 $4$가 거짓입니다.",
+      "sourcePage": 2,
+      "sourceCorrectOptionNumbers": [
+        4
+      ]
+    },
+    {
+      "number": 7,
+      "correctOptionNumbers": [
+        4
+      ],
+      "imagePath": "assets/q07.png",
+      "sourceImagePath": "assets/source-q07.png",
+      "replaced": true,
+      "replacementReason": "원본의 AB=4, BC=5, 직각 A와 C=60도는 양립 불가. 아래 후처리에서 AB=5√3/2로 바꾸어 각 C=60도 및 빗변 5와 일치시키고 GH=9√3/2로 계산.",
+      "verification": "$BC:HI=5:9$이고 $A,B,C,D,E,F$는 각각 $G,H,I,J,K,L$에 대응합니다. 따라서 보기 $1,2$는 참입니다. $CF=7\\times\\frac59=\\frac{35}{9}\\,cm$이고 $GH=\\frac{5\\sqrt{3}}{2}\\times\\frac95=\\frac{9\\sqrt{3}}{2}\\,cm$이므로 보기 $4$가 거짓입니다. $\\angle H=180^\\circ-90^\\circ-60^\\circ=30^\\circ$이며 $\\angle DEF$가 대응하므로 보기 $5$는 참입니다.",
+      "sourcePage": 2,
+      "sourceCorrectOptionNumbers": [
+        4
+      ]
+    },
+    {
+      "number": 8,
+      "correctOptionNumbers": [
+        3
+      ],
+      "imagePath": "assets/q08.png",
+      "sourceImagePath": "assets/source-q08.png",
+      "replaced": false,
+      "replacementReason": "",
+      "verification": "접기에 의해 $\\angle EDB=\\angle CDB=x$입니다. $AB\\parallel CD$이므로 $\\angle FBD=\\angle CDB=x$입니다. $\\triangle BFD$에서 $84^\\circ+2x=180^\\circ$이므로 $x=48^\\circ$입니다.",
+      "sourcePage": 2,
+      "adaptation": "원본 단답형·서술형을 다섯 보기로 변환. 증명 요구가 있으면 이유와 결과를 함께 포함."
+    },
+    {
+      "number": 9,
+      "correctOptionNumbers": [
+        4
+      ],
+      "imagePath": "assets/q09.png",
+      "sourceImagePath": "assets/source-q09.png",
+      "replaced": false,
+      "replacementReason": "",
+      "verification": "$\\angle B=54^\\circ$, $\\angle C=126^\\circ$입니다. 따라서 $\\angle CBF=27^\\circ$입니다. $CF\\perp BF$이므로 $\\angle BCF=63^\\circ$입니다. $\\angle DCF=126^\\circ-63^\\circ=63^\\circ$입니다.",
+      "sourcePage": 2,
+      "adaptation": "원본 단답형·서술형을 다섯 보기로 변환. 증명 요구가 있으면 이유와 결과를 함께 포함."
+    },
+    {
+      "number": 10,
+      "correctOptionNumbers": [
+        4
+      ],
+      "imagePath": "assets/q10.png",
+      "sourceImagePath": "assets/source-q10.png",
+      "replaced": false,
+      "replacementReason": "",
+      "verification": "$A+C=180^\\circ-82^\\circ=98^\\circ$입니다. 외각의 성질로 $a=82^\\circ+\\frac A2$, $b=82^\\circ+\\frac C2$입니다. $a+b=164^\\circ+\\frac{98^\\circ}{2}=213^\\circ$입니다.",
+      "sourcePage": 2,
+      "adaptation": "원본 단답형·서술형을 다섯 보기로 변환. 증명 요구가 있으면 이유와 결과를 함께 포함."
+    },
+    {
+      "number": 11,
+      "correctOptionNumbers": [
+        4
+      ],
+      "imagePath": "assets/q11.png",
+      "sourceImagePath": "assets/source-q11.png",
+      "replaced": false,
+      "replacementReason": "",
+      "verification": "직각 꼭짓점에서 두 접점까지의 길이는 모두 반지름 $2\\,cm$입니다. 같은 점에서 그은 접선 길이를 더하면 $AB+BC=AC+2r=15\\,cm$입니다. 둘레는 $15+11=26\\,cm$이고 넓이는 $\\frac12\\times2\\times26=26\\,cm^2$입니다.",
+      "sourcePage": 3,
+      "adaptation": "원본 단답형·서술형을 다섯 보기로 변환. 증명 요구가 있으면 이유와 결과를 함께 포함."
+    },
+    {
+      "number": 12,
+      "correctOptionNumbers": [
+        4
+      ],
+      "imagePath": "assets/q12.png",
+      "sourceImagePath": "assets/source-q12.png",
+      "replaced": false,
+      "replacementReason": "",
+      "verification": "$OB=OC$이므로 $\\angle OCB=30^\\circ$입니다. 따라서 $\\angle BCE=30^\\circ+24^\\circ=54^\\circ$입니다. $OC=OE$이므로 $\\angle OEC=24^\\circ$이고 $\\angle COE=132^\\circ$입니다. 그림의 중심 둘레에서 $\\angle BOE=360^\\circ-120^\\circ-132^\\circ=108^\\circ$이므로 $\\angle OBE=36^\\circ$입니다. $\\angle EBC=30^\\circ+36^\\circ=66^\\circ$이고 평행선으로 $\\angle ADE=66^\\circ$입니다. 따라서 $\\angle AIE=90^\\circ+33^\\circ=123^\\circ$입니다.",
+      "sourcePage": 3,
+      "adaptation": "원본 단답형·서술형을 다섯 보기로 변환. 증명 요구가 있으면 이유와 결과를 함께 포함."
+    },
+    {
+      "number": 13,
+      "correctOptionNumbers": [
+        3
+      ],
+      "imagePath": "assets/q13.png",
+      "sourceImagePath": "assets/source-q13.png",
+      "replaced": false,
+      "replacementReason": "",
+      "verification": "$AI$가 각의 이등분선이므로 $A=70^\\circ$입니다. $\\angle OAB=20^\\circ$이고 $OA=OB$이므로 $\\angle ABO=20^\\circ$입니다. $\\angle AOB=140^\\circ$에서 $\\angle ACB=70^\\circ$이고 $B=40^\\circ$입니다. 또는 외심의 세 이등변삼각형의 각을 더해 같은 결과를 얻습니다. $\\angle ADB=180^\\circ-20^\\circ-40^\\circ=120^\\circ$이므로 $\\angle ADE=60^\\circ$입니다.",
+      "sourcePage": 3,
+      "adaptation": "원본 단답형·서술형을 다섯 보기로 변환. 증명 요구가 있으면 이유와 결과를 함께 포함."
+    },
+    {
+      "number": 14,
+      "correctOptionNumbers": [
+        4
+      ],
+      "imagePath": "assets/q14.png",
+      "sourceImagePath": "assets/source-q14.png",
+      "replaced": false,
+      "replacementReason": "",
+      "verification": "$AD=CD$이므로 $10-3x=4$에서 $x=2$입니다. 대각선은 수직이므로 $\\angle DAO=60^\\circ$이고 $AC$는 꼭지각을 이등분하므로 $y=60$입니다. 따라서 $y-x=58$입니다.",
+      "sourcePage": 3,
+      "adaptation": "원본 단답형·서술형을 다섯 보기로 변환. 증명 요구가 있으면 이유와 결과를 함께 포함."
+    },
+    {
+      "number": 15,
+      "correctOptionNumbers": [
+        1
+      ],
+      "imagePath": "assets/q15.png",
+      "sourceImagePath": "assets/source-q15.png",
+      "replaced": false,
+      "replacementReason": "",
+      "verification": "$ED\\parallel BF$이므로 $\\angle EDO=\\angle FBO$입니다. $DO=BO$이고 두 직각이 같아 $\\triangle EOD\\cong\\triangle FOB$인 $ASA$ 합동입니다. $EO=FO$이므로 두 대각선이 서로를 이등분하여 $EBFD$는 평행사변형입니다. 또한 $BD\\perp EF$이므로 마름모입니다. 네 변이 $BF=5\\,cm$와 같아 둘레는 $20\\,cm$입니다.",
+      "sourcePage": 3,
+      "adaptation": "원본 단답형·서술형을 다섯 보기로 변환. 증명 요구가 있으면 이유와 결과를 함께 포함."
+    },
+    {
+      "number": 16,
+      "correctOptionNumbers": [
+        2
+      ],
+      "imagePath": "assets/q16.png",
+      "sourceImagePath": "assets/source-q16.png",
+      "replaced": false,
+      "replacementReason": "",
+      "verification": "$\\angle D=72^\\circ$이므로 $\\angle CAD=180^\\circ-72^\\circ-48^\\circ=60^\\circ$입니다. 이등분선으로 $\\angle DAE=30^\\circ$이고 $AD\\parallel CE$이므로 $\\angle E=30^\\circ$입니다.",
+      "sourcePage": 4,
+      "adaptation": "원본 단답형·서술형을 다섯 보기로 변환. 증명 요구가 있으면 이유와 결과를 함께 포함."
+    },
+    {
+      "number": 17,
+      "correctOptionNumbers": [
+        3
+      ],
+      "imagePath": "assets/q17.png",
+      "sourceImagePath": "assets/source-q17.png",
+      "replaced": false,
+      "replacementReason": "",
+      "verification": "$BD=25-20=5\\,cm$입니다. $\\angle DBE=\\angle CBA$, $\\angle BDE=\\angle BCA=90^\\circ$이므로 $\\triangle BDE\\sim\\triangle BCA$입니다. $BD:BC=DE:CA$에서 $5:15=DE:20$이므로 $DE=\\frac{20}{3}\\,cm$입니다. 넓이는 $\\frac12\\times5\\times\\frac{20}{3}=\\frac{50}{3}\\,cm^2$입니다.",
+      "sourcePage": 4,
+      "adaptation": "원본 단답형·서술형을 다섯 보기로 변환. 증명 요구가 있으면 이유와 결과를 함께 포함."
+    },
+    {
+      "number": 18,
+      "correctOptionNumbers": [
+        4
+      ],
+      "imagePath": "assets/q18.png",
+      "sourceImagePath": "assets/source-q18.png",
+      "replaced": false,
+      "replacementReason": "",
+      "verification": "$AB^2=AD\\times AC$이므로 $225=9AC$에서 $AC=25\\,cm$입니다. 따라서 $x=25-9=16$입니다. $\\frac12\\times15\\times20=\\frac12\\times25\\times y$에서 $y=12$입니다. 따라서 $x+y=28$입니다.",
+      "sourcePage": 4,
+      "adaptation": "원본 단답형·서술형을 다섯 보기로 변환. 증명 요구가 있으면 이유와 결과를 함께 포함."
+    },
+    {
+      "number": 19,
+      "correctOptionNumbers": [
+        3
+      ],
+      "imagePath": "assets/q19.png",
+      "sourceImagePath": "assets/source-q19.png",
+      "replaced": false,
+      "replacementReason": "",
+      "verification": "$AD=BC$에서 $4x-3=7-x$이므로 $x=2$입니다. $AB=CD$에서 $2y+2=y+5$이므로 $y=3$입니다. 실제 변의 길이는 $5,8$로 양수이며 두 쌍이 각각 같아 평행사변형입니다. $xy=2\\times3=6$입니다.",
+      "sourcePage": 4,
+      "adaptation": "원본 단답형·서술형을 다섯 보기로 변환. 증명 요구가 있으면 이유와 결과를 함께 포함."
+    },
+    {
+      "number": 20,
+      "correctOptionNumbers": [
+        2
+      ],
+      "imagePath": "assets/q20.png",
+      "sourceImagePath": "assets/source-q20.png",
+      "replaced": false,
+      "replacementReason": "",
+      "verification": "접기에 의해 $BC^{\\prime}=BC=10\\,cm$, $C^{\\prime}E=CE=8-3=5\\,cm$입니다. 두 삼각형 $ABC^{\\prime},DC^{\\prime}E$는 직각이 같고 남은 예각도 서로 같아 $AA$ 닮음입니다. $AB:DC^{\\prime}=BC^{\\prime}:C^{\\prime}E$에서 $8:DC^{\\prime}=10:5$이므로 $DC^{\\prime}=4\\,cm$입니다.",
+      "sourcePage": 4,
+      "adaptation": "원본 단답형·서술형을 다섯 보기로 변환. 증명 요구가 있으면 이유와 결과를 함께 포함."
+    }
+  ]
+}

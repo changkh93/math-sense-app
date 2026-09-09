@@ -1,0 +1,539 @@
+{
+  "round": 1,
+  "unitId": "reg_1781420075936_chap_1781420292103_unit_1788903283590",
+  "sourceTitle": "중3 모의고사 원본1회",
+  "questions": [
+    {
+      "number": 1,
+      "correctOptionNumbers": [
+        2
+      ],
+      "imagePath": null,
+      "sourceImagePath": "assets/source-q01.png",
+      "replaced": false,
+      "replacementReason": "",
+      "crop": null,
+      "verification": [
+        "$f(2)=2^2-5\\times2+1$입니다.",
+        "$4-10+1=-5$입니다."
+      ],
+      "sourcePage": 1
+    },
+    {
+      "number": 2,
+      "correctOptionNumbers": [
+        3
+      ],
+      "imagePath": null,
+      "sourceImagePath": "assets/source-q02.png",
+      "replaced": false,
+      "replacementReason": "",
+      "crop": null,
+      "verification": [
+        "축은 $x=-3$이고 $a=2>0$이므로 아래로 볼록합니다.",
+        "축 왼쪽인 $x<-3$에서 $x$가 증가하면 꼭짓점 쪽으로 내려가므로 감소합니다."
+      ],
+      "sourcePage": 1
+    },
+    {
+      "number": 3,
+      "correctOptionNumbers": [
+        5
+      ],
+      "imagePath": null,
+      "sourceImagePath": "assets/source-q03.png",
+      "replaced": false,
+      "replacementReason": "",
+      "crop": null,
+      "verification": [
+        "꼭짓점은 $(1,3)$이고 $y$절편은 $5$입니다. 아래로 볼록하며 오른쪽으로 $1$, 위로 $3$ 이동했습니다.",
+        "$x$축 대칭은 $y$값의 부호를 바꾸므로 $y=-2(x-1)^2-3$입니다."
+      ],
+      "sourcePage": 1
+    },
+    {
+      "number": 4,
+      "correctOptionNumbers": [
+        3
+      ],
+      "imagePath": null,
+      "sourceImagePath": "assets/source-q04.png",
+      "replaced": false,
+      "replacementReason": "",
+      "crop": null,
+      "verification": [
+        "$y=-(x-2)^2$이므로 꼭짓점은 $(2,0)$, $y$절편은 $(0,-4)$입니다.",
+        "기울기 $a=\\frac{0-(-4)}{2-0}=2$, $b=-4$이므로 $a-b=6$입니다."
+      ],
+      "sourcePage": 1
+    },
+    {
+      "number": 5,
+      "correctOptionNumbers": [
+        5
+      ],
+      "imagePath": null,
+      "sourceImagePath": "assets/source-q05.png",
+      "replaced": false,
+      "replacementReason": "",
+      "crop": null,
+      "verification": [
+        "$c=5$, $-\\frac{b}{2a}=1$이므로 $b=-2a$입니다.",
+        "$9a+3b+5=2$에 대입하면 $3a=-3$, $a=-1$, $b=2$입니다.",
+        "$a+b+c=-1+2+5=6$입니다."
+      ],
+      "sourcePage": 1
+    },
+    {
+      "number": 6,
+      "correctOptionNumbers": [
+        3
+      ],
+      "imagePath": "assets/q06.png",
+      "sourceImagePath": "assets/source-q06.png",
+      "replaced": false,
+      "replacementReason": "",
+      "crop": [
+        2,
+        160,
+        194,
+        327,
+        326
+      ],
+      "verification": [
+        "아래로 볼록하므로 $a>0$입니다.",
+        "축이 $y$축 오른쪽이므로 $-\\frac{b}{2a}>0$, 따라서 $b<0$입니다.",
+        "$y$절편이 양수이므로 $c>0$입니다."
+      ],
+      "sourcePage": 2
+    },
+    {
+      "number": 7,
+      "correctOptionNumbers": [
+        2
+      ],
+      "imagePath": "assets/q07.png",
+      "sourceImagePath": "assets/source-q07.png",
+      "replaced": true,
+      "replacementReason": "정답표의 ④(12)는 두 포물선의 이동 거리 2, 높이 4와 불일치. 넓이 8인 ②로 교정하고 색칠한 경계를 본문에 명시.",
+      "crop": [
+        2,
+        167,
+        704,
+        331,
+        825
+      ],
+      "verification": [
+        "두 식은 각각 $y=-(x+3)^2+4$, $y=-(x+1)^2+4$입니다.",
+        "오른쪽 그래프는 왼쪽 그래프를 오른쪽으로 $2$ 이동한 것입니다. 색칠한 부분은 높이 $4$에 걸쳐 가로 폭이 항상 $2$인 띠입니다.",
+        "왼쪽의 휘어진 부분을 오른쪽으로 옮기면 가로 $2$, 세로 $4$인 직사각형과 넓이가 같아 $8$입니다."
+      ],
+      "sourcePage": 2
+    },
+    {
+      "number": 8,
+      "correctOptionNumbers": [
+        4
+      ],
+      "imagePath": "assets/q08.png",
+      "sourceImagePath": "assets/source-q08.png",
+      "replaced": true,
+      "replacementReason": "정답표는 ③이나 이는 sin A이다. 본문의 cos A에 맞는 ④로 교정.",
+      "crop": [
+        2,
+        558,
+        190,
+        741,
+        315
+      ],
+      "verification": [
+        "$AB=\\sqrt{5^2+3^2}=\\sqrt{34}$입니다.",
+        "$\\cos A=\\frac{AC}{AB}=\\frac3{\\sqrt{34}}=\\frac{3\\sqrt{34}}{34}$입니다."
+      ],
+      "sourcePage": 2
+    },
+    {
+      "number": 9,
+      "correctOptionNumbers": [
+        2
+      ],
+      "imagePath": "assets/q09.png",
+      "sourceImagePath": "assets/source-q09.png",
+      "replaced": false,
+      "replacementReason": "",
+      "crop": [
+        2,
+        557,
+        755,
+        740,
+        858
+      ],
+      "verification": [
+        "$AB=3$이고 $\\triangle ADE\\sim\\triangle ABD$이므로 $AD^2=AE\\times AB=3$, $AD=\\sqrt3$입니다.",
+        "$\\cos x=\\frac{AE}{AD}=\\frac1{\\sqrt3}$이고 $x+y=90^\\circ$이므로 $\\sin y=\\cos x$입니다.",
+        "합은 $\\frac2{\\sqrt3}=\\frac{2\\sqrt3}{3}$입니다."
+      ],
+      "sourcePage": 2
+    },
+    {
+      "number": 10,
+      "correctOptionNumbers": [
+        1
+      ],
+      "imagePath": "assets/q10.png",
+      "sourceImagePath": "assets/source-q10.png",
+      "replaced": false,
+      "replacementReason": "",
+      "crop": [
+        3,
+        68,
+        151,
+        409,
+        265
+      ],
+      "verification": [
+        "$\\sin36^\\circ=\\cos(90^\\circ-36^\\circ)=\\cos54^\\circ$입니다.",
+        "표의 $54^\\circ$ 행, 코사인 열에서 $0.5878$을 읽습니다."
+      ],
+      "sourcePage": 3
+    },
+    {
+      "number": 11,
+      "correctOptionNumbers": [
+        4
+      ],
+      "imagePath": "assets/q11.png",
+      "sourceImagePath": "assets/source-q11.png",
+      "replaced": false,
+      "replacementReason": "",
+      "crop": [
+        3,
+        139,
+        576,
+        351,
+        709
+      ],
+      "verification": [
+        "접는 성질과 평행선에서 $\\angle ACB=\\angle BAC=67.5^\\circ$이므로 $AB=BC$입니다.",
+        "$A$에서 $BC$에 내린 높이는 폭 $x$입니다. $\\angle B=45^\\circ$이므로 $AB=x\\sqrt2$, 따라서 $BC=x\\sqrt2$입니다.",
+        "$\\frac12x\\cdot x\\sqrt2=32\\sqrt2$에서 $x^2=64$, 길이이므로 $x=8$입니다."
+      ],
+      "sourcePage": 3
+    },
+    {
+      "number": 12,
+      "correctOptionNumbers": [
+        5
+      ],
+      "imagePath": "assets/q12.png",
+      "sourceImagePath": "assets/source-q12.png",
+      "replaced": false,
+      "replacementReason": "",
+      "crop": [
+        3,
+        562,
+        192,
+        738,
+        311
+      ],
+      "verification": [
+        "$B$에서 $AC$에 내린 수선의 발을 $H$라 하면 $CH=30\\cos30^\\circ=15\\sqrt3$, $BH=30\\sin30^\\circ=15$입니다.",
+        "$AH=25\\sqrt3-15\\sqrt3=10\\sqrt3$입니다.",
+        "$AB^2=(10\\sqrt3)^2+15^2=525$이므로 $AB=5\\sqrt{21}\\,m$입니다."
+      ],
+      "sourcePage": 3
+    },
+    {
+      "number": 13,
+      "correctOptionNumbers": [
+        4
+      ],
+      "imagePath": "assets/q13.png",
+      "sourceImagePath": "assets/source-q13.png",
+      "replaced": false,
+      "replacementReason": "",
+      "crop": [
+        3,
+        578,
+        605,
+        730,
+        714
+      ],
+      "verification": [
+        "높이를 $h$라 하면 밑변의 두 부분은 $\\frac h{\\sqrt3}$와 $h$입니다.",
+        "$\\frac h{\\sqrt3}+h=8$이므로 $h=4(3-\\sqrt3)$입니다.",
+        "넓이는 $\\frac12\\times8\\times h=16(3-\\sqrt3)$입니다."
+      ],
+      "sourcePage": 3
+    },
+    {
+      "number": 14,
+      "correctOptionNumbers": [
+        5
+      ],
+      "imagePath": "assets/q14.png",
+      "sourceImagePath": "assets/source-q14.png",
+      "replaced": false,
+      "replacementReason": "",
+      "crop": [
+        4,
+        83,
+        188,
+        227,
+        275
+      ],
+      "verification": [
+        "$\\angle A=180^\\circ-75^\\circ-75^\\circ=30^\\circ$입니다.",
+        "넓이는 $\\frac12\\times3\\times3\\times\\sin30^\\circ=\\frac94\\,cm^2$입니다."
+      ],
+      "sourcePage": 4
+    },
+    {
+      "number": 15,
+      "correctOptionNumbers": [
+        3
+      ],
+      "imagePath": "assets/q15.png",
+      "sourceImagePath": "assets/source-q15.png",
+      "replaced": false,
+      "replacementReason": "",
+      "crop": [
+        4,
+        163,
+        574,
+        313,
+        716
+      ],
+      "verification": [
+        "반지름을 $r$라 하면 $OA=r$, $OM=r-3$입니다.",
+        "$r^2=6^2+(r-3)^2$에서 $6r=45$이므로 $r=\\frac{15}{2}$입니다."
+      ],
+      "sourcePage": 4
+    },
+    {
+      "number": 16,
+      "correctOptionNumbers": [
+        2
+      ],
+      "imagePath": "assets/q16.png",
+      "sourceImagePath": "assets/source-q16.png",
+      "replaced": false,
+      "replacementReason": "",
+      "crop": [
+        4,
+        593,
+        232,
+        724,
+        349
+      ],
+      "verification": [
+        "큰 현의 절반은 $6$, 작은 현의 절반은 $2$입니다. 중심에서 현까지 거리를 $d$라 하면 $R^2=d^2+36$, $r^2=d^2+4$입니다.",
+        "$R^2-r^2=32=(R-r)(R+r)$이고 $R+r=10$이므로 $R-r=\\frac{16}{5}$입니다."
+      ],
+      "sourcePage": 4
+    },
+    {
+      "number": 17,
+      "correctOptionNumbers": [
+        2
+      ],
+      "imagePath": "assets/q17.png",
+      "sourceImagePath": "assets/source-q17.png",
+      "replaced": false,
+      "replacementReason": "",
+      "crop": [
+        4,
+        550,
+        692,
+        740,
+        824
+      ],
+      "verification": [
+        "$AC=4\\,cm$이고 반지름을 $r$라 하면 $OC=r-2$입니다.",
+        "$r^2=(r-2)^2+4^2$에서 $4r=20$, $r=5\\,cm$입니다."
+      ],
+      "sourcePage": 4
+    },
+    {
+      "number": 18,
+      "correctOptionNumbers": [
+        4
+      ],
+      "imagePath": "assets/q18.png",
+      "sourceImagePath": "assets/source-q18.png",
+      "replaced": false,
+      "replacementReason": "",
+      "crop": [
+        5,
+        177,
+        209,
+        323,
+        367
+      ],
+      "verification": [
+        "$BE=BD=4$이므로 $CE=7-4=3$입니다.",
+        "$CF=CE=3$이므로 $AF=8-3=5$입니다. 따라서 $AD=AF=5$입니다."
+      ],
+      "sourcePage": 5
+    },
+    {
+      "number": 19,
+      "correctOptionNumbers": [
+        1
+      ],
+      "imagePath": "assets/q19.png",
+      "sourceImagePath": "assets/source-q19.png",
+      "replaced": false,
+      "replacementReason": "",
+      "crop": [
+        5,
+        191,
+        699,
+        319,
+        820
+      ],
+      "verification": [
+        "$\\angle BOC=60^\\circ$입니다. 부채꼴 넓이는 $\\pi\\times12^2\\times\\frac{60}{360}=24\\pi$입니다.",
+        "$\\triangle BOC$의 넓이는 $\\frac12\\times12^2\\times\\sin60^\\circ=36\\sqrt3$입니다.",
+        "차는 $(24\\pi-36\\sqrt3)\\,cm^2$입니다."
+      ],
+      "sourcePage": 5
+    },
+    {
+      "number": 20,
+      "correctOptionNumbers": [
+        4
+      ],
+      "imagePath": "assets/q20.png",
+      "sourceImagePath": "assets/source-q20.png",
+      "replaced": false,
+      "replacementReason": "",
+      "crop": [
+        5,
+        562,
+        187,
+        724,
+        303
+      ],
+      "verification": [
+        "두 할선 사이의 바깥 각은 큰 호와 작은 호에 대한 중심각 차의 절반입니다. 이는 삼각형의 외각에서 두 원주각을 빼서 얻습니다.",
+        "따라서 $65^\\circ=\\frac{180^\\circ-x}{2}$이고 $x=50^\\circ$입니다."
+      ],
+      "sourcePage": 5
+    },
+    {
+      "number": 21,
+      "correctOptionNumbers": [
+        2
+      ],
+      "imagePath": "assets/q21.png",
+      "sourceImagePath": "assets/source-q21.png",
+      "replaced": false,
+      "replacementReason": "",
+      "crop": [
+        5,
+        484,
+        691,
+        631,
+        817
+      ],
+      "verification": [
+        "빗변 $c=2R=6$입니다. 두 직각변을 $a,b$라 하면 접선 길이에서 $a+b-c=2r=2$이므로 $a+b=8$입니다.",
+        "반둘레 $s=\\frac{8+6}{2}=7$이므로 넓이는 $rs=7\\,cm^2$입니다."
+      ],
+      "sourcePage": 5
+    },
+    {
+      "number": 22,
+      "correctOptionNumbers": [
+        3
+      ],
+      "imagePath": "assets/q22.png",
+      "sourceImagePath": "assets/source-q22.png",
+      "replaced": true,
+      "replacementReason": "본문 AB=6은 그림 AB=4, BC=6과 모순. 그림에 맞게 AB=4, BC=6으로 본문 수정. 원본 정답 ③(18)과 일치.",
+      "crop": [
+        6,
+        145,
+        204,
+        325,
+        330
+      ],
+      "verification": [
+        "$AD=t$라 하면 외접사각형의 성질에서 $CD=BC+AD-AB=t+2$입니다.",
+        "$CD^2=(6-t)^2+4^2$이므로 $(t+2)^2=(6-t)^2+16$입니다. 풀면 $t=3$, $CD=5$입니다.",
+        "둘레는 $4+6+5+3=18\\,cm$입니다."
+      ],
+      "sourcePage": 6
+    },
+    {
+      "number": 23,
+      "correctOptionNumbers": [
+        1
+      ],
+      "imagePath": "assets/q23.png",
+      "sourceImagePath": "assets/source-q23.png",
+      "replaced": false,
+      "replacementReason": "",
+      "crop": [
+        6,
+        170,
+        684,
+        339,
+        799
+      ],
+      "verification": [
+        "$\\triangle DBC$는 직각이등변삼각형이므로 $BC=\\sqrt{12}=2\\sqrt3$입니다.",
+        "$B=(0,0)$, $C=(2\\sqrt3,0)$으로 놓으면 $AB=2$, $A=(0,2)$입니다. $BD$는 $y=x$, $AC$는 $y=2-\\frac{x}{\\sqrt3}$입니다.",
+        "교점의 높이는 $h=3-\\sqrt3$입니다. 넓이는 $\\frac12\\times2\\sqrt3\\times(3-\\sqrt3)=3\\sqrt3-3$입니다."
+      ],
+      "sourcePage": 6
+    },
+    {
+      "number": 24,
+      "correctOptionNumbers": [
+        3
+      ],
+      "imagePath": "assets/q24.png",
+      "sourceImagePath": "assets/source-q24.png",
+      "replaced": false,
+      "replacementReason": "",
+      "crop": [
+        6,
+        497,
+        202,
+        662,
+        358
+      ],
+      "verification": [
+        "정사각형의 한 변을 $2$라 하면 $DE=DF=\\sqrt5$입니다.",
+        "$\\triangle DEF$의 넓이는 $4-1-1-\\frac12=\\frac32$입니다.",
+        "$\\frac12\\times\\sqrt5\\times\\sqrt5\\times\\sin x=\\frac32$에서 $\\sin x=\\frac35$입니다."
+      ],
+      "sourcePage": 6
+    },
+    {
+      "number": 25,
+      "correctOptionNumbers": [
+        3
+      ],
+      "imagePath": "assets/q25.png",
+      "sourceImagePath": "assets/source-q25.png",
+      "replaced": false,
+      "replacementReason": "",
+      "crop": [
+        6,
+        542,
+        550,
+        737,
+        675
+      ],
+      "verification": [
+        "$\\angle BAT=\\angle ATB=\\alpha$로 두면 $\\angle PBT=180^\\circ-2\\alpha$입니다.",
+        "접선과 현의 각에서 $\\angle PTB=180^\\circ-\\alpha$입니다. $\\triangle PBT$의 각의 합으로 $30+(180-2\\alpha)+(180-\\alpha)=180$, $\\alpha=70^\\circ$입니다.",
+        "내접사각형 $ABCT$에서 $x+\\angle BAT=180^\\circ$이므로 $x=110^\\circ$입니다."
+      ],
+      "sourcePage": 6
+    }
+  ]
+}

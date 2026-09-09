@@ -1,0 +1,623 @@
+{
+  "round": 2,
+  "unitId": "reg_1781420075936_chap_1781420292103_unit_1788903293848",
+  "sourceTitle": "중3 수학 원본5회 (별도 해설지 대조)",
+  "questions": [
+    {
+      "number": 1,
+      "correctOptionNumbers": [
+        1
+      ],
+      "imagePath": null,
+      "sourceImagePath": "assets/source-q01.png",
+      "replaced": false,
+      "replacementReason": "",
+      "crop": null,
+      "verification": [
+        "평행이동은 이차항의 계수 $-3$을 바꾸지 않습니다.",
+        "꼭짓점이 $(0,7)$이므로 $y=-3(x-0)^2+7=-3x^2+7$입니다."
+      ],
+      "sourcePage": 1
+    },
+    {
+      "number": 2,
+      "correctOptionNumbers": [
+        3
+      ],
+      "imagePath": "assets/q02.png",
+      "sourceImagePath": "assets/source-q02.png",
+      "replaced": false,
+      "replacementReason": "",
+      "crop": [
+        1,
+        154,
+        735,
+        299,
+        858
+      ],
+      "verification": [
+        "가로는 $25-x$이므로 $x(25-x)=154$입니다.",
+        "$x^2-25x+154=(x-11)(x-14)=0$이므로 $x=11,14$입니다. 두 길이 모두 가능합니다.",
+        "합은 $11+14=25\\,cm$입니다."
+      ],
+      "sourcePage": 1
+    },
+    {
+      "number": 3,
+      "correctOptionNumbers": [
+        4
+      ],
+      "imagePath": "assets/q03.png",
+      "sourceImagePath": "assets/source-q03.png",
+      "replaced": false,
+      "replacementReason": "",
+      "crop": [
+        1,
+        607,
+        200,
+        755,
+        369
+      ],
+      "verification": [
+        "$y$절편에서 $b=6$입니다. 축은 $x=1$이므로 $-\\frac{a}{2(-2)}=1$, $a=4$입니다.",
+        "$a+b=4+6=10$입니다."
+      ],
+      "sourcePage": 1
+    },
+    {
+      "number": 4,
+      "correctOptionNumbers": [
+        4
+      ],
+      "imagePath": "assets/q04.png",
+      "sourceImagePath": "assets/source-q04.png",
+      "replaced": false,
+      "replacementReason": "",
+      "crop": [
+        1,
+        551,
+        724,
+        722,
+        873
+      ],
+      "verification": [
+        "$(0,-5)$를 지나므로 $b=-5$입니다. $(-5,0)$을 대입하면 $25-5a-5=0$, $a=4$입니다.",
+        "$y=x^2+4x-5=(x+2)^2-9$이므로 꼭짓점은 $(-2,-9)$입니다."
+      ],
+      "sourcePage": 1
+    },
+    {
+      "number": 5,
+      "correctOptionNumbers": [
+        4
+      ],
+      "imagePath": null,
+      "sourceImagePath": "assets/source-q05.png",
+      "replaced": true,
+      "replacementReason": "문제지의 양수 제곱항은 해설지 식 및 정답과 불일치. 해설지의 음수 제곱항으로 수정하여 최대 이익을 구하는 원래 의도 보존.",
+      "crop": null,
+      "verification": [
+        "$2000=-\\frac1{100}x^2+10x-500$입니다.",
+        "정리하면 $x^2-1000x+250000=(x-500)^2=0$이므로 $x=500$입니다."
+      ],
+      "sourcePage": 2
+    },
+    {
+      "number": 6,
+      "correctOptionNumbers": [
+        4
+      ],
+      "imagePath": null,
+      "sourceImagePath": "assets/source-q06.png",
+      "replaced": false,
+      "replacementReason": "",
+      "crop": null,
+      "verification": [
+        "꼭짓점은 $(1,0)$이므로 $y=a(x-1)^2$입니다.",
+        "$(0,-3)$을 대입하면 $a=-3$이므로 $y=-3(x-1)^2$입니다."
+      ],
+      "sourcePage": 2
+    },
+    {
+      "number": 7,
+      "correctOptionNumbers": [
+        2
+      ],
+      "imagePath": "assets/q07.png",
+      "sourceImagePath": "assets/source-q07.png",
+      "replaced": false,
+      "replacementReason": "",
+      "crop": [
+        2,
+        557,
+        235,
+        737,
+        418
+      ],
+      "verification": [
+        "축은 $x=2$입니다. 두 교점의 간격이 $6$이므로 각각 $x=-1,5$입니다.",
+        "$(-1,0)$을 대입하면 $0=1+4+a$, $a=-5$입니다."
+      ],
+      "sourcePage": 2
+    },
+    {
+      "number": 8,
+      "correctOptionNumbers": [
+        2
+      ],
+      "imagePath": null,
+      "sourceImagePath": "assets/source-q08.png",
+      "replaced": false,
+      "replacementReason": "",
+      "crop": null,
+      "verification": [
+        "$2x^2-4x-1=x-3$에서 $(2x-1)(x-2)=0$이므로 $x=\\frac12,2$입니다.",
+        "$y=x-3$에 대입하면 각각 $y=-\\frac52,-1$입니다."
+      ],
+      "sourcePage": 2
+    },
+    {
+      "number": 9,
+      "correctOptionNumbers": [
+        4
+      ],
+      "imagePath": "assets/q09.png",
+      "sourceImagePath": "assets/source-q09.png",
+      "replaced": false,
+      "replacementReason": "",
+      "crop": [
+        3,
+        117,
+        270,
+        333,
+        433
+      ],
+      "verification": [
+        "$OD=\\sqrt k$, $OC=OB=\\sqrt{\\frac ka}$입니다.",
+        "$BO=CD$에서 $\\sqrt{\\frac ka}=\\sqrt k-\\sqrt{\\frac ka}$입니다.",
+        "$2\\sqrt{\\frac ka}=\\sqrt k$를 제곱하고 $k>0$으로 나누면 $\\frac4a=1$, $a=4$입니다."
+      ],
+      "sourcePage": 3
+    },
+    {
+      "number": 10,
+      "correctOptionNumbers": [
+        4
+      ],
+      "imagePath": null,
+      "sourceImagePath": "assets/source-q10.png",
+      "replaced": false,
+      "replacementReason": "",
+      "crop": null,
+      "verification": [
+        "$y=-(x+3)^2+14$이므로 원래 축은 $x=-3$입니다.",
+        "위로 볼록하므로 이동 후 축 오른쪽에서 감소합니다. 새 축이 $x=0$이므로 $-3+k=0$, $k=3$입니다."
+      ],
+      "sourcePage": 3
+    },
+    {
+      "number": 11,
+      "correctOptionNumbers": [
+        4
+      ],
+      "imagePath": null,
+      "sourceImagePath": "assets/source-q11.png",
+      "replaced": false,
+      "replacementReason": "",
+      "crop": null,
+      "verification": [
+        "각 꼭짓점은 차례로 $(0,2)$, $(-1,0)$, $(-1,1)$, $(2,-7)$, $(3,10)$입니다.",
+        "가로좌표가 양수이고 세로좌표가 음수인 것은 $(2,-7)$이므로 보기 $4$입니다."
+      ],
+      "sourcePage": 3
+    },
+    {
+      "number": 12,
+      "correctOptionNumbers": [
+        4
+      ],
+      "imagePath": null,
+      "sourceImagePath": "assets/source-q12.png",
+      "replaced": false,
+      "replacementReason": "",
+      "crop": null,
+      "verification": [
+        "$4=1-2a-b$이므로 $b=-2a-3$입니다.",
+        "꼭짓점은 $(a,-a^2-b)$입니다. $-a^2+2a+3=-2a+7$에서 $(a-2)^2=0$, $a=2$입니다.",
+        "$b=-7$이므로 $a-b=9$입니다."
+      ],
+      "sourcePage": 3
+    },
+    {
+      "number": 13,
+      "correctOptionNumbers": [
+        4
+      ],
+      "imagePath": "assets/q13.png",
+      "sourceImagePath": "assets/source-q13.png",
+      "replaced": false,
+      "replacementReason": "",
+      "crop": [
+        4,
+        124,
+        234,
+        335,
+        397
+      ],
+      "verification": [
+        "두 식은 $y=-(x-1)^2+4$, $y=-(x-4)^2+4$입니다.",
+        "두 왼쪽 가지의 가로 간격은 항상 $3$이고 높이는 $4$입니다. 한쪽 휘어진 부분을 옮기면 직사각형과 같습니다.",
+        "넓이는 $3\\times4=12$입니다."
+      ],
+      "sourcePage": 4
+    },
+    {
+      "number": 14,
+      "correctOptionNumbers": [
+        1
+      ],
+      "imagePath": "assets/q14.png",
+      "sourceImagePath": "assets/source-q14.png",
+      "replaced": false,
+      "replacementReason": "",
+      "crop": [
+        4,
+        134,
+        782,
+        316,
+        943
+      ],
+      "verification": [
+        "한 변을 $a$라 하면 $CD=\\frac a2$, $BD=\\frac{\\sqrt3a}{2}$, $ED=BE=\\frac{\\sqrt3a}{4}$입니다.",
+        "직각삼각형 $CDE$에서 $CE=\\frac{\\sqrt7a}{4}$입니다.",
+        "$\\triangle BCE$의 넓이는 $\\frac12BE\\cdot CD=\\frac{\\sqrt3a^2}{16}$이며 동시에 $\\frac12BC\\cdot CE\\sin\\theta$입니다. 따라서 $p=\\frac{\\sqrt3}{2\\sqrt7}$, $p^2=\\frac3{28}$입니다."
+      ],
+      "sourcePage": 4
+    },
+    {
+      "number": 15,
+      "correctOptionNumbers": [
+        4
+      ],
+      "imagePath": "assets/q15.png",
+      "sourceImagePath": "assets/source-q15.png",
+      "replaced": false,
+      "replacementReason": "",
+      "crop": [
+        4,
+        550,
+        234,
+        780,
+        378
+      ],
+      "verification": [
+        "$10\\sqrt2=\\frac12\\times8\\times5\\sin B$에서 $\\sin B=\\frac{\\sqrt2}{2}$입니다.",
+        "$180^\\circ-B$는 예각이고 사인 값이 같으므로 $180^\\circ-B=45^\\circ$, $B=135^\\circ$입니다."
+      ],
+      "sourcePage": 4
+    },
+    {
+      "number": 16,
+      "correctOptionNumbers": [
+        3
+      ],
+      "imagePath": "assets/q16.png",
+      "sourceImagePath": "assets/source-q16.png",
+      "replaced": false,
+      "replacementReason": "",
+      "crop": [
+        4,
+        550,
+        785,
+        783,
+        863
+      ],
+      "verification": [
+        "$B$에서 $CA$의 연장선에 내린 수선의 발을 $D$라 하고 $AD=t$라 하면 $AB=2t$, $BD=\\sqrt3t$입니다.",
+        "$\\triangle BDC$는 직각이등변삼각형이므로 $DC=\\sqrt3t$, $BC=\\sqrt6t$, $AC=(\\sqrt3-1)t$입니다.",
+        "넓이는 $\\frac12\\cdot2t\\cdot(\\sqrt3-1)t\\cdot\\sin120^\\circ=\\frac{3-\\sqrt3}{2}t^2$이므로 $t=\\sqrt2$입니다.",
+        "세 변의 합은 $\\sqrt2+2\\sqrt3+\\sqrt6$이므로 $p+2q+3r=1+4+3=8$입니다."
+      ],
+      "sourcePage": 4
+    },
+    {
+      "number": 17,
+      "correctOptionNumbers": [
+        4
+      ],
+      "imagePath": null,
+      "sourceImagePath": "assets/source-q17.png",
+      "replaced": false,
+      "replacementReason": "",
+      "crop": null,
+      "verification": [
+        "대각선으로 나눈 넓이의 합은 $\\frac12ab\\sin60^\\circ=\\frac{\\sqrt3}{4}ab$입니다.",
+        "$b=12-a$에서 넓이는 $-\\frac{\\sqrt3}{4}(a-6)^2+9\\sqrt3$이므로 최댓값은 $S=9\\sqrt3$입니다.",
+        "$S^2=243$입니다."
+      ],
+      "sourcePage": 5
+    },
+    {
+      "number": 18,
+      "correctOptionNumbers": [
+        3
+      ],
+      "imagePath": "assets/q18.png",
+      "sourceImagePath": "assets/source-q18.png",
+      "replaced": false,
+      "replacementReason": "",
+      "crop": [
+        5,
+        145,
+        670,
+        303,
+        908
+      ],
+      "verification": [
+        "$B=C=75^\\circ$이고 $\\angle BDC=75^\\circ$이므로 $BD=BC$입니다.",
+        "$D$에서 $AB$에 내린 수선의 발을 $H$라 하면 $DH=4\\sin30^\\circ=2$입니다. $\\angle HBD=45^\\circ$이므로 $BH=DH=2$입니다.",
+        "$BC^2=BD^2=2^2+2^2=8$입니다."
+      ],
+      "sourcePage": 5
+    },
+    {
+      "number": 19,
+      "correctOptionNumbers": [
+        4
+      ],
+      "imagePath": "assets/q19.png",
+      "sourceImagePath": "assets/source-q19.png",
+      "replaced": false,
+      "replacementReason": "",
+      "crop": [
+        5,
+        567,
+        224,
+        763,
+        388
+      ],
+      "verification": [
+        "수평거리를 $d$라 하면 $\\tan30^\\circ=\\frac{20}{d}$이므로 $d=20\\sqrt3$입니다.",
+        "올려다본 각이 $45^\\circ$이므로 옥상보다 높은 부분도 $20\\sqrt3$입니다.",
+        "굴뚝의 전체 높이는 $20+20\\sqrt3=20(\\sqrt3+1)\\,m$입니다."
+      ],
+      "sourcePage": 5
+    },
+    {
+      "number": 20,
+      "correctOptionNumbers": [
+        5
+      ],
+      "imagePath": "assets/q20.png",
+      "sourceImagePath": "assets/source-q20.png",
+      "replaced": false,
+      "replacementReason": "",
+      "crop": [
+        6,
+        108,
+        284,
+        344,
+        454
+      ],
+      "verification": [
+        "$AC=\\frac{1100}{0.44}=2500\\,m$입니다.",
+        "시간은 $\\frac{2500}{120}=20+\\frac56$분이며 $\\frac56\\times60=50$초입니다.",
+        "따라서 $20$분 $50$초입니다."
+      ],
+      "sourcePage": 6
+    },
+    {
+      "number": 21,
+      "correctOptionNumbers": [
+        5
+      ],
+      "imagePath": "assets/q21.png",
+      "sourceImagePath": "assets/source-q21.png",
+      "replaced": false,
+      "replacementReason": "",
+      "crop": [
+        6,
+        582,
+        204,
+        747,
+        383
+      ],
+      "verification": [
+        "$AC=AD=1$이므로 $\\sin x=BC$, $\\cos y=BC$, $\\tan z=\\frac{AD}{DE}=\\frac1{DE}$입니다.",
+        "예각 $x$가 커지면 높이 $BC$는 커지고 가로 $AB$는 작아집니다. 따라서 사인은 증가하지만 코사인은 감소합니다."
+      ],
+      "sourcePage": 6
+    },
+    {
+      "number": 22,
+      "correctOptionNumbers": [
+        3
+      ],
+      "imagePath": "assets/q22.png",
+      "sourceImagePath": "assets/source-q22.png",
+      "replaced": false,
+      "replacementReason": "",
+      "crop": [
+        6,
+        523,
+        809,
+        808,
+        1037
+      ],
+      "verification": [
+        "직사각형의 대각선은 같고 서로를 이등분하므로 $AC=BD=4$입니다.",
+        "넓이는 $\\frac12AC\\cdot BD\\sin54^\\circ=8\\sin54^\\circ$입니다.",
+        "표의 $\\sin54^\\circ=0.81$을 사용하면 $8\\times0.81=6.48$입니다."
+      ],
+      "sourcePage": 6
+    },
+    {
+      "number": 23,
+      "correctOptionNumbers": [
+        3
+      ],
+      "imagePath": null,
+      "sourceImagePath": "assets/source-q23.png",
+      "replaced": false,
+      "replacementReason": "",
+      "crop": null,
+      "verification": [
+        "각 항은 차례로 $\\frac12$, $-3$, $2$, $\\frac32$입니다.",
+        "따라서 $\\frac12-3+2+\\frac32=1$입니다."
+      ],
+      "sourcePage": 7
+    },
+    {
+      "number": 24,
+      "correctOptionNumbers": [
+        5
+      ],
+      "imagePath": "assets/q24.png",
+      "sourceImagePath": "assets/source-q24.png",
+      "replaced": false,
+      "replacementReason": "",
+      "crop": [
+        7,
+        181,
+        644,
+        277,
+        871
+      ],
+      "verification": [
+        "$BC=2\\cos60^\\circ=1$, $CD=2\\sin60^\\circ=\\sqrt3$입니다.",
+        "$\\angle BDA=150^\\circ$이고 $AD=BD$이므로 $\\angle BAD=15^\\circ$입니다.",
+        "$\\tan15^\\circ=\\frac{BC}{AC}=\\frac1{2+\\sqrt3}=2-\\sqrt3$입니다."
+      ],
+      "sourcePage": 7
+    },
+    {
+      "number": 25,
+      "correctOptionNumbers": [
+        3
+      ],
+      "imagePath": "assets/q25.png",
+      "sourceImagePath": "assets/source-q25.png",
+      "replaced": false,
+      "replacementReason": "",
+      "crop": [
+        7,
+        570,
+        255,
+        762,
+        455
+      ],
+      "verification": [
+        "접기와 평행선의 각에서 $BE=BF=ED=\\frac{3\\sqrt3}{2}$입니다. 접힌 점을 $C^{\\prime}$라 하면 $BC^{\\prime}=\\sqrt6$입니다.",
+        "직각삼각형 $BC^{\\prime}F$에서 $C^{\\prime}F=CF=\\frac{\\sqrt3}{2}$입니다. $F$에서 $AD$에 내린 수선의 발을 $H$라 하면 $EH=\\sqrt3$, $FH=\\sqrt6$, $EF=3$입니다.",
+        "$x=\\angle HEF$이므로 $\\sin x=\\frac{\\sqrt6}{3}$. $\\sin x\\cos x\\tan x=\\sin^2x=\\frac23$입니다."
+      ],
+      "sourcePage": 7
+    },
+    {
+      "number": 26,
+      "correctOptionNumbers": [
+        3
+      ],
+      "imagePath": "assets/q26.png",
+      "sourceImagePath": "assets/source-q26.png",
+      "replaced": false,
+      "replacementReason": "",
+      "crop": [
+        7,
+        549,
+        819,
+        788,
+        936
+      ],
+      "verification": [
+        "$BE=2$, $AE=\\sqrt2$, $DE=1$입니다. $BE:AE=AE:DE=\\sqrt2:1$이고 $\\angle BEA=\\angle AED$이므로 $\\triangle ABE\\sim\\triangle DAE$입니다.",
+        "따라서 $\\angle DAE=\\alpha$. $\\triangle DAE$의 외각 $\\angle AEC=\\alpha+\\beta$입니다.",
+        "$AC=EC$인 직각삼각형에서 $\\angle AEC=45^\\circ$이므로 $k^2=\\sin^245^\\circ=\\frac12$입니다."
+      ],
+      "sourcePage": 7
+    },
+    {
+      "number": 27,
+      "correctOptionNumbers": [
+        5
+      ],
+      "imagePath": "assets/q27.png",
+      "sourceImagePath": "assets/source-q27.png",
+      "replaced": false,
+      "replacementReason": "",
+      "crop": [
+        8,
+        153,
+        198,
+        287,
+        363
+      ],
+      "verification": [
+        "$A+B=90^\\circ$입니다. $\\cos A=\\frac{AC}{AB}$이고 $\\sin B=\\frac{AC}{AB}$이므로 항상 같습니다.",
+        "나머지 등식은 특별한 각에서만 성립하거나 변의 비가 서로 다릅니다."
+      ],
+      "sourcePage": 8
+    },
+    {
+      "number": 28,
+      "correctOptionNumbers": [
+        2
+      ],
+      "imagePath": "assets/q28.png",
+      "sourceImagePath": "assets/source-q28.png",
+      "replaced": false,
+      "replacementReason": "",
+      "crop": [
+        8,
+        118,
+        823,
+        338,
+        952
+      ],
+      "verification": [
+        "$BC=5$이며 여각 관계에서 $x=\\angle C$, $y=\\angle B$입니다.",
+        "$\\sin x=\\frac35$, $\\sin y=\\frac45$이므로 차는 $-\\frac15$입니다."
+      ],
+      "sourcePage": 8
+    },
+    {
+      "number": 29,
+      "correctOptionNumbers": [
+        2
+      ],
+      "imagePath": null,
+      "sourceImagePath": "assets/source-q29.png",
+      "replaced": false,
+      "replacementReason": "",
+      "crop": null,
+      "verification": [
+        "탄젠트가 정의되므로 $\\cos x\\ne0$입니다. 분자와 분모를 $\\cos x$로 나누면 $\\frac{2\\tan x-3}{4+3\\tan x}$입니다.",
+        "$\\tan x=2$를 넣으면 $\\frac{4-3}{4+6}=\\frac1{10}$입니다."
+      ],
+      "sourcePage": 8
+    },
+    {
+      "number": 30,
+      "correctOptionNumbers": [
+        4
+      ],
+      "imagePath": "assets/q30.png",
+      "sourceImagePath": "assets/source-q30.png",
+      "replaced": false,
+      "replacementReason": "",
+      "crop": [
+        8,
+        575,
+        585,
+        754,
+        774
+      ],
+      "verification": [
+        "$AG=\\sqrt3a$, $AF=\\sqrt2a$, $AM=\\sqrt{2a^2+\\frac{a^2}{4}}=\\frac{3a}{2}$, $GM=\\frac a2$입니다.",
+        "$M$에서 $AG$에 내린 수선의 발을 $P$, $AP=t$라 하면 $AM^2-t^2=GM^2-(AG-t)^2$입니다. 정리하면 $t=\\frac{5a}{2\\sqrt3}$입니다.",
+        "$\\cos x=\\frac{AP}{AM}=\\frac{5\\sqrt3}{9}$입니다."
+      ],
+      "sourcePage": 8
+    }
+  ]
+}

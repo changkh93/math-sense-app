@@ -290,8 +290,10 @@
 }
 
 .space-container.login-layout {
-  height: 100%;
-  min-height: 100dvh;
+  box-sizing: border-box;
+  width: 100%;
+  height: auto;
+  min-height: clamp(520px, calc(100svh - 220px), 760px);
   padding: 1rem;
   overflow: hidden; /* Prevent animation overflow from causing scrollbars */
   display: flex;

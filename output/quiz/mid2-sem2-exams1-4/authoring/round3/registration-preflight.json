@@ -1,0 +1,13 @@
+{
+  "project": "math-sense-1f6a8",
+  "bucket": "math-sense-1f6a8.firebasestorage.app",
+  "unitId": "reg_1781420075936_chap_1781420235224_unit_1788901201841",
+  "title": "2학년 2학기 중간 3회",
+  "parentChapterId": "reg_1781420075936_chap_1781420235224",
+  "existingQuizCount": 0,
+  "plannedQuizCount": 20,
+  "plannedImageCount": 17,
+  "questionsSHA256": "f9d2b6fedf75a03b8779a6bec3bd6d53181a183d309c281d90d4bc4665cbae21",
+  "existingQuizIds": [],
+  "writes": 0
+}

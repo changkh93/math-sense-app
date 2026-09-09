@@ -1,0 +1,508 @@
+{
+  "status": "READY_TO_REGISTER",
+  "questionCount": 80,
+  "imageCount": 71,
+  "sourcePagesVisuallyRead": 26,
+  "allSourceQuestionNumbersPresent": true,
+  "allDiagramsVisuallyInspected": true,
+  "originalChoiceAnswerKeysCompared": 29,
+  "independentMathChecks": [
+    {
+      "check": "R1Q8",
+      "actual": 64.0,
+      "expected": 64.0,
+      "status": "PASS"
+    },
+    {
+      "check": "R1Q9",
+      "actual": 54.0,
+      "expected": 54.0,
+      "status": "PASS"
+    },
+    {
+      "check": "R1Q10",
+      "actual": 10.0,
+      "expected": 10.0,
+      "status": "PASS"
+    },
+    {
+      "check": "R1Q11",
+      "actual": 6.0,
+      "expected": 6.0,
+      "status": "PASS"
+    },
+    {
+      "check": "R1Q12",
+      "actual": 12.0,
+      "expected": 12.0,
+      "status": "PASS"
+    },
+    {
+      "check": "R1Q13",
+      "actual": 4.5,
+      "expected": 4.5,
+      "status": "PASS"
+    },
+    {
+      "check": "R1Q15",
+      "actual": 36.0,
+      "expected": 36.0,
+      "status": "PASS"
+    },
+    {
+      "check": "R1Q16",
+      "actual": 3.36,
+      "expected": 3.36,
+      "status": "PASS"
+    },
+    {
+      "check": "R1Q17",
+      "actual": 18.0,
+      "expected": 18.0,
+      "status": "PASS"
+    },
+    {
+      "check": "R1Q18",
+      "actual": 32.0,
+      "expected": 32.0,
+      "status": "PASS"
+    },
+    {
+      "check": "R1Q19",
+      "actual": 10.0,
+      "expected": 10.0,
+      "status": "PASS"
+    },
+    {
+      "check": "R2Q8",
+      "actual": 48.0,
+      "expected": 48.0,
+      "status": "PASS"
+    },
+    {
+      "check": "R2Q9",
+      "actual": 63.0,
+      "expected": 63.0,
+      "status": "PASS"
+    },
+    {
+      "check": "R2Q10",
+      "actual": 213.0,
+      "expected": 213.0,
+      "status": "PASS"
+    },
+    {
+      "check": "R2Q11",
+      "actual": 26.0,
+      "expected": 26.0,
+      "status": "PASS"
+    },
+    {
+      "check": "R2Q12",
+      "actual": 123.0,
+      "expected": 123.0,
+      "status": "PASS"
+    },
+    {
+      "check": "R2Q13",
+      "actual": 60.0,
+      "expected": 60.0,
+      "status": "PASS"
+    },
+    {
+      "check": "R2Q14",
+      "actual": 58.0,
+      "expected": 58.0,
+      "status": "PASS"
+    },
+    {
+      "check": "R2Q15",
+      "actual": 20.0,
+      "expected": 20.0,
+      "status": "PASS"
+    },
+    {
+      "check": "R2Q16",
+      "actual": 30.0,
+      "expected": 30.0,
+      "status": "PASS"
+    },
+    {
+      "check": "R2Q17",
+      "actual": 16.666666666666668,
+      "expected": 16.666666666666668,
+      "status": "PASS"
+    },
+    {
+      "check": "R2Q18",
+      "actual": 28.0,
+      "expected": 28.0,
+      "status": "PASS"
+    },
+    {
+      "check": "R2Q19",
+      "actual": 6.0,
+      "expected": 6.0,
+      "status": "PASS"
+    },
+    {
+      "check": "R2Q20",
+      "actual": 4.0,
+      "expected": 4.0,
+      "status": "PASS"
+    },
+    {
+      "check": "R3Q8",
+      "actual": 22.0,
+      "expected": 22.0,
+      "status": "PASS"
+    },
+    {
+      "check": "R3Q9 corrected",
+      "actual": 2.0,
+      "expected": 2.0,
+      "status": "PASS"
+    },
+    {
+      "check": "R3Q10",
+      "actual": 39.0,
+      "expected": 39.0,
+      "status": "PASS"
+    },
+    {
+      "check": "R3Q11",
+      "actual": 1.0,
+      "expected": 1.0,
+      "status": "PASS"
+    },
+    {
+      "check": "R3Q12",
+      "actual": 186.0,
+      "expected": 186.0,
+      "status": "PASS"
+    },
+    {
+      "check": "R3Q14",
+      "actual": 15.0,
+      "expected": 15.0,
+      "status": "PASS"
+    },
+    {
+      "check": "R3Q16",
+      "actual": 116.0,
+      "expected": 116.0,
+      "status": "PASS"
+    },
+    {
+      "check": "R3Q17",
+      "actual": 8.0,
+      "expected": 8.0,
+      "status": "PASS"
+    },
+    {
+      "check": "R3Q18",
+      "actual": 4.5,
+      "expected": 4.5,
+      "status": "PASS"
+    },
+    {
+      "check": "R3Q19",
+      "actual": 4.0,
+      "expected": 4.0,
+      "status": "PASS"
+    },
+    {
+      "check": "R3Q20 corrected",
+      "actual": 8.0,
+      "expected": 8.0,
+      "status": "PASS"
+    },
+    {
+      "check": "R4Q9",
+      "actual": 42.0,
+      "expected": 42.0,
+      "status": "PASS"
+    },
+    {
+      "check": "R4Q10",
+      "actual": 128.0,
+      "expected": 128.0,
+      "status": "PASS"
+    },
+    {
+      "check": "R4Q11",
+      "actual": 7.0,
+      "expected": 7.0,
+      "status": "PASS"
+    },
+    {
+      "check": "R4Q12",
+      "actual": 48.0,
+      "expected": 48.0,
+      "status": "PASS"
+    },
+    {
+      "check": "R4Q13",
+      "actual": 17.0,
+      "expected": 17.0,
+      "status": "PASS"
+    },
+    {
+      "check": "R4Q14",
+      "actual": 40.0,
+      "expected": 40.0,
+      "status": "PASS"
+    },
+    {
+      "check": "R4Q15",
+      "actual": 6.0,
+      "expected": 6.0,
+      "status": "PASS"
+    },
+    {
+      "check": "R4Q16",
+      "actual": 2.7,
+      "expected": 2.7,
+      "status": "PASS"
+    },
+    {
+      "check": "R4Q17",
+      "actual": 4.714285714285714,
+      "expected": 4.714285714285714,
+      "status": "PASS"
+    },
+    {
+      "check": "R4Q18",
+      "actual": 80.0,
+      "expected": 80.0,
+      "status": "PASS"
+    },
+    {
+      "check": "R4Q19",
+      "actual": 41.0,
+      "expected": 41.0,
+      "status": "PASS"
+    },
+    {
+      "check": "R4Q20",
+      "actual": 16.666666666666668,
+      "expected": 16.666666666666668,
+      "status": "PASS"
+    },
+    {
+      "check": "R1Q4 rhombus area",
+      "actual": 160.0,
+      "expected": 160.0,
+      "status": "PASS"
+    },
+    {
+      "check": "R1Q4 BP=DP",
+      "actual": 10.770329614269007,
+      "expected": 10.770329614269007,
+      "status": "PASS"
+    },
+    {
+      "check": "R1Q14 independent coordinates",
+      "actual": 39.99999999999999,
+      "expected": 40.0,
+      "status": "PASS"
+    },
+    {
+      "check": "R2Q7 corrected right base",
+      "actual": 24.999999999999996,
+      "expected": 25.0,
+      "status": "PASS"
+    },
+    {
+      "check": "R2Q7 corrected GH",
+      "actual": 7.794228634059946,
+      "expected": 7.794228634059947,
+      "status": "PASS"
+    },
+    {
+      "check": "R3Q7 ABC right",
+      "actual": 0.0,
+      "expected": 0.0,
+      "status": "PASS"
+    },
+    {
+      "check": "R3Q7 actual GH",
+      "actual": 3.6000000000000005,
+      "expected": 3.6,
+      "status": "PASS"
+    },
+    {
+      "check": "R3Q7 actual AH",
+      "actual": 4.800000000000001,
+      "expected": 4.8,
+      "status": "PASS"
+    },
+    {
+      "check": "R3Q7 new similar angle",
+      "actual": 36.86989764584401,
+      "expected": 36.869897645844006,
+      "status": "PASS"
+    },
+    {
+      "check": "R3Q9 actual corrected area",
+      "actual": 9.0,
+      "expected": 9.0,
+      "status": "PASS"
+    },
+    {
+      "check": "R3Q9 PM",
+      "actual": 1.9999999999999998,
+      "expected": 2.0,
+      "status": "PASS"
+    },
+    {
+      "check": "R3Q9 PN",
+      "actual": 0.9999999999999999,
+      "expected": 1.0,
+      "status": "PASS"
+    },
+    {
+      "check": "R3Q15 QPA",
+      "actual": 20.00000000000001,
+      "expected": 20.0,
+      "status": "PASS"
+    },
+    {
+      "check": "R3Q15 RQA",
+      "actual": 39.99999999999999,
+      "expected": 40.0,
+      "status": "PASS"
+    },
+    {
+      "check": "R3Q20 original contradiction confirmed; replaced with valid AA similarity",
+      "status": "PASS"
+    },
+    {
+      "check": "R4Q6 independent area",
+      "actual": 27.0,
+      "expected": 27.0,
+      "status": "PASS"
+    },
+    {
+      "check": "R4Q6 right angle",
+      "actual": -4.440892098500626e-16,
+      "expected": 0.0,
+      "status": "PASS"
+    },
+    {
+      "check": "R4Q7 overlap 0.2",
+      "actual": 9.0,
+      "expected": 9.0,
+      "status": "PASS"
+    },
+    {
+      "check": "R4Q7 overlap 0.6",
+      "actual": 9.0,
+      "expected": 9.0,
+      "status": "PASS"
+    },
+    {
+      "check": "R4Q18 arbitrary side points (0.2, 0.7)",
+      "actual": 80.0,
+      "expected": 80.0,
+      "status": "PASS"
+    },
+    {
+      "check": "R4Q18 arbitrary side points (0.8, 0.3)",
+      "actual": 80.0,
+      "expected": 80.0,
+      "status": "PASS"
+    },
+    {
+      "check": "R4Q18 arbitrary side points (0.5, 0.5)",
+      "actual": 80.0,
+      "expected": 80.0,
+      "status": "PASS"
+    }
+  ],
+  "rounds": [
+    {
+      "round": 1,
+      "unitId": "reg_1781420075936_chap_1781420235224_unit_1788901151685",
+      "questionCount": 20,
+      "imageCount": 19,
+      "sha256": "60647e6703fe598a7371a51e1f80c51ca91989cf4a383f2a9ed6c28c41644b1c",
+      "revisions": [
+        {
+          "number": 2,
+          "reason": "원본 그림 주변의 뒤집힌 문자와 중복 글자를 제거하고 수선·직각 표시를 선명하게 다시 그림."
+        },
+        {
+          "number": 4,
+          "reason": "P=O인 경우 조건이 부족하므로 P는 O와 다름을 명시. 보기 1의 합동 대응 순서를 BCP와 DCP로 교정."
+        },
+        {
+          "number": 16,
+          "reason": "원문 본문의 AC=4cm는 대각선 BD=5cm와 모순. 그림과 정답에 일치하는 AD=4cm로 수정하고 수선의 발 정의를 명시."
+        }
+      ]
+    },
+    {
+      "round": 2,
+      "unitId": "reg_1781420075936_chap_1781420235224_unit_1788901191909",
+      "questionCount": 20,
+      "imageCount": 17,
+      "sha256": "42bd5b341f7e833544cead7ae8512a6e63b7efe57b200b5f07a492edbfc4b4df",
+      "revisions": [
+        {
+          "number": 4,
+          "reason": "원문의 될 수 없는은 직사각형도 가능한 보기 2와 충돌하므로 조건만으로 보장할 수 없는으로 명확히 수정."
+        },
+        {
+          "number": 7,
+          "reason": "원본의 AB=4, BC=5, 직각 A와 C=60도는 양립 불가. 아래 후처리에서 AB=5√3/2로 바꾸어 각 C=60도 및 빗변 5와 일치시키고 GH=9√3/2로 계산."
+        }
+      ]
+    },
+    {
+      "round": 3,
+      "unitId": "reg_1781420075936_chap_1781420235224_unit_1788901201841",
+      "questionCount": 20,
+      "imageCount": 17,
+      "sha256": "f9d2b6fedf75a03b8779a6bec3bd6d53181a183d309c281d90d4bc4665cbae21",
+      "revisions": [
+        {
+          "number": 2,
+          "reason": "보기 5 아래의 불완전한 중복 수식 조각은 제거하고 완결된 원문 둘레 조건을 유지. 길이와 넓이의 단위를 명시."
+        },
+        {
+          "number": 5,
+          "reason": "될 수 없는을 조건만으로 보장할 수 없는으로 수정하여 직사각형도 가능한 보기 2의 논리적 모순 해소."
+        },
+        {
+          "number": 7,
+          "reason": "BG=12, CG=3과 그림의 B=28도는 양립하지 않으며 원본 닮음 진술 및 정답도 틀림. 28도 삭제, 성립하는 도형으로 재작성하고 같은 높이·중선·닮음 개념의 다섯 보기로 교정."
+        },
+        {
+          "number": 9,
+          "reason": "같은 두 변이 6인 삼각형의 넓이 36은 최대 가능 넓이 18을 초과. 넓이를 9로 수정하여 실제 도형이 성립하고 동일한 넓이 분할 풀이가 가능하도록 교정."
+        },
+        {
+          "number": 20,
+          "reason": "원본 AD=1, DF=3과 각 조건은 DE=2, AE=3, BE=2/3을 강제하여 AB=4인 삼각형 ABE가 성립하지 않음. 이등변삼각형의 주어진 세 변과 AA 닮음·둘레 평가를 유지한 중점 평행선 문항으로 새로 작성."
+        }
+      ]
+    },
+    {
+      "round": 4,
+      "unitId": "reg_1781420075936_chap_1781420235224_unit_1788901261901",
+      "questionCount": 20,
+      "imageCount": 18,
+      "sha256": "2c0ceebffa5b3424c6e592eca4cb31bbc6cca64451ad8bdadca43fa593ebb9eb",
+      "revisions": [
+        {
+          "number": 2,
+          "reason": "원본 보기 1과 2는 서로 동치여서 단일 정답이 불가능. 보기 1을 z=2x-y로 수정하여 중복 정답 해소."
+        }
+      ]
+    }
+  ],
+  "limitations": [
+    "실제 학생 계정의 정답 제출 동작은 이 데이터 등록 작업에서 실행하지 않음."
+  ]
+}

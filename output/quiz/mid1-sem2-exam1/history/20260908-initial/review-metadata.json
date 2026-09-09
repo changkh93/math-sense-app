@@ -1,0 +1,375 @@
+{
+  "title": "1학년 2학기 중간 1회",
+  "unitId": "reg_1781420075936_chap_1781420191007_unit_1788876936054",
+  "sourceTitle": "2025년 2학기 중간고사 대비 1회",
+  "status": "DRAFT_AWAITING_USER_CONFIRMATION",
+  "dbWritten": false,
+  "storageUploaded": false,
+  "questionCount": 25,
+  "schemaNotes": [
+    "복수정답 4/6/14번의 answer는 앱이 지원하는 배열이며 각 원소는 원본 옵션과 정확히 일치한다. 단일 문자열로 강제하면 원본 복수정답을 보존할 수 없다.",
+    "이미지는 assets에 로컬 보관한다. DB 등록 시 별도 업로드 후 imageUrl로 매핑해야 한다. 현재 공개 URL은 없으며 일반 JSON 가져오기 화면은 imageUrl을 저장하지 않는다.",
+    "1/16번은 원본 이미지 안에 보기 전체를 보존하고 options에는 선택할 번호를 넣었다.",
+    "21~25번의 원본 지시문은 유지하고 5개의 선택지를 새로 추가했다. 22번은 원본 자체 모순으로 등록 보류한다."
+  ],
+  "questions": [
+    {
+      "number": 1,
+      "correctOptionNumbers": [
+        4
+      ],
+      "sourceQuestionNumber": 1,
+      "sourceImage": "assets/source-q01.png",
+      "imagePath": "assets/q01.png",
+      "optionsAdded": false,
+      "optionRendering": "source-image-number",
+      "issues": [
+        {
+          "severity": "preservation",
+          "message": "원본의 화살표·선분 기호를 임의 복원하지 않고 문제와 보기 전체를 이미지로 보존했습니다. 선택 버튼은 원본 보기 번호입니다."
+        }
+      ],
+      "publishStatus": "awaiting-user-review"
+    },
+    {
+      "number": 2,
+      "correctOptionNumbers": [
+        2
+      ],
+      "sourceQuestionNumber": 2,
+      "sourceImage": "assets/source-q02.png",
+      "imagePath": null,
+      "optionsAdded": false,
+      "optionRendering": "text",
+      "issues": [],
+      "publishStatus": "awaiting-user-review"
+    },
+    {
+      "number": 3,
+      "correctOptionNumbers": [
+        2
+      ],
+      "sourceQuestionNumber": 3,
+      "sourceImage": "assets/source-q03.png",
+      "imagePath": "assets/q03.png",
+      "optionsAdded": false,
+      "optionRendering": "text",
+      "issues": [],
+      "publishStatus": "awaiting-user-review"
+    },
+    {
+      "number": 4,
+      "correctOptionNumbers": [
+        2,
+        4
+      ],
+      "sourceQuestionNumber": 4,
+      "sourceImage": "assets/source-q04.png",
+      "imagePath": null,
+      "optionsAdded": false,
+      "optionRendering": "text",
+      "issues": [],
+      "publishStatus": "awaiting-user-review"
+    },
+    {
+      "number": 5,
+      "correctOptionNumbers": [
+        3
+      ],
+      "sourceQuestionNumber": 5,
+      "sourceImage": "assets/source-q05.png",
+      "imagePath": "assets/q05.png",
+      "optionsAdded": false,
+      "optionRendering": "text",
+      "issues": [],
+      "publishStatus": "awaiting-user-review"
+    },
+    {
+      "number": 6,
+      "correctOptionNumbers": [
+        2,
+        4
+      ],
+      "sourceQuestionNumber": 6,
+      "sourceImage": "assets/source-q06.png",
+      "imagePath": "assets/q06.png",
+      "optionsAdded": false,
+      "optionRendering": "text",
+      "issues": [],
+      "publishStatus": "awaiting-user-review"
+    },
+    {
+      "number": 7,
+      "correctOptionNumbers": [
+        4
+      ],
+      "sourceQuestionNumber": 7,
+      "sourceImage": "assets/source-q07.png",
+      "imagePath": null,
+      "optionsAdded": false,
+      "optionRendering": "text",
+      "issues": [],
+      "publishStatus": "awaiting-user-review"
+    },
+    {
+      "number": 8,
+      "correctOptionNumbers": [
+        3
+      ],
+      "sourceQuestionNumber": 8,
+      "sourceImage": "assets/source-q08.png",
+      "imagePath": null,
+      "optionsAdded": false,
+      "optionRendering": "text",
+      "issues": [],
+      "publishStatus": "awaiting-user-review"
+    },
+    {
+      "number": 9,
+      "correctOptionNumbers": [
+        3
+      ],
+      "sourceQuestionNumber": 9,
+      "sourceImage": "assets/source-q09.png",
+      "imagePath": "assets/q09.png",
+      "optionsAdded": false,
+      "optionRendering": "text",
+      "issues": [],
+      "publishStatus": "awaiting-user-review"
+    },
+    {
+      "number": 10,
+      "correctOptionNumbers": [
+        4
+      ],
+      "sourceQuestionNumber": 10,
+      "sourceImage": "assets/source-q10.png",
+      "imagePath": "assets/q10.png",
+      "optionsAdded": false,
+      "optionRendering": "text",
+      "issues": [],
+      "publishStatus": "awaiting-user-review"
+    },
+    {
+      "number": 11,
+      "correctOptionNumbers": [
+        3
+      ],
+      "sourceQuestionNumber": 11,
+      "sourceImage": "assets/source-q11.png",
+      "imagePath": "assets/q11.png",
+      "optionsAdded": false,
+      "optionRendering": "text",
+      "issues": [],
+      "publishStatus": "awaiting-user-review"
+    },
+    {
+      "number": 12,
+      "correctOptionNumbers": [
+        4
+      ],
+      "sourceQuestionNumber": 12,
+      "sourceImage": "assets/source-q12.png",
+      "imagePath": null,
+      "optionsAdded": false,
+      "optionRendering": "text",
+      "issues": [],
+      "publishStatus": "awaiting-user-review"
+    },
+    {
+      "number": 13,
+      "correctOptionNumbers": [
+        2
+      ],
+      "sourceQuestionNumber": 13,
+      "sourceImage": "assets/source-q13.png",
+      "imagePath": null,
+      "optionsAdded": false,
+      "optionRendering": "text",
+      "issues": [
+        {
+          "severity": "explanation",
+          "message": "원본 해설이 외각이 같다는 조건만으로 정십각형이라고 단정합니다. 변이 같다는 조건은 없으므로 해설을 바로잡았으며 정답은 동일합니다."
+        }
+      ],
+      "publishStatus": "awaiting-user-review"
+    },
+    {
+      "number": 14,
+      "correctOptionNumbers": [
+        2,
+        3
+      ],
+      "sourceQuestionNumber": 14,
+      "sourceImage": "assets/source-q14.png",
+      "imagePath": "assets/q14.png",
+      "optionsAdded": false,
+      "optionRendering": "text",
+      "issues": [],
+      "publishStatus": "awaiting-user-review"
+    },
+    {
+      "number": 15,
+      "correctOptionNumbers": [
+        4
+      ],
+      "sourceQuestionNumber": 15,
+      "sourceImage": "assets/source-q15.png",
+      "imagePath": "assets/q15.png",
+      "optionsAdded": false,
+      "optionRendering": "text",
+      "issues": [],
+      "publishStatus": "awaiting-user-review"
+    },
+    {
+      "number": 16,
+      "correctOptionNumbers": [
+        2
+      ],
+      "sourceQuestionNumber": 16,
+      "sourceImage": "assets/source-q16.png",
+      "imagePath": "assets/q16.png",
+      "optionsAdded": false,
+      "optionRendering": "source-image-number",
+      "issues": [
+        {
+          "severity": "approval",
+          "message": "원문은 직사각형이라고 하지만 그림은 오각형입니다. 원본은 보존했습니다. 그림 기준 정답은 ②이며, 공개 전 “직사각형”을 “도형”으로 수정할지 확인이 필요합니다."
+        }
+      ],
+      "publishStatus": "awaiting-user-review"
+    },
+    {
+      "number": 17,
+      "correctOptionNumbers": [
+        5
+      ],
+      "sourceQuestionNumber": 17,
+      "sourceImage": "assets/source-q17.png",
+      "imagePath": null,
+      "optionsAdded": false,
+      "optionRendering": "text",
+      "issues": [
+        {
+          "severity": "terminology",
+          "message": "정다면체의 삼각형 면을 “옆면”으로 부르는 원본 표현은 엄밀하지 않습니다. 원본 문구와 정답은 유지하고 해설에서 설명했습니다."
+        }
+      ],
+      "publishStatus": "awaiting-user-review"
+    },
+    {
+      "number": 18,
+      "correctOptionNumbers": [
+        1
+      ],
+      "sourceQuestionNumber": 18,
+      "sourceImage": "assets/source-q18.png",
+      "imagePath": null,
+      "optionsAdded": false,
+      "optionRendering": "text",
+      "issues": [
+        {
+          "severity": "approval",
+          "message": "원본 정답은 ①입니다. ③의 “항상 원”은 기본 회전체의 내부 단면이라는 범위에서만 맞습니다. 고리 모양 회전체까지 포함하면 예외가 있어, 공개 전 범위 명시 여부를 확인해야 합니다."
+        }
+      ],
+      "publishStatus": "awaiting-user-review"
+    },
+    {
+      "number": 19,
+      "correctOptionNumbers": [
+        5
+      ],
+      "sourceQuestionNumber": 19,
+      "sourceImage": "assets/source-q19.png",
+      "imagePath": "assets/q19.png",
+      "optionsAdded": false,
+      "optionRendering": "text",
+      "issues": [],
+      "publishStatus": "awaiting-user-review"
+    },
+    {
+      "number": 20,
+      "correctOptionNumbers": [
+        4
+      ],
+      "sourceQuestionNumber": 20,
+      "sourceImage": "assets/source-q20.png",
+      "imagePath": "assets/q20.png",
+      "optionsAdded": false,
+      "optionRendering": "text",
+      "issues": [],
+      "publishStatus": "awaiting-user-review"
+    },
+    {
+      "number": 21,
+      "correctOptionNumbers": [
+        3
+      ],
+      "sourceQuestionNumber": 21,
+      "sourceImage": "assets/source-q21.png",
+      "imagePath": "assets/q21.png",
+      "optionsAdded": true,
+      "optionRendering": "text",
+      "issues": [],
+      "publishStatus": "awaiting-user-review"
+    },
+    {
+      "number": 22,
+      "correctOptionNumbers": [
+        5
+      ],
+      "sourceQuestionNumber": 22,
+      "sourceImage": "assets/source-q22.png",
+      "imagePath": "assets/q22.png",
+      "optionsAdded": true,
+      "optionRendering": "text",
+      "issues": [
+        {
+          "severity": "blocking",
+          "message": "원본 답 x=70°를 대입하면 두 각 모두 190°가 됩니다. 그림과 수치가 모순되므로 원본 답은 대조용으로만 보존하고 DB 등록을 보류합니다. 수정 제안은 별도 검토 문서에 있습니다."
+        }
+      ],
+      "publishStatus": "blocked-source-error"
+    },
+    {
+      "number": 23,
+      "correctOptionNumbers": [
+        4
+      ],
+      "sourceQuestionNumber": 23,
+      "sourceImage": "assets/source-q23.png",
+      "imagePath": "assets/q23.png",
+      "optionsAdded": true,
+      "optionRendering": "text",
+      "issues": [],
+      "publishStatus": "awaiting-user-review"
+    },
+    {
+      "number": 24,
+      "correctOptionNumbers": [
+        3
+      ],
+      "sourceQuestionNumber": 24,
+      "sourceImage": "assets/source-q24.png",
+      "imagePath": null,
+      "optionsAdded": true,
+      "optionRendering": "text",
+      "issues": [],
+      "publishStatus": "awaiting-user-review"
+    },
+    {
+      "number": 25,
+      "correctOptionNumbers": [
+        3
+      ],
+      "sourceQuestionNumber": 25,
+      "sourceImage": "assets/source-q25.png",
+      "imagePath": "assets/q25.png",
+      "optionsAdded": true,
+      "optionRendering": "text",
+      "issues": [],
+      "publishStatus": "awaiting-user-review"
+    }
+  ]
+}

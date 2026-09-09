@@ -1,0 +1,48 @@
+[
+  {
+    "round": 2,
+    "file": "/Users/selah/Downloads/[실전모의고사 03] 2024-1-2.pdf",
+    "pages": 8,
+    "pageTextChars": [
+      802,
+      836,
+      849,
+      757,
+      684,
+      1067,
+      1422,
+      626
+    ]
+  },
+  {
+    "round": 3,
+    "file": "/Users/selah/Downloads/[실전모의고사 04] 2024-1-2 중간.pdf",
+    "pages": 10,
+    "pageTextChars": [
+      885,
+      782,
+      731,
+      1021,
+      690,
+      668,
+      470,
+      1314,
+      1353,
+      270
+    ]
+  },
+  {
+    "round": 4,
+    "file": "/Users/selah/Downloads/[실전모의고사 05] 2024-1-2 중간고사.pdf",
+    "pages": 7,
+    "pageTextChars": [
+      952,
+      1168,
+      667,
+      945,
+      827,
+      1273,
+      1343
+    ]
+  }
+]

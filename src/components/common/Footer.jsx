@@ -1,77 +1,50 @@
-import React from 'react';
 import { Link } from 'react-router-dom';
+import './Footer.css';
 
-const Footer = () => {
+const channels = [
+  ['인스타그램', 'https://www.instagram.com/metasense_edu/'],
+  ['카카오톡 상담', 'https://pf.kakao.com/_xfxkGDn'],
+  ['유튜브', 'https://www.youtube.com/@metasense_edu'],
+  ['네이버 블로그', 'https://blog.naver.com/metasense_edu'],
+  ['네이버 클립', 'https://clip.naver.com/@metasense_edu'],
+  ['수학감각 교재', 'https://smartstore.naver.com/dulcine'],
+];
+
+export default function Footer() {
   return (
-    <footer style={{
-      background: 'rgba(5, 5, 16, 0.95)',
-      color: '#64748b',
-      padding: '3rem 2rem',
-      borderTop: '1px solid rgba(0, 243, 255, 0.1)',
-      fontFamily: '"Rajdhani", sans-serif',
-      position: 'relative',
-      zIndex: 10
-    }}>
-      <div style={{
-        maxWidth: '1200px',
-        margin: '0 auto',
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        gap: '1.5rem',
-        textAlign: 'center'
-      }}>
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '1.5rem',
-          marginBottom: '0.5rem'
-        }}>
-          <strong style={{ 
-            color: '#ffffff', 
-            fontSize: '1.2rem', 
-            letterSpacing: '2px',
-            background: 'linear-gradient(135deg, #00f3ff 0%, #8b5cf6 100%)',
-            WebkitBackgroundClip: 'text',
-            WebkitTextFillColor: 'transparent'
-          }}>MSense</strong>
-          <Link to="/privacy" style={{ color: '#94a3b8', textDecoration: 'none', fontSize: '0.9rem' }}>개인정보처리방침</Link>
-          <span style={{ color: '#1e293b' }}>|</span>
-          <Link to="/terms" style={{ color: '#94a3b8', textDecoration: 'none', fontSize: '0.9rem' }}>이용약관</Link>
-          <span style={{ color: '#1e293b' }}>|</span>
-          <Link to="/referral" style={{ color: '#94a3b8', textDecoration: 'none', fontSize: '0.9rem' }}>추천인 제도</Link>
+    <footer className="metasense-footer">
+      <div className="metasense-footer__inner">
+        <div className="metasense-footer__top">
+        <div className="metasense-footer__brand">
+          <a className="metasense-footer__logo" href="https://msense.me">메타센스<span>msense.me</span></a>
+          <p>메타센스는 둘시네가 운영합니다.</p>
         </div>
-
-        <div style={{
-          display: 'flex',
-          flexWrap: 'wrap',
-          justifyContent: 'center',
-          gap: '0.8rem 1.5rem',
-          fontSize: '0.85rem',
-          lineHeight: '1.5'
-        }}>
+        <nav className="metasense-footer__channels" aria-label="메타센스 공식 채널 및 교재">
+          {channels.map(([label, href]) => (
+            <a key={href} href={href} target="_blank" rel="noopener noreferrer">
+              {label}<span className="metasense-footer__arrow" aria-hidden="true">↗</span>
+              <span className="metasense-footer__sr-only"> (새 창)</span>
+            </a>
+          ))}
+        </nav>
+        </div>
+        <p className="metasense-footer__channel-note">카카오톡 채널명: 둘시네 온라인 교육</p>
+        <div className="metasense-footer__business">
           <span>사업자등록번호: 891-91-00078</span>
-          <span style={{ color: '#1e293b' }}>|</span>
           <span>대표자: 장기홍</span>
-          <span style={{ color: '#1e293b' }}>|</span>
           <span>주소: 인천시 중구 송산로 9</span>
-          <span style={{ color: '#1e293b' }}>|</span>
-          <span>전화: 010-6285-4382</span>
-          <span style={{ color: '#1e293b' }}>|</span>
-          <span>이메일: <a href="mailto:paul@dulcine.net" style={{ color: '#64748b', textDecoration: 'none' }}>paul@dulcine.net</a></span>
+          <span>전화: <a href="tel:01062854382">010-6285-4382</a></span>
+          <span>이메일: <a href="mailto:paul@dulcine.net">paul@dulcine.net</a></span>
         </div>
-
-        <p style={{
-          fontSize: '0.75rem',
-          color: '#334155',
-          marginTop: '1rem',
-          letterSpacing: '1px'
-        }}>
-          © 2026 MSense. All missions accomplished.
-        </p>
+        <div className="metasense-footer__bottom">
+          <nav aria-label="이용 정책">
+            <Link to="/privacy">개인정보처리방침</Link>
+            <Link to="/terms">이용약관</Link>
+            <Link to="/referral">추천인 제도</Link>
+          </nav>
+          <small>© {new Date().getFullYear()} MetaSense. All rights reserved.</small>
+        </div>
       </div>
     </footer>
   );
-};
-
-export default Footer;
+}

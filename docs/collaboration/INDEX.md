@@ -7,9 +7,14 @@ For an existing task, read its STATE.md and actual artifacts before continuing.
 
 | ID | Goal | Phase | State file | Next action |
 |---|---|---|---|---|
+| 20260909-mid3-sem2-exams1-4 | 중3 2학기 중간 1~4회 작성·등록 | DONE | [STATE](tasks/20260909-mid3-sem2-exams1-4/STATE.md) | Codex 직접100문항·그림78개 등록 및 DB/이미지 검증 완료 |
+| 20260909-mid2-sem2-exams1-4 | 중2 2학기 중간 1~4회 작성·등록 | DONE | [STATE](tasks/20260909-mid2-sem2-exams1-4/STATE.md) | Codex 직접 80문항·그림71개 등록, DB전체필드 및 이미지 HTTP/해시 검증 완료 |
+| 20260909-mid1-sem2-exams2-4 | 중1 2학기 중간 2~4회 75문항 생성·등록 | DONE | [STATE](tasks/20260909-mid1-sem2-exams2-4/STATE.md) | Codex 직접75문항·이미지53개 등록, DB전체필드·이미지HTTP/해시 검증 완료 |
+| 20260908-mid1-sem2-exam1 | 중1 2학기 중간 1회 25문항·이미지 검토본 | DONE | [STATE](tasks/20260908-mid1-sem2-exam1/STATE.md) | 승인된 25문항·그림16개 운영 등록, DB 필드·이미지 HTTP/해시 검증 완료 |
 | 20260908-agora-index | 스텔라 아고라 목록·답변 인덱스 오류 복구 | DONE | [STATE](tasks/20260908-agora-index/STATE.md) | 목록·답변 인덱스 READY; 제보 글 답변 1건 조회 성공 |
 | 20260908-learning-save-stability | 학습 기록 저장·완료 체크 안정화 | ACTIVE (release pending) | [STATE](tasks/20260908-learning-save-stability/STATE.md) | 운영 인덱스 복구; 워크북 유실·집계·퀴즈 16/20 복구 위치 오류 수정/검증, 함수·규칙·웹 배포 전 |
-| 20260908-youtube-author-brand | 유튜브 공식 전환·네 채널 수학감각 저자 소개 | WAITING_USER | [STATE](tasks/20260908-youtube-author-brand/STATE.md) | 직접 수정·게시 완료; Instagram 모바일 외부 링크2개 추가 대기 |
+| 20260909-multiplication-distribution | 곱셈 영상 IG·카카오 배포와 연결·교류 | DONE | [STATE](tasks/20260909-multiplication-distribution/STATE.md) | IG릴스·카카오 링크 소식·연결·문의답변1·독자댓글1; 실행 MD 반영 |
+| 20260908-youtube-author-brand | 유튜브 공식 전환·네 채널 수학감각 저자 소개 | DONE | [STATE](tasks/20260908-youtube-author-brand/STATE.md) | 9/9 Instagram 실제 외부 링크 확인으로 대기 해소 |
 | 20260908-marketing-day01 | 100일 마케팅 1일차 실행 | ACTIVE | [STATE](tasks/20260908-marketing-day01/STATE.md) | 3채널 발행·댓글2·팔로우1 완료; 매일 계획·일지 예약 설정, 실제 접수 검증·오후 마감 남음 |
 | 20260907-workbook-completion-report | 분수 나눗셈 워크북 완료 체크 제보 조사 | DONE (local fix) | [STATE](tasks/20260907-workbook-completion-report/STATE.md) | 완료 문서를 무시하던 카드 판정 수정, 회귀검사·빌드 통과; 웹 배포 전 |
 | 20260907-lumi-runtime-recovery | 루미 신호 개수·정답 판정 수정과 엔진 복구 안내 | DONE (local) | [STATE](tasks/20260907-lumi-runtime-recovery/STATE.md) | 실제 브라우저 정답·숨은 조건 통과, 지연 복구 및 빌드 검증; 운영 배포 전 |

@@ -1,0 +1,408 @@
+{
+  "round": 4,
+  "unitId": "reg_1781420075936_chap_1781420292103_unit_1788907123074",
+  "sourceTitle": "중3 모의고사 원본7회",
+  "questions": [
+    {
+      "number": 1,
+      "correctOptionNumbers": [
+        5
+      ],
+      "imagePath": "assets/q01.png",
+      "sourceImagePath": "assets/source-q01.png",
+      "replaced": false,
+      "replacementReason": "",
+      "crop": [
+        1,
+        117,
+        412,
+        303,
+        586
+      ],
+      "verification": [
+        "$B$의 가로좌표를 $t$라 하면 $C$의 가로좌표는 $7-t$입니다. $0<t<\\frac72$이며 가로는 $7-2t$, 높이는 $-t^2+7t$입니다.",
+        "둘레는 $2(-t^2+5t+7)=-2(t-\\frac52)^2+\\frac{53}{2}$입니다.",
+        "$t=\\frac52$는 가능한 범위에 있으므로 최댓값은 $\\frac{53}{2}$입니다."
+      ],
+      "sourcePage": 1
+    },
+    {
+      "number": 2,
+      "correctOptionNumbers": [
+        3
+      ],
+      "imagePath": null,
+      "sourceImagePath": "assets/source-q02.png",
+      "replaced": true,
+      "replacementReason": "서로 다른 단위의 수치를 더하는 문제이므로 수치의 합임을 명시하고 원본 보기의 부적절한 m 단위를 제거.",
+      "crop": null,
+      "verification": [
+        "$y=-4.9(t-2)^2+19.6$이므로 $a=2$, $b=19.6$입니다.",
+        "$-4.9t(t-4)=0$에서 다시 땅에 닿는 양의 시간은 $c=4$입니다.",
+        "수치의 합은 $2+19.6+4=25.6$입니다."
+      ],
+      "sourcePage": 1
+    },
+    {
+      "number": 3,
+      "correctOptionNumbers": [
+        4
+      ],
+      "imagePath": null,
+      "sourceImagePath": "assets/source-q03.png",
+      "replaced": false,
+      "replacementReason": "",
+      "crop": null,
+      "verification": [
+        "$y=(x-k)^2+5-k^2$이므로 최솟값은 $5-k^2$입니다.",
+        "$k^2<5$를 만족하는 자연수는 $1,2$입니다. 합은 $3$입니다."
+      ],
+      "sourcePage": 1
+    },
+    {
+      "number": 4,
+      "correctOptionNumbers": [
+        3
+      ],
+      "imagePath": null,
+      "sourceImagePath": "assets/source-q04.png",
+      "replaced": false,
+      "replacementReason": "",
+      "crop": null,
+      "verification": [
+        "최솟값이 있으므로 $a>0$입니다.",
+        "꼭짓점은 $(-p,-q)=(-3,-4)$이므로 $p=3$, $q=4$입니다."
+      ],
+      "sourcePage": 1
+    },
+    {
+      "number": 5,
+      "correctOptionNumbers": [
+        3
+      ],
+      "imagePath": "assets/q05.png",
+      "sourceImagePath": "assets/source-q05.png",
+      "replaced": false,
+      "replacementReason": "",
+      "crop": [
+        1,
+        494,
+        775,
+        678,
+        953
+      ],
+      "verification": [
+        "첫 삼각형에서 $BC=3$이므로 $AC=5$입니다.",
+        "가장 큰 삼각형의 배율은 $12:4=3:1$이므로 $AC^{\\prime\\prime}=15$입니다.",
+        "$CC^{\\prime\\prime}=15-5=10$입니다."
+      ],
+      "sourcePage": 1
+    },
+    {
+      "number": 6,
+      "correctOptionNumbers": [
+        1
+      ],
+      "imagePath": "assets/q06.png",
+      "sourceImagePath": "assets/source-q06.png",
+      "replaced": true,
+      "replacementReason": "원본 그림의 OB=0.5736은 본문 OB=0.6428과 모순. 본문·표·정답에 맞춰 단위원 그림을 새로 작성.",
+      "crop": [
+        2,
+        57,
+        211,
+        416,
+        342
+      ],
+      "verification": [
+        "$OA=OD=1$이고 $\\cos\\angle AOB=0.6428$이므로 표에서 $\\angle AOB=50^\\circ$입니다.",
+        "$AB=\\sin50^\\circ=0.7660$, $CD=\\tan50^\\circ=1.1918$입니다.",
+        "합은 $0.7660+1.1918=1.9578$입니다."
+      ],
+      "sourcePage": 2
+    },
+    {
+      "number": 7,
+      "correctOptionNumbers": [
+        3
+      ],
+      "imagePath": null,
+      "sourceImagePath": "assets/source-q07.png",
+      "replaced": true,
+      "replacementReason": "원본 ㄱ의 sin A² 표기가 모호하고 참인 ㄱ,ㄹ,ㅁ 조합이 보기에 없음. 제곱 표기를 sin² A로 명확히 하고 ③을 ㄱ,ㄹ,ㅁ으로 수정.",
+      "crop": null,
+      "verification": [
+        "$45^\\circ$에서는 사인과 코사인이 같으므로 ㄱ은 참입니다.",
+        "$45^\\circ$보다 큰 예각에서는 사인이 코사인보다 크고 탄젠트가 $1$보다 큽니다. 따라서 ㄴ은 거짓, ㅁ은 참입니다.",
+        "$45^\\circ$보다 작은 예각에서는 사인이 코사인보다 작아 ㄷ은 거짓입니다. 해당 구간의 탄젠트는 양수이고 $1$ 이하이므로 ㄹ은 참입니다."
+      ],
+      "sourcePage": 2
+    },
+    {
+      "number": 8,
+      "correctOptionNumbers": [
+        5
+      ],
+      "imagePath": "assets/q08.png",
+      "sourceImagePath": "assets/source-q08.png",
+      "replaced": false,
+      "replacementReason": "",
+      "crop": [
+        2,
+        499,
+        211,
+        638,
+        374
+      ],
+      "verification": [
+        "$\\cos53^\\circ=\\frac{BC}{AB}=\\frac5{AB}$입니다.",
+        "따라서 $AB=\\frac5{\\cos53^\\circ}\\,m$입니다."
+      ],
+      "sourcePage": 2
+    },
+    {
+      "number": 9,
+      "correctOptionNumbers": [
+        4
+      ],
+      "imagePath": "assets/q09.png",
+      "sourceImagePath": "assets/source-q09.png",
+      "replaced": false,
+      "replacementReason": "",
+      "crop": [
+        2,
+        494,
+        799,
+        696,
+        931
+      ],
+      "verification": [
+        "높이를 $h$라 하면 가까운 수평거리는 $h$, 먼 수평거리는 $\\sqrt3h$입니다.",
+        "$\\sqrt3h-h=30$에서 $h=\\frac{30}{\\sqrt3-1}=15(\\sqrt3+1)\\,m$입니다."
+      ],
+      "sourcePage": 2
+    },
+    {
+      "number": 10,
+      "correctOptionNumbers": [
+        2
+      ],
+      "imagePath": "assets/q10.png",
+      "sourceImagePath": "assets/source-q10.png",
+      "replaced": false,
+      "replacementReason": "",
+      "crop": [
+        3,
+        99,
+        183,
+        255,
+        349
+      ],
+      "verification": [
+        "$BP=DP$이고 $AC\\perp BD$이므로 $AC$는 현 $BD$의 수직이등분선이며 중심을 지나는 지름입니다.",
+        "$AP\\cdot PC=BP\\cdot PD=36$에서 $PC=9\\,cm$입니다.",
+        "지름 $AC=13\\,cm$이므로 반지름은 $6.5\\,cm$입니다."
+      ],
+      "sourcePage": 3
+    },
+    {
+      "number": 11,
+      "correctOptionNumbers": [
+        5
+      ],
+      "imagePath": "assets/q11.png",
+      "sourceImagePath": "assets/source-q11.png",
+      "replaced": false,
+      "replacementReason": "",
+      "crop": [
+        3,
+        456,
+        241,
+        832,
+        723
+      ],
+      "verification": [
+        "$\\angle OMA=\\angle ONC=90^\\circ$, $OA=OC$, $OM=ON$입니다.",
+        "이는 빗변과 다른 한 변이 같은 직각삼각형의 $RHS$ 합동입니다. 따라서 $\\triangle OAM\\cong\\triangle OCN$입니다.",
+        "직각은 두 알려진 변 사이의 끼인각이 아니므로 $SAS$를 쓰는 보기 $5$가 잘못되었습니다."
+      ],
+      "sourcePage": 3
+    },
+    {
+      "number": 12,
+      "correctOptionNumbers": [
+        1
+      ],
+      "imagePath": "assets/q12.png",
+      "sourceImagePath": "assets/source-q12.png",
+      "replaced": false,
+      "replacementReason": "",
+      "crop": [
+        4,
+        95,
+        218,
+        263,
+        372
+      ],
+      "verification": [
+        "호 $AC$의 중심각은 $360^\\circ\\times\\frac16=60^\\circ$입니다. 호 $BD$의 중심각은 $60^\\circ\\times\\frac25=24^\\circ$입니다.",
+        "원 안에서 교차하는 두 현의 각은 마주 보는 두 호의 중심각 합의 절반이므로 $\\angle BPD=\\frac{60+24}{2}^\\circ=42^\\circ$입니다."
+      ],
+      "sourcePage": 4
+    },
+    {
+      "number": 13,
+      "correctOptionNumbers": [
+        2
+      ],
+      "imagePath": null,
+      "sourceImagePath": "assets/source-q13.png",
+      "replaced": true,
+      "replacementReason": "원문의 항상 내접하는 사각형이 아닌 것을 모든 도형에서 내접을 보장할 수 없는 종류로 명확히 표현.",
+      "crop": null,
+      "verification": [
+        "직사각형의 대각 합은 항상 $180^\\circ$입니다. 등변사다리꼴도 같은 밑각과 평행선의 성질에서 대각 합이 $180^\\circ$입니다.",
+        "마름모와 평행사변형은 직각인 특별한 경우를 제외하면 대각 합이 $180^\\circ$가 아닙니다. 따라서 항상 내접한다고 보장하지 못하는 것은 ㄱ, ㄷ입니다."
+      ],
+      "sourcePage": 4
+    },
+    {
+      "number": 14,
+      "correctOptionNumbers": [
+        2
+      ],
+      "imagePath": "assets/q14.png",
+      "sourceImagePath": "assets/source-q14.png",
+      "replaced": false,
+      "replacementReason": "",
+      "crop": [
+        4,
+        489,
+        181,
+        674,
+        339
+      ],
+      "verification": [
+        "$\\angle ABC=90^\\circ$, $\\angle ACB=35^\\circ$이므로 $\\angle CAB=55^\\circ$입니다.",
+        "접선과 현의 각에서 $\\angle PBA=35^\\circ$이고 $\\angle PAB=180^\\circ-55^\\circ=125^\\circ$입니다.",
+        "$\\angle APB=180^\\circ-125^\\circ-35^\\circ=20^\\circ$입니다."
+      ],
+      "sourcePage": 4
+    },
+    {
+      "number": 15,
+      "correctOptionNumbers": [
+        3
+      ],
+      "imagePath": "assets/q15.png",
+      "sourceImagePath": "assets/source-q15.png",
+      "replaced": true,
+      "replacementReason": "정답표의 cm는 문제의 측량 거리 m와 불일치하므로 m로 교정.",
+      "crop": [
+        4,
+        493,
+        733,
+        751,
+        925
+      ],
+      "verification": [
+        "$\\angle A=180^\\circ-60^\\circ-75^\\circ=45^\\circ$입니다.",
+        "$C$에서 $AB$에 내린 수선의 길이는 $20\\sin60^\\circ=10\\sqrt3$이며 동시에 $AC\\sin45^\\circ$입니다.",
+        "따라서 $AC=\\frac{10\\sqrt3}{\\sqrt2/2}=10\\sqrt6\\,m$입니다."
+      ],
+      "sourcePage": 4
+    },
+    {
+      "number": 16,
+      "correctOptionNumbers": [
+        1
+      ],
+      "imagePath": "assets/q16.png",
+      "sourceImagePath": "assets/source-q16.png",
+      "replaced": true,
+      "replacementReason": "원본 16번의 두 소문항을 빠짐없이 포함하는 넓이·길이 짝 선택형으로 구성. 정답표에 누락된 두 번째 답은 독립 계산으로 보완.",
+      "crop": [
+        5,
+        87,
+        210,
+        321,
+        300
+      ],
+      "verification": [
+        "전체 넓이는 $\\frac12\\times2\\times4\\times\\sin120^\\circ=2\\sqrt3\\,cm^2$입니다.",
+        "$AD=x$라 하면 두 작은 삼각형 넓이의 합은 $\\frac12\\times2x\\sin60^\\circ+\\frac12\\times4x\\sin60^\\circ=\\frac{3\\sqrt3}{2}x$입니다.",
+        "전체와 같게 놓으면 $x=\\frac43\\,cm$입니다."
+      ],
+      "sourcePage": 5
+    },
+    {
+      "number": 17,
+      "correctOptionNumbers": [
+        4
+      ],
+      "imagePath": "assets/q17.png",
+      "sourceImagePath": "assets/source-q17.png",
+      "replaced": false,
+      "replacementReason": "",
+      "crop": [
+        5,
+        73,
+        830,
+        266,
+        966
+      ],
+      "verification": [
+        "$CD$의 접점을 $E$라 하면 $DE=DA=16$, $CE=CB=9$이므로 $CD=25\\,cm$입니다.",
+        "두 수직변의 길이 차는 $7\\,cm$이므로 $AB=\\sqrt{25^2-7^2}=24\\,cm$입니다.",
+        "사다리꼴 넓이는 $\\frac{16+9}{2}\\times24=300\\,cm^2$입니다."
+      ],
+      "sourcePage": 5
+    },
+    {
+      "number": 18,
+      "correctOptionNumbers": [
+        1
+      ],
+      "imagePath": "assets/q18.png",
+      "sourceImagePath": "assets/source-q18.png",
+      "replaced": false,
+      "replacementReason": "",
+      "crop": [
+        5,
+        490,
+        243,
+        673,
+        424
+      ],
+      "verification": [
+        "$\\angle MQA$는 현 $MD,AB$의 교차각이므로 그 크기는 호 $MA$와 호 $BD$의 중심각 합의 절반입니다.",
+        "호 $MA=MB$이므로 이 합은 호 $MD$의 중심각과 같습니다.",
+        "$P,C,M$이 일직선이므로 $\\angle PCD=\\angle MCD$이며 호 $MD$에 대한 원주각입니다. 따라서 두 각은 같습니다."
+      ],
+      "sourcePage": 5
+    },
+    {
+      "number": 19,
+      "correctOptionNumbers": [
+        4
+      ],
+      "imagePath": "assets/q19.png",
+      "sourceImagePath": "assets/source-q19.png",
+      "replaced": false,
+      "replacementReason": "",
+      "crop": [
+        5,
+        472,
+        845,
+        664,
+        1022
+      ],
+      "verification": [
+        "같은 호이므로 $AC=AD=12$입니다. $CD$의 중점을 $H$, $CH=DH=t$, $PH=u$, $AH=h$라 하면 $AH\\perp CD$입니다.",
+        "$h^2+t^2=12^2$, $h^2+u^2=8^2$이므로 $t^2-u^2=144-64=80$입니다.",
+        "$PC\\cdot PD=(t+u)(t-u)=t^2-u^2=80$입니다."
+      ],
+      "sourcePage": 5
+    }
+  ]
+}

@@ -1,0 +1,580 @@
+{
+  "round": 3,
+  "unitId": "reg_1781420075936_chap_1781420292103_unit_1788907111960",
+  "sourceTitle": "중3 모의고사 원본6회",
+  "questions": [
+    {
+      "number": 1,
+      "correctOptionNumbers": [
+        1
+      ],
+      "imagePath": "assets/q01.png",
+      "sourceImagePath": "assets/source-q01.png",
+      "replaced": false,
+      "replacementReason": "",
+      "crop": [
+        1,
+        172,
+        378,
+        339,
+        568
+      ],
+      "verification": [
+        "$AB=7$, $AC=5$, $BC=\\sqrt{49-25}=2\\sqrt6$입니다.",
+        "$\\sin B=\\frac{AC}{AB}=\\frac57$이고 $\\cos A=\\frac57$, $\\sin C=1$, $\\cos C=0$입니다."
+      ],
+      "sourcePage": 1
+    },
+    {
+      "number": 2,
+      "correctOptionNumbers": [
+        4
+      ],
+      "imagePath": null,
+      "sourceImagePath": "assets/source-q02.png",
+      "replaced": false,
+      "replacementReason": "",
+      "crop": null,
+      "verification": [
+        "주어진 식은 $\\frac{\\sqrt3+1}{2}\\cdot\\frac{1-\\sqrt3}{2}$입니다.",
+        "분자는 $(1+\\sqrt3)(1-\\sqrt3)=1-3=-2$이므로 값은 $-\\frac12$입니다."
+      ],
+      "sourcePage": 1
+    },
+    {
+      "number": 3,
+      "correctOptionNumbers": [
+        5
+      ],
+      "imagePath": null,
+      "sourceImagePath": "assets/source-q03.png",
+      "replaced": false,
+      "replacementReason": "",
+      "crop": null,
+      "verification": [
+        "$\\sin90^\\circ=1$, $\\cos0^\\circ=1$이므로 ㄱ, ㄴ은 거짓입니다.",
+        "ㄷ과 ㅁ은 참이고 $\\cos30^\\circ=\\frac{\\sqrt3}{2}$이므로 ㄹ은 거짓입니다.",
+        "$\\sin0^\\circ=\\tan0^\\circ=0$이므로 ㅂ도 참입니다."
+      ],
+      "sourcePage": 1
+    },
+    {
+      "number": 4,
+      "correctOptionNumbers": [
+        3
+      ],
+      "imagePath": "assets/q04.png",
+      "sourceImagePath": "assets/source-q04.png",
+      "replaced": false,
+      "replacementReason": "",
+      "crop": [
+        1,
+        458,
+        608,
+        806,
+        848
+      ],
+      "verification": [
+        "$\\sin29^\\circ=\\frac{x}{10}$입니다.",
+        "표에서 $\\sin29^\\circ=0.4848$이므로 $x=10\\times0.4848=4.848$입니다."
+      ],
+      "sourcePage": 1
+    },
+    {
+      "number": 5,
+      "correctOptionNumbers": [
+        2
+      ],
+      "imagePath": "assets/q05.png",
+      "sourceImagePath": "assets/source-q05.png",
+      "replaced": false,
+      "replacementReason": "",
+      "crop": [
+        2,
+        132,
+        199,
+        368,
+        325
+      ],
+      "verification": [
+        "높이를 $h$라 하면 밑변의 두 부분은 $\\sqrt3h$, $h$입니다.",
+        "$(\\sqrt3+1)h=8$이므로 $h=4(\\sqrt3-1)$입니다.",
+        "넓이는 $\\frac12\\times8\\times h=16(\\sqrt3-1)$입니다."
+      ],
+      "sourcePage": 2
+    },
+    {
+      "number": 6,
+      "correctOptionNumbers": [
+        1
+      ],
+      "imagePath": "assets/q06.png",
+      "sourceImagePath": "assets/source-q06.png",
+      "replaced": false,
+      "replacementReason": "",
+      "crop": [
+        2,
+        119,
+        632,
+        378,
+        795
+      ],
+      "verification": [
+        "$\\triangle ABC$는 직각이등변삼각형이므로 $BC=3\\sqrt2\\times\\sqrt2=6$입니다.",
+        "$\\tan60^\\circ=\\frac{BC}{CD}$이므로 $CD=\\frac6{\\sqrt3}=2\\sqrt3$입니다.",
+        "$xy=6\\times2\\sqrt3=12\\sqrt3$입니다."
+      ],
+      "sourcePage": 2
+    },
+    {
+      "number": 7,
+      "correctOptionNumbers": [
+        2
+      ],
+      "imagePath": "assets/q07.png",
+      "sourceImagePath": "assets/source-q07.png",
+      "replaced": false,
+      "replacementReason": "",
+      "crop": [
+        2,
+        552,
+        222,
+        741,
+        407
+      ],
+      "verification": [
+        "$AB=15\\tan60^\\circ=15\\sqrt3\\,m$입니다.",
+        "$AC=\\frac{15}{\\cos60^\\circ}=30\\,m$입니다.",
+        "원래 길이는 $AB+AC=30+15\\sqrt3\\,m$입니다."
+      ],
+      "sourcePage": 2
+    },
+    {
+      "number": 8,
+      "correctOptionNumbers": [
+        5
+      ],
+      "imagePath": "assets/q08.png",
+      "sourceImagePath": "assets/source-q08.png",
+      "replaced": false,
+      "replacementReason": "",
+      "crop": [
+        2,
+        541,
+        622,
+        747,
+        806
+      ],
+      "verification": [
+        "$DH=2$, $FH=2\\sqrt2$, $DF=2\\sqrt3$입니다.",
+        "$\\sin x^\\circ=\\frac1{\\sqrt3}$, $\\cos x^\\circ=\\frac{\\sqrt2}{\\sqrt3}$이므로 곱은 $\\frac{\\sqrt2}{3}$입니다."
+      ],
+      "sourcePage": 2
+    },
+    {
+      "number": 9,
+      "correctOptionNumbers": [
+        1
+      ],
+      "imagePath": "assets/q09.png",
+      "sourceImagePath": "assets/source-q09.png",
+      "replaced": false,
+      "replacementReason": "",
+      "crop": [
+        3,
+        142,
+        244,
+        349,
+        442
+      ],
+      "verification": [
+        "$B$를 원점, $BC$를 가로축으로 놓으면 $C^{\\prime}=(6\\cos30^\\circ,6\\sin30^\\circ)=(3\\sqrt3,3)$입니다.",
+        "$AD$는 높이 $6$인 수평선입니다. $C^{\\prime}D^{\\prime}$을 따라 위로 $3$ 올라갈 때 왼쪽으로 $\\frac3{\\sqrt3}=\\sqrt3$ 이동합니다.",
+        "$E$의 가로좌표는 $2\\sqrt3$이고 $A$의 가로좌표는 $0$이므로 $AE=2\\sqrt3$입니다."
+      ],
+      "sourcePage": 3
+    },
+    {
+      "number": 10,
+      "correctOptionNumbers": [
+        4
+      ],
+      "imagePath": "assets/q10.png",
+      "sourceImagePath": "assets/source-q10.png",
+      "replaced": false,
+      "replacementReason": "",
+      "crop": [
+        3,
+        149,
+        744,
+        347,
+        864
+      ],
+      "verification": [
+        "$BC=\\frac{12}{2/3}=18$입니다. $AD=BD=t$라 하면 $DC=18-t$입니다.",
+        "$t^2=12^2+(18-t)^2$에서 $t=13$, $DC=5$입니다.",
+        "$\\cos y=\\frac{DC}{AD}=\\frac5{13}$입니다."
+      ],
+      "sourcePage": 3
+    },
+    {
+      "number": 11,
+      "correctOptionNumbers": [
+        5
+      ],
+      "imagePath": "assets/q11.png",
+      "sourceImagePath": "assets/source-q11.png",
+      "replaced": false,
+      "replacementReason": "",
+      "crop": [
+        3,
+        572,
+        175,
+        725,
+        329
+      ],
+      "verification": [
+        "원의 중심에서 현에 내린 수선은 현을 이등분합니다.",
+        "따라서 $x=5+5=10$입니다."
+      ],
+      "sourcePage": 3
+    },
+    {
+      "number": 12,
+      "correctOptionNumbers": [
+        1
+      ],
+      "imagePath": "assets/q12.png",
+      "sourceImagePath": "assets/source-q12.png",
+      "replaced": false,
+      "replacementReason": "",
+      "crop": [
+        3,
+        568,
+        650,
+        726,
+        809
+      ],
+      "verification": [
+        "현의 절반은 $5$입니다.",
+        "$x^2+5^2=13^2$에서 $x^2=144$, 거리이므로 $x=12$입니다."
+      ],
+      "sourcePage": 3
+    },
+    {
+      "number": 13,
+      "correctOptionNumbers": [
+        3
+      ],
+      "imagePath": "assets/q13.png",
+      "sourceImagePath": "assets/source-q13.png",
+      "replaced": false,
+      "replacementReason": "",
+      "crop": [
+        4,
+        165,
+        176,
+        336,
+        353
+      ],
+      "verification": [
+        "호의 길이는 중심각에 비례하며 같은 원에서는 원주각에도 비례합니다.",
+        "$x:3=75:25=3:1$이므로 $x=9$입니다."
+      ],
+      "sourcePage": 4
+    },
+    {
+      "number": 14,
+      "correctOptionNumbers": [
+        5
+      ],
+      "imagePath": "assets/q14.png",
+      "sourceImagePath": "assets/source-q14.png",
+      "replaced": false,
+      "replacementReason": "",
+      "crop": [
+        4,
+        173,
+        625,
+        335,
+        793
+      ],
+      "verification": [
+        "$\\angle APB$가 보는 큰 호 $AB$의 중심각은 $360^\\circ-120^\\circ=240^\\circ$입니다.",
+        "따라서 $x=\\frac{240^\\circ}{2}=120^\\circ$입니다."
+      ],
+      "sourcePage": 4
+    },
+    {
+      "number": 15,
+      "correctOptionNumbers": [
+        3
+      ],
+      "imagePath": "assets/q15.png",
+      "sourceImagePath": "assets/source-q15.png",
+      "replaced": false,
+      "replacementReason": "",
+      "crop": [
+        4,
+        563,
+        202,
+        742,
+        366
+      ],
+      "verification": [
+        "$PB=PA=9$이고 $PO=x+3$입니다. 접점에서 반지름은 접선에 수직입니다.",
+        "$(x+3)^2=x^2+9^2$에서 $6x=72$, $x=12$입니다."
+      ],
+      "sourcePage": 4
+    },
+    {
+      "number": 16,
+      "correctOptionNumbers": [
+        3
+      ],
+      "imagePath": "assets/q16.png",
+      "sourceImagePath": "assets/source-q16.png",
+      "replaced": false,
+      "replacementReason": "",
+      "crop": [
+        4,
+        516,
+        681,
+        778,
+        885
+      ],
+      "verification": [
+        "$\\pi r^2=4\\pi$에서 $r=2$입니다. 외접사각형에서 $AB+CD=AD+BC=10$이므로 반둘레는 $10$입니다.",
+        "네 삼각형의 높이가 모두 $2$이므로 넓이는 $rs=2\\times10=20$입니다."
+      ],
+      "sourcePage": 4
+    },
+    {
+      "number": 17,
+      "correctOptionNumbers": [
+        2
+      ],
+      "imagePath": "assets/q17.png",
+      "sourceImagePath": "assets/source-q17.png",
+      "replaced": false,
+      "replacementReason": "",
+      "crop": [
+        5,
+        158,
+        177,
+        341,
+        342
+      ],
+      "verification": [
+        "$\\angle ABD=\\angle ACD=62^\\circ$이고 지름에 대한 각 $\\angle ADB=90^\\circ$입니다.",
+        "$x=180^\\circ-90^\\circ-62^\\circ=28^\\circ$입니다."
+      ],
+      "sourcePage": 5
+    },
+    {
+      "number": 18,
+      "correctOptionNumbers": [
+        2
+      ],
+      "imagePath": "assets/q18.png",
+      "sourceImagePath": "assets/source-q18.png",
+      "replaced": false,
+      "replacementReason": "",
+      "crop": [
+        5,
+        64,
+        558,
+        431,
+        811
+      ],
+      "verification": [
+        "ㄱ은 같은 현 $BC$에 대한 각이 $90^\\circ,80^\\circ$로 달라 내접하지 않습니다. ㄴ은 대각의 합이 $75^\\circ+70^\\circ=145^\\circ$로 내접하지 않습니다.",
+        "ㄷ은 $PD\\cdot PA=5\\times9=45$, $PC\\cdot PB=3\\times15=45$로 같아 두 할선의 곱 관계의 역에 의해 내접합니다.",
+        "ㄹ은 두 대각선 조각의 곱이 $3\\times5=15$, $4\\times4=16$으로 달라 내접하지 않습니다."
+      ],
+      "sourcePage": 5
+    },
+    {
+      "number": 19,
+      "correctOptionNumbers": [
+        2
+      ],
+      "imagePath": "assets/q19.png",
+      "sourceImagePath": "assets/source-q19.png",
+      "replaced": false,
+      "replacementReason": "",
+      "crop": [
+        5,
+        558,
+        197,
+        741,
+        367
+      ],
+      "verification": [
+        "반지름을 $r$라 하면 $OP=r+1$, $OT=r$이고 $(r+1)^2=r^2+3$에서 $r=1$입니다.",
+        "$OP=2$, $OT=1$이므로 $\\angle POT=60^\\circ$입니다. 이는 $\\angle AOT$와 같습니다.",
+        "호의 길이는 $2\\pi\\times1\\times\\frac{60}{360}=\\frac\\pi3$입니다."
+      ],
+      "sourcePage": 5
+    },
+    {
+      "number": 20,
+      "correctOptionNumbers": [
+        4
+      ],
+      "imagePath": "assets/q20.png",
+      "sourceImagePath": "assets/source-q20.png",
+      "replaced": false,
+      "replacementReason": "",
+      "crop": [
+        5,
+        567,
+        636,
+        730,
+        796
+      ],
+      "verification": [
+        "$\\angle A$가 보는 호 $BCDE$와 $\\angle D$가 보는 호 $CBAE$의 합은 원 한 바퀴와 호 $BC$를 더한 것과 같습니다.",
+        "따라서 $\\angle A+\\angle D=\\frac{360^\\circ+80^\\circ}{2}=220^\\circ$입니다."
+      ],
+      "sourcePage": 5
+    },
+    {
+      "number": 21,
+      "correctOptionNumbers": [
+        4
+      ],
+      "imagePath": "assets/q21.png",
+      "sourceImagePath": "assets/source-q21.png",
+      "replaced": false,
+      "replacementReason": "",
+      "crop": [
+        6,
+        111,
+        222,
+        380,
+        370
+      ],
+      "verification": [
+        "두 할선의 바깥 각은 먼 호와 가까운 호의 중심각 차의 절반입니다.",
+        "$\\angle P=\\frac{100^\\circ-38^\\circ}{2}=31^\\circ$입니다."
+      ],
+      "sourcePage": 6
+    },
+    {
+      "number": 22,
+      "correctOptionNumbers": [
+        1
+      ],
+      "imagePath": "assets/q22.png",
+      "sourceImagePath": "assets/source-q22.png",
+      "replaced": false,
+      "replacementReason": "",
+      "crop": [
+        6,
+        172,
+        676,
+        330,
+        826
+      ],
+      "verification": [
+        "$5x(2x-1)=x(7x+1)$입니다.",
+        "$3x^2-6x=3x(x-2)=0$이고 선분의 길이가 양수이므로 $x=0$은 제외됩니다.",
+        "따라서 $x=2$입니다."
+      ],
+      "sourcePage": 6
+    },
+    {
+      "number": 23,
+      "correctOptionNumbers": [
+        5
+      ],
+      "imagePath": "assets/q23.png",
+      "sourceImagePath": "assets/source-q23.png",
+      "replaced": false,
+      "replacementReason": "",
+      "crop": [
+        6,
+        457,
+        213,
+        826,
+        628
+      ],
+      "verification": [
+        "지름 $AC$와 접선은 수직이며 $\\angle CPA=90^\\circ$입니다. 따라서 첫 빈칸은 직각입니다.",
+        "$\\angle CAB=\\angle CPB$는 호 $BC$에 대한 같은 원주각입니다.",
+        "$\\angle BAT=90^\\circ-\\angle CAB$, $\\angle BPA=90^\\circ-\\angle CPB$이므로 마지막 빈칸은 $\\angle BPA$여야 합니다. 보기 $5$는 틀립니다."
+      ],
+      "sourcePage": 6
+    },
+    {
+      "number": 24,
+      "correctOptionNumbers": [
+        4
+      ],
+      "imagePath": "assets/q24.png",
+      "sourceImagePath": "assets/source-q24.png",
+      "replaced": false,
+      "replacementReason": "",
+      "crop": [
+        7,
+        171,
+        224,
+        334,
+        382
+      ],
+      "verification": [
+        "$AB=16$이므로 중심에서 $AB$까지의 거리는 $\\sqrt{10^2-8^2}=6$입니다.",
+        "$CD\\perp AB$이고 $P$는 $AB$ 위에 있으므로 $CD$의 중점과 $P$ 사이 거리가 바로 $6$입니다.",
+        "따라서 $\\frac{y-x}{2}=6$, $y-x=12$입니다."
+      ],
+      "sourcePage": 7
+    },
+    {
+      "number": 25,
+      "correctOptionNumbers": [
+        5
+      ],
+      "imagePath": "assets/q25.png",
+      "sourceImagePath": "assets/source-q25.png",
+      "replaced": false,
+      "replacementReason": "",
+      "crop": [
+        7,
+        171,
+        718,
+        331,
+        884
+      ],
+      "verification": [
+        "$\\angle BAP=\\angle CAQ$이고 $\\angle ABP=\\angle AQC$이므로 $\\triangle ABP\\sim\\triangle AQC$입니다.",
+        "따라서 $AB: AQ=AP:AC$이므로 $AP\\cdot AQ=AB\\cdot AC=20$입니다.",
+        "$AP=t$, $AQ=t+1$에서 $t(t+1)=20$, $(t-4)(t+5)=0$입니다. 길이는 양수이므로 $AP=4$입니다."
+      ],
+      "sourcePage": 7
+    },
+    {
+      "number": 26,
+      "correctOptionNumbers": [
+        5
+      ],
+      "imagePath": "assets/q26.png",
+      "sourceImagePath": "assets/source-q26.png",
+      "replaced": false,
+      "replacementReason": "",
+      "crop": [
+        7,
+        498,
+        229,
+        795,
+        415
+      ],
+      "verification": [
+        "사각형 $OAPB$에서 $\\angle AOB=360^\\circ-90^\\circ-90^\\circ-40^\\circ=140^\\circ$입니다.",
+        "$C$를 지나는 큰 호 $AB$의 중심각은 $220^\\circ$입니다. 이 중 호 $BC$는 $\\frac35$이므로 중심각은 $132^\\circ$입니다.",
+        "$\\angle BAC=\\frac{132^\\circ}{2}=66^\\circ$입니다."
+      ],
+      "sourcePage": 7
+    }
+  ]
+}

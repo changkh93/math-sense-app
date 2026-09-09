@@ -1,6 +1,7 @@
 import { lazy, Suspense, useEffect } from 'react'
 import { Navigate, Routes, Route } from 'react-router-dom'
 import './App.css'
+import Footer from './components/common/Footer'
 import './styles/space-theme.css' /* Global Space Theme */
 const SpaceHome = lazy(() => import('./components/Space/SpaceHome'))
 const QuizBattleChallengeReceiver = lazy(() => import('./components/Space/QuizBattleChallengeReceiver'))
@@ -177,6 +178,7 @@ function App() {
       <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
       </Suspense>
+      <Footer />
     </DirectMemoRealtimeProvider>
   )
 }

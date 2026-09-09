@@ -1,0 +1,392 @@
+{
+  "status": "READY_TO_REGISTER",
+  "questions": 100,
+  "images": 78,
+  "sourceChoiceKeysCompared": 73,
+  "correctedAnswerKeys": [
+    {
+      "round": 1,
+      "number": 7,
+      "original": 4,
+      "correct": 2
+    },
+    {
+      "round": 1,
+      "number": 8,
+      "original": 3,
+      "correct": 4
+    }
+  ],
+  "independentNumericalChecks": 86,
+  "checks": [
+    {
+      "label": "r1q1",
+      "value": -5
+    },
+    {
+      "label": "r1q4",
+      "value": 6
+    },
+    {
+      "label": "r1q5",
+      "value": 6
+    },
+    {
+      "label": "r1q7",
+      "value": 8.0
+    },
+    {
+      "label": "r1q8",
+      "value": 0.5144957554275265
+    },
+    {
+      "label": "r1q9",
+      "value": 1.1547005383792517
+    },
+    {
+      "label": "r1q10",
+      "value": 0.5878
+    },
+    {
+      "label": "r1q11",
+      "value": 7.999999999999999
+    },
+    {
+      "label": "r1q12",
+      "value": 22.9128784747792
+    },
+    {
+      "label": "r1q13",
+      "value": 20.287187078897958
+    },
+    {
+      "label": "r1q14",
+      "value": 2.2499999999999996
+    },
+    {
+      "label": "r1q15",
+      "value": 7.5
+    },
+    {
+      "label": "r1q16",
+      "value": 3.2
+    },
+    {
+      "label": "r1q17",
+      "value": 5.0
+    },
+    {
+      "label": "r1q18",
+      "value": 5
+    },
+    {
+      "label": "r1q19",
+      "value": 13.044394613675458
+    },
+    {
+      "label": "r1q20",
+      "value": 50
+    },
+    {
+      "label": "r1q21",
+      "value": 7.0
+    },
+    {
+      "label": "r1q22",
+      "value": 18.0
+    },
+    {
+      "label": "r1q23",
+      "value": 2.196152422706632
+    },
+    {
+      "label": "r1q24",
+      "value": 0.6
+    },
+    {
+      "label": "r1q25",
+      "value": 110.0
+    },
+    {
+      "label": "r2q2",
+      "value": 25
+    },
+    {
+      "label": "r2q3",
+      "value": 10
+    },
+    {
+      "label": "r2q5",
+      "value": 2000.0
+    },
+    {
+      "label": "r2q7",
+      "value": -5
+    },
+    {
+      "label": "r2q8a",
+      "value": -2.5
+    },
+    {
+      "label": "r2q8b",
+      "value": -1
+    },
+    {
+      "label": "r2q9",
+      "value": 4.0
+    },
+    {
+      "label": "r2q10",
+      "value": 3
+    },
+    {
+      "label": "r2q12",
+      "value": 9
+    },
+    {
+      "label": "r2q13",
+      "value": 12
+    },
+    {
+      "label": "r2q14",
+      "value": 0.10714285714285712
+    },
+    {
+      "label": "r2q15",
+      "value": 14.142135623730951
+    },
+    {
+      "label": "r2q16area",
+      "value": 1.2679491924311224
+    },
+    {
+      "label": "r2q16perimeter",
+      "value": 7.327804920294029
+    },
+    {
+      "label": "r2q17",
+      "value": 242.99999999999997
+    },
+    {
+      "label": "r2q18",
+      "value": 7.999999999999998
+    },
+    {
+      "label": "r2q19",
+      "value": 54.641016151377556
+    },
+    {
+      "label": "r2q20",
+      "value": 1250.0
+    },
+    {
+      "label": "r2q22",
+      "value": 6.48
+    },
+    {
+      "label": "r2q23",
+      "value": 0.9999999999999993
+    },
+    {
+      "label": "r2q24",
+      "value": 0.2679491924311227
+    },
+    {
+      "label": "r2q25",
+      "value": 0.6666666666666666
+    },
+    {
+      "label": "r2q26",
+      "value": 0.4999999999999999
+    },
+    {
+      "label": "r2q28",
+      "value": -0.20000000000000007
+    },
+    {
+      "label": "r2q29",
+      "value": 0.1
+    },
+    {
+      "label": "r2q30",
+      "value": 0.9622504486493763
+    },
+    {
+      "label": "r3q1",
+      "value": 0.7142857142857143
+    },
+    {
+      "label": "r3q2",
+      "value": -0.5000000000000002
+    },
+    {
+      "label": "r3q4",
+      "value": 4.848
+    },
+    {
+      "label": "r3q5",
+      "value": 11.712812921102035
+    },
+    {
+      "label": "r3q6",
+      "value": 20.784609690826535
+    },
+    {
+      "label": "r3q7",
+      "value": 55.980762113533146
+    },
+    {
+      "label": "r3q8",
+      "value": 0.4714045207910318
+    },
+    {
+      "label": "r3q9",
+      "value": 3.4641016151377544
+    },
+    {
+      "label": "r3q10",
+      "value": 0.38461538461538464
+    },
+    {
+      "label": "r3q11",
+      "value": 10
+    },
+    {
+      "label": "r3q12",
+      "value": 12.0
+    },
+    {
+      "label": "r3q13",
+      "value": 9.0
+    },
+    {
+      "label": "r3q14",
+      "value": 120.0
+    },
+    {
+      "label": "r3q15",
+      "value": 15.0
+    },
+    {
+      "label": "r3q16",
+      "value": 20.0
+    },
+    {
+      "label": "r3q17",
+      "value": 28
+    },
+    {
+      "label": "r3q18power",
+      "value": 45
+    },
+    {
+      "label": "r3q19",
+      "value": 1.0471975511965976
+    },
+    {
+      "label": "r3q20",
+      "value": 220.0
+    },
+    {
+      "label": "r3q21",
+      "value": 31.0
+    },
+    {
+      "label": "r3q22",
+      "value": 30
+    },
+    {
+      "label": "r3q24",
+      "value": 12.0
+    },
+    {
+      "label": "r3q25",
+      "value": 20
+    },
+    {
+      "label": "r3q26",
+      "value": 66.0
+    },
+    {
+      "label": "r4q1",
+      "value": 26.5
+    },
+    {
+      "label": "r4q2",
+      "value": 25.6
+    },
+    {
+      "label": "r4q3",
+      "value": 3
+    },
+    {
+      "label": "r4q5",
+      "value": 10.0
+    },
+    {
+      "label": "r4q6",
+      "value": 1.9578
+    },
+    {
+      "label": "r4q9",
+      "value": 40.98076211353315
+    },
+    {
+      "label": "r4q10",
+      "value": 6.5
+    },
+    {
+      "label": "r4q12",
+      "value": 42.0
+    },
+    {
+      "label": "r4q14",
+      "value": 20
+    },
+    {
+      "label": "r4q15",
+      "value": 24.49489742783178
+    },
+    {
+      "label": "r4q16area",
+      "value": 3.464101615137755
+    },
+    {
+      "label": "r4q16length",
+      "value": 1.3333333333333337
+    },
+    {
+      "label": "r4q17",
+      "value": 300.0
+    },
+    {
+      "label": "r4q19",
+      "value": 80
+    }
+  ],
+  "rounds": [
+    {
+      "round": 1,
+      "count": 25,
+      "sha256": "6094ddfed161dd42c7e4f1cbc8955fdc18cfb6b696b19a2c87c8cb6ea26370c8"
+    },
+    {
+      "round": 2,
+      "count": 30,
+      "sha256": "99c5056156fcdec852f4ebf36a48726becdfcc7127248d6d2f21b6e5f842a193"
+    },
+    {
+      "round": 3,
+      "count": 26,
+      "sha256": "18d914619a1de734e215032ef50405808f1783845b6dec0349d7928f50c68510"
+    },
+    {
+      "round": 4,
+      "count": 19,
+      "sha256": "70ae89a3cc25742634eeca0a3c9e3823cee9da7b68f4066450ae710becc9c66e"
+    }
+  ],
+  "educationalReview": "All 100 questions, provided answer sheets, geometric conditions and explanations reviewed by Codex. Four-stage hints exclude direct answers; two-part source question R4Q16 preserved as paired choices.",
+  "visualReview": "All 78 figures inspected in contact sheets; clipping corrected with wider margins. R4Q6 redrawn with corrected number; vector inspected.",
+  "limits": "Original diagrams retain schematic, not-to-scale shapes. No student-account submission performed."
+}

@@ -1,0 +1,617 @@
+[
+  {
+    "file": "assets/q01.png",
+    "source": "/var/folders/pn/jnf88cns4r9_lw3qvgp8jsyw0000gn/T/codex-clipboard-9651e331-cb71-410e-b24b-aa8f4b956f8d.png",
+    "sourcePage": 1,
+    "cropPixels": [
+      108,
+      283,
+      891,
+      681
+    ],
+    "size": [
+      783,
+      398
+    ]
+  },
+  {
+    "file": "assets/q03.png",
+    "source": "/var/folders/pn/jnf88cns4r9_lw3qvgp8jsyw0000gn/T/codex-clipboard-9651e331-cb71-410e-b24b-aa8f4b956f8d.png",
+    "sourcePage": 1,
+    "cropPixels": [
+      250,
+      1741,
+      743,
+      2112
+    ],
+    "size": [
+      493,
+      371
+    ]
+  },
+  {
+    "file": "assets/q05.png",
+    "source": "/var/folders/pn/jnf88cns4r9_lw3qvgp8jsyw0000gn/T/codex-clipboard-9651e331-cb71-410e-b24b-aa8f4b956f8d.png",
+    "sourcePage": 1,
+    "cropPixels": [
+      1188,
+      1383,
+      1546,
+      1801
+    ],
+    "size": [
+      358,
+      418
+    ]
+  },
+  {
+    "file": "assets/q06.png",
+    "source": "/var/folders/pn/jnf88cns4r9_lw3qvgp8jsyw0000gn/T/codex-clipboard-ce9f4c30-7d7b-4746-851f-f2ba1dac0b00.png",
+    "sourcePage": 2,
+    "cropPixels": [
+      180,
+      283,
+      684,
+      691
+    ],
+    "size": [
+      504,
+      408
+    ]
+  },
+  {
+    "file": "assets/q09.png",
+    "source": "/var/folders/pn/jnf88cns4r9_lw3qvgp8jsyw0000gn/T/codex-clipboard-ce9f4c30-7d7b-4746-851f-f2ba1dac0b00.png",
+    "sourcePage": 2,
+    "cropPixels": [
+      1064,
+      242,
+      1562,
+      552
+    ],
+    "size": [
+      498,
+      310
+    ]
+  },
+  {
+    "file": "assets/q10.png",
+    "source": "/var/folders/pn/jnf88cns4r9_lw3qvgp8jsyw0000gn/T/codex-clipboard-ce9f4c30-7d7b-4746-851f-f2ba1dac0b00.png",
+    "sourcePage": 2,
+    "cropPixels": [
+      926,
+      1388,
+      1714,
+      2030
+    ],
+    "size": [
+      788,
+      642
+    ]
+  },
+  {
+    "file": "assets/q11.png",
+    "source": "/var/folders/pn/jnf88cns4r9_lw3qvgp8jsyw0000gn/T/codex-clipboard-055cf0bd-7f07-4bba-bfa1-b0bbcbfce1d1.png",
+    "sourcePage": 3,
+    "cropPixels": [
+      172,
+      179,
+      722,
+      515
+    ],
+    "size": [
+      550,
+      336
+    ]
+  },
+  {
+    "file": "assets/q14.png",
+    "source": "/var/folders/pn/jnf88cns4r9_lw3qvgp8jsyw0000gn/T/codex-clipboard-055cf0bd-7f07-4bba-bfa1-b0bbcbfce1d1.png",
+    "sourcePage": 3,
+    "cropPixels": [
+      1115,
+      272,
+      1530,
+      651
+    ],
+    "size": [
+      415,
+      379
+    ]
+  },
+  {
+    "file": "assets/q15.png",
+    "source": "/var/folders/pn/jnf88cns4r9_lw3qvgp8jsyw0000gn/T/codex-clipboard-055cf0bd-7f07-4bba-bfa1-b0bbcbfce1d1.png",
+    "sourcePage": 3,
+    "cropPixels": [
+      1122,
+      1551,
+      1580,
+      1916
+    ],
+    "size": [
+      458,
+      365
+    ]
+  },
+  {
+    "file": "assets/q16.png",
+    "source": "/var/folders/pn/jnf88cns4r9_lw3qvgp8jsyw0000gn/T/codex-clipboard-1f39f86d-1a7d-4346-9fc3-5ab11c0fc3f8.png",
+    "sourcePage": 4,
+    "cropPixels": [
+      91,
+      246,
+      842,
+      1557
+    ],
+    "size": [
+      751,
+      1311
+    ]
+  },
+  {
+    "file": "assets/q19.png",
+    "source": "/var/folders/pn/jnf88cns4r9_lw3qvgp8jsyw0000gn/T/codex-clipboard-1f39f86d-1a7d-4346-9fc3-5ab11c0fc3f8.png",
+    "sourcePage": 4,
+    "cropPixels": [
+      1123,
+      954,
+      1530,
+      1298
+    ],
+    "size": [
+      407,
+      344
+    ]
+  },
+  {
+    "file": "assets/q20.png",
+    "source": "/var/folders/pn/jnf88cns4r9_lw3qvgp8jsyw0000gn/T/codex-clipboard-1f39f86d-1a7d-4346-9fc3-5ab11c0fc3f8.png",
+    "sourcePage": 4,
+    "cropPixels": [
+      1123,
+      1817,
+      1586,
+      2126
+    ],
+    "size": [
+      463,
+      309
+    ]
+  },
+  {
+    "file": "assets/q21.png",
+    "source": "/var/folders/pn/jnf88cns4r9_lw3qvgp8jsyw0000gn/T/codex-clipboard-153e404b-af73-48bb-b1af-fc6d5023c16f.png",
+    "sourcePage": 5,
+    "cropPixels": [
+      311,
+      264,
+      614,
+      648
+    ],
+    "size": [
+      303,
+      384
+    ]
+  },
+  {
+    "file": "assets/q22.png",
+    "source": "/var/folders/pn/jnf88cns4r9_lw3qvgp8jsyw0000gn/T/codex-clipboard-153e404b-af73-48bb-b1af-fc6d5023c16f.png",
+    "sourcePage": 5,
+    "cropPixels": [
+      132,
+      1071,
+      813,
+      1507
+    ],
+    "size": [
+      681,
+      436
+    ]
+  },
+  {
+    "file": "assets/q23.png",
+    "source": "/var/folders/pn/jnf88cns4r9_lw3qvgp8jsyw0000gn/T/codex-clipboard-153e404b-af73-48bb-b1af-fc6d5023c16f.png",
+    "sourcePage": 5,
+    "cropPixels": [
+      244,
+      2010,
+      714,
+      2386
+    ],
+    "size": [
+      470,
+      376
+    ]
+  },
+  {
+    "file": "assets/q25.png",
+    "source": "/var/folders/pn/jnf88cns4r9_lw3qvgp8jsyw0000gn/T/codex-clipboard-153e404b-af73-48bb-b1af-fc6d5023c16f.png",
+    "sourcePage": 5,
+    "cropPixels": [
+      1136,
+      1401,
+      1533,
+      1785
+    ],
+    "size": [
+      397,
+      384
+    ]
+  },
+  {
+    "file": "assets/source-q01.png",
+    "source": "/var/folders/pn/jnf88cns4r9_lw3qvgp8jsyw0000gn/T/codex-clipboard-9651e331-cb71-410e-b24b-aa8f4b956f8d.png",
+    "sourcePage": 1,
+    "cropPixels": [
+      101,
+      283,
+      898,
+      708
+    ],
+    "size": [
+      797,
+      425
+    ]
+  },
+  {
+    "file": "assets/source-q02.png",
+    "source": "/var/folders/pn/jnf88cns4r9_lw3qvgp8jsyw0000gn/T/codex-clipboard-9651e331-cb71-410e-b24b-aa8f4b956f8d.png",
+    "sourcePage": 1,
+    "cropPixels": [
+      101,
+      992,
+      898,
+      1349
+    ],
+    "size": [
+      797,
+      357
+    ]
+  },
+  {
+    "file": "assets/source-q03.png",
+    "source": "/var/folders/pn/jnf88cns4r9_lw3qvgp8jsyw0000gn/T/codex-clipboard-9651e331-cb71-410e-b24b-aa8f4b956f8d.png",
+    "sourcePage": 1,
+    "cropPixels": [
+      101,
+      1687,
+      898,
+      2287
+    ],
+    "size": [
+      797,
+      600
+    ]
+  },
+  {
+    "file": "assets/source-q04.png",
+    "source": "/var/folders/pn/jnf88cns4r9_lw3qvgp8jsyw0000gn/T/codex-clipboard-9651e331-cb71-410e-b24b-aa8f4b956f8d.png",
+    "sourcePage": 1,
+    "cropPixels": [
+      972,
+      250,
+      1769,
+      648
+    ],
+    "size": [
+      797,
+      398
+    ]
+  },
+  {
+    "file": "assets/source-q05.png",
+    "source": "/var/folders/pn/jnf88cns4r9_lw3qvgp8jsyw0000gn/T/codex-clipboard-9651e331-cb71-410e-b24b-aa8f4b956f8d.png",
+    "sourcePage": 1,
+    "cropPixels": [
+      972,
+      1221,
+      1769,
+      2098
+    ],
+    "size": [
+      797,
+      877
+    ]
+  },
+  {
+    "file": "assets/source-q06.png",
+    "source": "/var/folders/pn/jnf88cns4r9_lw3qvgp8jsyw0000gn/T/codex-clipboard-ce9f4c30-7d7b-4746-851f-f2ba1dac0b00.png",
+    "sourcePage": 2,
+    "cropPixels": [
+      55,
+      131,
+      843,
+      843
+    ],
+    "size": [
+      788,
+      712
+    ]
+  },
+  {
+    "file": "assets/source-q07.png",
+    "source": "/var/folders/pn/jnf88cns4r9_lw3qvgp8jsyw0000gn/T/codex-clipboard-ce9f4c30-7d7b-4746-851f-f2ba1dac0b00.png",
+    "sourcePage": 2,
+    "cropPixels": [
+      55,
+      1209,
+      843,
+      1588
+    ],
+    "size": [
+      788,
+      379
+    ]
+  },
+  {
+    "file": "assets/source-q08.png",
+    "source": "/var/folders/pn/jnf88cns4r9_lw3qvgp8jsyw0000gn/T/codex-clipboard-ce9f4c30-7d7b-4746-851f-f2ba1dac0b00.png",
+    "sourcePage": 2,
+    "cropPixels": [
+      55,
+      1892,
+      843,
+      2279
+    ],
+    "size": [
+      788,
+      387
+    ]
+  },
+  {
+    "file": "assets/source-q09.png",
+    "source": "/var/folders/pn/jnf88cns4r9_lw3qvgp8jsyw0000gn/T/codex-clipboard-ce9f4c30-7d7b-4746-851f-f2ba1dac0b00.png",
+    "sourcePage": 2,
+    "cropPixels": [
+      926,
+      131,
+      1714,
+      863
+    ],
+    "size": [
+      788,
+      732
+    ]
+  },
+  {
+    "file": "assets/source-q10.png",
+    "source": "/var/folders/pn/jnf88cns4r9_lw3qvgp8jsyw0000gn/T/codex-clipboard-ce9f4c30-7d7b-4746-851f-f2ba1dac0b00.png",
+    "sourcePage": 2,
+    "cropPixels": [
+      926,
+      1209,
+      1714,
+      2217
+    ],
+    "size": [
+      788,
+      1008
+    ]
+  },
+  {
+    "file": "assets/source-q11.png",
+    "source": "/var/folders/pn/jnf88cns4r9_lw3qvgp8jsyw0000gn/T/codex-clipboard-055cf0bd-7f07-4bba-bfa1-b0bbcbfce1d1.png",
+    "sourcePage": 3,
+    "cropPixels": [
+      79,
+      114,
+      872,
+      686
+    ],
+    "size": [
+      793,
+      572
+    ]
+  },
+  {
+    "file": "assets/source-q12.png",
+    "source": "/var/folders/pn/jnf88cns4r9_lw3qvgp8jsyw0000gn/T/codex-clipboard-055cf0bd-7f07-4bba-bfa1-b0bbcbfce1d1.png",
+    "sourcePage": 3,
+    "cropPixels": [
+      79,
+      1072,
+      872,
+      1358
+    ],
+    "size": [
+      793,
+      286
+    ]
+  },
+  {
+    "file": "assets/source-q13.png",
+    "source": "/var/folders/pn/jnf88cns4r9_lw3qvgp8jsyw0000gn/T/codex-clipboard-055cf0bd-7f07-4bba-bfa1-b0bbcbfce1d1.png",
+    "sourcePage": 3,
+    "cropPixels": [
+      79,
+      1666,
+      872,
+      2245
+    ],
+    "size": [
+      793,
+      579
+    ]
+  },
+  {
+    "file": "assets/source-q14.png",
+    "source": "/var/folders/pn/jnf88cns4r9_lw3qvgp8jsyw0000gn/T/codex-clipboard-055cf0bd-7f07-4bba-bfa1-b0bbcbfce1d1.png",
+    "sourcePage": 3,
+    "cropPixels": [
+      951,
+      114,
+      1773,
+      908
+    ],
+    "size": [
+      822,
+      794
+    ]
+  },
+  {
+    "file": "assets/source-q15.png",
+    "source": "/var/folders/pn/jnf88cns4r9_lw3qvgp8jsyw0000gn/T/codex-clipboard-055cf0bd-7f07-4bba-bfa1-b0bbcbfce1d1.png",
+    "sourcePage": 3,
+    "cropPixels": [
+      951,
+      1416,
+      1773,
+      2209
+    ],
+    "size": [
+      822,
+      793
+    ]
+  },
+  {
+    "file": "assets/source-q16.png",
+    "source": "/var/folders/pn/jnf88cns4r9_lw3qvgp8jsyw0000gn/T/codex-clipboard-1f39f86d-1a7d-4346-9fc3-5ab11c0fc3f8.png",
+    "sourcePage": 4,
+    "cropPixels": [
+      91,
+      112,
+      877,
+      1572
+    ],
+    "size": [
+      786,
+      1460
+    ]
+  },
+  {
+    "file": "assets/source-q17.png",
+    "source": "/var/folders/pn/jnf88cns4r9_lw3qvgp8jsyw0000gn/T/codex-clipboard-1f39f86d-1a7d-4346-9fc3-5ab11c0fc3f8.png",
+    "sourcePage": 4,
+    "cropPixels": [
+      91,
+      1684,
+      877,
+      2420
+    ],
+    "size": [
+      786,
+      736
+    ]
+  },
+  {
+    "file": "assets/source-q18.png",
+    "source": "/var/folders/pn/jnf88cns4r9_lw3qvgp8jsyw0000gn/T/codex-clipboard-1f39f86d-1a7d-4346-9fc3-5ab11c0fc3f8.png",
+    "sourcePage": 4,
+    "cropPixels": [
+      962,
+      112,
+      1748,
+      716
+    ],
+    "size": [
+      786,
+      604
+    ]
+  },
+  {
+    "file": "assets/source-q19.png",
+    "source": "/var/folders/pn/jnf88cns4r9_lw3qvgp8jsyw0000gn/T/codex-clipboard-1f39f86d-1a7d-4346-9fc3-5ab11c0fc3f8.png",
+    "sourcePage": 4,
+    "cropPixels": [
+      962,
+      856,
+      1748,
+      1501
+    ],
+    "size": [
+      786,
+      645
+    ]
+  },
+  {
+    "file": "assets/source-q20.png",
+    "source": "/var/folders/pn/jnf88cns4r9_lw3qvgp8jsyw0000gn/T/codex-clipboard-1f39f86d-1a7d-4346-9fc3-5ab11c0fc3f8.png",
+    "sourcePage": 4,
+    "cropPixels": [
+      962,
+      1740,
+      1748,
+      2385
+    ],
+    "size": [
+      786,
+      645
+    ]
+  },
+  {
+    "file": "assets/source-q21.png",
+    "source": "/var/folders/pn/jnf88cns4r9_lw3qvgp8jsyw0000gn/T/codex-clipboard-153e404b-af73-48bb-b1af-fc6d5023c16f.png",
+    "sourcePage": 5,
+    "cropPixels": [
+      73,
+      139,
+      866,
+      661
+    ],
+    "size": [
+      793,
+      522
+    ]
+  },
+  {
+    "file": "assets/source-q22.png",
+    "source": "/var/folders/pn/jnf88cns4r9_lw3qvgp8jsyw0000gn/T/codex-clipboard-153e404b-af73-48bb-b1af-fc6d5023c16f.png",
+    "sourcePage": 5,
+    "cropPixels": [
+      73,
+      1018,
+      866,
+      1534
+    ],
+    "size": [
+      793,
+      516
+    ]
+  },
+  {
+    "file": "assets/source-q23.png",
+    "source": "/var/folders/pn/jnf88cns4r9_lw3qvgp8jsyw0000gn/T/codex-clipboard-153e404b-af73-48bb-b1af-fc6d5023c16f.png",
+    "sourcePage": 5,
+    "cropPixels": [
+      73,
+      1844,
+      866,
+      2400
+    ],
+    "size": [
+      793,
+      556
+    ]
+  },
+  {
+    "file": "assets/source-q24.png",
+    "source": "/var/folders/pn/jnf88cns4r9_lw3qvgp8jsyw0000gn/T/codex-clipboard-153e404b-af73-48bb-b1af-fc6d5023c16f.png",
+    "sourcePage": 5,
+    "cropPixels": [
+      945,
+      152,
+      1744,
+      324
+    ],
+    "size": [
+      799,
+      172
+    ]
+  },
+  {
+    "file": "assets/source-q25.png",
+    "source": "/var/folders/pn/jnf88cns4r9_lw3qvgp8jsyw0000gn/T/codex-clipboard-153e404b-af73-48bb-b1af-fc6d5023c16f.png",
+    "sourcePage": 5,
+    "cropPixels": [
+      945,
+      1289,
+      1744,
+      1805
+    ],
+    "size": [
+      799,
+      516
+    ]
+  }
+]

@@ -1,0 +1,374 @@
+{
+  "round": 3,
+  "unitId": "reg_1781420075936_chap_1781420191007_unit_1788876965426",
+  "sourceTitle": "중1 실전모의고사(04)",
+  "questions": [
+    {
+      "number": 1,
+      "correctOptionNumbers": [
+        1,
+        3
+      ],
+      "imagePath": null,
+      "sourceImagePath": "assets/source-q01.png",
+      "replaced": false,
+      "replacementReason": "",
+      "verification": "보기 순서대로 $y=500x$, $y=x^2$, $y=80x$, $y=\\frac{100}{x}$, $y=10-2x$입니다. 이 중 $y=kx$ 꼴인 보기 $1,3$만 정비례입니다.",
+      "sourcePage": 1,
+      "sourceCorrectOptionNumbers": [
+        1,
+        3
+      ]
+    },
+    {
+      "number": 2,
+      "correctOptionNumbers": [
+        3,
+        5
+      ],
+      "imagePath": null,
+      "sourceImagePath": "assets/source-q02.png",
+      "replaced": false,
+      "replacementReason": "",
+      "verification": "보기 $1$은 정비례입니다. $a<0$이면 $-a>0$이므로 보기 $2$의 그래프는 제$1,3$사분면을 지납니다. 보기 $3$은 곱이 일정하여 반비례입니다. 낮과 밤은 $x+y=24$이므로 보기 $4$는 거짓입니다. 줄어든 길이는 $y=0.2x$이므로 보기 $5$는 참입니다.",
+      "sourcePage": 1,
+      "sourceCorrectOptionNumbers": [
+        3,
+        5
+      ]
+    },
+    {
+      "number": 3,
+      "correctOptionNumbers": [
+        3
+      ],
+      "imagePath": "assets/q03.png",
+      "sourceImagePath": "assets/source-q03.png",
+      "replaced": false,
+      "replacementReason": "",
+      "verification": "보기 $1$의 직선은 $(-2,6)$, 보기 $4$는 $(4,8)$, 보기 $5$는 $(6,2)$를 지나 각각 $-3,2,\\frac13$의 계수를 갖습니다. 보기 $2$의 곡선은 $(-2,6)$을 지나 곱이 $-12$입니다. 보기 $3$의 곡선은 $(6,2)$를 지나 곱이 $12$이므로 $y=\\frac{12}{x}$여야 합니다.",
+      "sourcePage": 1,
+      "sourceCorrectOptionNumbers": [
+        3
+      ]
+    },
+    {
+      "number": 4,
+      "correctOptionNumbers": [
+        5
+      ],
+      "imagePath": "assets/q04.png",
+      "sourceImagePath": "assets/source-q04.png",
+      "replaced": false,
+      "replacementReason": "",
+      "verification": "그래프는 원점과 $(5,3)$을 지나므로 $y=\\frac35x$입니다. 각 가로좌표에 대한 세로좌표는 $-9,-\\frac{18}{25},\\frac9{25},\\frac95,6$입니다. 보기의 세로좌표와 같은 것은 마지막 점뿐입니다.",
+      "sourcePage": 1,
+      "sourceCorrectOptionNumbers": [
+        5
+      ]
+    },
+    {
+      "number": 5,
+      "correctOptionNumbers": [
+        2
+      ],
+      "imagePath": null,
+      "sourceImagePath": "assets/source-q05.png",
+      "replaced": false,
+      "replacementReason": "",
+      "verification": "$2a-4=\\frac12(-a+2)$입니다. 양변에 $2$를 곱하면 $4a-8=-a+2$, 따라서 $5a=10$이므로 $a=2$입니다. 이때 점은 원점으로 조건을 만족합니다.",
+      "sourcePage": 2,
+      "sourceCorrectOptionNumbers": [
+        2
+      ]
+    },
+    {
+      "number": 6,
+      "correctOptionNumbers": [
+        3
+      ],
+      "imagePath": null,
+      "sourceImagePath": "assets/source-q06.png",
+      "replaced": false,
+      "replacementReason": "",
+      "verification": "$x$는 $\\pm1,\\pm2,\\pm5,\\pm10$ 중 하나여야 합니다. $-3<x\\le8$을 만족하는 것은 $-2,-1,1,2,5$로 $5$개입니다. 대응점은 $(-2,-5),(-1,-10),(1,10),(2,5),(5,2)$입니다.",
+      "sourcePage": 2,
+      "sourceCorrectOptionNumbers": [
+        3
+      ]
+    },
+    {
+      "number": 7,
+      "correctOptionNumbers": [
+        5
+      ],
+      "imagePath": "assets/q07.png",
+      "sourceImagePath": "assets/source-q07.png",
+      "replaced": false,
+      "replacementReason": "",
+      "verification": "$b=-\\frac32\\times(-2)=3$입니다. $a=(-2)\\times3=-6$이므로 $a+b=-6+3=-3$입니다.",
+      "sourcePage": 2,
+      "sourceCorrectOptionNumbers": [
+        5
+      ]
+    },
+    {
+      "number": 8,
+      "correctOptionNumbers": [
+        1
+      ],
+      "imagePath": null,
+      "sourceImagePath": "assets/source-q08.png",
+      "replaced": false,
+      "replacementReason": "",
+      "verification": "$a=6\\times\\frac12=3$입니다. $-9b=3$이므로 $b=-\\frac13$입니다. 따라서 $a+3b=3-1=2$입니다.",
+      "sourcePage": 2,
+      "sourceCorrectOptionNumbers": [
+        1
+      ]
+    },
+    {
+      "number": 9,
+      "correctOptionNumbers": [
+        2
+      ],
+      "imagePath": null,
+      "sourceImagePath": "assets/source-q09.png",
+      "replaced": false,
+      "replacementReason": "",
+      "verification": "$1$시간은 $60$분이므로 용량은 $15\\times60=900\\,mL$입니다. $900\\div36=25$이므로 매분 $25\\,mL$씩 넣어야 합니다.",
+      "sourcePage": 2,
+      "sourceCorrectOptionNumbers": [
+        2
+      ]
+    },
+    {
+      "number": 10,
+      "correctOptionNumbers": [
+        1,
+        4
+      ],
+      "imagePath": "assets/q10.png",
+      "sourceImagePath": "assets/source-q10.png",
+      "replaced": false,
+      "replacementReason": "",
+      "verification": "보기 $1$은 직선과 반직선을 길이처럼 절반으로 표현하여 옳지 않습니다. $CA,CB$는 시작점과 방향이 같고 중점 조건으로 $AC=CD$입니다. $AD=3t$, $AC=\\frac32t$, $BC=\\frac12t$입니다. $BC=4\\,cm$이면 $t=8\\,cm$, $AC=12\\,cm$여서 보기 $4$도 틀립니다. 네 점은 한 직선 위에 있으므로 보기 $5$는 참입니다.",
+      "sourcePage": 2,
+      "sourceCorrectOptionNumbers": [
+        1,
+        4
+      ]
+    },
+    {
+      "number": 11,
+      "correctOptionNumbers": [
+        5
+      ],
+      "imagePath": "assets/q11.png",
+      "sourceImagePath": "assets/source-q11.png",
+      "replaced": false,
+      "replacementReason": "",
+      "verification": "$l\\perp AB$, $AM=BM$이므로 ㄱ은 참이고 $AM=PM$은 주어지지 않아 ㄴ은 거짓입니다. $PM\\perp AB$이므로 ㄷ은 참입니다. $A$에서 $l$까지의 거리는 $AM=BM$이므로 ㄹ도 참입니다.",
+      "sourcePage": 3,
+      "sourceCorrectOptionNumbers": [
+        5
+      ]
+    },
+    {
+      "number": 12,
+      "correctOptionNumbers": [
+        3
+      ],
+      "imagePath": "assets/q12.png",
+      "sourceImagePath": "assets/source-q12.png",
+      "replaced": false,
+      "replacementReason": "",
+      "verification": "$90^\\circ+t=6t$이므로 $t=18^\\circ$입니다. $DOE=u$, $BOE=2u$이면 $18^\\circ+3u=90^\\circ$에서 $u=24^\\circ$입니다. 따라서 $COE=18^\\circ+24^\\circ=42^\\circ$입니다.",
+      "sourcePage": 3,
+      "sourceCorrectOptionNumbers": [
+        3
+      ]
+    },
+    {
+      "number": 13,
+      "correctOptionNumbers": [
+        4
+      ],
+      "imagePath": "assets/q13.png",
+      "sourceImagePath": "assets/source-q13.png",
+      "replaced": false,
+      "replacementReason": "",
+      "verification": "밑면과 수직인 면은 $BFGC,BFEA,AEHD$의 $3$개이고 $BFGC$의 모서리는 $BF,FG,GC,CB$입니다. $BC\\parallel EH$도 참입니다. $AE,DH$는 같은 면 $AEHD$에 있어 꼬인 위치가 아닙니다. $AB$와 만나는 모서리는 $AD,AE,BC,BF$의 $4$개입니다.",
+      "sourcePage": 3,
+      "sourceCorrectOptionNumbers": [
+        4
+      ]
+    },
+    {
+      "number": 14,
+      "correctOptionNumbers": [
+        5
+      ],
+      "imagePath": "assets/q14.png",
+      "sourceImagePath": "assets/source-q14.png",
+      "replaced": false,
+      "replacementReason": "",
+      "verification": "$l$을 가로지르는 직선으로 보면 $c$의 엇각은 $s$이고 동위각은 $q$이므로 ㄱ은 거짓, ㄴ은 참입니다. $n$을 가로지르는 직선으로 보면 $c,g$는 동위각이어서 ㄷ은 참입니다. $g+h=180^\\circ$이므로 $c+h=180^\\circ$이면 $c=g$가 되어 ㅁ도 참입니다. $c=h$만으로는 평행을 보장하지 않아 ㄹ은 거짓입니다.",
+      "sourcePage": 3,
+      "sourceCorrectOptionNumbers": [
+        5
+      ]
+    },
+    {
+      "number": 15,
+      "correctOptionNumbers": [
+        4
+      ],
+      "imagePath": "assets/q15.png",
+      "sourceImagePath": "assets/source-q15.png",
+      "replaced": false,
+      "replacementReason": "",
+      "verification": "보조선을 이용하면 $x-33^\\circ=76^\\circ-y$이므로 $x+y=109^\\circ$입니다. 주어진 평행 조건에서 각의 크기가 같음을 이용했으므로 성질 (가)를 사용했습니다.",
+      "sourcePage": 4,
+      "sourceCorrectOptionNumbers": [
+        4
+      ]
+    },
+    {
+      "number": 16,
+      "correctOptionNumbers": [
+        1
+      ],
+      "imagePath": null,
+      "sourceImagePath": "assets/source-q16.png",
+      "replaced": false,
+      "replacementReason": "",
+      "verification": "곡면이 포함되면 교선은 곡선일 수 있어 ㄱ은 거짓입니다. ㄴ은 시작점이 다른 반직선, ㄷ은 맞꼭지각의 성질이므로 참입니다. ㄹ에는 평행인 경우가 빠졌습니다. ㅁ의 두 직선은 만나거나 평행하거나 꼬일 수 있습니다. ㅂ은 평행 조건이 없으므로 거짓입니다.",
+      "sourcePage": 4,
+      "sourceCorrectOptionNumbers": [
+        1
+      ]
+    },
+    {
+      "number": 17,
+      "correctOptionNumbers": [
+        1
+      ],
+      "imagePath": "assets/q17.png",
+      "sourceImagePath": "assets/source-q17.png",
+      "replaced": false,
+      "replacementReason": "",
+      "verification": "처음 그릴 각은 꼭짓점이 $B$인 $\\angle XBY$입니다. $\\angle BAC$는 꼭짓점이 $A$이므로 맞지 않습니다. $B$ 중심으로 반지름 $c$를 옮겨 $A$, 반지름 $a$를 옮겨 $C$를 정한 뒤 $AC$를 이으면 됩니다. 나머지 보기는 모두 옳습니다.",
+      "sourcePage": 4,
+      "sourceCorrectOptionNumbers": [
+        1
+      ]
+    },
+    {
+      "number": 18,
+      "correctOptionNumbers": [
+        1
+      ],
+      "imagePath": "assets/q18.png",
+      "sourceImagePath": "assets/source-q18.png",
+      "replaced": false,
+      "replacementReason": "",
+      "verification": "$t>3$이고 $t<17$이므로 $3<t<17$입니다. 보기 중 $2\\,km$만 이 범위를 벗어나고 나머지는 모두 범위 안에 있습니다.",
+      "sourcePage": 4,
+      "sourceCorrectOptionNumbers": [
+        1
+      ]
+    },
+    {
+      "number": 19,
+      "correctOptionNumbers": [
+        3
+      ],
+      "imagePath": null,
+      "sourceImagePath": "assets/source-q19.png",
+      "replaced": false,
+      "replacementReason": "",
+      "verification": "보기 $1$은 $2+5<8$이라 불가능하고, 보기 $4$는 두 각의 합이 $180^\\circ$라 불가능합니다. 보기 $5$는 크기를 정할 수 없습니다. 보기 $2$는 끼인각이 아니며 주어진 수치에서 두 삼각형이 가능합니다. 보기 $3$은 $AB,AC$와 그 끼인각 $A$가 주어져 하나로 정해집니다.",
+      "sourcePage": 5,
+      "sourceCorrectOptionNumbers": [
+        3
+      ]
+    },
+    {
+      "number": 20,
+      "correctOptionNumbers": [
+        5
+      ],
+      "imagePath": "assets/q20.png",
+      "sourceImagePath": "assets/source-q20.png",
+      "replaced": false,
+      "replacementReason": "",
+      "verification": "$AC=BC$, $CD=CE$, $\\angle ACD=\\angle BCE=120^\\circ$이므로 $\\triangle ACD\\cong\\triangle BCE$입니다. ㄱ과 ㄹ은 참, 순서가 다른 ㄷ은 거짓입니다. $\\triangle AFG$와 $\\triangle BFC$는 $A,B$의 각이 같고 $F$의 각이 맞꼭지각이므로 $\\angle AGB=\\angle BCF=60^\\circ$입니다. $\\angle BFC=\\angle FEC+\\angle FCE=\\angle FEC+60^\\circ=\\angle GED$입니다. 또 $\\triangle AHC$와 $\\triangle EHD$에서 $H$의 각이 같고 $C,E$의 각이 각각 $60^\\circ$여서 $\\angle FAG=\\angle EDH$입니다. 참은 $5$개입니다.",
+      "sourcePage": 5,
+      "sourceCorrectOptionNumbers": [
+        5
+      ]
+    },
+    {
+      "number": 21,
+      "correctOptionNumbers": [
+        3
+      ],
+      "imagePath": "assets/q21.png",
+      "sourceImagePath": "assets/source-q21.png",
+      "replaced": false,
+      "replacementReason": "",
+      "verification": "$x=4$일 때 $y=-3$, $x=-4$일 때 $y=3$입니다. 따라서 $(4,-3),(-4,3)$과 원점을 지나는 직선이 정답입니다. 그림의 보기 $3$이 이에 해당합니다.",
+      "sourcePage": 5,
+      "adaptation": "원래 그래프 직접 그리기 문항을 두 점이 표시된 다섯 그래프에서 선택하도록 변환; 식과 평가 개념 유지."
+    },
+    {
+      "number": 22,
+      "correctOptionNumbers": [
+        3
+      ],
+      "imagePath": "assets/q22.png",
+      "sourceImagePath": "assets/source-q22.png",
+      "replaced": false,
+      "replacementReason": "",
+      "verification": "그림에서 $a>0$이고 $AP=4a$, $BQ=8a$, $PQ=8-4=4$입니다. 넓이는 $\\frac12(4a+8a)\\times4=24a=18$이므로 $a=\\frac34$입니다.",
+      "sourcePage": 5
+    },
+    {
+      "number": 23,
+      "correctOptionNumbers": [
+        4
+      ],
+      "imagePath": "assets/q23.png",
+      "sourceImagePath": "assets/source-q23.png",
+      "replaced": true,
+      "replacementReason": "원본 4x의 도 기호가 중복되어 새 그림에 (x+55)도, (2x-15)도, 4x도로 일관되게 표기. 정답105도 유지.",
+      "verification": "$(x+55)+(2x-15)+4x=180$이므로 $7x=140$, $x=20$입니다. $\\angle AOF=75^\\circ$이므로 $\\angle AOC=180^\\circ-75^\\circ=105^\\circ$입니다.",
+      "sourcePage": 6
+    },
+    {
+      "number": 24,
+      "correctOptionNumbers": [
+        1
+      ],
+      "imagePath": "assets/q24.png",
+      "sourceImagePath": "assets/source-q24.png",
+      "replaced": false,
+      "replacementReason": "",
+      "verification": "$AB$와 꼬인 모서리는 $EF,DG,HI,IJ,IF,CG$입니다. $HJ$는 $AB$와 같은 윗면에 놓이므로 포함하지 않습니다. 면 $ABED$와 평행한 것은 $CG,CJ,JI,IF,FG$로 $a=5$입니다. 면 $BEFIH$와 수직인 것은 $AB,DE,FG,CJ$로 $b=4$입니다. 따라서 $a+b=9$입니다.",
+      "sourcePage": 6
+    },
+    {
+      "number": 25,
+      "correctOptionNumbers": [
+        1
+      ],
+      "imagePath": "assets/q25.png",
+      "sourceImagePath": "assets/source-q25.png",
+      "replaced": false,
+      "replacementReason": "",
+      "verification": "첫 근거는 주어진 $OA=OB$입니다. 둘째는 $OD=OB+BD=OA+AC=OC$입니다. 셋째는 $\\angle AOD=\\angle BOC$가 공통각이라는 것입니다. 두 변과 끼인각이 같아 $\\triangle OAD\\cong\\triangle OBC$인 $SAS$ 합동입니다. 주어진 두 각의 수치는 이 합동 증명에 필요하지 않습니다.",
+      "sourcePage": 6
+    }
+  ]
+}

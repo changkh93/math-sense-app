@@ -1,0 +1,165 @@
+{
+  "status": "READY_TO_REGISTER",
+  "sourceChoiceAnswerAudit": {
+    "questions": 60,
+    "matches": 60
+  },
+  "all75IndependentlySolved": true,
+  "figureCount": 53,
+  "visualQA": "All 53 figures inspected; clipped labels recaptured; 4 figures newly drawn",
+  "checks": {
+    "integerTriangles": [
+      [
+        7,
+        7,
+        11
+      ],
+      [
+        8,
+        8,
+        9
+      ],
+      [
+        9,
+        9,
+        7
+      ],
+      [
+        10,
+        10,
+        5
+      ],
+      [
+        11,
+        11,
+        3
+      ],
+      [
+        12,
+        12,
+        1
+      ]
+    ],
+    "integerPoints": [
+      [
+        -2,
+        -5
+      ],
+      [
+        -1,
+        -10
+      ],
+      [
+        1,
+        10
+      ],
+      [
+        2,
+        5
+      ],
+      [
+        5,
+        2
+      ]
+    ],
+    "round2Q14SkewEdges": [
+      "AI",
+      "AD",
+      "AE",
+      "CD",
+      "DH",
+      "EF",
+      "EH",
+      "GH"
+    ],
+    "round3Q24SkewEdges": [
+      "DG",
+      "EF",
+      "FI",
+      "CG",
+      "HI",
+      "IJ"
+    ],
+    "round3Q24Parallel": [
+      "FI",
+      "FG",
+      "CG",
+      "CJ",
+      "IJ"
+    ],
+    "round3Q24Perpendicular": [
+      "AB",
+      "DE",
+      "FG",
+      "CJ"
+    ],
+    "shortAnswerCalculations": {
+      "2": [
+        1.125,
+        "CD",
+        245,
+        26.0,
+        90
+      ],
+      "3": [
+        -0.75,
+        0.75,
+        105.0,
+        9,
+        "OBC SAS"
+      ],
+      "4": [
+        180.0,
+        1.3333333333333333,
+        4.0,
+        28.0,
+        90
+      ]
+    }
+  },
+  "rounds": [
+    {
+      "round": 2,
+      "unitId": "reg_1781420075936_chap_1781420191007_unit_1788876955807",
+      "count": 25,
+      "images": 18,
+      "sha256": "239e0d636cd7820087afeca9fb6d6608f0c97d282261948c48772efc191b15c4",
+      "corrections": [
+        {
+          "number": 25,
+          "reason": "원문 ADE=30도는 E가 BC 위에 있을 때 불가능(45도 이상). BAE=30도로 최소 수정하고 정확한 새 그림 작성. 원문 해설의 F/G 표기 혼선도 수정."
+        }
+      ]
+    },
+    {
+      "round": 3,
+      "unitId": "reg_1781420075936_chap_1781420191007_unit_1788876965426",
+      "count": 25,
+      "images": 17,
+      "sha256": "c786f062c5fc8a1bf6d05d702565d44859cb7b2242a78312e3079041a87e3103",
+      "corrections": [
+        {
+          "number": 23,
+          "reason": "원본 4x의 도 기호가 중복되어 새 그림에 (x+55)도, (2x-15)도, 4x도로 일관되게 표기. 정답105도 유지."
+        }
+      ]
+    },
+    {
+      "round": 4,
+      "unitId": "reg_1781420075936_chap_1781420191007_unit_1788876975928",
+      "count": 25,
+      "images": 18,
+      "sha256": "5b3a73258928d7c5da63717930dd96a9562b106c579906b88f8966fc7f5a0b42",
+      "corrections": [
+        {
+          "number": 18,
+          "reason": "원문 각 A=40도,C=60도와 변 EF=8,ED=5는 함께 성립하지 않는다. 불필요한 ED=5 조건을 제거하고 보기2를 AB=DE로 수정하여 합동 대응 개념 및 정답5 유지."
+        },
+        {
+          "number": 23,
+          "reason": "원본 그림의 두 곡선 이름이 넓이 조건과 답안 a=4에 반대로 붙어 있음. 위 곡선 y=12/x, 아래 곡선 y=a/x로 정확한 새 그림 작성."
+        }
+      ]
+    }
+  ]
+}

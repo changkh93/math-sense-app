@@ -1,0 +1,47 @@
+{
+  "status": "REGISTERED_AND_VERIFIED",
+  "questionCount": 80,
+  "imageCount": 71,
+  "rounds": [
+    {
+      "round": 1,
+      "title": "2학년 2학기 중간 1회",
+      "unitId": "reg_1781420075936_chap_1781420235224_unit_1788901151685",
+      "quizCount": 20,
+      "imageCount": 19,
+      "verifiedAt": "2026-09-08T21:38:13.200Z",
+      "allFieldsReadBackMatched": true,
+      "allImageHTTP200AndSHA256Matched": true
+    },
+    {
+      "round": 2,
+      "title": "2학년 2학기 중간 2회",
+      "unitId": "reg_1781420075936_chap_1781420235224_unit_1788901191909",
+      "quizCount": 20,
+      "imageCount": 17,
+      "verifiedAt": "2026-09-08T21:38:57.549Z",
+      "allFieldsReadBackMatched": true,
+      "allImageHTTP200AndSHA256Matched": true
+    },
+    {
+      "round": 3,
+      "title": "2학년 2학기 중간 3회",
+      "unitId": "reg_1781420075936_chap_1781420235224_unit_1788901201841",
+      "quizCount": 20,
+      "imageCount": 17,
+      "verifiedAt": "2026-09-08T21:39:22.741Z",
+      "allFieldsReadBackMatched": true,
+      "allImageHTTP200AndSHA256Matched": true
+    },
+    {
+      "round": 4,
+      "title": "2학년 2학기 중간 4회",
+      "unitId": "reg_1781420075936_chap_1781420235224_unit_1788901261901",
+      "quizCount": 20,
+      "imageCount": 18,
+      "verifiedAt": "2026-09-08T21:39:50.429Z",
+      "allFieldsReadBackMatched": true,
+      "allImageHTTP200AndSHA256Matched": true
+    }
+  ]
+}

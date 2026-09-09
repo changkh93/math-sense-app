@@ -1,0 +1,371 @@
+{
+  "round": 4,
+  "unitId": "reg_1781420075936_chap_1781420191007_unit_1788876975928",
+  "sourceTitle": "중1 실전모의고사(05)",
+  "questions": [
+    {
+      "number": 1,
+      "correctOptionNumbers": [
+        1
+      ],
+      "imagePath": null,
+      "sourceImagePath": "assets/source-q01.png",
+      "replaced": false,
+      "replacementReason": "",
+      "verification": "ㄱ은 $y=kx$에서 $\\frac yx=k$이므로 참입니다. ㄴ과 ㄹ은 함께 증가한다는 사실만으로 일정한 비를 보장하지 못합니다. ㄷ과 ㅁ도 감소한다는 사실만으로 일정한 곱을 보장하지 못하므로 모두 거짓입니다.",
+      "sourcePage": 1,
+      "sourceCorrectOptionNumbers": [
+        1
+      ]
+    },
+    {
+      "number": 2,
+      "correctOptionNumbers": [
+        3
+      ],
+      "imagePath": "assets/q02.png",
+      "sourceImagePath": "assets/source-q02.png",
+      "replaced": false,
+      "replacementReason": "",
+      "verification": "$A=(3,6)$이므로 정사각형 한 변은 $6$입니다. $D=(3+6,6)=(9,6)$이므로 반비례 계수는 $a=9\\times6=54$입니다.",
+      "sourcePage": 1,
+      "sourceCorrectOptionNumbers": [
+        3
+      ]
+    },
+    {
+      "number": 3,
+      "correctOptionNumbers": [
+        3
+      ],
+      "imagePath": "assets/q03.png",
+      "sourceImagePath": "assets/source-q03.png",
+      "replaced": false,
+      "replacementReason": "",
+      "verification": "$-6=\\frac{12}{b}$에서 $b=-2$입니다. $-6=a(-2)$이므로 $a=3$입니다. $3=3c$이므로 $c=1$입니다. 따라서 $a+b+c=3-2+1=2$입니다.",
+      "sourcePage": 1,
+      "sourceCorrectOptionNumbers": [
+        3
+      ]
+    },
+    {
+      "number": 4,
+      "correctOptionNumbers": [
+        2
+      ],
+      "imagePath": "assets/q04.png",
+      "sourceImagePath": "assets/source-q04.png",
+      "replaced": false,
+      "replacementReason": "",
+      "verification": "$A=(-3,-\\frac a3)$, $C=(3,\\frac a3)$이고 그림에서 $a<0$입니다. 가로는 $6$, 세로는 $-\\frac{2a}{3}$입니다. $6\\times(-\\frac{2a}{3})=60$에서 $-4a=60$이므로 $a=-15$입니다.",
+      "sourcePage": 1,
+      "sourceCorrectOptionNumbers": [
+        2
+      ]
+    },
+    {
+      "number": 5,
+      "correctOptionNumbers": [
+        3
+      ],
+      "imagePath": "assets/q05.png",
+      "sourceImagePath": "assets/source-q05.png",
+      "replaced": false,
+      "replacementReason": "",
+      "verification": "$y=\\frac12\\times x\\times8=4x$이고 $0\\le x\\le12$입니다. 양의 $x$에서 양의 $y$이므로 제$1$사분면을 지납니다. 정비례이므로 보기 $1,2,5$는 틀리고, $24=4x$에서 $x=6$이므로 보기 $4$도 틀립니다.",
+      "sourcePage": 2,
+      "sourceCorrectOptionNumbers": [
+        3
+      ]
+    },
+    {
+      "number": 6,
+      "correctOptionNumbers": [
+        2
+      ],
+      "imagePath": null,
+      "sourceImagePath": "assets/source-q06.png",
+      "replaced": false,
+      "replacementReason": "",
+      "verification": "$xy=8\\times20=160$, $y=\\frac{160}{x}$이므로 ㄴ은 참이고 ㄱ,ㄷ은 거짓입니다. 인원이 두 배가 되면 일수는 절반이므로 ㄹ은 거짓입니다. $y=10$일 때 $x=16$이므로 ㅁ은 참입니다.",
+      "sourcePage": 2,
+      "sourceCorrectOptionNumbers": [
+        2
+      ]
+    },
+    {
+      "number": 7,
+      "correctOptionNumbers": [
+        1
+      ],
+      "imagePath": null,
+      "sourceImagePath": "assets/source-q07.png",
+      "replaced": false,
+      "replacementReason": "",
+      "verification": "같은 평면에 수직인 두 직선은 같은 방향으로 뻗어 평행하므로 ㄱ은 참입니다. ㄴ에는 꼬인 위치도 가능하므로 거짓입니다. ㄷ의 두 직선은 만나면 수직이지만 꼬인 위치일 수도 있습니다. ㄹ에는 평행한 경우가 빠져 있습니다.",
+      "sourcePage": 2,
+      "sourceCorrectOptionNumbers": [
+        1
+      ]
+    },
+    {
+      "number": 8,
+      "correctOptionNumbers": [
+        2
+      ],
+      "imagePath": "assets/q08.png",
+      "sourceImagePath": "assets/source-q08.png",
+      "replaced": false,
+      "replacementReason": "",
+      "verification": "$MQ$와 평행한 면은 $BFGPN$ 하나이며 수직인 면은 없습니다. $MQ$와 수직인 모서리는 $MN,QP$, 평행한 모서리는 $NP$입니다. 꼬인 모서리는 $AB,BN,BF,FG,GH,EF,PG$의 $7$개입니다. 따라서 보기 $2$가 틀립니다.",
+      "sourcePage": 2,
+      "sourceCorrectOptionNumbers": [
+        2
+      ]
+    },
+    {
+      "number": 9,
+      "correctOptionNumbers": [
+        3
+      ],
+      "imagePath": "assets/q09.png",
+      "sourceImagePath": "assets/source-q09.png",
+      "replaced": false,
+      "replacementReason": "",
+      "verification": "평행선의 각을 옮기면 $\\angle BCD=2u+2v=120^\\circ$입니다. 같은 방식으로 $\\angle BFD=u+v$이므로 $\\angle BFD=60^\\circ$입니다.",
+      "sourcePage": 3,
+      "sourceCorrectOptionNumbers": [
+        3
+      ]
+    },
+    {
+      "number": 10,
+      "correctOptionNumbers": [
+        1
+      ],
+      "imagePath": "assets/q10.png",
+      "sourceImagePath": "assets/source-q10.png",
+      "replaced": false,
+      "replacementReason": "",
+      "verification": "윗부분 작은 각은 $180^\\circ-(3x+8^\\circ)$입니다. 가운데 선분의 기울어진 각은 아래 꺾임각 $(x+10^\\circ)$에서 $(x-6^\\circ)$를 뺀 $16^\\circ$입니다. 따라서 $x=180^\\circ-(3x+8^\\circ)+16^\\circ$입니다. $4x=188^\\circ$이므로 $x=47^\\circ$입니다.",
+      "sourcePage": 3,
+      "sourceCorrectOptionNumbers": [
+        1
+      ]
+    },
+    {
+      "number": 11,
+      "correctOptionNumbers": [
+        4
+      ],
+      "imagePath": "assets/q11.png",
+      "sourceImagePath": "assets/source-q11.png",
+      "replaced": false,
+      "replacementReason": "",
+      "verification": "$(3x-6^\\circ)+(6x+6^\\circ)=90^\\circ$에서 $x=10^\\circ$입니다. $\\angle BCE=90^\\circ-66^\\circ=24^\\circ$입니다. 정사각형의 대각선 $BD$는 꼭짓점 각을 이등분하므로 $\\angle EBC=180^\\circ-45^\\circ=135^\\circ$입니다. $\\angle BEC=180^\\circ-135^\\circ-24^\\circ=21^\\circ$입니다.",
+      "sourcePage": 3,
+      "sourceCorrectOptionNumbers": [
+        4
+      ]
+    },
+    {
+      "number": 12,
+      "correctOptionNumbers": [
+        2
+      ],
+      "imagePath": "assets/q12.png",
+      "sourceImagePath": "assets/source-q12.png",
+      "replaced": false,
+      "replacementReason": "",
+      "verification": "$AB=BC$, $BE=CF$, 끼인각이 직각이므로 $\\triangle ABE\\cong\\triangle BCF$입니다. 따라서 $\\angle BAE=\\angle CBF$이고 $\\angle BAE+\\angle BFC=90^\\circ$입니다. 두 선분 $AE,BF$는 수직이어서 $\\angle AGF=90^\\circ$입니다. 사각형 $ADFG$에서 $D,G$의 각이 직각이므로 $\\angle GAD+\\angle GFD=180^\\circ$입니다. $\\triangle ABC\\cong\\triangle DCB$도 세 변이 같아 성립합니다. 따라서 보기 $2$만 틀립니다.",
+      "sourcePage": 3,
+      "sourceCorrectOptionNumbers": [
+        2
+      ]
+    },
+    {
+      "number": 13,
+      "correctOptionNumbers": [
+        5
+      ],
+      "imagePath": "assets/q13.png",
+      "sourceImagePath": "assets/source-q13.png",
+      "replaced": false,
+      "replacementReason": "",
+      "verification": "$MN=\\frac12AB+\\frac12BC=\\frac12AC$이므로 $AC=40\\,cm$입니다. $AB=10\\,cm$, $AM=5\\,cm$이므로 $MC=40-5=35\\,cm$입니다.",
+      "sourcePage": 3,
+      "sourceCorrectOptionNumbers": [
+        5
+      ]
+    },
+    {
+      "number": 14,
+      "correctOptionNumbers": [
+        3,
+        4
+      ],
+      "imagePath": "assets/q14.png",
+      "sourceImagePath": "assets/source-q14.png",
+      "replaced": false,
+      "replacementReason": "",
+      "verification": "접으면 면 $MNKL$과 $HI$는 한 점에서 만나며 $NC,JK$는 꼬인 위치이므로 보기 $1,2$는 거짓입니다. $EH$는 면 $KDEJ$에 수직이고 $BC,GF$는 접힌 입체에서 끝점에서 만나므로 보기 $3,4$는 참입니다. $ML,EJ$도 끝점에서 만나므로 보기 $5$는 거짓입니다.",
+      "sourcePage": 3,
+      "sourceCorrectOptionNumbers": [
+        3,
+        4
+      ]
+    },
+    {
+      "number": 15,
+      "correctOptionNumbers": [
+        1,
+        4
+      ],
+      "imagePath": null,
+      "sourceImagePath": "assets/source-q15.png",
+      "replaced": false,
+      "replacementReason": "",
+      "verification": "한 평면에 수직인 두 직선은 같은 방향이어서 보기 $1$은 참입니다. 한 평면 위의 두 직선은 만나거나 평행하므로 보기 $4$도 참입니다. 같은 평면과 평행한 두 직선끼리는 교차·평행·꼬인 위치가 모두 가능하여 보기 $2,3$은 거짓입니다. 보기 $5$의 두 방향은 평행하지 않아 거짓입니다.",
+      "sourcePage": 4,
+      "sourceCorrectOptionNumbers": [
+        1,
+        4
+      ]
+    },
+    {
+      "number": 16,
+      "correctOptionNumbers": [
+        3
+      ],
+      "imagePath": "assets/q16.png",
+      "sourceImagePath": "assets/source-q16.png",
+      "replaced": false,
+      "replacementReason": "",
+      "verification": "$BC$는 오른쪽 수평선과 $180^\\circ-115^\\circ=65^\\circ$를 이룹니다. $C$의 각이 $85^\\circ$이므로 $CD$는 오른쪽 아래로 수평선과 $30^\\circ$를 이룹니다. $ED$는 오른쪽 수평선과 $100^\\circ$이므로 $DE$의 아래쪽 기울기는 $80^\\circ$입니다. $D$에서 $x=180^\\circ+30^\\circ-80^\\circ=130^\\circ$입니다.",
+      "sourcePage": 4,
+      "sourceCorrectOptionNumbers": [
+        3
+      ]
+    },
+    {
+      "number": 17,
+      "correctOptionNumbers": [
+        5
+      ],
+      "imagePath": null,
+      "sourceImagePath": "assets/source-q17.png",
+      "replaced": false,
+      "replacementReason": "",
+      "verification": "보기 $1,4$는 한 변 다음 끼인각으로 방향을 정하고 다른 변을 옮깁니다. 보기 $2,3$은 각을 먼저 정한 뒤 양쪽 변 길이를 옮깁니다. 보기 $5$는 끼인각을 정하기 전에 두 변을 각각 그리므로 주어진 각에 맞는 위치가 정해지지 않습니다. 따라서 제시된 기본 작도 순서로 옳지 않습니다.",
+      "sourcePage": 4,
+      "sourceCorrectOptionNumbers": [
+        5
+      ]
+    },
+    {
+      "number": 18,
+      "correctOptionNumbers": [
+        5
+      ],
+      "imagePath": null,
+      "sourceImagePath": "assets/source-q18.png",
+      "replaced": true,
+      "replacementReason": "원문 각 A=40도,C=60도와 변 EF=8,ED=5는 함께 성립하지 않는다. 불필요한 ED=5 조건을 제거하고 보기2를 AB=DE로 수정하여 합동 대응 개념 및 정답5 유지.",
+      "verification": "$\\angle B=180^\\circ-40^\\circ-60^\\circ=80^\\circ$입니다. 대응 관계에 따라 $\\angle D=40^\\circ$, $\\angle E=80^\\circ$, $AB=DE$, $BC=EF=8\\,cm$입니다. 따라서 보기 $5$만 틀립니다.",
+      "sourcePage": 4,
+      "sourceCorrectOptionNumbers": [
+        5
+      ]
+    },
+    {
+      "number": 19,
+      "correctOptionNumbers": [
+        1
+      ],
+      "imagePath": "assets/q19.png",
+      "sourceImagePath": "assets/source-q19.png",
+      "replaced": false,
+      "replacementReason": "",
+      "verification": "$OB=OC$, $\\angle OBE=\\angle OCI=45^\\circ$이고 $\\angle BOE=90^\\circ-\\angle EOC=\\angle COI$이므로 두 삼각형은 $ASA$ 합동입니다. 따라서 $OE=OI$, $BE=CI$이며 $EC+CI=EC+BE=BC=4\\,cm$입니다. 넓이도 $OECI=OEC+OCI=OEC+OBE=OBC$입니다. $\\angle EOC$는 두 번째 정사각형의 회전 위치에 따라 달라지므로 $45^\\circ$로 정해지지 않습니다.",
+      "sourcePage": 4,
+      "sourceCorrectOptionNumbers": [
+        1
+      ]
+    },
+    {
+      "number": 20,
+      "correctOptionNumbers": [
+        1
+      ],
+      "imagePath": "assets/q20.png",
+      "sourceImagePath": "assets/source-q20.png",
+      "replaced": false,
+      "replacementReason": "",
+      "verification": "$AD=CD$, $DE=DG$이고 $DF$가 작은 정사각형의 대각선이므로 $\\angle ADE=\\angle CDG=45^\\circ$입니다. 따라서 $\\triangle ADE\\cong\\triangle CDG$입니다. $\\angle DCG=\\angle DAE=28^\\circ$이므로 $\\angle DGC=180^\\circ-45^\\circ-28^\\circ=107^\\circ$입니다. 작은 정사각형에서 $\\angle DGF=90^\\circ$이므로 $\\angle CGF=107^\\circ-90^\\circ=17^\\circ$입니다.",
+      "sourcePage": 4,
+      "sourceCorrectOptionNumbers": [
+        1
+      ]
+    },
+    {
+      "number": 21,
+      "correctOptionNumbers": [
+        4
+      ],
+      "imagePath": null,
+      "sourceImagePath": "assets/source-q21.png",
+      "replaced": false,
+      "replacementReason": "",
+      "verification": "$A$는 매분 $20\\times30=600$개의 톱니가 지나가므로 $a=600\\times3=1800$입니다. $B$는 매분 $60b=600$에서 $b=10$회 돕니다. 따라서 $\\frac ab=\\frac{1800}{10}=180$입니다.",
+      "sourcePage": 5
+    },
+    {
+      "number": 22,
+      "correctOptionNumbers": [
+        3
+      ],
+      "imagePath": "assets/q22.png",
+      "sourceImagePath": "assets/source-q22.png",
+      "replaced": false,
+      "replacementReason": "",
+      "verification": "$A=(3,9)$, $B=(3,-1)$입니다. 밑변 $AB$의 중점은 $P=(3,\\frac{9+(-1)}2)=(3,4)$입니다. $y=ax$가 $P$를 지나므로 $4=3a$, $a=\\frac43$입니다.",
+      "sourcePage": 5
+    },
+    {
+      "number": 23,
+      "correctOptionNumbers": [
+        2
+      ],
+      "imagePath": "assets/q23.png",
+      "sourceImagePath": "assets/source-q23.png",
+      "replaced": true,
+      "replacementReason": "원본 그림의 두 곡선 이름이 넓이 조건과 답안 a=4에 반대로 붙어 있음. 위 곡선 y=12/x, 아래 곡선 y=a/x로 정확한 새 그림 작성.",
+      "verification": "$C=(3,4)$이므로 큰 직사각형의 넓이는 $3\\times4=12$입니다. 작은 직사각형의 넓이는 $3\\times\\frac a3=a$입니다. $12=3a$이므로 $a=4$입니다. 양의 영역에서 $a<12$이므로 작은 그래프는 아래쪽에 놓입니다.",
+      "sourcePage": 5
+    },
+    {
+      "number": 24,
+      "correctOptionNumbers": [
+        3
+      ],
+      "imagePath": "assets/q24.png",
+      "sourceImagePath": "assets/source-q24.png",
+      "replaced": false,
+      "replacementReason": "",
+      "verification": "$DOE=t$라 하면 $BOD=4t$이므로 $5t=90^\\circ$, $t=18^\\circ$입니다. $COD=\\frac59\\times18^\\circ=10^\\circ$이고 $COE=10^\\circ+18^\\circ=28^\\circ$입니다. $AOF$와 $COE$는 맞꼭지각이므로 $\\angle AOF=28^\\circ$입니다.",
+      "sourcePage": 5
+    },
+    {
+      "number": 25,
+      "correctOptionNumbers": [
+        1
+      ],
+      "imagePath": "assets/q25.png",
+      "sourceImagePath": "assets/source-q25.png",
+      "replaced": false,
+      "replacementReason": "",
+      "verification": "$AD=AB$, $AC=AG$이고 $\\angle DAC=90^\\circ+\\angle BAC=\\angle BAG$이므로 $\\triangle ADC\\cong\\triangle ABG$인 $SAS$ 합동입니다. $AB$와 $CD$의 교점을 $Q$라 하면 $\\triangle ADQ$에서 $\\angle DAQ=90^\\circ$입니다. 합동으로 $\\angle QBP=\\angle ADC$, 맞꼭지각으로 $\\angle BQP=\\angle AQD$입니다. $\\angle x$는 $\\triangle BQP$의 외각이므로 $x=\\angle QBP+\\angle BQP=\\angle ADC+\\angle AQD=90^\\circ$입니다.",
+      "sourcePage": 5
+    }
+  ]
+}

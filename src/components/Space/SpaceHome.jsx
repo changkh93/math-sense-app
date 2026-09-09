@@ -55,7 +55,6 @@ import { validateQuizCompletionSnapshot } from '../../utils/quizSessionGuards'
 
 import soundManager from '../../utils/SoundManager'
 import SpaceNavbar from './SpaceNavbar'
-import Footer from '../common/Footer'
 import { BellRing, Sparkles, X } from 'lucide-react'
 
 // Styles
@@ -3252,7 +3251,7 @@ function SpaceHome() {
     const titleText = "META SENSE"
     
     return (
-      <div className="space-bg" style={{ display: 'flex', flexDirection: 'column', minHeight: '100dvh' }}>
+      <div className="space-bg logged-out-home" style={{ display: 'flex', flexDirection: 'column', minHeight: 0 }}>
         <StarField count={200} />
         <div className="nebula-bg" />
         <div
@@ -3430,7 +3429,7 @@ function SpaceHome() {
           textAlign: 'center',
           position: 'relative',
           zIndex: 10,
-          padding: isMobile ? '4rem 1.5rem' : '4rem 2rem' // Added vertical padding
+          padding: isMobile ? '7rem 1.5rem 4rem' : '7rem 2rem 5rem'
         }}>
           {/* 왼쪽 행성 장식 */}
           <div style={{ 
@@ -3838,9 +3837,6 @@ function SpaceHome() {
               )}
             </AnimatePresence>
           </div>
-        </div>
-        <div style={{ width: '100%', zIndex: 100, marginTop: 'auto' }}>
-          <Footer />
         </div>
       </div>
     )

@@ -1,0 +1,31 @@
+{
+  "status": "REGISTERED_AND_VERIFIED",
+  "totalQuizzes": 75,
+  "totalImages": 53,
+  "rounds": [
+    {
+      "round": 2,
+      "unitId": "reg_1781420075936_chap_1781420191007_unit_1788876955807",
+      "title": "1학년 2학기 중간 2회",
+      "quizCount": 25,
+      "imageCount": 18,
+      "verifiedAt": "2026-09-08T15:50:46.323Z"
+    },
+    {
+      "round": 3,
+      "unitId": "reg_1781420075936_chap_1781420191007_unit_1788876965426",
+      "title": "1학년 2학기 중간 3회",
+      "quizCount": 25,
+      "imageCount": 17,
+      "verifiedAt": "2026-09-08T15:51:43.791Z"
+    },
+    {
+      "round": 4,
+      "unitId": "reg_1781420075936_chap_1781420191007_unit_1788876975928",
+      "title": "1학년 2학기 중간 4회",
+      "quizCount": 25,
+      "imageCount": 18,
+      "verifiedAt": "2026-09-08T15:52:12.952Z"
+    }
+  ]
+}
