@@ -179,3 +179,14 @@ Pygbag archive `0.9`, CPython 3.12, 관찰된 pygame `2.5.0.dev1` 조합을 사�
 - Chrome에서 cold boot, pygame 화면/마우스, 동일 인터프리터 재실행, print와 ValueError 출력, 부모 console·미확인 warn/error 보존, 진단 모드 전환 확인. 대량 bootstrap/config 로그는 사라졌다. Vite/React 개발 안내, 브라우저 ScriptProcessorNode deprecated 경고, 미확인 upstream focus/blur DISCARD 로그는 남긴다.
 - rhwpDev.help() 안내는 src/public/runtime 검색에서 찾지 못했다. 외부 도구/확장 출처 가능성이 있으나 확정하지 않으며 전역 console 차단으로 숨기지 않았다.
 - 단위 검사와 scoped ESLint, production build 통과. 실제 서비스 배포는 하지 않음.
+
+## 초급 turtle / ColabTurtlePlus 수업 지원 (2026-09-09)
+
+- `runtime/python-game-runner/turtle.py`는 수업용 호환 모듈이다. `import turtle`, `from turtle import *`, `from ColabTurtlePlus.Turtle import *`, 별칭 import를 지원한다. upstream 전체 라이브러리 설치나 Tk 에뮬레이션은 아니다.
+- 사용자가 제공한 집 그리기와 경주를 `public/python-game-examples/turtle/{house,race}.py`에 복원했다. 들여쓰기와 Markdown 이스케이프를 정리했고, 독립된 경주 파일에는 import 한 줄만 보충했다. 사용자 코드의 좌표·도형·승자 조건을 바꾸지 않는다. 예제를 자동으로 새 프로젝트에 넣거나 폐기한 코드 놀이터 UI를 되살리지 않는다.
+- 실행 파일의 정확한 `!pip install ColabTurtlePlus` / `%pip install ColabTurtlePlus` 한 줄은 설치 없이 건너뛴다. 다른 pip/셸 명령을 실행하거나 무시하지 않는다. 멀티라인 문자열 내부는 보존하고 오류 줄 번호도 유지한다. 각 Python 파일은 import를 포함해야 하며 이전 콜랩 셀 전역 상태를 이어받지 않는다.
+- 지원 핵심: Screen/setup/bgcolor, Turtle, 이동·회전·좌표 조회, 원/호, penup/pendown, 선 두께, 색과 채우기, shape/hideturtle, write, 여러 거북이, 일반 함수/for/while/random. 색 이름의 공백(`deep sky blue` 등), 두 색 지정, RGB, 소수 선 두께(1.5), 속력 0~15(0 즉시 표시), Arial 오타 `Ariel` 보정과 OS 한글 폰트 fallback 포함.
+- Python은 원래 순서로 좌표와 분기/승자를 계산한다. sandbox의 SVG renderer는 명령을 순서대로 애니메이션으로 표시한다. 소스에 async/await를 넣을 필요가 없다. 그리기 완료까지 실행 상태를 유지하고 자연 종료 뒤 그림을 남긴다. 정지/새 실행 시 애니메이션·모듈·그림을 초기화한다. 이 방식은 별도의 Python 디버거/한 줄씩 실행은 아니므로 print 출력 시점은 화면 애니메이션보다 앞설 수 있다.
+- `done()` / `mainloop()`는 브라우저 창을 막지 않으며 host가 대기·완성 그림 유지를 맡는다. Tk 위젯, 이벤트 콜백(onkey/onclick/ontimer), GIF 사용자 모양, 외부 Colab/IPython 기능 등 전체 turtle/ColabTurtlePlus API는 이번 범위에 포함하지 않는다. trace 제한과 명령 수/좌표 제한으로 잘못된 반복을 종료한다.
+- `document.mjs`에서 Python/JS를 한 srcDoc에 넣으므로 외부 패키지 설치나 새 CDN 의존성은 없다. standalone runner도 같은 문서를 사용한다. 기존 sandbox/프로토콜/기기 저장/과제 첨부를 유지한다.
+- 검증: Python 수업/기하/오류 5개 + pygame 루프 4개, studio 정책/콘솔 12개 통과. 실제 Chrome에서 집 13개 채움 도형, 경주 중 움직임과 최종 승자/한글, 정지·초기화·표준 turtle import·speed(0), turtle→print→pygame→오류 및 동일 인터프리터 유지 확인. house/race 스크린샷 시각 확인. scoped ESLint/production build 통과. Safari/Firefox·운영 배포 미검증.

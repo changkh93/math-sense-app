@@ -7,6 +7,7 @@ For an existing task, read its STATE.md and actual artifacts before continuing.
 
 | ID | Goal | Phase | State file | Next action |
 |---|---|---|---|---|
+| 20260909-studio-turtle | 초급 ColabTurtlePlus 집 그리기·거북이 경주 지원 | DONE (local) | [STATE](tasks/20260909-studio-turtle/STATE.md) | 두 수업 예제·정지/재실행·pygame 전환·브라우저 시각 검증 완료; 배포 전 |
 | 20260909-python-game-studio-implementation | pygame 온라인 IDE·업로드·메타센스 통합 구현 | DONE (local MVP) | [STATE](tasks/20260909-python-game-studio-implementation/STATE.md) | 실행기 과다 콘솔 로그 정리·Chrome 실행/출력 검증 완료; 과제 인덱스 운영 READY, 웹 배포 전 |
 | 20260909-python-game-studio-design | pygame 온라인 IDE 가능성·메타센스 통합 설계 | DONE (design only) | [STATE](tasks/20260909-python-game-studio-design/STATE.md) | 초기 구현은 python-game-studio-implementation 기록 참조 |
 | 20260909-course-2d-explorers | 중등수학·파이썬·고전 읽기 2D 행성 화면 개선 | DONE (local; not deployed) | [STATE](tasks/20260909-course-2d-explorers/STATE.md) | 구현·회귀·반응형 Chromium QA 완료; 요청 시 배포 후 운영 검증 |

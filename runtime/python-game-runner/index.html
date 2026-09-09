@@ -54,6 +54,7 @@ html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#080f20;col
  }
 })();
 </script>
+<!-- STUDIO_TURTLE_RENDERER -->
 <script>
 window.config={cdn:'https://pygame-web.github.io/archives/0.9/',executable:'https://pygame-web.github.io/archives/0.9/cpython312/main.js',user_canvas:1,user_canvas_managed:1,gui_divider:1,ume_block:0,can_close:0,autorun:1,quiet:true};
 window.studioCommand='';window.studioEngineReady=false;window.studioActiveRun=null;
@@ -83,8 +84,9 @@ window.addEventListener('message',function connect(event){
 });
 // Audio can be suspended by browser policy. It never gates Python execution.
 const audioContexts=new Set();
-window.studioResetPresentation=()=>{
+window.studioResetPresentation=(preserveTurtle=false)=>{
  window.studioActiveRun=null;
+ window.studioTurtleReset(preserveTurtle);
  document.getElementById('canvas').width=document.getElementById('canvas').width;
  for(const context of audioContexts)context.studioSoundRequested=false;
  document.getElementById('audio-note').hidden=true;
@@ -147,6 +149,19 @@ ORIGINAL_ENV = dict(os.environ)
 ORIGINAL_DONT_WRITE = sys.dont_write_bytecode
 active = None
 pygame_ready = False
+TURTLE_SOURCE = __STUDIO_TURTLE_SOURCE__
+
+def install_studio_turtle():
+    module = types.ModuleType('turtle')
+    module.__file__ = '/studio/turtle.py'
+    module.__dict__['_bridge'] = platform.window
+    exec(compile(TURTLE_SOURCE, module.__file__, 'exec'), module.__dict__)
+    package = types.ModuleType('ColabTurtlePlus')
+    package.__path__ = []
+    package.Turtle = module
+    sys.modules['turtle'] = module
+    sys.modules['ColabTurtlePlus'] = package
+    sys.modules['ColabTurtlePlus.Turtle'] = module
 
 def emit(kind, text='', run_id=None):
     platform.window.studioEmitEncoded(kind, base64.b64encode(str(text).encode('utf-8')).decode('ascii'), run_id)
@@ -211,6 +226,20 @@ class BrowserGameLoops(ast.NodeTransformer):
     visit_For = visit_While
 
 def compile_project(source, filename, namespace):
+    # Accept only the lesson's exact Colab install directive. Never run shell/pip.
+    # Tokenize first so a matching line inside a multiline string stays unchanged.
+    import io, re, tokenize
+    string_lines = set()
+    try:
+        for token in tokenize.generate_tokens(io.StringIO(source).readline):
+            if token.type == tokenize.STRING:
+                string_lines.update(range(token.start[0], token.end[0] + 1))
+    except (tokenize.TokenError, IndentationError):
+        pass  # ast.parse below reports the original syntax error and line.
+    source = ''.join(
+        ('\n' if line.endswith('\n') else '')
+        if number not in string_lines and re.fullmatch(r'[ \t]*[!%]pip[ \t]+install[ \t]+ColabTurtlePlus[ \t]*(?:#[^\n]*)?\n?', line)
+        else line for number, line in enumerate(source.splitlines(keepends=True), 1))
     tree = ast.parse(source, filename=filename)
     # Resolve common pygame imports without guessing from text/comments/strings.
     aliases = {}
@@ -238,9 +267,11 @@ def cancel_user_callbacks(loop):
             if code and code.co_filename.startswith(ROOT + '/'):
                 handle.cancel()
 
-async def stop_current():
+async def stop_current(preserve_turtle=False):
     global active
-    if active is None: return True
+    if active is None:
+        if not preserve_turtle: platform.window.studioResetPresentation()
+        return True
     context = active
     context['deadline'] = time.monotonic() + .5
     sys.settrace(context['trace'])
@@ -262,6 +293,8 @@ async def stop_current():
     sys.path[:] = ORIGINAL_PATH
     sys.argv[:] = ORIGINAL_ARGV
     sys.modules['__main__'] = ORIGINAL_MAIN
+    for name in ('turtle', 'ColabTurtlePlus.Turtle', 'ColabTurtlePlus'):
+        sys.modules.pop(name, None)
     sys.dont_write_bytecode = ORIGINAL_DONT_WRITE
     os.environ.clear(); os.environ.update(ORIGINAL_ENV)
     # Drop project imports even when the same path/mtime is reused on the next run.
@@ -276,7 +309,7 @@ async def stop_current():
     if os.path.exists(ROOT): shutil.rmtree(ROOT)
     context['namespace'].clear()
     active = None
-    platform.window.studioResetPresentation()
+    platform.window.studioResetPresentation(preserve_turtle)
     gc.collect()
     return True
 
@@ -311,6 +344,7 @@ async def start_project(command):
     module.__file__ = source_path
     sys.modules['__main__'] = module
     namespace = module.__dict__
+    install_studio_turtle()
     context = {'id': run_id, 'namespace': namespace, 'baseline_tasks': set(asyncio.all_tasks()), 'tasks': [], 'deadline': time.monotonic() + 2, 'failed': False}
     active = context
     platform.window.studioActiveRun = run_id
@@ -365,9 +399,9 @@ async def studio_boot():
                 if not await stop_current(): return
         if active:
             active['deadline'] = time.monotonic() + 2
-            if active['failed'] or all(task.done() for task in active['tasks']):
+            if active['failed'] or (all(task.done() for task in active['tasks']) and not platform.window.studioTurtleBusy()):
                 run_id = active['id']
-                if not await stop_current(): return
+                if not await stop_current(preserve_turtle=not active['failed']): return
                 emit('EXIT', run_id=run_id)
         await asyncio.sleep(.01)
 

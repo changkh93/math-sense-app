@@ -1,5 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
 import runnerHtml from '../../../runtime/python-game-runner/index.html?raw'
+import turtlePython from '../../../runtime/python-game-runner/turtle.py?raw'
+import turtleRenderer from '../../../runtime/python-game-runner/turtle-renderer.js?raw'
+import { buildRunnerDocument } from '../../../runtime/python-game-runner/document.mjs'
+
+const runnerDocument = buildRunnerDocument(runnerHtml, turtlePython, turtleRenderer)
 
 // One isolated interpreter per editor session. Runs replace files/state over the port.
 export default function GamePreview({ run, onEvent }) {
@@ -70,7 +75,7 @@ export default function GamePreview({ run, onEvent }) {
   }, [engineEpoch])
   useEffect(() => { runRef.current = run; sendRef.current?.(run) }, [run])
   return <div className="pgs-runtime">
-    <iframe key={engineEpoch} ref={frameRef} title="Python 게임 실행 화면" srcDoc={runnerHtml} sandbox="allow-scripts" allow="autoplay" referrerPolicy="no-referrer" tabIndex={run ? 0 : -1} aria-hidden={!run} style={{ pointerEvents: run ? 'auto' : 'none' }} />
+    <iframe key={engineEpoch} ref={frameRef} title="Python 게임 실행 화면" srcDoc={runnerDocument} sandbox="allow-scripts" allow="autoplay" referrerPolicy="no-referrer" tabIndex={run ? 0 : -1} aria-hidden={!run} style={{ pointerEvents: run ? 'auto' : 'none' }} />
     {!run && <div className="pgs-empty"><span className="pgs-orbit">✦</span><strong>코드가 게임이 되는 곳</strong><p>실행을 누르면 코드가 바로 실행됩니다.</p><small>마우스·방향키를 사용할 때는 게임 화면을 클릭하세요.</small></div>}
   </div>
 }
