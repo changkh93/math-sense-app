@@ -7,7 +7,7 @@ export function createStudioAttachments(project, { paths = [] } = {}) {
   return [...new Set(paths)].map(path => {
     const file = checked.files.find(item => item.path === path)
     if (!file) throw new Error(`${path}: 파일이 변경되었습니다. 목록을 새로고침해 주세요.`)
-    if (file.kind !== 'python' || !/\.py$/i.test(file.path)) throw new Error('게임 스튜디오에서는 .py 파일만 첨부할 수 있습니다.')
+    if (file.kind !== 'python' || !/\.py$/i.test(file.path)) throw new Error('코드 스튜디오에서는 .py 파일만 첨부할 수 있습니다.')
     return new File([file.text], `${name}/${path}`, { type: 'text/x-python' })
   })
 }

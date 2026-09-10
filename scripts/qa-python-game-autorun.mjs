@@ -5,7 +5,7 @@ const browser = await chromium.launch({ headless: true, args: ['--autoplay-polic
 const context = await browser.newContext()
 context.setDefaultTimeout(90000)
 const page = await context.newPage()
-const frame = () => page.frameLocator('iframe[title="Python 게임 실행 화면"]')
+const frame = () => page.frameLocator('iframe[title="Python 코드 실행 화면"]')
 async function code(source) {
   await page.locator('.cm-content').click()
   await page.keyboard.press(process.platform === 'darwin' ? 'Meta+a' : 'Control+a')
@@ -32,7 +32,7 @@ try {
   await run('GAME_AUTO_STARTED')
   assert.equal(await frame().locator('#audio-note').isVisible(), false)
   console.log('PASS helper/from imports and display start without an extra click')
-  const runtime = await (await page.locator('iframe[title="Python 게임 실행 화면"]').elementHandle()).contentFrame()
+  const runtime = await (await page.locator('iframe[title="Python 코드 실행 화면"]').elementHandle()).contentFrame()
   await runtime.evaluate(async () => {
     window.qaAudio = new AudioContext()
     await qaAudio.suspend()

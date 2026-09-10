@@ -19,7 +19,7 @@ try {
   await page.goto(process.env.GAME_STUDIO_QA_URL || 'http://127.0.0.1:5179/dev/python-game-studio')
   await page.locator('.cm-content').waitFor()
   await run('print("CONSOLE_QA_PRINT")', 'CONSOLE_QA_PRINT')
-  const runtime = await (await page.locator('iframe[title="Python 게임 실행 화면"]').elementHandle()).contentFrame()
+  const runtime = await (await page.locator('iframe[title="Python 코드 실행 화면"]').elementHandle()).contentFrame()
   await runtime.evaluate(() => { window.consoleQaIdentity = 'warm' })
   await run('import pygame\npygame.init()\npygame.display.set_mode((320,240))\nprint("CONSOLE_QA_GAME")\nrunning = True\nwhile running:\n    for event in pygame.event.get():\n        if event.type == pygame.MOUSEBUTTONDOWN:\n            print("CONSOLE_QA_MOUSE")\n    pygame.display.update()\n', 'CONSOLE_QA_GAME')
   await runtime.locator('#canvas').click()

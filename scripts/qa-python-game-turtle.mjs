@@ -10,7 +10,7 @@ const output = new URL(process.env.GAME_STUDIO_QA_OUTPUT || '../docs/collaborati
 await mkdir(output, { recursive: true })
 const errors = []
 page.on('pageerror', error => errors.push(error.message))
-const runtime = async () => (await page.locator('iframe[title="Python 게임 실행 화면"]').elementHandle()).contentFrame()
+const runtime = async () => (await page.locator('iframe[title="Python 코드 실행 화면"]').elementHandle()).contentFrame()
 async function run(source) {
   await page.locator('.cm-content').click()
   await page.keyboard.press(process.platform === 'darwin' ? 'Meta+a' : 'Control+a')

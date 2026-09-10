@@ -96,7 +96,7 @@ export default function GamePreview({ run, onEvent }) {
   }, [engineEpoch])
   useEffect(() => { runRef.current = run; sendRef.current?.(run) }, [run])
   return <div className="pgs-runtime">
-    <iframe key={engineEpoch} ref={frameRef} title="Python 게임 실행 화면" srcDoc={runnerDocument} sandbox="allow-scripts" allow="autoplay" referrerPolicy="no-referrer" tabIndex={run ? 0 : -1} aria-hidden={!run} style={{ pointerEvents: run ? 'auto' : 'none' }} />
-    {!run && <div className="pgs-empty"><span className="pgs-orbit">✦</span><strong>코드가 게임이 되는 곳</strong><p>실행을 누르면 코드가 바로 실행됩니다.</p><small>마우스·방향키를 사용할 때는 게임 화면을 클릭하세요.</small></div>}
+    <iframe key={engineEpoch} ref={frameRef} title="Python 코드 실행 화면" srcDoc={runnerDocument} sandbox="allow-scripts" allow="autoplay" referrerPolicy="no-referrer" tabIndex={run ? 0 : -1} aria-hidden={!run} style={{ pointerEvents: run ? 'auto' : 'none' }} />
+    {!run && <div className="pgs-empty"><span className="pgs-orbit">✦</span><strong>코드로 만들고, 실행하며 배워요</strong><p>실행을 누르면 코드가 바로 실행됩니다.</p><small>마우스·방향키를 사용할 때는 실행 화면을 클릭하세요.</small></div>}
   </div>
 }

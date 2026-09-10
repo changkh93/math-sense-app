@@ -14,14 +14,14 @@ async function drag(name, dx, dy) {
   await page.mouse.move(r.x + r.width / 2, r.y + r.height / 2)
   await page.mouse.down(); await page.mouse.move(r.x + r.width / 2 + dx, r.y + r.height / 2 + dy, { steps: 12 }); await page.mouse.up()
 }
-const files = '파일 탐색기 너비 조절', editor = '소스코드와 게임 화면 너비 조절', output = '출력·오류 영역 높이 조절'
+const files = '파일 탐색기 너비 조절', editor = '소스코드와 실행 화면 너비 조절', output = '출력·오류 영역 높이 조절'
 try {
   await page.goto(process.env.GAME_STUDIO_QA_URL || 'http://127.0.0.1:5179/dev/python-game-studio')
   await page.locator('.cm-content').waitFor()
   await page.locator('.cm-content').click(); await page.keyboard.insertText('import pygame\npygame.init()\nscreen=pygame.display.set_mode((320,240))\nwhile True:\n    for event in pygame.event.get():\n        if event.type == pygame.MOUSEBUTTONDOWN: print("LAYOUT_CLICK")\n    screen.fill((20,80,90))\n    pygame.display.flip()\n')
   await page.getByRole('button', { name: '실행', exact: true }).click()
   await page.waitForFunction(() => document.querySelector('.pgs-run-status')?.textContent === '실행 중', null, { timeout: 90000 })
-  const runtime = await (await page.locator('iframe[title="Python 게임 실행 화면"]').elementHandle()).contentFrame()
+  const runtime = await (await page.locator('iframe[title="Python 코드 실행 화면"]').elementHandle()).contentFrame()
   const marker = await runtime.evaluate(() => window.qaLayoutMarker = crypto.randomUUID())
   const startFile = await box('.pgs-files')
   await drag(files, 90, 0)
@@ -34,7 +34,7 @@ try {
   assert.ok((await box('.pgs-console')).height > startConsole.height + 100)
   assert.equal(await runtime.evaluate(() => window.qaLayoutMarker), marker)
   assert.equal(await page.locator('.pgs-run-status').innerText(), '실행 중')
-  await page.frameLocator('iframe[title="Python 게임 실행 화면"]').locator('#canvas').click()
+  await page.frameLocator('iframe[title="Python 코드 실행 화면"]').locator('#canvas').click()
   await page.waitForFunction(() => document.querySelector('.pgs-console pre')?.textContent.includes('LAYOUT_CLICK'))
   console.log('PASS three drag boundaries resize panels; running game and mouse input remain intact')
   await page.screenshot({ path: '/tmp/metasense-pygame-layout.png' })

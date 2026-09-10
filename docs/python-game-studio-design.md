@@ -1,4 +1,4 @@
-# MetaSense Python Game Studio 통합 설계
+# MetaSense Python Code Studio 통합 설계
 
 작성: 2026-09-09. 이 문서는 초기 설계 기록이다. 후속 초기 MVP 구현·검증·설계 구체화는 [구현 기록](python-game-studio-implementation.md)을 참조한다.
 
@@ -20,7 +20,7 @@ Pygbag은 pygame-ce 게임을 웹용으로 패키징하는 도구다. React에 �
 | `src/components/PythonWorld/PythonEditor.jsx` | CodeMirror 6 Python 편집기, 스니펫 삽입, 실행 줄 표시 | 편집기 재사용. Monaco 신규 도입은 보류 |
 | `src/components/PythonWorld/runtime/pythonWorld.worker.js` | Pyodide 0.29.4, msense/metasense 외 import 제한, 상속 제한 | 루미 학습 실행기를 pygame 용도로 변경하지 않음 |
 | `src/components/PythonWorld/runtime/PythonRuntimeClient.js` | 실행 제한 10초, Worker 종료/복구 | 장시간 게임과 별도 수명주기 사용 |
-| `src/components/Space/coursePlanetCatalog.js` | `python_project`에 ‘게임 만들기 / Game Studio’ 표시 | 해당 행성의 기존 수업 진입을 유지하고 ‘게임 스튜디오’ 진입 추가 |
+| `src/components/Space/coursePlanetCatalog.js` | `python_project`에 ‘게임 만들기 / Code Studio’ 표시 | 해당 행성의 기존 수업 진입을 유지하고 ‘코드 스튜디오’ 진입 추가 |
 | `src/components/Space/SpaceHome.jsx`, `MissionHub.jsx` | 루미 허브와 단원별 미션 화면 연결 | 기존 탐색·복귀 패턴, 수업 메타데이터 연계 |
 | `src/components/PrivateRoute.jsx` | 로그인 여부 검사 | 수강 권한은 별도 확인; 로그인만으로 모든 강좌를 허용하지 않음 |
 | `firebase.json` | Firebase Hosting `dist`, SPA rewrite | 편집기는 현재 호스팅, 실행기는 별도 origin 배치 |
@@ -64,7 +64,7 @@ Pygbag은 pygame-ce 게임을 웹용으로 패키징하는 도구다. React에 �
 
 ## 4. 화면과 학습 동선
 
-`파이썬 성단 → 게임 만들기 행성 → 게임 스튜디오 → 내 프로젝트 / 수업 예제`
+`파이썬 성단 → 게임 만들기 행성 → 코드 스튜디오 → 내 프로젝트 / 수업 예제`
 
 ```text
 ← 수업으로   몬스터 잡기   저장됨       실행   정지   크게 보기

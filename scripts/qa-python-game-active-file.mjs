@@ -21,7 +21,7 @@ try {
   await page.getByRole('button', { name: '내 프로젝트', exact: true }).click()
   await page.locator('input[accept=".json,.mspygame.json,.py"]').setInputFiles({ name: 'active.mspygame.json', buffer: Buffer.from(JSON.stringify(project)) })
   await file('images/test1.py').waitFor(); await run('ROOT_GAME')
-  const runtime = await (await page.locator('iframe[title="Python 게임 실행 화면"]').elementHandle()).contentFrame()
+  const runtime = await (await page.locator('iframe[title="Python 코드 실행 화면"]').elementHandle()).contentFrame()
   const marker = await runtime.evaluate(() => window.qaActiveMarker = crypto.randomUUID())
   const gameBefore = await runtime.locator('#canvas').screenshot()
   await file('images/test1.py').click()

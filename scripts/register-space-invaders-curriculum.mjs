@@ -10,7 +10,7 @@ const manifest=JSON.parse(await fs.readFile(new URL('manifest.json',content),'ut
 const bank=JSON.parse(await fs.readFile(new URL('assessments.json',content),'utf8'))
 const documents=[]
 const push=(collection,id,data)=>documents.push({path:`${collection}/${id}`,data:{...data,id,docId:id,managedBy:marker}})
-push('chapters',chapterId,{regionId,title:'우주 방어대',order:4,description:'게임 스튜디오에서 문서를 따라 만드는 10단원 우주 슈팅 게임'})
+push('chapters',chapterId,{regionId,title:'우주 방어대',order:4,description:'코드 스튜디오에서 문서를 따라 만드는 10단원 우주 슈팅 게임'})
 for(let i=0;i<10;i++){
  const n=String(i+1).padStart(2,'0'),unitId=`unit_space_invaders_${n}`
  const text=await fs.readFile(new URL(`data-log/${n}.md`,content),'utf8')

@@ -37,7 +37,7 @@ await mkdir(out,{recursive:true})
 const browser = await chromium.launch({ headless:true, ...(process.env.CHROME_PATH ? {executablePath:process.env.CHROME_PATH} : {}) })
 const context = await browser.newContext({ viewport:{width:1440,height:960} })
 const page = await context.newPage()
-const frame = () => page.frameLocator('iframe[title="Python 게임 실행 화면"]')
+const frame = () => page.frameLocator('iframe[title="Python 코드 실행 화면"]')
 const failures=[];page.on('pageerror',error=>failures.push(error.message))
 async function code(text) {
   await page.locator('.pgs-file-list button').filter({hasText:'main.py'}).click()
@@ -49,7 +49,7 @@ async function run() {
   assert.equal(await frame().getByRole('button',{name:'게임 시작 · 소리 켜기'}).count(),0)
 }
 async function consoleIncludes(text) { await page.waitForFunction(text=>document.querySelector('.pgs-console pre')?.textContent.includes(text),text,{timeout:20000}) }
-async function stop() { await page.getByRole('button',{name:'정지',exact:true}).click();await page.waitForFunction(()=>document.querySelector('iframe[title="Python 게임 실행 화면"]')?.getAttribute('aria-hidden')==='true');assert.equal(await page.locator('iframe[title="Python 게임 실행 화면"]').count(),1) }
+async function stop() { await page.getByRole('button',{name:'정지',exact:true}).click();await page.waitForFunction(()=>document.querySelector('iframe[title="Python 코드 실행 화면"]')?.getAttribute('aria-hidden')==='true');assert.equal(await page.locator('iframe[title="Python 코드 실행 화면"]').count(),1) }
 try {
   await page.goto(base);await page.getByRole('button',{name:'실행',exact:true}).waitFor()
   await page.screenshot({path:`${out}/studio.png`})
@@ -74,7 +74,7 @@ try {
   await stop();console.log('PASS PNG, optional TTF/MP3 upload, OGG conversion and rendering')
   await page.getByRole('button',{name:'내 프로젝트',exact:true}).click();await page.getByRole('button',{name:'몬스터 잡기 예제'}).click();await page.waitForFunction(()=>document.querySelector('input[aria-label="프로젝트 이름"]')?.value==='몬스터 잡기')
   await run();await frame().locator('#canvas').press('Enter');await page.waitForTimeout(400)
-  const runtimeFrame=await (await page.locator('iframe[title="Python 게임 실행 화면"]').elementHandle()).contentFrame()
+  const runtimeFrame=await (await page.locator('iframe[title="Python 코드 실행 화면"]').elementHandle()).contentFrame()
   await runtimeFrame.evaluate(()=>window.python.PyRun_SimpleString(`import asyncio, json, platform\nqa_ns = next(t.get_coro().cr_frame.f_locals['coroutine'].cr_frame.f_globals for t in asyncio.all_tasks() if t.get_coro().cr_frame and 'coroutine' in t.get_coro().cr_frame.f_locals and getattr(t.get_coro().cr_frame.f_locals['coroutine'], 'cr_frame', None))\ndef qa_state():\n g=qa_ns['my_game'];p=qa_ns['my_player']\n platform.window.qaState=json.dumps({'score':g.score,'round':g.round_number,'lives':p.lives,'safe':p.safe,'y':p.rect.y,'monsters':len(g.monster_group)})\nqa_state()\n`))
   await page.waitForTimeout(200)
   const state=async()=>{await runtimeFrame.evaluate(()=>window.python.PyRun_SimpleString('qa_state()'));await page.waitForTimeout(100);return JSON.parse(await runtimeFrame.evaluate(()=>window.qaState))}

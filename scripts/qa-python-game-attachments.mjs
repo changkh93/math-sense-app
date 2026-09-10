@@ -44,7 +44,7 @@ try {
   assert.equal(await page.evaluate(()=>window.attachments[1][0].name),'나의 프로젝트/images/test.py')
   console.log('PASS own-account listing, latest saved snapshot, selected nested source, immutable attachments')
   await page.screenshot({path:'/tmp/metasense-studio-attachment.png'})
-  const before=page.url();const popupEvent=page.waitForEvent('popup');await page.getByRole('link',{name:'게임 스튜디오 열기 ↗'}).click();const popup=await popupEvent
+  const before=page.url();const popupEvent=page.waitForEvent('popup');await page.getByRole('link',{name:'코드 스튜디오 열기 ↗'}).click();const popup=await popupEvent
   await popup.waitForURL('**/python-game-studio');assert.equal(page.url(),before);assert.equal(await popup.evaluate(()=>window.opener),null)
   await popup.goto('http://127.0.0.1:5179/dev/python-game-studio');await popup.locator('.cm-content').waitFor()
   assert.equal(await popup.getByRole('button',{name:'수업으로 돌아가기'}).count(),0);await popup.close()

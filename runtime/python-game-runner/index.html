@@ -1,6 +1,6 @@
 <!doctype html>
 <html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>MetaSense Game Runner</title>
+<title>MetaSense Code Runner</title>
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline' 'unsafe-eval' https://pygame-web.github.io; connect-src https://pygame-web.github.io; style-src 'unsafe-inline'; img-src blob: data:; media-src blob: data: https://pygame-web.github.io; worker-src blob:;">
 <style>
 html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#080f20;color:#dbeafe;font:14px system-ui}body{display:grid;place-items:center}#canvas{max-width:100%;max-height:100%;object-fit:contain;outline:none}#canvas3d,#stdout,#transfer,#html{display:none!important}#start{position:absolute;inset:0;display:grid;place-content:center;text-align:center;background:#080f20ee;gap:14px}button{font:inherit;background:#83f3cd;border:0;border-radius:12px;padding:14px 24px;cursor:pointer;color:#08271f}#note{max-width:320px;line-height:1.6}#start[hidden],#audio-note[hidden]{display:none}#audio-note{position:absolute;bottom:16px;max-width:90%;padding:8px 12px;border-radius:8px;background:#182438dd;color:#dbeafe;font-size:12px;pointer-events:none}
@@ -471,4 +471,4 @@ async def studio_boot():
 
 ORIGINAL_RUN(studio_boot())
 </script></head>
-<body><canvas id="canvas" width="1200" height="700" tabindex="0"></canvas><div id="start"><div id="note">Python 실행 환경을 준비하고 있습니다.<br>첫 실행에는 시간이 조금 걸릴 수 있습니다.</div></div><div id="audio-note" hidden>소리를 들으려면 게임 화면을 클릭하세요.</div></body></html>
+<body><canvas id="canvas" width="1200" height="700" tabindex="0"></canvas><div id="start"><div id="note">Python 실행 환경을 준비하고 있습니다.<br>첫 실행에는 시간이 조금 걸릴 수 있습니다.</div></div><div id="audio-note" hidden>소리를 들으려면 실행 화면을 클릭하세요.</div></body></html>

@@ -4338,7 +4338,7 @@ function SpaceHome() {
 
       {currentView === 'planet' && selectedClusterId === 'python' && !selectedRegionId && !is2DMode && !isMobile && (
         <button type="button" className="space-btn cosmic-btn" style={{ position: 'fixed', right: 24, bottom: 28, zIndex: 50 }} onClick={() => window.open('/python-game-studio', '_blank', 'noopener,noreferrer')}>
-          ⌘ 게임 스튜디오 열기
+          ⌘ 코드 스튜디오 열기
         </button>
       )}
 

@@ -37,7 +37,7 @@ def _options(values, allowed):
         values['bg'] = values.pop('background')
     for key in values:
         if key not in allowed:
-            raise TclError('현재 게임 스튜디오에서 지원하지 않는 tkinter 옵션: ' + key)
+            raise TclError('현재 코드 스튜디오에서 지원하지 않는 tkinter 옵션: ' + key)
     return values
 
 

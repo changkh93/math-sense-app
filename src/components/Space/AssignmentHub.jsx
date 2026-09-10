@@ -2516,7 +2516,7 @@ function SubmissionPanel({ clusterId, regionId, dateStr, assignment, warnings = 
           </div>
 
           {['python', '파이썬'].includes(clusterId) && user?.uid && <div style={{ marginBottom: '1rem' }}>
-            <button type="button" className="space-btn" disabled={isSubmitting || isAddingStudio} onClick={() => setAttachmentMode(attachmentMode === 'studio' ? null : 'studio')} style={{ width: '100%' }}>⌘ 게임 스튜디오에서 추가</button>
+            <button type="button" className="space-btn" disabled={isSubmitting || isAddingStudio} onClick={() => setAttachmentMode(attachmentMode === 'studio' ? null : 'studio')} style={{ width: '100%' }}>⌘ 코드 스튜디오에서 추가</button>
           </div>}
           {attachmentMode === 'studio' && ['python', '파이썬'].includes(clusterId) && user?.uid && <Suspense fallback={<p>스튜디오 목록을 준비하고 있습니다…</p>}>
             <GameStudioAttachmentPicker key={`${user.uid}:${dateStr}`} uid={user.uid} disabled={isSubmitting} onBusyChange={setIsAddingStudio} onAdd={added => { handleFileSelect({ target: { files: added } }); setAttachmentMode(null); }} />

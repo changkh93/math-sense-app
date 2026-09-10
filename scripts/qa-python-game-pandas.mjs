@@ -48,7 +48,7 @@ try {
   await saved()
   const first = await snapshot()
   assert.equal(Buffer.from(first.files.find(file => file.path === 'new_data.csv').data, 'base64').toString('utf8'), ',name,scores\n0,왕새우,80\n1,홍길동,90\n2,박명수,60\n')
-  const frame = await (await page.locator('iframe[title="Python 게임 실행 화면"]').elementHandle()).contentFrame()
+  const frame = await (await page.locator('iframe[title="Python 코드 실행 화면"]').elementHandle()).contentFrame()
   await frame.evaluate(() => { window.pandasQaIdentity = 'warm' })
   await page.locator('.pgs-console').screenshot({ path: fileURLToPath(new URL('weather-output.png', output)) })
   console.log('PASS original weather/csv operations: numeric inference, Series, mean/max, filters, formatted output and local CSV')

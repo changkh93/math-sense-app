@@ -51,7 +51,7 @@ const MIDDLE_WORLDS = {
 
 const PYTHON_WORLDS = {
   python_foundation: { topic: '문법 기초', subtitle: 'Python Foundation', color: '#61c7ff', image: '/assets/planets/python-foundation.png' },
-  python_project: { topic: '게임 만들기', subtitle: 'Game Studio', color: '#f879df', image: '/assets/planets/python-project.png' },
+  python_project: { topic: '게임 만들기', subtitle: 'Code Studio', color: '#f879df', image: '/assets/planets/python-project.png' },
   python_advanced: { topic: '알고리즘 심화', subtitle: 'Advanced Lab', color: '#57ebd0', image: '/assets/planets/python-advanced.png' },
   python_math: { topic: '수학 코딩', subtitle: 'Math Engine', color: '#ffd66b', image: '/assets/planets/python-data.png' },
   python_data: { topic: '데이터 분석', subtitle: 'Data Observatory', color: '#9caaff', image: '/assets/planets/python-data.png' },
@@ -69,7 +69,7 @@ const COMMON_STATIONS = {
   dark: { id: 'dark', title: '다크 매터', topic: '복습할 문제', color: '#bca5f5', image: '/assets/planets/elementary/dark.webp', showsCount: true },
   refinery: { id: 'refinery', title: '다크매터 정제소', topic: '오답 정제하기', color: '#e2b18c', image: '/assets/planets/elementary/refinery.webp', showsCount: true },
   reading_library: { id: 'reading_library', title: '나의 책장', topic: '독서 기록과 작품 보관', color: '#67ddbd', image: '/assets/planets/reading-library.webp' },
-  python_game_studio: { id: 'python_game_studio', title: '게임 스튜디오', topic: 'Python으로 나만의 게임 만들기', color: '#83f3cd', icon: '⌘' },
+  python_game_studio: { id: 'python_game_studio', title: '코드 스튜디오', topic: 'Python으로 그림·게임·수학 탐구하기', color: '#83f3cd', icon: '⌘' },
   lumi_protocol: { id: 'lumi_protocol', title: '루미 프로토콜', topic: '20개의 파이썬 미션', color: '#62ebd5', icon: '△' },
   algorithm_constellation: { id: 'algorithm_constellation', title: '생각의 항로', topic: '알고리즘 사고력 훈련', color: '#9ba7ff', image: '/assets/planets/algorithm-constellation.png' },
 }

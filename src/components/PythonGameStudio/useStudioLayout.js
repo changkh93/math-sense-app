@@ -52,7 +52,7 @@ export default function useStudioLayout(uid, ready, previewRef) {
     files: { min: minFile, max: maxFile, value: files, orientation: 'vertical', label: '파일 탐색기 너비 조절' },
     editor: bounds.mobile
       ? { min: 280, max: 900, value: mobileEditor, orientation: 'horizontal', label: '소스코드 영역 높이 조절' }
-      : { min: 240, max: Math.max(240, remaining - 260), value: editor, orientation: 'vertical', label: '소스코드와 게임 화면 너비 조절' },
+      : { min: 240, max: Math.max(240, remaining - 260), value: editor, orientation: 'vertical', label: '소스코드와 실행 화면 너비 조절' },
     console: { min: 90, max: maxConsole, value: consoleHeight, orientation: 'horizontal', label: '출력·오류 영역 높이 조절' },
   }
   const change = (name, value) => {

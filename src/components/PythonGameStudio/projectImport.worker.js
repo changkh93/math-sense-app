@@ -18,11 +18,11 @@ self.onmessage = async ({ data: request }) => {
       input = { id: crypto.randomUUID(), title: file.name.replace(/\.py$/i, '').slice(0, 80) || '가져온 프로젝트', schemaVersion: 1, runtimeVersion: RUNTIME_VERSION, entrypoint: path, files: [{ path, text }] }
     } else {
       try { input = JSON.parse(text.replace(/^\uFEFF/, '')) }
-      catch { throw new Error('프로젝트 파일을 읽을 수 없습니다. 게임 스튜디오에서 다운로드한 JSON 파일인지 확인해 주세요.') }
+      catch { throw new Error('프로젝트 파일을 읽을 수 없습니다. 코드 스튜디오에서 다운로드한 JSON 파일인지 확인해 주세요.') }
     }
     const project = validateProject(input)
     self.postMessage({ ok: true, project: { ...project, id: crypto.randomUUID(), revision: 0 } })
   } catch (error) {
-    self.postMessage({ ok: false, message: error instanceof TypeError ? '프로젝트 파일 구조가 올바르지 않습니다. 게임 스튜디오에서 다운로드한 파일을 선택해 주세요.' : error.message })
+    self.postMessage({ ok: false, message: error instanceof TypeError ? '프로젝트 파일 구조가 올바르지 않습니다. 코드 스튜디오에서 다운로드한 파일을 선택해 주세요.' : error.message })
   }
 }

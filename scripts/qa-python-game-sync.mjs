@@ -20,7 +20,7 @@ while running:
     pygame.display.update()
 pygame.quit()
 `
-const frame = () => page.frameLocator('iframe[title="Python 게임 실행 화면"]')
+const frame = () => page.frameLocator('iframe[title="Python 코드 실행 화면"]')
 async function code(text) {
   await page.locator('.cm-content').click(); await page.keyboard.press(process.platform === 'darwin' ? 'Meta+a' : 'Control+a'); await page.keyboard.insertText(text)
 }
@@ -29,7 +29,7 @@ async function start(text) {
   await page.waitForFunction(() => document.querySelector('.pgs-run-status')?.textContent === '실행 중', null, { timeout: 90000 })
 }
 async function python(source) {
-  const runtime = await (await page.locator('iframe[title="Python 게임 실행 화면"]').elementHandle()).contentFrame()
+  const runtime = await (await page.locator('iframe[title="Python 코드 실행 화면"]').elementHandle()).contentFrame()
   await runtime.evaluate(source => window.python.PyRun_SimpleString(source), source)
 }
 try {

@@ -26,7 +26,7 @@ try {
   await page.goto(process.env.GAME_STUDIO_QA_URL || 'http://127.0.0.1:5179/dev/python-game-studio')
   await editor.waitFor()
   assert.match(await run(await readFile(new URL('main.py', folder), 'utf8')), /배열·표 수업 확인 완료/)
-  const frame = await (await page.locator('iframe[title="Python 게임 실행 화면"]').elementHandle()).contentFrame()
+  const frame = await (await page.locator('iframe[title="Python 코드 실행 화면"]').elementHandle()).contentFrame()
   await frame.evaluate(() => { window.mathQaIdentity = 'warm' })
   console.log('PASS native NumPy arrays, 2D slice writes, random, pandas Series dtype/labels, matrix/dict/tuple inputs and loc')
   assert.match(await run(await readFile(new URL('probability.py', folder), 'utf8')), /확률: 5\/12/)

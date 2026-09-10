@@ -5,7 +5,7 @@ const browser = await chromium.launch({ headless: true, ...(process.env.CHROME_P
 const context = await browser.newContext()
 context.setDefaultTimeout(90000)
 const page = await context.newPage()
-const runtime = () => page.frameLocator('iframe[title="Python 게임 실행 화면"]')
+const runtime = () => page.frameLocator('iframe[title="Python 코드 실행 화면"]')
 const times = [], requests = []
 page.on('request', request => { if (/\/cpython312\/(main\.js|main\.wasm)/.test(request.url())) requests.push(request.url()) })
 async function code(text) {

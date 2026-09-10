@@ -10,7 +10,7 @@ const manifest=JSON.parse(await fs.readFile(new URL('manifest.json',content),'ut
 const bank=JSON.parse(await fs.readFile(new URL('assessments.json',content),'utf8'))
 const documents=[]
 const push=(collection,id,data)=>documents.push({path:`${collection}/${id}`,data:{...data,id,docId:id,managedBy:marker}})
-for (const [i,[id,title,section]] of chapters.entries()) push('chapters',id,{regionId,title,order:5+i,description:`Udemy Section ${section} 제작 순서로 배우는 화성 탐사 게임 · 영상 없이 게임 스튜디오에서 실습`})
+for (const [i,[id,title,section]] of chapters.entries()) push('chapters',id,{regionId,title,order:5+i,description:`Udemy Section ${section} 제작 순서로 배우는 화성 탐사 게임 · 영상 없이 코드 스튜디오에서 실습`})
 for(let i=0;i<31;i++){
  const chapterId=chapters.find(c=>c[2]===manifest.units[i].section)[0]
  const n=String(i+1).padStart(2,'0'),unitId=`unit_mars_expedition_${n}`

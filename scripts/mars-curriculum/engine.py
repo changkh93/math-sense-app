@@ -130,7 +130,7 @@ def emit():
         lecture = LECTURES[number - 1]
         md = f'# Data Log {number:02} - {title}\n\n'
         md += f'원강의 {lecture["number"]}강의 제작 순서에 대응합니다. 영상 없이 이 문서만 보고 작성합니다. [강의 위치]({lecture.get("url", "https://www.udemy.com/course/the-art-of-doing-video-game-creation-with-python-and-pygame/learn/lecture/" + lecture["lectureId"])})는 순서를 확인하기 위한 참고입니다.\n\n'
-        md += '파이썬 → **게임 스튜디오**에서 실습합니다. 정지 → main.py 수정 → 실행 → 게임 화면 클릭 순서로 진행하세요. 게임 화면에 포커스가 있어야 방향키와 Space가 전달됩니다. 각 단계의 편집을 모두 마친 다음 실행합니다. 게임이 작거나 아래쪽 HUD가 잘리면 게임 화면 오른쪽 위의 **크게 보기** 버튼으로 전체 화면에서 확인하세요.\n\n'
+        md += '파이썬 → **코드 스튜디오**에서 실습합니다. 정지 → main.py 수정 → 실행 → 게임 화면 클릭 순서로 진행하세요. 게임 화면에 포커스가 있어야 방향키와 Space가 전달됩니다. 각 단계의 편집을 모두 마친 다음 실행합니다. 게임이 작거나 아래쪽 HUD가 잘리면 게임 화면 오른쪽 위의 **크게 보기** 버튼으로 전체 화면에서 확인하세요.\n\n'
         if number == 1:
             md += '**내 프로젝트 → 화성 탐사대 수업 준비**로 빈 main.py와 에셋을 준비합니다. 프로젝트 이름에 기초 실험을 붙이고 01~08에서 같은 파일을 이어서 고칩니다. 매 단계 새 수업 준비를 누르지 않습니다.\n\n'
         elif number == 10:
@@ -138,7 +138,7 @@ def emit():
         else:
             md += '이전 단원의 마지막 main.py에서 이어갑니다. 누적 코드는 스크롤 창에서 읽거나, 스튜디오의 **화성 탐사대 단계 비교·수업 자료**에서 에셋을 포함한 별도 프로젝트로 열 수 있습니다. 직접 작성한 초안을 먼저 백업하세요.\n\n'
         md += COMMENT_GUIDE + '\n'
-        md += '[게임 스튜디오 열기](/python-game-studio) · [전체 수업 자료 ZIP](/mars-expedition/mars-expedition-course.zip) · [에셋 안내](/mars-expedition/ASSETS.html)\n'
+        md += '[코드 스튜디오 열기](/python-game-studio) · [전체 수업 자료 ZIP](/mars-expedition/mars-expedition-course.zip) · [에셋 안내](/mars-expedition/ASSETS.html)\n'
         for step in steps:
             md += f'\n## {step["id"]} - {step["title"]}\n\n{step["why"]}\n\n'
             md += continuity(step) + prediction('mars-expedition', step) + '### 수정 위치와 입력할 코드\n\n'

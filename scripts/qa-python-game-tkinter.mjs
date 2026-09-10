@@ -17,7 +17,7 @@ const fixture = { id: 'tkinter-qa-project', title: 'Flash Card QA', schemaVersio
 for (const path of ['data/english_word.csv', 'images/card_front.png', 'images/card_back.png', 'images/right.png', 'images/wrong.png']) fixture.files.push({ path, kind: path.endsWith('.csv') ? 'csv' : 'image', data: (await readFile(new URL(path, folder))).toString('base64') })
 const errors = []
 page.on('pageerror', error => errors.push(error.message))
-const frame = async () => (await page.locator('iframe[title="Python 게임 실행 화면"]').elementHandle()).contentFrame()
+const frame = async () => (await page.locator('iframe[title="Python 코드 실행 화면"]').elementHandle()).contentFrame()
 async function run(text) {
   if (text !== undefined) {
     await page.locator('.cm-content').click()

@@ -31,12 +31,12 @@ export default function GameStudioAttachmentPicker({ uid, onAdd, onBusyChange, d
     } catch (failure) { if (alive.current) setError(failure.message) }
     finally { if (alive.current) setBusy(false); onBusyChange?.(false) }
   }
-  return <section className="studio-attachment-picker" aria-label="게임 스튜디오에서 첨부">
-    <header><strong>게임 스튜디오에서 추가</strong><a href="/python-game-studio" target="_blank" rel="noopener noreferrer">게임 스튜디오 열기 ↗</a><button type="button" disabled={busy || disabled} onClick={reload}>목록 새로고침</button></header>
+  return <section className="studio-attachment-picker" aria-label="코드 스튜디오에서 첨부">
+    <header><strong>코드 스튜디오에서 추가</strong><a href="/python-game-studio" target="_blank" rel="noopener noreferrer">코드 스튜디오 열기 ↗</a><button type="button" disabled={busy || disabled} onClick={reload}>목록 새로고침</button></header>
     <p>이 브라우저에서 내 계정으로 저장한 프로젝트입니다. 다른 탭에서 수정했다면 저장 후 목록을 새로고침해 주세요.</p>
     {!rows && <p role="status">프로젝트 목록을 불러오고 있습니다…</p>}
     {(error || listing.error) && <p role="alert">{error || listing.error}</p>}
-    {rows?.length === 0 && !listing.error && <p>저장된 프로젝트가 없습니다. 게임 스튜디오에서 먼저 프로젝트를 만들어 주세요.</p>}
+    {rows?.length === 0 && !listing.error && <p>저장된 프로젝트가 없습니다. 코드 스튜디오에서 먼저 프로젝트를 만들어 주세요.</p>}
     {row && <>
       <label>프로젝트<select aria-label="스튜디오 프로젝트" disabled={busy || disabled} value={row.project.id} onChange={e => { setSelectedId(e.target.value); setPaths([]); setError('') }}>{rows.map(item => <option key={item.key} value={item.project.id}>{item.project.title} · {item.project.files.filter(file => file.kind === 'python').length}개 Python 파일</option>)}</select></label>
       <small>마지막 저장: {new Date(row.savedAt).toLocaleString('ko-KR')}</small>

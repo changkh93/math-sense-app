@@ -2,7 +2,7 @@ import { HighlightStyle, syntaxHighlighting, bracketMatching } from '@codemirror
 import { tags } from '@lezer/highlight'
 import { highlightActiveLine } from '@codemirror/view'
 
-// Opt in from Game Studio; other Python lesson editors retain their current appearance.
+// Opt in from Code Studio; other Python lesson editors retain their current appearance.
 export const studioSyntax = [
   syntaxHighlighting(HighlightStyle.define([
     { tag: tags.keyword, class: 'pgs-code-keyword' },
