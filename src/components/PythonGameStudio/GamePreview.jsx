@@ -4,7 +4,15 @@ import turtlePython from '../../../runtime/python-game-runner/turtle.py?raw'
 import turtleRenderer from '../../../runtime/python-game-runner/turtle-renderer.js?raw'
 import { buildRunnerDocument } from '../../../runtime/python-game-runner/document.mjs'
 
-const runnerDocument = buildRunnerDocument(runnerHtml, turtlePython, turtleRenderer)
+import tkPython from '../../../runtime/python-game-runner/tkinter.py?raw'
+import tkRenderer from '../../../runtime/python-game-runner/tkinter-renderer.js?raw'
+import pandasPython from '../../../runtime/python-game-runner/studio_pandas.py?raw'
+
+import plotPython from '../../../runtime/python-game-runner/studio_plot.py?raw'
+import plotRenderer from '../../../runtime/python-game-runner/plot-renderer.js?raw'
+import plotFont from '../../../public/mars-expedition/assets/fonts/DoHyeon-Regular.ttf?inline'
+
+const runnerDocument = buildRunnerDocument(runnerHtml, turtlePython, turtleRenderer, tkPython, tkRenderer, pandasPython, plotPython, plotRenderer, plotFont)
 
 // One isolated interpreter per editor session. Runs replace files/state over the port.
 export default function GamePreview({ run, onEvent }) {
@@ -20,6 +28,7 @@ export default function GamePreview({ run, onEvent }) {
     const sessionId = crypto.randomUUID()
     let connected = false, engineReady = false, bootFailed = false, disposed = false, count = 0, windowAt = Date.now(), watchdog
     let waitingId = null, waitingForStop = false
+    let csvBaseline = new Map()
     const recover = () => {
       if (!disposed) setEngineEpoch(value => value + 1)
     }
@@ -33,6 +42,7 @@ export default function GamePreview({ run, onEvent }) {
       clearTimeout(watchdog)
       waitingId = next?.id || crypto.randomUUID()
       waitingForStop = !next
+      csvBaseline = new Map((next?.project.files || []).filter(file => file.kind === 'csv').map(file => [file.path, file.data]))
       channel.port1.postMessage({ type: next ? 'RUN' : 'STOP', protocolVersion: 2, sessionId, runId: waitingId, project: next?.payload })
       // A normal stop must acknowledge cleanup. Reset only an unresponsive engine.
       if (!next && engineReady && !document.hidden) watchdog = setTimeout(recover, 3500)
@@ -53,6 +63,17 @@ export default function GamePreview({ run, onEvent }) {
       if (data.runId === waitingId && ['READY','RUNNING','STOPPED','ERROR'].includes(data.type)) clearTimeout(watchdog)
       if (data.type === 'STOPPED' && data.runId === waitingId) waitingForStop = false
       if (data.type === 'STOPPED' || data.runId !== runRef.current?.id) return
+      if (data.type === 'FILE_WRITE') {
+        try {
+          if (typeof data.text !== 'string' || data.text.length > 280000) throw new Error('CSV 저장 데이터가 너무 큽니다.')
+          const file = JSON.parse(data.text)
+          const accepted = callbackRef.current({ type: 'FILE_WRITE', file, projectId: runRef.current.project.id, expectedData: csvBaseline.get(file.path) })
+          if (accepted) csvBaseline.set(file.path, file.data)
+        } catch {
+          callbackRef.current({ type: 'STDERR', text: 'CSV 저장 결과를 읽지 못했습니다. 파일 크기와 내용을 확인해 주세요.\n' })
+        }
+        return
+      }
       if (!['READY','RUNNING','STDOUT','STDERR','ERROR','EXIT'].includes(data.type)) return
       callbackRef.current({ type: data.type, text: String(data.text || '').slice(0,8192) })
     }

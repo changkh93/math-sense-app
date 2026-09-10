@@ -79,9 +79,12 @@
     "video:render:source-promo": "remotion render video/index.jsx MetasenseSourceBrandFilm out/metasense-source-brand-film.mp4 --codec=h264 --pixel-format=yuv420p",
     "video:still:source-promo": "remotion still video/index.jsx MetasenseSourceBrandFilm out/metasense-source-brand-film-still.png --frame=1000",
     "test:python-game-studio": "node --test scripts/test-python-game-studio.mjs scripts/test-python-game-console.mjs",
+    "test:python-game-pandas": "python3 scripts/test-python-game-pandas.py",
+    "test:python-game-tkinter": "python3 scripts/test-python-game-tkinter.py",
     "test:python-game-turtle": "python3 scripts/test-python-game-turtle.py && python3 scripts/test-python-game-sync.py",
     "test:python-game-completion": "node --test scripts/test-python-game-completion.mjs",
-    "dev:python-game-runner": "node scripts/serve-python-game-runner.mjs"
+    "dev:python-game-runner": "node scripts/serve-python-game-runner.mjs",
+    "test:python-game-math": "python3 -B scripts/test-python-game-math.py"
   },
   "dependencies": {
     "@codemirror/autocomplete": "^6.20.3",

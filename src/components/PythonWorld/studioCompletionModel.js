@@ -7,14 +7,42 @@ const ignored = new Set(['Comment', 'String', 'FormatString'])
 const text = (model, node) => node ? model.source.slice(node.from, node.to) : ''
 const typeFrom = ref => {
   if (!ref) return null
-  const list = ref.match(/^list\[(.+)\]$/)
-  return list ? { ...instance('list'), item: typeFrom(list[1]) } : instance(ref)
+  const list = ref.match(/^(list|tuple)\[(.+)\]$/)
+  return list ? { ...instance(list[1]), item: typeFrom(list[2]) } : instance(ref)
 }
 const moduleName = path => path.replace(/\.py$/i, '').replace(/\/__init__$/, '').replaceAll('/', '.')
 
 // Each editor owns this cache. Only referenced project Python files are parsed.
 export function createStudioAnalyzer(getProject = () => ({})) {
   const cache = new Map()
+  const headerCache = new Map()
+  const literal = (model, node) => node?.name === 'String' && /^(['"])[^\\\n]*\1$/.test(text(model, node)) ? text(model, node).slice(1, -1) : null
+  function csvColumns(path) {
+    const file = (getProject().files || []).find(f => f.path === path && f.kind === 'csv')
+    if (!file?.data || file.data.length > 280000) return []
+    if (headerCache.get(path)?.data === file.data) return headerCache.get(path).columns
+    try {
+      const source = new TextDecoder().decode(Uint8Array.from(atob(file.data), c => c.charCodeAt(0))).replace(/^\uFEFF/, '')
+      const columns = []; let cell = '', quoted = false
+      for (let i = 0; i < source.length; i++) {
+        const c = source[i]
+        if (c === '"') { if (quoted && source[i + 1] === '"') { cell += '"'; i++ } else quoted = !quoted }
+        else if (!quoted && (c === ',' || c === '\n' || c === '\r')) { columns.push(cell); cell = ''; if (c !== ',') break }
+        else cell += c
+        if (i === source.length - 1) columns.push(cell)
+      }
+      const names = []
+      if (columns.length > 200 || columns.some(name => name.length > 180)) return []
+      for (const [i, name] of columns.entries()) {
+        const base = name || `Unnamed: ${i}`; let label = base, suffix = 1
+        while (names.includes(label)) label = `${base}.${suffix++}`
+        names.push(label)
+      }
+      if (headerCache.size > 100) headerCache.clear()
+      headerCache.set(path, { data: file.data, columns: names })
+      return names
+    } catch { return [] }
+  }
   let current
   let previousFiles = []
   function parse(source, path, depth = 0) {
@@ -150,6 +178,7 @@ export function createStudioAnalyzer(getProject = () => ({})) {
       }
       return expression(binding.iterable, binding.scope, binding.at, depth + 1)?.item || null
     }
+    if (binding.expr && binding.destructured) return expression(binding.expr, binding.scope, binding.at, depth + 1)?.item || binding
     if (binding.expr && !binding.destructured) {
       let value = expression(binding.expr, binding.scope, binding.at, depth + 1)
       if (binding.extraMembers) value = { ...value, members: new Map([...(value?.members || []), ...binding.extraMembers]) }
@@ -165,6 +194,9 @@ export function createStudioAnalyzer(getProject = () => ({})) {
     seen.add(identity)
     if (value.kind === 'module' && value.model) return new Map([...value.model.root.bindings].map(([name, list]) => [name, list.at(-1)]))
     const result = new Map(Object.entries(catalog[value.ref] || {}))
+    if (value.ref === 'pandas.DataFrame') for (const label of value.columns || []) {
+      if (!result.has(label)) result.set(label, { label, type: 'property', ...instance('pandas.Series'), info: '표의 열. ["열 이름"]으로도 선택할 수 있습니다.' })
+    }
     for (const base of value.bases || []) for (const [key, val] of members(expression(base, value.scope, Infinity, depth + 1), depth + 1, seen)) result.set(key, val)
     for (const [key, val] of value.members || []) result.set(key, val)
     return result
@@ -176,18 +208,39 @@ export function createStudioAnalyzer(getProject = () => ({})) {
     if (['String', 'FormatString'].includes(node.name)) return instance('str')
     if (node.name === 'Number') return instance(value.includes('.') ? 'float' : 'int')
     if (node.name === 'ArrayExpression') return { ...instance('list'), item: expression(parts.find(n => !['[', ']', ','].includes(n.name)), scope, pos, depth + 1) }
-    if (node.name === 'DictionaryExpression') return instance('dict')
+    if (node.name === 'DictionaryExpression') return { ...instance('dict'), keys: parts.filter(n => n.name === 'String' && n.nextSibling?.name === ':').map(n => literal(model, n)).filter(v => v !== null) }
     if (node.name === 'SetExpression') return instance('set')
     if (node.name === 'TupleExpression') return instance('tuple')
     if (node.name === 'ParenthesizedExpression') return expression(parts[1], scope, pos, depth + 1)
+    if (node.name === 'BinaryExpression') {
+      const operands = parts.map(n => expression(n, scope, pos, depth + 1))
+      if (operands.some(v => v?.ref === 'numpy.ndarray')) return instance('numpy.ndarray')
+    }
     if (node.name === 'MemberExpression') {
       const base = expression(parts[0], scope, pos, depth + 1)
       const property = node.getChild('PropertyName')
-      if (!property) return base?.item || null
+      if (!property) {
+        if (base?.ref === 'pandas.DataFrame') {
+          if (parts[2]?.name === 'String') return instance('pandas.Series')
+          if (parts[2]?.name === 'ArrayExpression') return { ...base, columns: children(parts[2]).map(n => literal(model, n)).filter(v => v !== null) }
+          return base
+        }
+        if (base?.ref === 'numpy.ndarray' && parts.some(n => n.name === ':' || n.name === 'SliceExpression')) return base
+        return base?.item || null
+      }
       return resolve(members(base, depth + 1).get(text(model, property)), depth + 1)
     }
     if (node.name === 'CallExpression') {
       const callee = expression(parts[0], scope, pos, depth + 1)
+      const args = children(node.getChild('ArgList')).filter(n => !['(', ')', ','].includes(n.name))
+      const owner = parts[0]?.name === 'MemberExpression' ? expression(parts[0].firstChild, scope, pos, depth + 1) : null
+      if (callee?.returns === 'pandas.DataFrame' && callee.label === 'read_csv') return { ...instance('pandas.DataFrame'), columns: csvColumns(literal(model, args[0])) }
+      if (callee?.returns === 'pandas.DataFrame' && callee.label === 'DataFrame') return { ...instance('pandas.DataFrame'), columns: expression(args[0], scope, pos, depth + 1)?.keys || [] }
+      if (owner?.ref === 'pandas.DataFrame' && callee?.label === 'to_dict') {
+        const orient = args.find(n => n.name === 'String' && (n === args[0] || (n.prevSibling?.name === 'AssignOp' && text(model, n.prevSibling.prevSibling) === 'orient')))
+        return typeFrom(literal(model, orient) === 'records' ? 'list[dict]' : 'dict')
+      }
+      if (owner?.ref === 'pandas.DataFrame' && callee?.label === 'head') return owner
       if (callee?.kind === 'class' && callee.members) return { ...callee, kind: 'instance', signature: undefined }
       if (callee?.returns) return typeFrom(callee.returns)
       if (callee?.returnAnnotation) {
@@ -204,7 +257,7 @@ export function createStudioAnalyzer(getProject = () => ({})) {
   }
   function context(source, pos, path) {
     const files = (getProject().files || []).filter(f => f.path !== path)
-    if (files.length !== previousFiles.length || files.some((f, i) => f.path !== previousFiles[i]?.path || f.text !== previousFiles[i]?.text)) cache.clear()
+    if (files.length !== previousFiles.length || files.some((f, i) => f.path !== previousFiles[i]?.path || f.text !== previousFiles[i]?.text || f.data !== previousFiles[i]?.data)) cache.clear()
     previousFiles = files
     current = { source, path }
     const model = parse(source, path)
@@ -246,9 +299,12 @@ export function createStudioAnalyzer(getProject = () => ({})) {
       const value = call && expression(call.firstChild, scope, pos)
       const name = value?.label
       let options = []
+      const member = enclosing(stringNode, 'MemberExpression')
+      const table = member && stringNode.parent === member && expression(member.firstChild, scope, pos)
+      if (table?.ref === 'pandas.DataFrame') return { from: stringNode.from + 1, options: (table.columns || []).map(label => ({ label, type: 'property', detail: '표의 열' })), string: true }
       if (['color', 'pencolor', 'fillcolor', 'bgcolor'].includes(name)) options = colors.map(label => ({ label, type: 'constant', info: '색 이름', detail: '색상' }))
       else if (name === 'shape') options = ['turtle', 'classic', 'arrow', 'circle', 'square', 'triangle', 'blank'].map(label => ({ label, type: 'constant', detail: '거북이 모양' }))
-      else if (['load', 'Font', 'Sound', 'open'].includes(name)) {
+      else if (['load', 'Font', 'Sound', 'open', 'PhotoImage', 'read_csv'].includes(name)) {
         options = (getProject().files || []).filter(f => !value.fileKind || f.kind === value.fileKind).map(f => ({ label: f.path, type: 'text', detail: '프로젝트 파일', info: '프로젝트 루트 기준 경로' }))
       }
       return options.length ? { from: stringNode.from + 1, options, string: true } : null

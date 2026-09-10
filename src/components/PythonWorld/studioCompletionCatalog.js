@@ -95,5 +95,116 @@ define('random', [['randint', 'a, b', 'a부터 b까지의 정수 하나. 양 끝
 define('math', [['sqrt', 'x', '제곱근.', 'float'], ['sin', 'x', '사인. 각도는 라디안.', 'float'], ['cos', 'x', '코사인. 각도는 라디안.', 'float'], ['radians', 'degrees', '도를 라디안으로 바꿉니다.', 'float'], ['degrees', 'radians', '라디안을 도로 바꿉니다.', 'float'], ['hypot', '*coordinates', '거리 계산.', 'float'], ['ceil', 'x', '올림.', 'int'], ['floor', 'x', '내림.', 'int']])
 for (const name of ['pi', 'e', 'tau', 'inf']) catalog.math[name] = { label: name, type: 'constant', ...instance('float'), info: '수학 상수' }
 define('asyncio', [['sleep', 'delay', 'await asyncio.sleep(0)은 브라우저에 화면을 갱신할 시간을 줍니다.'], ['run', 'coroutine', '비동기 함수를 실행합니다.']])
-export const modules = ['turtle', 'ColabTurtlePlus', 'pygame', 'random', 'math', 'asyncio'].map(mod)
+define('tkinter', [
+  ['Tk', '', '브라우저 안에 수업용 창을 만듭니다.', 'tkinter.Tk'],
+  ['Canvas', 'master=None, width=800, height=526', '이미지와 글자를 배치할 캔버스.', 'tkinter.Canvas'],
+  ['PhotoImage', 'file', '프로젝트의 PNG 이미지 파일.', 'tkinter.PhotoImage'],
+  ['Button', 'master=None, image=None, text="", command=None', '클릭할 때 command 함수를 실행합니다. 함수 이름 뒤에 괄호를 붙이지 마세요.', 'tkinter.Button'],
+  ['mainloop', '', '버튼과 타이머 이벤트 처리를 시작합니다. 코드 마지막에 사용하세요.'],
+])
+define('tkinter.Tk', [
+  ['title', 'string', '창 제목을 지정합니다.'], ['config', 'padx=0, pady=0, bg="white"', '창의 여백과 배경색.'],
+  ['after', 'ms, func, *args', 'ms 밀리초 뒤 함수를 실행합니다. 3000은 3초입니다.', 'str'],
+  ['after_cancel', 'id', 'after가 반환한 예약 번호로 실행을 취소합니다.'],
+  ['mainloop', '', '창을 유지하며 클릭과 타이머를 처리합니다.'], ['quit', '', '이벤트 처리를 종료합니다.'], ['destroy', '', '창을 닫습니다.'],
+])
+define('tkinter.Canvas', [
+  ['create_image', 'x, y, image, anchor="center"', '중심 좌표에 이미지를 놓고 항목 번호를 반환합니다.', 'int'],
+  ['create_text', 'x, y, text, font=None, fill="black"', '글자를 놓고 항목 번호를 반환합니다.', 'int'],
+  ['itemconfig', 'tagOrId, **options', '기존 항목의 text, image, fill, font를 바꿉니다.'],
+  ['config', 'bg=None, width=None, height=None, highlightthickness=0', '캔버스 배경·크기·테두리 설정.'],
+])
+define('tkinter.Button', [['config', 'text=None, image=None, command=None, state="normal"', '버튼 모양·동작 설정. state="disabled"로 잠글 수 있습니다.']])
+for (const name of ['tkinter.Canvas', 'tkinter.Button']) {
+  catalog[name].grid = fn('grid', 'row=0, column=0, columnspan=1, rowspan=1, padx=0, pady=0', '0부터 시작하는 행·열에 배치합니다.')
+  catalog[name].configure = { ...catalog[name].config, label: 'configure' }
+}
+catalog['tkinter.Canvas'].itemconfigure = { ...catalog['tkinter.Canvas'].itemconfig, label: 'itemconfigure' }
+catalog['tkinter.Tk'].configure = { ...catalog['tkinter.Tk'].config, label: 'configure' }
+define('tkinter.PhotoImage', [['width', '', '이미지 가로 픽셀 수.', 'int'], ['height', '', '이미지 세로 픽셀 수.', 'int']])
+catalog.tkinter.PhotoImage.fileKind = 'image'
+for (const label of ['NORMAL', 'DISABLED', 'CENTER', 'N', 'S', 'E', 'W', 'NW', 'NE', 'SW', 'SE']) catalog.tkinter[label] = { label, type: 'constant', ...instance('str'), info: 'tkinter 상태·배치 상수' }
+define('pandas', [
+  ['read_csv', 'filepath_or_buffer, encoding="utf-8", dtype=None', 'CSV를 표로 읽습니다. 숫자 열은 자동 인식하며 dtype=str로 문자열을 보존합니다.', 'pandas.DataFrame'],
+  ['DataFrame', 'data=None, columns=None, index=None', '사전, 행 목록 또는 NumPy 2차원 배열로 표를 만듭니다. 각 열의 길이는 같아야 합니다.', 'pandas.DataFrame'],
+  ['Series', 'data=None, index=None, name=None, dtype=None', '한 열의 값과 행 번호를 담습니다.', 'pandas.Series'],
+])
+catalog.pandas.read_csv.fileKind = 'csv'
+define('pandas.DataFrame', [
+  ['to_dict', 'orient="dict"', '기본은 {열: {행 번호: 값}}. orient="records"는 행별 사전 목록입니다.', 'dict'],
+  ['to_csv', 'path_or_buf=None, index=True, encoding="utf-8"', 'CSV 저장. index=False로 행 번호를 제외합니다. 프로젝트 CSV는 이 브라우저에 보관됩니다.'],
+  ['head', 'n=5', '처음 n개 행을 확인합니다.', 'pandas.DataFrame'],
+])
+define('pandas.Series', [
+  ['to_list', '', '이 열의 값을 Python 리스트로 바꿉니다.', 'list'], ['tolist', '', 'to_list와 같은 기능입니다.', 'list'],
+  ['to_dict', '', '행 번호와 값을 사전으로 바꿉니다.', 'dict'],
+  ['mean', 'skipna=True', '숫자 열의 평균. 기본적으로 빈 값은 제외합니다.', 'float'],
+  ['max', 'skipna=True', '이 열에서 가장 큰 값을 구합니다.'], ['min', 'skipna=True', '이 열에서 가장 작은 값을 구합니다.'],
+  ['sum', 'skipna=True', '숫자 열의 합계를 구합니다.'], ['head', 'n=5', '처음 n개 값을 확인합니다.', 'pandas.Series'],
+])
+for (const ref of ['pandas.DataFrame', 'pandas.Series']) {
+  for (const [label, type, info] of [['index', 'list', '원래 행 번호. 조건으로 골라도 유지됩니다.'], ['shape', 'tuple', '데이터의 크기. 표는 (행 수, 열 수).'], ['empty', 'bool', '데이터가 비었는지 확인합니다.']]) catalog[ref][label] = { label, type: 'property', ...instance(type), info }
+}
+catalog['pandas.DataFrame'].columns = { label: 'columns', type: 'property', ...instance('list'), info: '표의 열 이름 목록.' }
+catalog['pandas.Series'].dtype = { label: 'dtype', type: 'property', ...instance('str'), info: '이 열의 자료형 표시.' }
+define('numpy', [
+  ['array', 'object, dtype=None', '리스트로 NumPy 배열을 만듭니다. 배열 * 2는 각 값을 두 배로 계산합니다.', 'numpy.ndarray'],
+  ['zeros', 'shape, dtype=float', '0으로 채운 배열. zeros((24, 2))는 24행 2열입니다.', 'numpy.ndarray'],
+  ['ones', 'shape, dtype=float', '1로 채운 배열.', 'numpy.ndarray'],
+  ['arange', 'start, stop, step=1', 'stop을 포함하지 않는 등간격 배열.', 'numpy.ndarray'],
+  ['linspace', 'start, stop, num=50', '양 끝을 포함하여 num개의 점을 만듭니다.', 'numpy.ndarray'],
+  ['histogram', 'a, bins=10, range=None, density=None', '도수와 구간 경계를 반환합니다. 마지막 구간만 오른쪽 경계를 포함합니다.', 'tuple[numpy.ndarray]'],
+  ['multiply', 'x1, x2', '배열의 같은 위치 값끼리 곱합니다.', 'numpy.ndarray'],
+  ...['sum', 'mean', 'min', 'max'].map(name => [name, 'a, axis=None', '배열 전체 또는 지정한 축을 따라 계산합니다.']),
+  ...['sin', 'cos', 'sqrt', 'abs'].map(name => [name, 'x', '배열의 각 값에 함수를 적용합니다.', 'numpy.ndarray']),
+])
+define('numpy.random', [
+  ['randint', 'low, high=None, size=None', 'low 이상 high 미만의 정수를 뽑습니다. size=30이면 30개.', 'numpy.ndarray'],
+  ['seed', 'seed=None', '같은 난수 실험을 재현하도록 씨앗 값을 정합니다.'],
+])
+catalog.numpy.random = mod('numpy.random')
+define('numpy.ndarray', [
+  ['tolist', '', '일반 Python 리스트로 바꿉니다.', 'list'], ['reshape', '*shape', '원소 수를 유지하며 배열 모양을 바꿉니다.', 'numpy.ndarray'],
+  ['astype', 'dtype', '배열의 자료형을 바꿉니다.', 'numpy.ndarray'],
+  ...['sum', 'mean', 'min', 'max'].map(name => [name, 'axis=None', '배열 전체 또는 지정 축의 값을 계산합니다.']),
+])
+for (const label of ['shape', 'ndim', 'size', 'dtype']) catalog['numpy.ndarray'][label] = { label, type: 'property', info: 'NumPy 배열의 모양·차원·크기·자료형.' }
+catalog.matplotlib = { pyplot: mod('matplotlib.pyplot') }
+const plotRows = [
+  ['plot', 'x, y, color=None, linewidth=1.5, alpha=None, label=None', '좌표들을 선으로 연결합니다.'],
+  ['scatter', 'x, y, s=36, c=None, alpha=None, label=None', '좌표에 점을 표시합니다. s는 점의 면적입니다.'],
+  ['hist', 'x, bins=10, rwidth=None, color=None, alpha=None, edgecolor=None', '자료를 구간별로 나누어 히스토그램을 그립니다.'],
+  ['bar', 'x, height, width=0.8, color=None, edgecolor=None', '계급값과 도수로 막대그래프를 그립니다.'],
+  ['grid', 'visible=None, axis="both"', '격자를 표시하거나 숨깁니다.'],
+  ['legend', 'fontsize=None, loc="best"', 'label로 지정한 범례. loc=0 자동, 1 오른쪽 위, 4 오른쪽 아래, 10 중앙.'],
+  ['text', 'x, y, s, fontsize=None, color=None', '지정한 좌표에 글씨를 씁니다.'],
+  ['axvline', 'x=0, color=None, linewidth=None', 'x 위치에 세로선을 그립니다.'],
+  ['axhline', 'y=0, color=None, linewidth=None', 'y 위치에 가로선을 그립니다.'],
+]
+define('matplotlib.pyplot', [...plotRows,
+  ['figure', 'num=None, figsize=None, dpi=100', '새 그래프. figsize=(6, 6)은 가로·세로 6인치.', 'matplotlib.Figure'],
+  ['axes', '', '그래프의 좌표축 객체를 만듭니다.', 'matplotlib.Axes'],
+  ['show', '', '그래프를 결과 화면에 표시합니다. 실행 종료 때도 자동 표시됩니다.'],
+  ['close', 'fig=None', '그래프 객체를 닫습니다. close("all")은 모두 닫습니다.'],
+  ['rc', 'group, **kwargs', '글꼴 등 그래프 기본 설정. 업로드한 TTF/OTF 폰트도 사용할 수 있습니다.'],
+  ...['title', 'xlabel', 'ylabel'].map(name => [name, 'label, fontsize=None, color=None', '제목 또는 축 이름을 지정합니다.']),
+  ...['xticks', 'yticks'].map(name => [name, 'ticks=None, labels=None, fontsize=None, color=None', '눈금 위치·글씨 크기·색을 지정합니다.']),
+  ...['xlim', 'ylim'].map(name => [name, 'left=None, right=None', '표시할 좌표 범위를 지정합니다.']),
+])
+define('matplotlib.Figure', [['add_subplot', '*args', '좌표축을 추가합니다.', 'matplotlib.Axes'], ['add_axes', 'rect', '지정 영역에 좌표축을 만듭니다.', 'matplotlib.Axes']])
+define('matplotlib.Axes', [...plotRows,
+  ...['title', 'xlabel', 'ylabel'].map(name => ['set_' + name, 'label, **kwargs', '제목 또는 축 이름을 지정합니다.']),
+  ...['xlim', 'ylim'].map(name => ['set_' + name, 'left=None, right=None', '좌표 범위를 지정합니다.']),
+])
+define('itertools', [
+  ['permutations', 'iterable, r=None', '서로 다른 항목을 순서를 고려하여 뽑습니다.'],
+  ['combinations', 'iterable, r', '순서를 고려하지 않고 뽑는 조합.'],
+  ['product', '*iterables, repeat=1', '가능한 모든 순서쌍. 주사위 두 번은 product(range(1,7), repeat=2).'],
+  ['groupby', 'iterable, key=None', '연속한 같은 키의 항목을 묶습니다.'],
+])
+define('fractions', [['Fraction', 'numerator=0, denominator=1', '정확한 분수. Fraction(15, 36)은 5/12.', 'fractions.Fraction']])
+catalog['fractions.Fraction'] = Object.fromEntries(['numerator', 'denominator'].map(label => [label, { label, type: 'property', ...instance('int'), info: label === 'numerator' ? '약분한 분자.' : '약분한 분모.' }]))
+for (const ref of ['pandas.DataFrame', 'pandas.Series']) for (const label of ['loc', 'iloc']) catalog[ref][label] = { label, type: 'property', info: label === 'loc' ? '이름으로 선택·수정: data.loc["왕새우", "몸무게"] = 100' : '0부터 시작하는 위치로 선택·수정: data.iloc[0, 0]' }
+
+export const modules = ['turtle', 'ColabTurtlePlus', 'pygame', 'tkinter', 'pandas', 'numpy', 'matplotlib', 'itertools', 'fractions', 'random', 'math', 'asyncio'].map(mod)
 export const colors = ['black', 'white', 'red', 'green', 'blue', 'yellow', 'orange', 'purple', 'pink', 'gray', 'brown', 'deepskyblue', 'saddlebrown', 'peru', 'firebrick', 'seagreen', 'mediumseagreen', 'gold', 'cyan', 'navy', 'lime', 'lightblue']

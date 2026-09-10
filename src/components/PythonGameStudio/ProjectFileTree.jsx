@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { folderPaths } from './projectFolders'
 import { ChevronDown, ChevronRight, Folder, FolderOpen, FileCode2, Image, Music, Type } from 'lucide-react'
-const icons = { python: FileCode2, image: Image, audio: Music, font: Type }
+const icons = { python: FileCode2, csv: FileCode2, image: Image, audio: Music, font: Type }
 const DRAG_TYPE = 'application/x-metasense-project-file'
 export default function ProjectFileTree({ project, selected, selectedFolder, onSelectFile, onSelectFolder, onMoveFile, onUpload, onError, busy }) {
   const [visibility, setVisibility] = useState({ selected, collapsed: new Set() })

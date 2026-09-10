@@ -1,6 +1,6 @@
 export const PROJECT_LIMITS = Object.freeze({ files: 100, codeBytes: 200 * 1024, assetBytes: 5 * 1024 * 1024, totalBytes: 6 * 1024 * 1024 })
 export const RUNTIME_VERSION = 'pygame-web-0.9-cp312-v1'
-const types = { py: 'python', png: 'image', jpg: 'image', jpeg: 'image', webp: 'image', ogg: 'audio', wav: 'audio', mp3: 'audio', ttf: 'font', otf: 'font' }
+const types = { py: 'python', csv: 'csv', png: 'image', jpg: 'image', jpeg: 'image', webp: 'image', ogg: 'audio', wav: 'audio', mp3: 'audio', ttf: 'font', otf: 'font' }
 export function normalizeFolderPath(input) {
   if (typeof input !== 'string') throw new Error('파일 이름을 확인해 주세요.')
   const path = input.normalize('NFC')
@@ -9,7 +9,7 @@ export function normalizeFolderPath(input) {
 }
 export function normalizePath(input) {
   const path = normalizeFolderPath(input)
-  if (!types[path.split('.').pop().toLowerCase()]) throw new Error('Python, PNG/JPG/WebP, OGG/WAV/MP3, TTF/OTF 파일을 사용해 주세요.')
+  if (!types[path.split('.').pop().toLowerCase()]) throw new Error('Python, CSV, PNG/JPG/WebP, OGG/WAV/MP3, TTF/OTF 파일을 사용해 주세요.')
   return path
 }
 export function fileKind(path) { return types[normalizePath(path).split('.').pop().toLowerCase()] }
@@ -24,6 +24,12 @@ export function base64ToBytes(data) {
 }
 export function validateAsset(path, bytes) {
   const ext = path.split('.').pop().toLowerCase()
+  if (ext === 'csv') {
+    if (bytes.length > PROJECT_LIMITS.codeBytes || bytes.includes(0)) throw new Error(`${path}: CSV는 200 KB 이하 UTF-8 텍스트를 사용해 주세요.`)
+    try { new TextDecoder('utf-8', { fatal: true }).decode(bytes) }
+    catch { throw new Error(`${path}: CSV를 UTF-8 형식으로 저장해 주세요.`) }
+    return
+  }
   const head = String.fromCharCode(...bytes.subarray(0, 12))
   const valid = ext === 'png' ? head.startsWith('\x89PNG\r\n\x1a\n')
     : ['jpg', 'jpeg'].includes(ext) ? bytes[0] === 255 && bytes[1] === 216 && bytes[2] === 255
@@ -34,6 +40,18 @@ export function validateAsset(path, bytes) {
     : ['ttf','otf'].includes(ext) ? head.startsWith('\x00\x01\x00\x00') || head.startsWith('OTTO') || head.startsWith('true')
     : false
   if (!valid) throw new Error(`${path}: 파일 내용과 확장자가 일치하지 않습니다.`)
+}
+
+// Runtime output may only update CSV in the same project and only if its prior
+// contents still match the run snapshot (or the last accepted runtime write).
+export function applyRuntimeCsv(project, projectId, file, expectedData) {
+  if (!project || project.id !== projectId) throw new Error('실행 중 프로젝트가 바뀌어 CSV 저장을 건너뛰었습니다.')
+  const path = normalizePath(file.path)
+  if (fileKind(path) !== 'csv') throw new Error('실행 결과는 CSV 파일로만 저장할 수 있습니다.')
+  const previous = project.files.find(item => item.path === path)
+  if (previous?.data !== expectedData) throw new Error(`${path}: 실행 중 파일이 변경되어 덮어쓰지 않았습니다. 다시 실행해 주세요.`)
+  const next = { path, kind: 'csv', data: file.data }
+  return validateProject({ ...project, files: previous ? project.files.map(item => item.path === path ? next : item) : [...project.files, next] })
 }
 export function validateProject(input) {
   if (!input || typeof input !== 'object' || input.schemaVersion !== 1 || input.runtimeVersion !== RUNTIME_VERSION) throw new Error('지원하지 않는 프로젝트 버전입니다.')

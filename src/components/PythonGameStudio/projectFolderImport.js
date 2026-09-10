@@ -1,6 +1,6 @@
 import { PROJECT_LIMITS, RUNTIME_VERSION, bytesToBase64, fileKind, normalizePath, validateProject } from './projectPolicy.mjs'
 
-const supported = /\.(py|png|jpe?g|webp|ogg|wav|mp3|ttf|otf)$/i
+const supported = /\.(py|csv|png|jpe?g|webp|ogg|wav|mp3|ttf|otf)$/i
 const ignoredDirectories = new Set(['__pycache__', 'node_modules', 'venv', 'env'])
 export async function readProjectFolder(entries) {
   if (!entries.length) throw new Error('폴더 안에 파일이 없습니다.')

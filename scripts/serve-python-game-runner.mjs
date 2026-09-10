@@ -2,8 +2,8 @@ import http from 'node:http'
 import { readFile } from 'node:fs/promises'
 import { buildRunnerDocument } from '../runtime/python-game-runner/document.mjs'
 const port = Number(process.env.PYTHON_GAME_RUNNER_PORT || 4178)
-const sources = await Promise.all(['index.html', 'turtle.py', 'turtle-renderer.js'].map(name => readFile(new URL(`../runtime/python-game-runner/${name}`, import.meta.url), 'utf8')))
-const html = buildRunnerDocument(...sources)
+const sources = await Promise.all(['index.html', 'turtle.py', 'turtle-renderer.js', 'tkinter.py', 'tkinter-renderer.js', 'studio_pandas.py', 'studio_plot.py', 'plot-renderer.js'].map(name => readFile(new URL(`../runtime/python-game-runner/${name}`, import.meta.url), 'utf8')))
+const html = buildRunnerDocument(...sources, (await readFile(new URL('../public/mars-expedition/assets/fonts/DoHyeon-Regular.ttf', import.meta.url))).toString('base64'))
 http.createServer((req, res) => {
   if (req.url !== '/' && req.url !== '/index.html') { res.writeHead(404); res.end(); return }
   res.writeHead(200, {

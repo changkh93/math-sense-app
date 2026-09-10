@@ -6,7 +6,7 @@ const { chromium } = createRequire(import.meta.url)(process.env.PLAYWRIGHT_MODUL
 const browser = await chromium.launch({ headless: true, ...(process.env.CHROME_PATH ? { executablePath: process.env.CHROME_PATH } : {}) })
 const page = await browser.newPage({ viewport: { width: 1800, height: 1100 } })
 page.setDefaultTimeout(90000)
-const output = new URL('../docs/collaboration/tasks/20260909-studio-turtle/verification/', import.meta.url)
+const output = new URL(process.env.GAME_STUDIO_QA_OUTPUT || '../docs/collaboration/tasks/20260909-studio-turtle/verification/', import.meta.url)
 await mkdir(output, { recursive: true })
 const errors = []
 page.on('pageerror', error => errors.push(error.message))

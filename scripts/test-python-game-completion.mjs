@@ -64,3 +64,49 @@ test('signature help, nested commas, imports and Unicode names', () => {
   assert.ok(labels('from pygame import Re').includes('Rect'))
   assert.ok(labels('이름="학생"\n이').includes('이름'))
 })
+
+test('Tk lesson widgets, pandas records and CSV/PNG path recommendations', () => {
+  const analyzer = createStudioAnalyzer(() => ({ files: [{ path: 'data/words.csv', kind: 'csv' }, { path: 'images/front.png', kind: 'image' }, { path: 'main.py', kind: 'python' }] }))
+  for (const [init, property] of [['w=Tk()', 'after_cancel'], ['c=Canvas()', 'itemconfig'], ['b=Button()', 'grid']]) assert.ok(labels(`from tkinter import *\n${init}\n${init[0]}.`).includes(property))
+  assert.ok(labels('import pandas as pd\ndata=pd.read_csv("data/words.csv")\ndata.').includes('to_dict'))
+  assert.ok(labels('import pandas as pd\nrows=pd.read_csv("data/words.csv").to_dict(orient="records")\nrows.').includes('remove'))
+  assert.deepEqual(labels('import pandas as pd\npd.read_csv("|', analyzer), ['data/words.csv'])
+  assert.deepEqual(labels('from tkinter import *\nPhotoImage(file="|', analyzer), ['images/front.png'])
+  assert.ok(!labels('from tkinter import *\nc=Canvas()\nc.').includes('create_window'))
+})
+
+test('pandas lesson Series, row filters, real CSV headers and schema freshness', () => {
+  let files = [{ path: 'weather.csv', kind: 'csv', data: Buffer.from('요일,온도,날씨\n월,20,맑음\n').toString('base64') }]
+  const analyzer = createStudioAnalyzer(() => ({ files }))
+  const head = 'import pandas as pd\ndata=pd.read_csv("weather.csv")\n'
+  assert.ok(labels(head+'data.', analyzer).includes('온도'))
+  assert.ok(labels(head+'data.온도.', analyzer).includes('mean'))
+  assert.ok(labels(head+'data["온도"].', analyzer).includes('max'))
+  assert.ok(labels(head+'selected=data[data.온도>=20]\nselected.', analyzer).includes('to_csv'))
+  assert.ok(labels(head+'data.head().온도.', analyzer).includes('to_list'))
+  assert.deepEqual(labels(head+'data["|', analyzer), ['요일', '온도', '날씨'])
+  assert.deepEqual(labels(head+'data[data.요일 == "|', analyzer), [])
+  assert.ok(!labels(head+'selected=data[["온도"]]\nselected.', analyzer).includes('요일'))
+  assert.ok(labels(head+'data.to_dict().').includes('items'))
+  assert.ok(labels(head+'data.to_dict("records").').includes('append'))
+  const quiz='import pandas as pd\nvalues={"name": ["홍길동"], "scores": [90]}\ndata=pd.DataFrame(values)\n'
+  assert.ok(labels(quiz+'data.').includes('scores'))
+  assert.ok(labels(quiz+'data.scores.').includes('mean'))
+  files = [{ ...files[0], data: Buffer.from('기온,"도시,이름"\n10,서울\n').toString('base64') }]
+  assert.deepEqual(labels(head+'data["|', analyzer), ['기온', '도시,이름'])
+  assert.ok(!labels(head+'data.', analyzer).includes('온도'))
+})
+
+test('math lesson modules, arrays and Matplotlib axes offer appropriate suggestions', () => {
+  for (const [code, expected] of [
+    ['import numpy as np\nnp.', 'histogram'], ['import numpy as np\nhist,bins=np.histogram([1,2])\nhist.', 'sum'], ['import numpy as np\nnp.random.', 'randint'],
+    ['import numpy as np\na=np.array([1,2])\na.', 'reshape'],
+    ['import numpy as np\na=np.arange(10)*2\na.', 'mean'],
+    ['import matplotlib.pyplot as plt\nplt.', 'hist'],
+    ['import matplotlib.pyplot as plt\nax=plt.axes()\nax.', 'scatter'],
+    ['import matplotlib.pyplot as plt\nf=plt.figure()\nf.', 'add_subplot'],
+    ['from fractions import Fraction\nf=Fraction(5,12)\nf.', 'numerator'],
+    ['import itertools\nitertools.', 'product'],
+    ['import pandas as pd\nh=pd.DataFrame({"x":[1]})\nh.', 'loc'],
+  ]) assert.ok(labels(code).includes(expected), code)
+})

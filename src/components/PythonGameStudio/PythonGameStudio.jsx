@@ -7,7 +7,7 @@ import { createProject } from './templates'
 import ProjectFileTree from './ProjectFileTree'
 import { folderPaths, moveProjectFile } from './projectFolders'
 import { listDrafts, saveDraft, selectDraft, deleteDraft } from './projectStore'
-import { base64ToBytes, bytesToBase64, fileKind, normalizePath, normalizeFolderPath, validateProject } from './projectPolicy.mjs'
+import { base64ToBytes, bytesToBase64, fileKind, normalizePath, normalizeFolderPath, validateProject, applyRuntimeCsv } from './projectPolicy.mjs'
 import { prepareRunnerProject, convertAudioToOgg, clearAudioConversionCache } from './audioConversion'
 import useStudioLayout from './useStudioLayout'
 import { importProjectFile, importProjectFolder } from './importProjectFile'
@@ -44,6 +44,7 @@ function AssetPreview({ file, onInsert, onConvert, busy }) {
   }, [file])
   return <div className="pgs-asset-preview">
     {file.kind === 'image' && <img src={url} alt={file.path} />}
+    {file.kind === 'csv' && <pre className="pgs-csv-preview">{new TextDecoder().decode(base64ToBytes(file.data))}</pre>}
     {file.kind === 'audio' && <audio src={url} controls preload="metadata" />}
     {file.kind === 'font' && <div className="pgs-font-sample" style={{ fontFamily: fontFamily || 'sans-serif' }}>나만의 게임<br />Hello, Game!<br />0123456789</div>}
     {file.kind === 'audio' && !file.path.toLowerCase().endsWith('.ogg') && <><small>게임 실행 시 자동으로 OGG로 변환합니다. 원본은 보존됩니다.</small><button disabled={busy} onClick={onConvert}>OGG 사본 만들기</button></>}
@@ -140,6 +141,19 @@ export default function PythonGameStudio({ uid = 'local-preview', onBack }) {
     return () => document.removeEventListener('visibilitychange', hide)
   }, [])
   const handleEvent = useCallback(event => {
+    if (event.type === 'FILE_WRITE') {
+      try {
+        const next = applyRuntimeCsv(latest.current, event.projectId, event.file, event.expectedData)
+        latest.current = next
+        setProject(next)
+        setNotice(`${event.file.path}에 학습 기록을 저장했습니다. 이 브라우저의 프로젝트에 보관됩니다.`)
+        return true
+      } catch (error) {
+        setNotice(error.message)
+        setLogs(prev => [...prev, { type: 'STDERR', text: `CSV 기기 저장 실패: ${error.message}\n`, id: crypto.randomUUID() }].slice(-250))
+        return false
+      }
+    }
     if (event.type === 'READY') setStatus('ready')
     if (event.type === 'RUNNING') setStatus('running')
     if (event.type === 'EXIT') setStatus(previous => previous === 'error' ? previous : 'exited')
@@ -189,7 +203,7 @@ export default function PythonGameStudio({ uid = 'local-preview', onBack }) {
   }
   const snippet = file => {
     const path = JSON.stringify(file.path)
-    const text = file.kind === 'image' ? `image = pygame.image.load(${path})` : file.kind === 'audio' ? `sound = pygame.mixer.Sound(${path})\nsound.play()` : `font = pygame.font.Font(${path}, 24)`
+    const text = file.kind === 'csv' ? `data = pd.read_csv(${path})` : file.kind === 'image' ? `image = pygame.image.load(${path})` : file.kind === 'audio' ? `sound = pygame.mixer.Sound(${path})\nsound.play()` : `font = pygame.font.Font(${path}, 24)`
     setSelected(project.entrypoint); setSelectedFolder(project.entrypoint.split('/').slice(0, -1).join('/'))
     setProject(prev => ({ ...prev, files: prev.files.map(f => f.path === prev.entrypoint ? { ...f, text: `${f.text}\n# ${file.path}\n${text}\n` } : f) }))
     setNotice('실행 파일 아래에 예시 코드를 넣었습니다. 게임에서 사용할 위치로 옮겨 주세요.')
@@ -293,7 +307,7 @@ export default function PythonGameStudio({ uid = 'local-preview', onBack }) {
     {notice && <div className="pgs-notice" role="status">{notice}<button aria-label="안내 닫기" onClick={() => setNotice('')}><X size={15} /></button></div>}
     <div className="pgs-toolbar"><div><span className="pgs-dot" /> 파일을 올리고, 나만의 게임을 만들어 보세요.</div><div className="pgs-run-actions"><span className={`pgs-run-status ${status}`}>{statusNames[status]}</span><span className="pgs-run-target" title={`실행 대상: ${runPath}`}>{runPath}</span><button className="pgs-run" title={`${runPath} 실행`} disabled={busy} onClick={execute}><Play size={16} fill="currentColor" /> 실행</button><button disabled={!run} onClick={stop}><Square size={15} /> 정지</button></div></div>
     <StudioPlayTools preferences={preferences} onPreferences={changePreferences} />
-    <div ref={layout.workspaceRef} className={`pgs-workspace${layout.dragging ? ' pgs-is-resizing' : ''}`} style={layout.style}><aside className="pgs-files"><div className="pgs-panel-title">프로젝트 파일<span><button title="Python 파일 추가" aria-label="Python 파일 추가" onClick={() => { setDialogValue('helper.py'); setDialog('file') }}><Plus size={15} /></button><button title="폴더 만들기" aria-label="폴더 만들기" onClick={() => { setDialogValue('새 폴더'); setDialog('folder'); setNotice('') }}><FolderPlus size={15} /></button><button title="파일 업로드" aria-label="파일 업로드" onClick={() => fileInput.current.click()}><Upload size={15} /></button></span></div><ProjectFileTree key={project.id} project={project} selected={selected} selectedFolder={selectedFolder} onSelectFolder={setSelectedFolder} busy={busy} onMoveFile={moveFile} onUpload={upload} onError={setNotice} onSelectFile={path => { setSelected(path); setSelectedFolder(path.split('/').slice(0, -1).join('/')); setErrorLine(null) }} /><button className="pgs-upload" disabled={busy} onClick={() => fileInput.current.click()}><Upload size={18} /> 파일 올리기<small>이미지 · 사운드 · 폰트 · Python</small></button><div className="pgs-file-tip">업로드 위치: {selectedFolder || '프로젝트 루트'}<br />파일을 폴더 위에 끌어다 놓으세요. 기존 파일은 ‘이동’ 버튼으로도 옮길 수 있습니다.<br />PNG, JPG, WebP · OGG, WAV, MP3 · TTF, OTF<br />파일 5 MB / 프로젝트 6 MB</div><input ref={fileInput} type="file" multiple accept=".py,.png,.jpg,.jpeg,.webp,.ogg,.wav,.mp3,.ttf,.otf" hidden onChange={e => upload(e.target.files)} /></aside>
+    <div ref={layout.workspaceRef} className={`pgs-workspace${layout.dragging ? ' pgs-is-resizing' : ''}`} style={layout.style}><aside className="pgs-files"><div className="pgs-panel-title">프로젝트 파일<span><button title="Python 파일 추가" aria-label="Python 파일 추가" onClick={() => { setDialogValue('helper.py'); setDialog('file') }}><Plus size={15} /></button><button title="폴더 만들기" aria-label="폴더 만들기" onClick={() => { setDialogValue('새 폴더'); setDialog('folder'); setNotice('') }}><FolderPlus size={15} /></button><button title="파일 업로드" aria-label="파일 업로드" onClick={() => fileInput.current.click()}><Upload size={15} /></button></span></div><ProjectFileTree key={project.id} project={project} selected={selected} selectedFolder={selectedFolder} onSelectFolder={setSelectedFolder} busy={busy} onMoveFile={moveFile} onUpload={upload} onError={setNotice} onSelectFile={path => { setSelected(path); setSelectedFolder(path.split('/').slice(0, -1).join('/')); setErrorLine(null) }} /><button className="pgs-upload" disabled={busy} onClick={() => fileInput.current.click()}><Upload size={18} /> 파일 올리기<small>이미지 · 사운드 · 폰트 · Python · CSV</small></button><div className="pgs-file-tip">업로드 위치: {selectedFolder || '프로젝트 루트'}<br />파일을 폴더 위에 끌어다 놓으세요. 기존 파일은 ‘이동’ 버튼으로도 옮길 수 있습니다.<br />PNG, JPG, WebP · OGG, WAV, MP3 · TTF, OTF · CSV (UTF-8, 200 KB)<br />파일 5 MB / 프로젝트 6 MB</div><input ref={fileInput} type="file" multiple accept=".py,.csv,.png,.jpg,.jpeg,.webp,.ogg,.wav,.mp3,.ttf,.otf" hidden onChange={e => upload(e.target.files)} /></aside>
     <div {...layout.separator('files')} />
     <section className="pgs-editor-pane"><input ref={replaceInput} type="file" hidden accept={`.${selected.split('.').at(-1)}`} onChange={replaceFile} /><div className="pgs-panel-title"><span>{selected}</span><div><button disabled={busy} onClick={() => replaceInput.current.click()}>파일 교체</button><button onClick={() => { setDialogValue(selected); setDialog('rename') }}>이름 변경</button><button disabled={busy} onClick={() => { setDialogValue(selected.split('/').slice(0, -1).join('/')); setNotice(''); setDialog('move') }}>이동</button>{activeFile?.kind === 'python' && selected !== project.entrypoint && <button onClick={() => setProject({ ...project, entrypoint: selected })}>기본 실행 파일로</button>}<button aria-label="선택한 파일 다운로드" onClick={() => download(activeFile.path.split('/').at(-1), activeFile.kind === 'python' ? activeFile.text : base64ToBytes(activeFile.data), 'application/octet-stream')}><Download size={14} /></button><button aria-label="선택한 파일 삭제" disabled={selected === project.entrypoint} onClick={() => { setDialog('delete') }}><Trash2 size={14} /></button></div></div>{activeFile?.kind === 'python' ? <PythonEditor colorful completionContext={{ path: selected, files: project.files }} key={selected} ref={editor} value={activeFile.text} onChange={editCode} activeLine={errorLine} /> : activeFile && <AssetPreview key={selected} file={activeFile} busy={busy} onInsert={() => snippet(activeFile)} onConvert={async () => {
       setBusy(true)

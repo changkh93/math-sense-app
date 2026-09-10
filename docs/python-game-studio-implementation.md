@@ -201,3 +201,14 @@ Pygbag archive `0.9`, CPython 3.12, 관찰된 pygame `2.5.0.dev1` 조합을 사�
 - 입력 시 자동 열림, Ctrl+Space 또는 Alt+/ 재호출, ↑↓ 선택, Enter/Tab 적용, Esc 닫기를 지원한다. 기존 일반 Tab 들여쓰기·괄호 닫기·실행 취소·테마/집중 설정은 유지한다.
 - 분석은 브라우저 안에서 이루어지고 학생 코드를 실행하거나 외부 서버로 전송하지 않는다. 파일별 20만 문자/재귀 깊이/캐시 수를 제한한다. 3,000개 변수(약 5.2만 문자) Node 점검에서 분석 약 39ms. 완전한 언어 서버는 아니므로 실행 중 동적 속성 생성·복잡한 타입 흐름·모든 문법/패키지 추론은 보장하지 않는다.
 - 검증: 모델 동작 7개, 기존 studio 정책/콘솔 12개와 turtle/루프 9개 통과. Chrome에서 자동 표시·Tab/Enter/Ctrl+Space·한 번 실행 취소·괄호 중복 방지·인자 안내·사용자 객체·작성 틀·들여쓰기·문자열/주석·프로젝트 import/이미지 경로·좁은 화면/Esc 확인. 추천 UI 스크린샷 시각 검토. 관련 lint 통과(기존 PythonGameStudio deletedIds effect 경고는 별도), production build 통과. 동적 타입의 완전한 의미 분석·Safari/Firefox/IME 조합 중 동작·운영 배포는 검증하지 않았다.
+
+## tkinter 플래시카드·CSV 수업 지원 (2026-09-10)
+
+[지원 범위·예제·저장 방식·검증](python-game-studio-tkinter.md)을 참고한다. Tk 전체나 정식 pandas가 아닌 주어진 수업용 호환 API를 제공한다. CSV는 프로젝트의 로컬 초안에 저장하며 과제 첨부의 .py 제한은 유지한다.
+
+## pandas 날씨·도시 데이터 수업 확장 (2026-09-10)
+
+[수업용 pandas 지원 범위](python-game-studio-pandas.md)에 따라 숫자 추론, DataFrame/Series 선택·비교·통계·변환·표 출력 및 CSV 저장을 지원한다. 사용자 퀴즈 1–5와 기존 Tk 플래시카드를 실제 Chrome에서 검증했다. pandas 전체 지원이나 노트북 자동 출력은 아니다.
+
+
+2026-09-10 수학 과정: 실제 WASM NumPy·Matplotlib를 처음에만 준비하고, 한글 Agg 그래프·실행 종료 자동 표시·패키지 재사용을 추가했습니다. pandas 배열 입력·Series dtype·loc/iloc, 수학 자동완성과 검증 예제는 [수학 수업 지원](python-game-studio-math.md)을 참조하세요.

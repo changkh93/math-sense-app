@@ -55,6 +55,8 @@ html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#080f20;col
 })();
 </script>
 <!-- STUDIO_TURTLE_RENDERER -->
+<!-- STUDIO_TK_RENDERER -->
+<!-- STUDIO_PLOT_RENDERER -->
 <script>
 window.config={cdn:'https://pygame-web.github.io/archives/0.9/',executable:'https://pygame-web.github.io/archives/0.9/cpython312/main.js',user_canvas:1,user_canvas_managed:1,gui_divider:1,ume_block:0,can_close:0,autorun:1,quiet:true};
 window.studioCommand='';window.studioEngineReady=false;window.studioActiveRun=null;
@@ -68,7 +70,7 @@ window.studioEmit=(type,text='',runId=window.studioActiveRun)=>{
  if(!port)return;
  if(performance.now()-windowStart>1000){sent=0;windowStart=performance.now();}
  if((type==='STDOUT'||type==='STDERR')&&++sent>100)return;
- port.postMessage({protocolVersion:2,sessionId,runId,type,text:String(text).slice(0,8192)});
+ port.postMessage({protocolVersion:2,sessionId,runId,type,text:String(text).slice(0,type==='FILE_WRITE'?280000:8192)});
  if(type==='READY'||type==='ENGINE_READY')document.getElementById('start').hidden=true;
  if(type==='ERROR'||type==='EXIT'||type==='STOPPED'){document.getElementById('start').hidden=true;document.getElementById('audio-note').hidden=true;}
 };
@@ -87,6 +89,8 @@ const audioContexts=new Set();
 window.studioResetPresentation=(preserveTurtle=false)=>{
  window.studioActiveRun=null;
  window.studioTurtleReset(preserveTurtle);
+ window.studioTkReset();
+ window.studioPlotReset(preserveTurtle);
  document.getElementById('canvas').width=document.getElementById('canvas').width;
  for(const context of audioContexts)context.studioSoundRequested=false;
  document.getElementById('audio-note').hidden=true;
@@ -118,7 +122,7 @@ document.addEventListener('pointerdown',resumeAudio);
 document.addEventListener('keydown',resumeAudio);
 window.addEventListener('DOMContentLoaded',()=>{
  document.getElementById('canvas').addEventListener('contextmenu',e=>e.preventDefault());
- document.addEventListener('keydown',e=>{if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight',' '].includes(e.key))e.preventDefault();});
+ document.addEventListener('keydown',e=>{if(!e.target.closest?.('#tk-root, #plot-root')&&['ArrowUp','ArrowDown','ArrowLeft','ArrowRight',' '].includes(e.key))e.preventDefault();});
 });
 window.addEventListener('error',e=>window.studioEmit('ERROR',e.message));
 window.addEventListener('unhandledrejection',e=>window.studioEmit('ERROR',e.reason?.message||e.reason));
@@ -138,6 +142,7 @@ import shutil
 import importlib
 import types
 import gc
+import warnings
 
 ROOT = '/tmp/studio'
 ORIGINAL_RUN = asyncio.run
@@ -148,8 +153,15 @@ ORIGINAL_ARGV = list(sys.argv)
 ORIGINAL_ENV = dict(os.environ)
 ORIGINAL_DONT_WRITE = sys.dont_write_bytecode
 active = None
-pygame_ready = False
+prepared_packages = set()
 TURTLE_SOURCE = __STUDIO_TURTLE_SOURCE__
+TK_SOURCE = __STUDIO_TK_SOURCE__
+PANDAS_SOURCE = __STUDIO_PANDAS_SOURCE__
+PLOT_SOURCE = __STUDIO_PLOT_SOURCE__
+PLOT_FONT = __STUDIO_PLOT_FONT__
+plot_session = None
+numpy_defaults = None
+ORIGINAL_WARNING_FILTERS = list(warnings.filters)
 
 def install_studio_turtle():
     module = types.ModuleType('turtle')
@@ -162,6 +174,15 @@ def install_studio_turtle():
     sys.modules['turtle'] = module
     sys.modules['ColabTurtlePlus'] = package
     sys.modules['ColabTurtlePlus.Turtle'] = module
+
+def install_studio_tk():
+    for name, source in [('tkinter', TK_SOURCE), ('pandas', PANDAS_SOURCE)]:
+        module = types.ModuleType(name)
+        module.__file__ = '/studio/' + name + '.py'
+        module.__dict__['_bridge'] = platform.window
+        module.__dict__['_save_csv'] = lambda path, data: emit('FILE_WRITE', json.dumps({'path': path, 'data': base64.b64encode(data).decode('ascii')}), active['id'])
+        exec(compile(source, module.__file__, 'exec'), module.__dict__)
+        sys.modules[name] = module
 
 def emit(kind, text='', run_id=None):
     platform.window.studioEmitEncoded(kind, base64.b64encode(str(text).encode('utf-8')).decode('ascii'), run_id)
@@ -178,18 +199,26 @@ class StudioOutput:
     def flush(self): pass
     def isatty(self): return False
 
-def uses_pygame(project):
+def project_packages(project):
+    packages = set()
+    supported = {'pygame', 'numpy', 'matplotlib'}
     for item in project['files']:
         if not item['path'].lower().endswith('.py'): continue
         try:
-            tree = ast.parse(base64.b64decode(item['data']).decode('utf-8'))
-        except (SyntaxError, UnicodeError):
-            continue
+            source = base64.b64decode(item['data']).decode('utf-8')
+            source = '\n'.join('' if line.strip() == '!pip install ColabTurtlePlus' else line for line in source.splitlines())
+            tree = ast.parse(source)
+        except (SyntaxError, UnicodeError): continue
         for node in ast.walk(tree):
-            if isinstance(node, ast.Import) and any(alias.name.split('.')[0] == 'pygame' for alias in node.names): return True
-            if isinstance(node, ast.ImportFrom) and (node.module or '').split('.')[0] == 'pygame': return True
-            if isinstance(node, ast.Call) and ((isinstance(node.func, ast.Name) and node.func.id == '__import__') or (isinstance(node.func, ast.Attribute) and node.func.attr == 'import_module')): return True
-    return False
+            if isinstance(node, ast.Import): packages.update(alias.name.split('.')[0] for alias in node.names)
+            elif isinstance(node, ast.ImportFrom): packages.add((node.module or '').split('.')[0])
+            elif isinstance(node, ast.Call) and node.args and isinstance(node.args[0], ast.Constant) and isinstance(node.args[0].value, str):
+                if (isinstance(node.func, ast.Name) and node.func.id == '__import__') or (isinstance(node.func, ast.Attribute) and node.func.attr == 'import_module'):
+                    packages.add(node.args[0].value.split('.')[0])
+    packages &= supported
+    if 'matplotlib' in packages:
+        packages.update(('numpy', 'PIL', 'cycler', 'dateutil', 'fontTools', 'kiwisolver', 'packaging', 'pyparsing', 'six'))
+    return packages
 
 class FrameCallFinder(ast.NodeVisitor):
     def __init__(self, call_paths): self.call_paths, self.found = call_paths, False
@@ -268,7 +297,7 @@ def cancel_user_callbacks(loop):
                 handle.cancel()
 
 async def stop_current(preserve_turtle=False):
-    global active
+    global active, plot_session
     if active is None:
         if not preserve_turtle: platform.window.studioResetPresentation()
         return True
@@ -285,15 +314,28 @@ async def stop_current(preserve_turtle=False):
             return False
     sys.settrace(None)
     cancel_user_callbacks(asyncio.get_running_loop())
+    if plot_session:
+        try:
+            if preserve_turtle: plot_session[0]()
+        except Exception as error:
+            report(error, context['id'])
+        finally:
+            plot_session[1]()
+            plot_session = None
     pygame = sys.modules.get('pygame')
     if pygame is not None:
         pygame.quit()
+    if numpy_defaults:
+        numpy = sys.modules.get('numpy')
+        numpy.seterr(**numpy_defaults[0])
+        numpy.set_printoptions(**numpy_defaults[1])
+    warnings.filters[:] = ORIGINAL_WARNING_FILTERS
     asyncio.run = ORIGINAL_RUN
     sys.stdout, sys.stderr = ORIGINAL_STDOUT, ORIGINAL_STDERR
     sys.path[:] = ORIGINAL_PATH
     sys.argv[:] = ORIGINAL_ARGV
     sys.modules['__main__'] = ORIGINAL_MAIN
-    for name in ('turtle', 'ColabTurtlePlus.Turtle', 'ColabTurtlePlus'):
+    for name in ('turtle', 'ColabTurtlePlus.Turtle', 'ColabTurtlePlus', 'tkinter', 'pandas'):
         sys.modules.pop(name, None)
     sys.dont_write_bytecode = ORIGINAL_DONT_WRITE
     os.environ.clear(); os.environ.update(ORIGINAL_ENV)
@@ -314,7 +356,7 @@ async def stop_current(preserve_turtle=False):
     return True
 
 async def start_project(command):
-    global active, pygame_ready
+    global active, plot_session, numpy_defaults
     run_id, project = command['runId'], command['project']
     os.makedirs(ROOT, exist_ok=True)
     for folder in project.get('folders', []):
@@ -328,9 +370,10 @@ async def start_project(command):
         full = ROOT + '/' + path
         os.makedirs(os.path.dirname(full), exist_ok=True)
         with open(full, 'wb') as output: output.write(base64.b64decode(item['data']))
-    if not pygame_ready and uses_pygame(project):
-        await shell.preload_code('import pygame', loaderhome='/tmp')
-        pygame_ready = True
+    packages = project_packages(project)
+    for package in sorted(packages - prepared_packages):
+        await shell.preload_code('import ' + package, loaderhome='/tmp')
+        prepared_packages.add(package)
     # An updated Run/Stop supersedes a slow first package preparation.
     if platform.window.studioCommand:
         os.chdir('/tmp'); shutil.rmtree(ROOT)
@@ -345,6 +388,7 @@ async def start_project(command):
     sys.modules['__main__'] = module
     namespace = module.__dict__
     install_studio_turtle()
+    install_studio_tk()
     context = {'id': run_id, 'namespace': namespace, 'baseline_tasks': set(asyncio.all_tasks()), 'tasks': [], 'deadline': time.monotonic() + 2, 'failed': False}
     active = context
     platform.window.studioActiveRun = run_id
@@ -354,6 +398,17 @@ async def start_project(command):
             raise RuntimeError('반복문이 화면을 멈췄습니다. 게임 루프에 await asyncio.sleep(0)을 넣어 주세요.')
         return trace
     context['trace'] = trace
+    if 'numpy' in packages:
+        import numpy
+        if numpy_defaults is None: numpy_defaults = (numpy.geterr(), numpy.get_printoptions())
+        numpy.seterr(divide='warn', over='warn', under='ignore', invalid='warn')
+        numpy.random.seed(None)
+        warnings.simplefilter('default', RuntimeWarning)
+    if 'matplotlib' in packages:
+        plot_module = types.ModuleType('studio_plot')
+        exec(compile(PLOT_SOURCE, '/studio/studio_plot.py', 'exec'), plot_module.__dict__)
+        plot_session = plot_module.install(platform.window, ROOT, PLOT_FONT)
+    context['deadline'] = time.monotonic() + 2
     async def watch(coroutine):
         try:
             await coroutine
@@ -399,7 +454,16 @@ async def studio_boot():
                 if not await stop_current(): return
         if active:
             active['deadline'] = time.monotonic() + 2
-            if active['failed'] or (all(task.done() for task in active['tasks']) and not platform.window.studioTurtleBusy()):
+            tk = sys.modules.get('tkinter')
+            try:
+                if tk and not active['failed']:
+                    sys.settrace(active['trace'])
+                    tk._pump()
+            except BaseException as error:
+                sys.settrace(None)
+                active['failed'] = True
+                report(error, active['id'])
+            if active['failed'] or (all(task.done() for task in active['tasks']) and not platform.window.studioTurtleBusy() and not (tk and tk._busy())):
                 run_id = active['id']
                 if not await stop_current(preserve_turtle=not active['failed']): return
                 emit('EXIT', run_id=run_id)

@@ -39,3 +39,23 @@ test('empty folders survive validation/runner payload and old projects remain re
 test('folder traversal, file collisions and case collisions are rejected', () => {
   for (const folders of [['../outside'], ['main.py'], ['main.py/sub'], ['assets', 'ASSETS']]) assert.throws(() => validateProject({ ...basic(), folders }))
 })
+
+test('CSV validates UTF-8 and supports guarded local runtime saves only', async () => {
+  const { applyRuntimeCsv } = await import('../src/components/PythonGameStudio/projectPolicy.mjs')
+  const bytes = text => bytesToBase64(new TextEncoder().encode(text))
+  const initial = validateProject(basic())
+  const csv = { path: 'data/words.csv', data: bytes('English,Korean\napple,사과\n') }
+  const first = applyRuntimeCsv(initial, initial.id, csv, undefined)
+  assert.equal(first.files[1].kind, 'csv')
+  assert.ok(first.folders.includes('data'))
+  assert.equal(toRunnerProject(first).files[1].data, csv.data)
+  const edited = { ...csv, data: bytes('English,Korean\n') }
+  assert.throws(() => applyRuntimeCsv(first, first.id, edited, undefined), /변경/)
+  assert.throws(() => applyRuntimeCsv(first, 'other-project', edited, csv.data), /프로젝트/)
+  assert.throws(() => applyRuntimeCsv(first, first.id, { path: 'main.py', text: 'changed' }, undefined), /CSV/)
+  assert.throws(() => applyRuntimeCsv(first, first.id, { ...csv, path: '../outside.csv' }, undefined))
+  const second = applyRuntimeCsv(first, first.id, edited, csv.data)
+  assert.equal(second.files.length, 2)
+  assert.equal(second.files[1].data, edited.data)
+  for (const data of [bytesToBase64(new Uint8Array([0xff])), bytes('a\0b'), bytes('a'.repeat(201*1024))]) assert.throws(() => applyRuntimeCsv(initial, initial.id, { ...csv, data }, undefined))
+})

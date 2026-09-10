@@ -51,3 +51,5 @@
 @media(prefers-reduced-motion:reduce){.pgs-run-feedback.exited>span{animation:none}}
 @media(max-width:900px){.pgs-color-key{gap:7px}.pgs-play-bar{gap:8px;padding:8px 12px}}
 @media(max-width:520px){.pgs-color-key{display:none}.pgs-theme-picker{margin-left:0}}
+
+.pgs-csv-preview{max-width:100%;max-height:70%;overflow:auto;align-self:stretch;white-space:pre;text-align:left;padding:16px;background:#080f20;color:#dbeafe;font:14px/1.7 monospace}
