@@ -1,0 +1,13 @@
+{
+  "verifiedAt": "2026-09-10T00:32:45.028Z",
+  "regionId": "reg_python_game_project",
+  "chapterId": "chap_gameproj_space_invaders_v1",
+  "hash": "fa4cb93b47c694cd057d1774715ea2fd29c2feae932ffd7dc64c48616a881b46",
+  "counts": {
+    "chapters": 1,
+    "units": 10,
+    "quizzes": 100,
+    "codeExercises": 29
+  },
+  "documentsVerified": 140
+}

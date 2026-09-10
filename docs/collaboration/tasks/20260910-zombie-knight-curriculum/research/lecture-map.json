@@ -1,0 +1,642 @@
+{
+  "verifiedFrom": "Authenticated Udemy visible course sidebar, 2026-09-10 KST",
+  "lectures": [
+    {
+      "number": 61,
+      "section": 10,
+      "title": "Creating a Tile Map",
+      "lectureId": "27613350",
+      "titleVerified": true,
+      "internalOrderVerified": true
+    },
+    {
+      "number": 62,
+      "section": 10,
+      "title": "Designing a Level",
+      "lectureId": "27613356",
+      "titleVerified": true,
+      "internalOrderVerified": true
+    },
+    {
+      "number": 63,
+      "section": 10,
+      "title": "Using 2 Dimensional Vectors for Player Movement Part 1",
+      "lectureId": "27613362",
+      "titleVerified": true,
+      "internalOrderVerified": true,
+      "evidenceStatus": "visible-transcript",
+      "url": "https://www.udemy.com/course/the-art-of-doing-video-game-creation-with-python-and-pygame/learn/lecture/27613362",
+      "internalSteps": [
+        "Player(Sprite)와 생성자 signature를 Tile 아래에 추가",
+        "지도 숫자4를 플레이어 위치로 지정",
+        "super/image/rect.bottomleft, 빈 update 작성",
+        "지도 순회에서 Player 생성 분기 추가",
+        "별도 player 그룹 선언/등록 및 loop update/draw 연결",
+        "실행해32px 위로 떠 있는 위치 확인",
+        "생성 y에32px 보정하고 발판위 표시 확인",
+        "Vector2 별칭 선언과 position(x,y),velocity(0,0),acceleration(0,0) 추가; 이동은 다음 강의"
+      ],
+      "adaptationNotes": [
+        "탐사대원 표시만 되고 아직 움직이지 않음",
+        "첨부3_using_vectors.py는63/64두강의의 누적본"
+      ]
+    },
+    {
+      "number": 64,
+      "section": 10,
+      "title": "Using 2 Dimensional Vectors for Player Movement Part 2",
+      "lectureId": "27613366",
+      "titleVerified": true,
+      "internalOrderVerified": true,
+      "evidenceStatus": "visible-transcript",
+      "url": "https://www.udemy.com/course/the-art-of-doing-video-game-creation-with-python-and-pygame/learn/lecture/27613366",
+      "internalSteps": [
+        "기존 rect.x±10 직접 이동을 임시 시연",
+        "수평가속도2와 마찰계수0.15 선언",
+        "키 입력에서 acceleration.x를 ±가속도로 교체",
+        "실행: 가속도만 바꿔서는 움직이지 않음",
+        "velocity+=acceleration 및 position 갱신, rect.bottomleft=position 연결",
+        "잘못된 position + 표현식을 +=로 수정해 실행",
+        "계속 가속해 화면 밖으로 빠져나감 관찰",
+        "acceleration.x-=velocity.x*마찰을 통합 전에 추가",
+        "실행: 키를 놓아도 왕복 진동하는 현상",
+        "매프레임 acceleration=Vector2(0,0)로 초기화 후 입력/마찰/적분",
+        "실행: 가속하며 출발하고 미끄러져 정지; 디버그print제거;중력없음"
+      ],
+      "adaptationNotes": [
+        "원강의는 velocity를 갱신한 뒤 position+=velocity+0.5*acceleration를 사용함. 개선본에서는 적분법을 일관되게 선택하고 차이를 설명할 것",
+        "vector변수에 정수를 할당할 수 없다는 원강의 표현은Python의재바인딩과구분해야함;수학벡터타입을 잃는 것이 문제"
+      ]
+    },
+    {
+      "number": 65,
+      "section": 10,
+      "title": "Adding Gravity",
+      "lectureId": "27613372",
+      "titleVerified": true,
+      "internalOrderVerified": true,
+      "evidenceStatus": "visible-transcript",
+      "url": "https://www.udemy.com/course/the-art-of-doing-video-game-creation-with-python-and-pygame/learn/lecture/27613372",
+      "internalSteps": [
+        "지도4를 높은 발판으로 옮겨 실행 확인",
+        "생성자에 수직가속도0.5 추가",
+        "update의 acceleration=Vector2(0,gravity)로 항상 중력 적용",
+        "실행: 점점 빨리 떨어지며 발판을 통과;1.5값 시험",
+        "player 생성/생성자에 grass/water 그룹 전달하고 참조 저장",
+        "이동계산 뒤 spritecollide로 발판 목록 확인, position.y=첫발판top와velocity.y=0",
+        "실행: 발판을 내려오며 착지 확인",
+        "물충돌시 경고print 추가 후 물에 들어가 출력 확인",
+        "gravity0.15/0.5 시험으로 착지떨림 관찰",
+        "접촉을 유지하려고 원본 position.y=top+1로 보정 후 실행"
+      ],
+      "adaptationNotes": [
+        "원본은 충돌후rect즉시반영이 없고 겹침유지+1에의존;개선시정렬/grounded로검증",
+        "이 시점에는 물 충돌시 출력만 있고 복원은66에서 도입"
+      ]
+    },
+    {
+      "number": 66,
+      "section": 10,
+      "title": "Adding Jumping and Wrap Around Movement",
+      "lectureId": "27613380",
+      "titleVerified": true,
+      "internalOrderVerified": true,
+      "evidenceStatus": "visible-transcript",
+      "url": "https://www.udemy.com/course/the-art-of-doing-video-game-creation-with-python-and-pygame/learn/lecture/27613380",
+      "internalSteps": [
+        "Player.jump 빈 메서드 작성",
+        "메인 KEYDOWN Space에서 jump 호출 연결",
+        "생성자에jump_speed15 추가",
+        "발판과 접촉할때만 velocity.y=-jump_speed",
+        "실행: 점프하지만 올라갈때도 발판윗면에붙는현상",
+        "착지보정에 velocity.y>0 조건 추가 후 관통/하강착지 실행",
+        "적분후rect이전 position.x<0이면WIDTH,>WIDTH이면0 wrap",
+        "실행: 좌우화면연결 확인",
+        "생성자에 시작x/y 저장",
+        "물충돌에서 position시작좌표와velocity(0,0) 복원",
+        "실행: 물진입후시작위치 확인",
+        "마지막에 update를 move/check_collisions로 추출하고 순서대로 호출",
+        "실행: 리팩터링 전과 동일한 동작 확인"
+      ],
+      "adaptationNotes": [
+        "jump코드와 KEYDOWN 배선이리팩터링보다먼저",
+        "원본rect접촉기반점프는새투명프레임에서지지면접촉을별도검증해야함"
+      ]
+    },
+    {
+      "number": 67,
+      "section": 10,
+      "title": "Sprite Animation",
+      "lectureId": "27626132",
+      "titleVerified": true,
+      "internalOrderVerified": true,
+      "evidenceStatus": "visible-transcript",
+      "url": "https://www.udemy.com/course/the-art-of-doing-video-game-creation-with-python-and-pygame/learn/lecture/27626132",
+      "internalSteps": [
+        "Prepare eight run and eight idle frames",
+        "Constructor: four lists for run/idle and left/right",
+        "Load and scale right run frames64x64",
+        "current_sprite=0; first run image; RUN static new character",
+        "animate(list): increment index by1, wrap and replace image",
+        "Call animate for right input; RUN fast animation",
+        "Add speed parameter0.2 and int(index); RUN slower loop",
+        "Load idle right frames; input if/elif/else idle; RUN",
+        "Flip right lists horizontally into left lists",
+        "Animate left input; RUN",
+        "Choose idle direction from velocity.x sign",
+        "Print velocity experiment; observe transparent padding collision defects"
+      ],
+      "adaptationNotes": [
+        "Persist facing explicitly instead of relying on tiny residual velocity",
+        "Modulo index gives final frame equal duration",
+        "Normalize foot anchors across idle/run"
+      ]
+    },
+    {
+      "number": 68,
+      "section": 10,
+      "title": "Collision Masks",
+      "lectureId": "27626134",
+      "titleVerified": true,
+      "internalOrderVerified": true,
+      "evidenceStatus": "visible-transcript",
+      "url": "https://www.udemy.com/course/the-art-of-doing-video-game-creation-with-python-and-pygame/learn/lecture/27626134",
+      "internalSteps": [
+        "Remove velocity logging",
+        "Tile.update blue debug rect; call after draw; RUN",
+        "Player debug rect; RUN inspect transparent padding",
+        "Create player mask in constructor; draw outline at screen origin",
+        "Move mask creation to update; RUN moving outline",
+        "Align outline with player image",
+        "Use collide_mask callback for grass collisions",
+        "RUN jitter; original changes landing offset+1 to+10",
+        "Cache grass mask once in Tile constructor",
+        "RUN edge departure, jump and water respawn"
+      ],
+      "adaptationNotes": [
+        "Draw debug overlay in world coordinates without mutating original frame",
+        "Refresh mask AFTER animation frame change; cache static tile masks",
+        "Replace magic+10 with measured foot anchor and stable support test"
+      ]
+    },
+    {
+      "number": 69,
+      "section": 11,
+      "title": "Zombie Knight Preview",
+      "lectureId": "27716078",
+      "titleVerified": true,
+      "internalOrderVerified": true,
+      "evidenceStatus": "visible-transcript",
+      "url": "https://www.udemy.com/course/the-art-of-doing-video-game-creation-with-python-and-pygame/learn/lecture/27716078",
+      "internalSteps": [
+        "Enter starts play",
+        "Run/jump/fire sword projectile",
+        "Projectile temporarily downs zombie; stomp before revival to remove",
+        "Stomp creates ruby at generator; zombie collecting ruby spawns another zombie",
+        "Player collecting ruby gains score and health",
+        "Wraparound and paired portals",
+        "Survive timed night; Enter advances; later nights increase speed/spawn rate"
+      ]
+    },
+    {
+      "number": 70,
+      "section": 11,
+      "title": "Zombie Knight Asset Gathering",
+      "lectureId": "27701364",
+      "titleVerified": true,
+      "internalOrderVerified": true,
+      "evidenceStatus": "visible-transcript",
+      "url": "https://www.udemy.com/course/the-art-of-doing-video-game-creation-with-python-and-pygame/learn/lecture/27701364",
+      "internalSteps": [
+        "Organize fonts/images/sounds directories",
+        "Player attack/idle/jump/run plus slash projectile",
+        "Two zombie variants: walk and death, reverse death for revival",
+        "Terrain/background; two portal families; spinning ruby",
+        "Sound effects and looping background music; demonstrate source attribution"
+      ]
+    },
+    {
+      "number": 71,
+      "section": 11,
+      "title": "Zombie Knight Setup 1",
+      "lectureId": "27701386",
+      "titleVerified": true,
+      "internalOrderVerified": true,
+      "evidenceStatus": "visible-transcript",
+      "url": "https://www.udemy.com/course/the-art-of-doing-video-game-creation-with-python-and-pygame/learn/lecture/27701386",
+      "internalSteps": [
+        "New game file; imports pygame/random; Vector2 alias; init",
+        "1280x736 screen,32px tiles gives40x23 map;60FPS clock",
+        "Event QUIT/update/tick loop; RUN black window",
+        "Load background with recttop-left and blit; RUN incorrect size",
+        "Scale background to screen size; RUN correct fit",
+        "Blueprint Game methods: init/update/draw/add_zombie/check_collisions/check_round_completion/check_game_over/start_new_round/pause_game/reset_game",
+        "Blueprint Tile(Sprite) constructor"
+      ]
+    },
+    {
+      "number": 72,
+      "section": 11,
+      "title": "Zombie Knight Setup 2",
+      "lectureId": "27701392",
+      "titleVerified": true,
+      "internalOrderVerified": true,
+      "evidenceStatus": "visible-transcript",
+      "url": "https://www.udemy.com/course/the-art-of-doing-video-game-creation-with-python-and-pygame/learn/lecture/27701392",
+      "internalSteps": [
+        "Blueprint Player: init/update/move/check_collisions/check_animations/jump/fire/reset/animate",
+        "Blueprint Bullet(Sprite): init/update",
+        "Blueprint Zombie from Player outline: init/update/move/check_collisions/check_animations/animate; no jump/fire/reset",
+        "Blueprint RubyMaker: init/update/animate",
+        "Blueprint Ruby: init/update/move/check_collisions/animate",
+        "Blueprint Portal: init/update/animate; stationary",
+        "No new visible behavior yet; all stubs"
+      ]
+    },
+    {
+      "number": 73,
+      "section": 11,
+      "title": "Zombie Knight Creating Our Tile Map",
+      "lectureId": "27701402",
+      "titleVerified": true,
+      "internalOrderVerified": true,
+      "evidenceStatus": "visible-transcript",
+      "url": "https://www.udemy.com/course/the-art-of-doing-video-game-creation-with-python-and-pygame/learn/lecture/27701402",
+      "internalSteps": [
+        "Groups first: all tiles/platform/player/projectile/zombie/portal/ruby; generator shares tile group",
+        "Map legend0empty1dirt2-5platform6generator7-8portal9player",
+        "Build23rows40cols all zeros",
+        "Row3 side platforms15tiles each",
+        "Row8 central18tiles; row10 side6each; row15 side16each",
+        "Row18 middle4tiles; row21 solid ground2; row22dirt1",
+        "No object generation/drawing until next lecture"
+      ]
+    },
+    {
+      "number": 74,
+      "section": 11,
+      "title": "Zombie Knight Tile Class",
+      "lectureId": "27701404",
+      "titleVerified": true,
+      "internalOrderVerified": true,
+      "evidenceStatus": "visible-transcript",
+      "url": "https://www.udemy.com/course/the-art-of-doing-video-game-creation-with-python-and-pygame/learn/lecture/27701404",
+      "internalSteps": [
+        "Nested map reading first: row then column; x=col*32,y=row*32",
+        "Construct Tile for1 with main group;2-5 main+platformgroup",
+        "Stubs pass for6generator7/8portals9player",
+        "Tile constructor x,y,image_int,main_group,optional_subgroup",
+        "super; load/scale correct image32x32; add platforms subgroup",
+        "Add every tile main group; recttop-left",
+        "Draw main tile group after background; RUN level visible"
+      ]
+    },
+    {
+      "number": 75,
+      "section": 11,
+      "title": "Zombie Knight Ruby Maker Class",
+      "lectureId": "27701408",
+      "titleVerified": true,
+      "internalOrderVerified": true,
+      "evidenceStatus": "visible-transcript",
+      "url": "https://www.udemy.com/course/the-art-of-doing-video-game-creation-with-python-and-pygame/learn/lecture/27701408",
+      "internalSteps": [
+        "RubyMaker constructor x,y,main_group; super",
+        "Load seven rotating ruby frames scaled64x64",
+        "index0/imagefirst/rectbottomleft/addmain",
+        "Update calls animate; animate(list,speed) index/cycle/int",
+        "Call animate rubyframes0.25",
+        "Place map6 at row3 center; construct from map",
+        "RUN static generator; original fixes misspelled super init",
+        "Add main_tile_group.update; RUN generator rotates"
+      ]
+    },
+    {
+      "number": 76,
+      "section": 11,
+      "title": "Zombie Knight Portal Class",
+      "lectureId": "27701410",
+      "titleVerified": true,
+      "internalOrderVerified": true,
+      "evidenceStatus": "visible-transcript",
+      "url": "https://www.udemy.com/course/the-art-of-doing-video-game-creation-with-python-and-pygame/learn/lecture/27701410",
+      "internalSteps": [
+        "Portal constructor x,y,color,portal_group; super",
+        "Choose green/purple list;22frames each scaled72x72",
+        "Random initial frame0..len-1; image/rectbottomleft",
+        "Copy animate method; update calls frames0.2",
+        "Map7/8 opposite diagonal pairs near top/bottom corners",
+        "Map reader constructs portals with color",
+        "Add portal to portalgroup; loop update/draw",
+        "RUN four animated portals; transport still absent"
+      ]
+    },
+    {
+      "number": 77,
+      "section": 11,
+      "title": "Zombie Knight Game Class 1",
+      "lectureId": "27701414",
+      "titleVerified": true,
+      "internalOrderVerified": true,
+      "evidenceStatus": "visible-transcript",
+      "url": "https://www.udemy.com/course/the-art-of-doing-video-game-creation-with-python-and-pygame/learn/lecture/27701414",
+      "internalSteps": [
+        "Game constructor: round_duration30,score0,round1,framecount0,remaining30",
+        "Load title48/HUD24 fonts",
+        "Update frame counter; each60frames decrement remaining and reset counter",
+        "Draw score/placeholder health100 bottomleft; titlecenter; round/timer bottomright",
+        "Create Game after background; loop Game.update/draw",
+        "RUN HUD countdown; no round completion behavior yet"
+      ]
+    },
+    {
+      "number": 78,
+      "section": 12,
+      "title": "Zombie Knight Player Class 1",
+      "lectureId": "27704198",
+      "titleVerified": true,
+      "internalOrderVerified": true,
+      "evidenceStatus": "visible-transcript",
+      "url": "https://www.udemy.com/course/the-art-of-doing-video-game-creation-with-python-and-pygame/learn/lecture/27704198",
+      "internalSteps": [
+        "Player constructor x,y,platform_group,portal_group,bullet_group; super",
+        "Constants horizontal acceleration,friction.15,gravity.8,jump18,starthealth100",
+        "Eight lists: run/idle/jump/attack in each direction",
+        "Load ten64x64frames for each right state; flip to left",
+        "Index0; initial idle image; rectbottomleft",
+        "Store groups; animate_jump/animate_fire=False",
+        "Load jump/slash/portal/player_hit sounds",
+        "Position(x,y),velocity0,acceleration(0,gravity)",
+        "Health100 and startingx/y saved; constructor complete, no player instantiation yet"
+      ]
+    },
+    {
+      "number": 79,
+      "section": 12,
+      "title": "Zombie Knight Player Class 2",
+      "lectureId": "27704204",
+      "titleVerified": true,
+      "internalOrderVerified": true,
+      "evidenceStatus": "visible-transcript",
+      "url": "https://www.udemy.com/course/the-art-of-doing-video-game-creation-with-python-and-pygame/learn/lecture/27704204",
+      "internalSteps": [
+        "Add map9 above middle small platform; instantiate Player with groups and add playergroup",
+        "Loop playergroup.update/draw; RUN placement",
+        "Correct source anchor x=col32-32,y=row32+32; RUN",
+        "Update calls move/check_collisions/check_animations stubs",
+        "Move resets acceleration(0,gravity), keys change xacceleration",
+        "Apply drag, velocity update, position update, horizontal wrap, rectsync",
+        "RUN player falls through world because no collision yet",
+        "TEMP gravity0; RUN horizontal acceleration/friction/wrap",
+        "Fix original misspelled acceleration reset causing oscillation",
+        "Restore gravity.8 for next lecture"
+      ]
+    },
+    {
+      "number": 80,
+      "section": 12,
+      "title": "Zombie Knight Player Class 3",
+      "lectureId": "27704208",
+      "titleVerified": true,
+      "internalOrderVerified": true,
+      "evidenceStatus": "visible-transcript",
+      "url": "https://www.udemy.com/course/the-art-of-doing-video-game-creation-with-python-and-pygame/learn/lecture/27704208",
+      "internalSteps": [
+        "Player.check_collisions falling: spritecollide platforms; snap feet top+1,vy0",
+        "Ascending: detect platform;vy0; while overlaps move down1 and syncrect",
+        "RUN falling landing; no jump input yet",
+        "Space KEYDOWN calls jump; grounded contact requirement,sound,vy=-18",
+        "RUN jumping/ceiling impact/wrap",
+        "Portal collision sound; choose opposite horizontal and vertical quadrant",
+        "Original exits x86 or WIDTH-150,y64 or HEIGHT-132; syncrect",
+        "RUN all four portal exits"
+      ]
+    },
+    {
+      "number": 81,
+      "section": 12,
+      "title": "Zombie Knight Player Class 4",
+      "lectureId": "27704210",
+      "titleVerified": true,
+      "internalOrderVerified": true,
+      "evidenceStatus": "visible-transcript",
+      "url": "https://www.udemy.com/course/the-art-of-doing-video-game-creation-with-python-and-pygame/learn/lecture/27704210",
+      "internalSteps": [
+        "Player.reset resets position/start anchor then rect",
+        "Copy animate from generator; animate(list,speed)",
+        "move input animates run.5; else idle by facing; RUN",
+        "jump sets animate_jumpTrue; check_animations chooses direction jump.1",
+        "RUN forever jumping; animate end clears jump flag; RUN one cycle",
+        "Bullet constructor x,y,group,player;speed20,range500",
+        "Choose flipped slash32x32 from playerdirection;rectcenter;startingx;addgroup",
+        "Bullet.update moves x;abs(distance)>range kills",
+        "Up KEYDOWN calls fire; sound,createBullet,setfireflag",
+        "check_animations chooses attack.25; animation completion clearsfire",
+        "RUN invisible bullets; add projectilegroup.update/draw; RUN full firing"
+      ]
+    },
+    {
+      "number": 82,
+      "section": 12,
+      "title": "Zombie Knight Zombie Class 1",
+      "lectureId": "27704216",
+      "titleVerified": true,
+      "internalOrderVerified": true,
+      "evidenceStatus": "visible-transcript",
+      "url": "https://www.udemy.com/course/the-art-of-doing-video-game-creation-with-python-and-pygame/learn/lecture/27704216",
+      "internalSteps": [
+        "Zombie constructor platformgroup,portalgroup,minspeed,maxspeed; super",
+        "Gravity3,rise_delay2; six directional walk/death/rise lists",
+        "Random two visual variants; load walk10/death10frames64px",
+        "Flip left; reverse death sequence creates rise frames",
+        "Random direction -1/1; initialwalkframe;spawnx100..WIDTH-100,y-100",
+        "Storegroups; animate_death/riseFalse; hit/kick/portal sounds",
+        "Position,velocity(direction*randomspeed,0),acceleration(0,gravity)",
+        "is_deadFalse,roundtime0,framecount0; no spawning until next lecture"
+      ]
+    },
+    {
+      "number": 83,
+      "section": 12,
+      "title": "Zombie Knight Zombie Class 2",
+      "lectureId": "27704222",
+      "titleVerified": true,
+      "internalOrderVerified": true,
+      "evidenceStatus": "visible-transcript",
+      "url": "https://www.udemy.com/course/the-art-of-doing-video-game-creation-with-python-and-pygame/learn/lecture/27704222",
+      "internalSteps": [
+        "Zombie.update calls move/check_collisions/check_animations",
+        "Copy player integration/wrap/rectsync without input/friction; constant horizontal speed",
+        "Copy platform landing and portals; remove upward collision branch",
+        "TEMP Enter creates zombie with speed2..7 and adds zombiegroup",
+        "Loop zombiegroup.update/draw",
+        "RUN multiple variants/directions/falling/portals/wrap; no animation yet"
+      ]
+    },
+    {
+      "number": 84,
+      "section": 12,
+      "title": "Zombie Knight Zombie Class 3",
+      "lectureId": "27705568",
+      "titleVerified": true,
+      "internalOrderVerified": true,
+      "evidenceStatus": "visible-transcript",
+      "url": "https://www.udemy.com/course/the-art-of-doing-video-game-creation-with-python-and-pygame/learn/lecture/27705568",
+      "internalSteps": [
+        "Copy Zombie.animate from Player but remove jump/fire completion flags",
+        "Zombie.move only when not is_dead; directional walk.5; RUN walking",
+        "Game constructor receives player and zombie/platform/portal/projectile/ruby groups; attach; update creationcall",
+        "Game.update calls check_collisions",
+        "groupcollide(projectiles,zombies,True,False); nested dictvalues lists",
+        "Hit sound; is_deadTrue; animate_deathTrue",
+        "Zombie.check_animations chooses deathdirection.095",
+        "Animation completion clears deathflag and holds lastdeathframe",
+        "RUN downed enemy stays down; revival not yet"
+      ]
+    },
+    {
+      "number": 85,
+      "section": 12,
+      "title": "Zombie Knight Zombie Class 4",
+      "lectureId": "27705570",
+      "titleVerified": true,
+      "internalOrderVerified": true,
+      "evidenceStatus": "visible-transcript",
+      "url": "https://www.udemy.com/course/the-art-of-doing-video-game-creation-with-python-and-pygame/learn/lecture/27705570",
+      "internalSteps": [
+        "Zombie.update ifdead framecount; eachFPS increment elapsed; at rise_delay2 setriseflag/index0",
+        "check_animations plays reverse death at.095",
+        "Animation completion clearsrise,is_deadFalse,resetselapsed/framecount",
+        "RUN repeated down/revive",
+        "Game.check_collisions spritecollide player/zombies; ifdead kick/remove/+25score",
+        "Else health-20/hitsound; HUD swaps hardcoded100 to player.health",
+        "RUN continuous collision drains health negative",
+        "Knock player x by -256*enemy.direction; sync rect; RUN one hit displacement"
+      ]
+    },
+    {
+      "number": 86,
+      "section": 12,
+      "title": "Zombie Knight Zombie Class 5",
+      "lectureId": "27705572",
+      "titleVerified": true,
+      "internalOrderVerified": true,
+      "evidenceStatus": "visible-transcript",
+      "url": "https://www.udemy.com/course/the-art-of-doing-video-game-creation-with-python-and-pygame/learn/lecture/27705572",
+      "internalSteps": [
+        "Game constant start_spawn_interval5 and mutable spawninterval",
+        "Game.update calls add_zombie",
+        "add_zombie checks second boundary and remainingtime modulo interval",
+        "Create Zombie speed[round,round+5],addgroup",
+        "RUN first auto enemy at remaining25",
+        "Source retains Enter spawn for testing; next lecture collectible class"
+      ]
+    },
+    {
+      "number": 87,
+      "section": 13,
+      "title": "Zombie Knight Ruby Class 1",
+      "lectureId": "27705574",
+      "titleVerified": true,
+      "internalOrderVerified": true,
+      "evidenceStatus": "visible-transcript",
+      "url": "https://www.udemy.com/course/the-art-of-doing-video-game-creation-with-python-and-pygame/learn/lecture/27705574",
+      "internalSteps": [
+        "Ruby constructor platformgroup,portalgroup; super;gravity3,vx5",
+        "Copy seven ruby frames from generator64px;image/index0;spawnnear generator",
+        "Storegroups/portalsound;position,randomvx+-5,gravityvector",
+        "Update animates.25/moves/checkcollisions",
+        "Copy Zombie landing/portal logic, copy motion without dead guard",
+        "Game stomp branch creates Ruby and adds rubygroup",
+        "Loop rubygroup.update/draw; RUN stomp generates moving crystal; collection absent"
+      ]
+    },
+    {
+      "number": 88,
+      "section": 13,
+      "title": "Zombie Knight Ruby Class 2",
+      "lectureId": "27705578",
+      "titleVerified": true,
+      "internalOrderVerified": true,
+      "evidenceStatus": "visible-transcript",
+      "url": "https://www.udemy.com/course/the-art-of-doing-video-game-creation-with-python-and-pygame/learn/lecture/27705578",
+      "internalSteps": [
+        "Game loads lostruby/pickup sounds and background music; notplayingyet",
+        "Player spritecollide rubies with removal; sound,+100score,+10health clamped100",
+        "Loop only living zombies; collect/remove ruby; lostsound",
+        "Create extra Zombie with round..round+5speed and addgroup",
+        "RUN both collection outcomes; original health typo fixed"
+      ]
+    },
+    {
+      "number": 89,
+      "section": 13,
+      "title": "Zombie Knight Game Class 2",
+      "lectureId": "27709208",
+      "titleVerified": true,
+      "internalOrderVerified": true,
+      "evidenceStatus": "visible-transcript",
+      "url": "https://www.udemy.com/course/the-art-of-doing-video-game-creation-with-python-and-pygame/learn/lecture/27709208",
+      "internalSteps": [
+        "check_round_completion remaining0 calls start_new_round; update invokescheck",
+        "start_new_round increments round; decrease spawn interval with positive bound",
+        "Reset remaining;empty zombie/ruby/projectilegroups;player.reset",
+        "Call pause_game with survived text",
+        "pause_game renders main/subtext and pauses music; source inner while processesEnter/QUIT",
+        "Call pause_game after Game creation for title; begin looping music onstart",
+        "TEMP duration3; RUN title,nextnight,pausedmusic/resume; restoration nextlecture"
+      ]
+    },
+    {
+      "number": 90,
+      "section": 13,
+      "title": "Zombie Knight Game Class 3",
+      "lectureId": "27709214",
+      "titleVerified": true,
+      "internalOrderVerified": true,
+      "evidenceStatus": "visible-transcript",
+      "url": "https://www.udemy.com/course/the-art-of-doing-video-game-creation-with-python-and-pygame/learn/lecture/27709214",
+      "internalSteps": [
+        "check_game_over health<=0 stopmusic,pausewithfinalscore,thenreset_game;updatecallscheck",
+        "reset score0,round1,time,spawninterval,health,playerposition,emptygroups,restartmusic",
+        "Restore duration30; TEMP rain enemies testgameover/restart",
+        "Fix Player.reset residualvelocity by resetting velocity0",
+        "Optional mask upgrade LAST: Tile static mask,Player update mask",
+        "Player landing/upward collisions use collide_mask",
+        "RUN jitter; original landing+1 becomes+5; RUN stable"
+      ]
+    },
+    {
+      "number": 91,
+      "section": 13,
+      "title": "Let's Play Zombie Knight!",
+      "lectureId": "27709226",
+      "titleVerified": true,
+      "internalOrderVerified": true,
+      "evidenceStatus": "visible-transcript",
+      "url": "https://www.udemy.com/course/the-art-of-doing-video-game-creation-with-python-and-pygame/learn/lecture/27709226",
+      "internalSteps": [
+        "Remove temporary Enter spawn shortcut",
+        "TEMP start round5 and spawninterval2 for stressplay",
+        "Test combat,rubycompetition,damage,portals,restart,survive,nextnight",
+        "Restore official round1 and spawninterval5",
+        "Encourage intentional physics/difficulty tuning and fullplaytest"
+      ]
+    }
+  ],
+  "resourcesObservation": "Lecture69 resource dropdown exposes zombie_knight_assets.zip and zombie_knight.py. Clicked .py but file not located in Downloads; download completion not verified. Browser internal downloads page is blocked by browser policy, no workaround attempted. Continue direct visible lecture research.",
+  "adaptationRequirements": [
+    "Do not publish original transcripts or reference art.",
+    "Frame-count timer should explicitly teach its fixed-step assumption; verify actual browser time.",
+    "Use measured fixed foot/body anchors and synchronize vector/rect after every collision.",
+    "Ceiling resolution must be bounded; avoid unbounded collision while loop.",
+    "Portal exits should derive from paired portal bounds plus margin and prevent immediate retrigger.",
+    "Keep projectile stun/stomp/revive and rival collectible mechanics.",
+    "Replace blocking pause loop with main-loop state, preserving introduction in89.",
+    "Check health<=0 before round completion; freeze finalscore and avoid spawn/collect after gameover.",
+    "Advance exactly one animation state/frame; reset cursor on state entry.",
+    "Count each collectible and each killed enemy once even in overlapping collision dictionaries.",
+    "Final mask upgrade is introduced in90, not enemy lessons83/86."
+  ],
+  "complete": true
+}

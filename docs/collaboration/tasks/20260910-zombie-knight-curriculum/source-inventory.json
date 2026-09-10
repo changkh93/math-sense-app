@@ -1,0 +1,241 @@
+{
+  "python": [
+    {
+      "file": "1_tile_map.py",
+      "sha256": "adbdcb2b2dd1b789b1a420b2fbe1575ae3d2f8f85e9cfa430e93128192fe3625",
+      "classes": [],
+      "lines": 54
+    },
+    {
+      "file": "2_creating_level.py",
+      "sha256": "c72b281ecdb84ae8405dcf5363d6321590a97e959ef1062a9a2e74c470f873cb",
+      "classes": [
+        "Tile"
+      ],
+      "lines": 106
+    },
+    {
+      "file": "3_using_vectors.py",
+      "sha256": "a1a907d1839d9e3d8b9f6f0d41b03e2870318f10cc2a7c3f0bb247eec56f7d67",
+      "classes": [
+        "Tile",
+        "Player"
+      ],
+      "lines": 157
+    },
+    {
+      "file": "4_adding_gravity.py",
+      "sha256": "328dedff47d7506364319dd78b191981f5c200fe2b47be9ff74a547782825f11",
+      "classes": [
+        "Tile",
+        "Player"
+      ],
+      "lines": 172
+    },
+    {
+      "file": "5_jumping.py",
+      "sha256": "fc3c82fe3a54bb311118979a766455c924c4c520f3063bfc14e02d7fe2abd4c9",
+      "classes": [
+        "Tile",
+        "Player"
+      ],
+      "lines": 201
+    },
+    {
+      "file": "6_animations.py",
+      "sha256": "9b9d6848490a373432a3b59fdd4074489ad317220f65feaf0099dcdb3a303ea1",
+      "classes": [
+        "Tile",
+        "Player"
+      ],
+      "lines": 254
+    },
+    {
+      "file": "7_masks.py",
+      "sha256": "91aac122b46cc34b6f09de5057d50b2777764047e0336c016842b434d8adace6",
+      "classes": [
+        "Tile",
+        "Player"
+      ],
+      "lines": 267
+    }
+  ],
+  "referenceAssets": [
+    {
+      "file": "background.png",
+      "size": [
+        1000,
+        750
+      ],
+      "mode": "RGBA"
+    },
+    {
+      "file": "boy/Idle (1).png",
+      "size": [
+        669,
+        569
+      ],
+      "mode": "RGBA"
+    },
+    {
+      "file": "boy/Idle (2).png",
+      "size": [
+        669,
+        569
+      ],
+      "mode": "RGBA"
+    },
+    {
+      "file": "boy/Idle (3).png",
+      "size": [
+        669,
+        569
+      ],
+      "mode": "RGBA"
+    },
+    {
+      "file": "boy/Idle (4).png",
+      "size": [
+        669,
+        569
+      ],
+      "mode": "RGBA"
+    },
+    {
+      "file": "boy/Idle (5).png",
+      "size": [
+        669,
+        569
+      ],
+      "mode": "RGBA"
+    },
+    {
+      "file": "boy/Idle (6).png",
+      "size": [
+        669,
+        569
+      ],
+      "mode": "RGBA"
+    },
+    {
+      "file": "boy/Idle (7).png",
+      "size": [
+        669,
+        569
+      ],
+      "mode": "RGBA"
+    },
+    {
+      "file": "boy/Idle (8).png",
+      "size": [
+        669,
+        569
+      ],
+      "mode": "RGBA"
+    },
+    {
+      "file": "boy/Idle (9).png",
+      "size": [
+        669,
+        569
+      ],
+      "mode": "RGBA"
+    },
+    {
+      "file": "boy/Run (1).png",
+      "size": [
+        669,
+        569
+      ],
+      "mode": "RGBA"
+    },
+    {
+      "file": "boy/Run (2).png",
+      "size": [
+        669,
+        569
+      ],
+      "mode": "RGBA"
+    },
+    {
+      "file": "boy/Run (3).png",
+      "size": [
+        669,
+        569
+      ],
+      "mode": "RGBA"
+    },
+    {
+      "file": "boy/Run (4).png",
+      "size": [
+        669,
+        569
+      ],
+      "mode": "RGBA"
+    },
+    {
+      "file": "boy/Run (5).png",
+      "size": [
+        669,
+        569
+      ],
+      "mode": "RGBA"
+    },
+    {
+      "file": "boy/Run (6).png",
+      "size": [
+        669,
+        569
+      ],
+      "mode": "RGBA"
+    },
+    {
+      "file": "boy/Run (7).png",
+      "size": [
+        669,
+        569
+      ],
+      "mode": "RGBA"
+    },
+    {
+      "file": "boy/Run (8).png",
+      "size": [
+        669,
+        569
+      ],
+      "mode": "RGBA"
+    },
+    {
+      "file": "dirt.png",
+      "size": [
+        32,
+        32
+      ],
+      "mode": "RGB"
+    },
+    {
+      "file": "grass.png",
+      "size": [
+        32,
+        32
+      ],
+      "mode": "RGB"
+    },
+    {
+      "file": "knight.png",
+      "size": [
+        64,
+        64
+      ],
+      "mode": "RGBA"
+    },
+    {
+      "file": "water.png",
+      "size": [
+        32,
+        32
+      ],
+      "mode": "RGB"
+    }
+  ]
+}

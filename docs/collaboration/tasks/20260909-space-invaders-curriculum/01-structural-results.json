@@ -1,0 +1,16 @@
+{
+  "python_ast": "24/24 pass",
+  "units": 10,
+  "exercises": 29,
+  "quizzes": 100,
+  "quiz_four_options_one_correct": "100/100 pass",
+  "trace_line_limit_failures": [
+    "si03 Scout 위치 중앙 리셋: 1 lines",
+    "si06 Raider.fire 탄환 발사 연결: 1 lines",
+    "si09 비상 정돈 check_game_status: 9 lines",
+    "si10 양방향 충돌 검사와 격추 스코어링: 9 lines"
+  ],
+  "manifest_steps": 23,
+  "manifest_totalCheckpoints": 24,
+  "note": "Structural checks only; not evidence of answer correctness or educational completeness."
+}

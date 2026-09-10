@@ -1,0 +1,129 @@
+{
+  "checkedAt": "2026-09-10T00:29:17.702Z",
+  "changes": [
+    {
+      "path": "units/unit_mars_expedition_01",
+      "field": "learningContents"
+    },
+    {
+      "path": "units/unit_mars_expedition_02",
+      "field": "learningContents"
+    },
+    {
+      "path": "units/unit_mars_expedition_03",
+      "field": "learningContents"
+    },
+    {
+      "path": "units/unit_mars_expedition_04",
+      "field": "learningContents"
+    },
+    {
+      "path": "units/unit_mars_expedition_05",
+      "field": "learningContents"
+    },
+    {
+      "path": "units/unit_mars_expedition_06",
+      "field": "learningContents"
+    },
+    {
+      "path": "units/unit_mars_expedition_07",
+      "field": "learningContents"
+    },
+    {
+      "path": "units/unit_mars_expedition_08",
+      "field": "learningContents"
+    },
+    {
+      "path": "units/unit_mars_expedition_09",
+      "field": "learningContents"
+    },
+    {
+      "path": "units/unit_mars_expedition_10",
+      "field": "learningContents"
+    },
+    {
+      "path": "units/unit_mars_expedition_11",
+      "field": "learningContents"
+    },
+    {
+      "path": "units/unit_mars_expedition_12",
+      "field": "learningContents"
+    },
+    {
+      "path": "units/unit_mars_expedition_13",
+      "field": "learningContents"
+    },
+    {
+      "path": "units/unit_mars_expedition_14",
+      "field": "learningContents"
+    },
+    {
+      "path": "units/unit_mars_expedition_15",
+      "field": "learningContents"
+    },
+    {
+      "path": "units/unit_mars_expedition_16",
+      "field": "learningContents"
+    },
+    {
+      "path": "units/unit_mars_expedition_17",
+      "field": "learningContents"
+    },
+    {
+      "path": "units/unit_mars_expedition_18",
+      "field": "learningContents"
+    },
+    {
+      "path": "units/unit_mars_expedition_19",
+      "field": "learningContents"
+    },
+    {
+      "path": "units/unit_mars_expedition_20",
+      "field": "learningContents"
+    },
+    {
+      "path": "units/unit_mars_expedition_21",
+      "field": "learningContents"
+    },
+    {
+      "path": "units/unit_mars_expedition_22",
+      "field": "learningContents"
+    },
+    {
+      "path": "units/unit_mars_expedition_23",
+      "field": "learningContents"
+    },
+    {
+      "path": "units/unit_mars_expedition_24",
+      "field": "learningContents"
+    },
+    {
+      "path": "units/unit_mars_expedition_25",
+      "field": "learningContents"
+    },
+    {
+      "path": "units/unit_mars_expedition_26",
+      "field": "learningContents"
+    },
+    {
+      "path": "units/unit_mars_expedition_27",
+      "field": "learningContents"
+    },
+    {
+      "path": "units/unit_mars_expedition_28",
+      "field": "learningContents"
+    },
+    {
+      "path": "units/unit_mars_expedition_29",
+      "field": "learningContents"
+    },
+    {
+      "path": "units/unit_mars_expedition_30",
+      "field": "learningContents"
+    },
+    {
+      "path": "units/unit_mars_expedition_31",
+      "field": "learningContents"
+    }
+  ]
+}

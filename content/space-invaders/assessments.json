@@ -1,0 +1,3182 @@
+{
+  "units": [
+    {
+      "unitKey": "si01",
+      "title": "출격 규칙과 게임 스튜디오 준비",
+      "exercises": [
+        {
+          "title": "Pygame 라이브러리 가져오기와 초기화",
+          "level": 1,
+          "category": "pygame",
+          "concepts": [
+            "import",
+            "pygame.init"
+          ],
+          "prompt": "우주 방어대를 시작하기 위해 pygame 모듈을 불러오고 기본 기능들을 초기화하는 3줄의 코드를 작성하세요. 이 문제는 발췌 코드 연습입니다. main.py 전체를 대체하거나 단독 실행하지 않습니다. 설명 주석은 따라 적지 않아도 됩니다.",
+          "answerLines": [
+            "import pygame",
+            "",
+            "pygame.init()"
+          ],
+          "hints": [
+            "import 키워드로 pygame을 불러옵니다.",
+            "pygame.init() 함수를 호출합니다."
+          ],
+          "commonMistakes": [
+            {
+              "message": "pygame.initialize()처럼 잘못된 함수명을 사용하는 경우"
+            },
+            {
+              "message": "import를 빼먹고 init()만 호출하는 경우"
+            }
+          ]
+        },
+        {
+          "title": "수업 준비 문구와 버전 출력",
+          "level": 1,
+          "category": "pygame",
+          "concepts": [
+            "print",
+            "pygame.__version__"
+          ],
+          "prompt": "01-A의 초기화 다음 두 줄입니다. 따옴표 안의 글은 출력 내용이며 pygame.__version__은 현재 버전을 읽습니다. 이 문제는 발췌 코드 연습입니다. main.py 전체를 대체하거나 단독 실행하지 않습니다. 설명 주석은 따라 적지 않아도 됩니다.",
+          "answerLines": [
+            "print(\"우주 방어대 수업 준비 완료!\")",
+            "print(\"Pygame 버전:\", pygame.__version__)"
+          ],
+          "hints": [
+            "따옴표 안의 글은 출력 내용이며 pygame.__version__은 현재 버전을 읽습니다.",
+            "설명용 주석은 입력하지 않습니다. 표시된 실행 코드와 들여쓰기를 기준으로 연습하세요."
+          ],
+          "commonMistakes": [
+            {
+              "message": "version() 함수로 잘못 호출하는 경우"
+            },
+            {
+              "message": "밑줄 두 개(__)를 하나만 작성하는 경우"
+            }
+          ]
+        }
+      ],
+      "quizzes": [
+        {
+          "question": "우주 방어대 게임에서 플레이어가 조종하는 아군 탐사선(Scout)의 기본 이동 방향은 무엇인가요?",
+          "options": [
+            {
+              "text": "좌우 방향키(←, →)를 이용한 수평 이동만 가능하다.",
+              "isCorrect": true
+            },
+            {
+              "text": "상하좌우 4방향으로 자유롭게 날아다닐 수 있다.",
+              "isCorrect": false
+            },
+            {
+              "text": "마우스 커서를 따라 360도 회전하며 이동한다.",
+              "isCorrect": false
+            },
+            {
+              "text": "자동으로 좌우를 왕복하며 플레이어는 방향을 바꿀 수 없다.",
+              "isCorrect": false
+            }
+          ],
+          "explanation": "정답 근거: 우주 방어대는 원작 스페이스 인베이더 규칙을 따라 화면 하단에서 좌우 방향키로만 수평 이동합니다. 상하 이동, 마우스 조작, 자동 왕복은 게임 규칙에 맞지 않습니다.",
+          "score": 1
+        },
+        {
+          "question": "우주 방어대 1개 라운드에 출격하는 외계 침략 드론(Raider) 편대의 총 개수는 몇 기인가요?",
+          "options": [
+            {
+              "text": "10열 × 5행 = 총 50기",
+              "isCorrect": false
+            },
+            {
+              "text": "11열 × 5행 = 총 55기",
+              "isCorrect": true
+            },
+            {
+              "text": "12열 × 4행 = 총 48기",
+              "isCorrect": false
+            },
+            {
+              "text": "8열 × 8행 = 총 64기",
+              "isCorrect": false
+            }
+          ],
+          "explanation": "정답 근거: 편대는 가로 11열, 세로 5행의 완벽한 격자로 정렬되어 총 55기가 출격합니다. 50기, 48기, 64기는 잘못된 계산입니다.",
+          "score": 1
+        },
+        {
+          "question": "화면 높이가 700픽셀일 때, 적이 침범하면 기체가 깎이는 '최후 방어선'의 세로 y 좌표는 어디인가요?",
+          "options": [
+            {
+              "text": "y = 50 픽셀 (상단 경계선)",
+              "isCorrect": false
+            },
+            {
+              "text": "y = 350 픽셀 (화면 정중앙)",
+              "isCorrect": false
+            },
+            {
+              "text": "y = 600 픽셀 (SCREEN_HEIGHT - 100)",
+              "isCorrect": true
+            },
+            {
+              "text": "y = 700 픽셀 (화면 맨 바닥)",
+              "isCorrect": false
+            }
+          ],
+          "explanation": "정답 근거: 방어선은 SCREEN_HEIGHT - 100 지점인 y = 600픽셀에 붉은 선으로 그어집니다. 50은 상단선, 350은 중앙, 700은 바닥입니다.",
+          "score": 1
+        },
+        {
+          "question": "플레이어 탐사선이 화면에 동시에 띄워둘 수 있는 플라즈마 탄환(ScoutPulse)의 최대 개수는 몇 발인가요?",
+          "options": [
+            {
+              "text": "제한 없이 무제한으로 연사할 수 있다.",
+              "isCorrect": false
+            },
+            {
+              "text": "최대 1발만 허용된다.",
+              "isCorrect": false
+            },
+            {
+              "text": "최대 3발까지 발사할 수 있다.",
+              "isCorrect": false
+            },
+            {
+              "text": "최대 2발까지만 동시에 존재할 수 있다.",
+              "isCorrect": true
+            }
+          ],
+          "explanation": "정답 근거: 아케이드 슈팅의 조작감과 긴장감을 위해 아군 탄환은 최대 2발로 엄격히 제한됩니다. 3발은 적 탄환의 제한입니다.",
+          "score": 1
+        },
+        {
+          "question": "외계 드론 편대가 화면 전체에 동시에 발사하여 유지할 수 있는 적 탄환(RaiderPulse)의 최대 개수는 몇 발인가요?",
+          "options": [
+            {
+              "text": "최대 3발",
+              "isCorrect": true
+            },
+            {
+              "text": "최대 1발",
+              "isCorrect": false
+            },
+            {
+              "text": "최대 5발",
+              "isCorrect": false
+            },
+            {
+              "text": "드론 개수만큼인 55발",
+              "isCorrect": false
+            }
+          ],
+          "explanation": "정답 근거: 적 드론 편대의 탄환은 화면에 최대 3발까지만 동시에 날아다닐 수 있도록 제한하여 난이도를 조절합니다.",
+          "score": 1
+        },
+        {
+          "question": "플레이어가 외계 침략 드론(Raider) 1기를 격추했을 때 얻는 기본 점수는 몇 점인가요?",
+          "options": [
+            {
+              "text": "10점",
+              "isCorrect": false
+            },
+            {
+              "text": "100점",
+              "isCorrect": true
+            },
+            {
+              "text": "500점",
+              "isCorrect": false
+            },
+            {
+              "text": "1000점",
+              "isCorrect": false
+            }
+          ],
+          "explanation": "정답 근거: 드론 1기당 100점의 점수를 획득합니다. 1000점은 라운드 정복 시의 기본 보너스 계산 단위입니다.",
+          "score": 1
+        },
+        {
+          "question": "현재 3라운드를 정복하여 적 드론을 모두 전멸시켰을 때 지급되는 라운드 클리어 보너스 점수는 얼마인가요?",
+          "options": [
+            {
+              "text": "1000점",
+              "isCorrect": false
+            },
+            {
+              "text": "2000점",
+              "isCorrect": false
+            },
+            {
+              "text": "3000점 (1000 × 3)",
+              "isCorrect": true
+            },
+            {
+              "text": "5000점",
+              "isCorrect": false
+            }
+          ],
+          "explanation": "정답 근거: 라운드 클리어 보너스는 1000 × 현재 라운드 번호이므로, 3라운드 클리어 시 1000 × 3 = 3000점이 가산됩니다.",
+          "score": 1
+        },
+        {
+          "question": "우주 방어대 게임 시작 시 플레이어에게 기본으로 주어지는 탐사선의 기체 생명(lives)은 몇 대인가요?",
+          "options": [
+            {
+              "text": "1대",
+              "isCorrect": false
+            },
+            {
+              "text": "3대",
+              "isCorrect": false
+            },
+            {
+              "text": "10대",
+              "isCorrect": false
+            },
+            {
+              "text": "5대",
+              "isCorrect": true
+            }
+          ],
+          "explanation": "정답 근거: 플레이어의 초기 기체 수는 5대로 설정되어 출발합니다. 1대나 3대는 너무 적고 10대는 지나치게 많습니다.",
+          "score": 1
+        },
+        {
+          "question": "메타센스 게임 스튜디오에서 '우주 방어대 수업 준비'를 눌렀을 때 이미지, 사운드, 폰트 파일이 준비되는 폴더의 이름은 무엇인가요?",
+          "options": [
+            {
+              "text": "assets",
+              "isCorrect": true
+            },
+            {
+              "text": "images",
+              "isCorrect": false
+            },
+            {
+              "text": "sounds",
+              "isCorrect": false
+            },
+            {
+              "text": "static",
+              "isCorrect": false
+            }
+          ],
+          "explanation": "정답 근거: 모든 게임 자원은 'assets' 폴더 안에 모여 있습니다. images, sounds로 나뉘어 있지 않고 단일 assets 폴더에 보관됩니다.",
+          "score": 1
+        },
+        {
+          "question": "파이썬 게임 코드의 시작 부분에서 `pygame.init()`을 호출해야 하는 가장 핵심적인 이유는 무엇인가요?",
+          "options": [
+            {
+              "text": "파이썬 인터프리터 자체를 재부팅하기 위해",
+              "isCorrect": false
+            },
+            {
+              "text": "Pygame에 포함된 그래픽, 사운드, 폰트 모듈들을 사용할 수 있도록 초기화하기 위해",
+              "isCorrect": true
+            },
+            {
+              "text": "1200×700 크기의 화면 창을 즉시 생성하기 위해",
+              "isCorrect": false
+            },
+            {
+              "text": "assets 폴더 안의 모든 그림 파일을 자동으로 읽어오기 위해",
+              "isCorrect": false
+            }
+          ],
+          "explanation": "정답 근거: pygame.init()은 Pygame 내부의 다양한 하위 시스템(디스플레이, 사운드믹서, 폰트 등)을 초기 가동시키는 함수입니다. 창 생성은 set_mode()가, 파일 로딩은 image.load() 등이 담당합니다.",
+          "score": 1
+        }
+      ]
+    },
+    {
+      "unitKey": "si02",
+      "title": "화면과 게임 루프, 다섯 설계도",
+      "exercises": [
+        {
+          "title": "화면 크기와 프레임 시계 준비",
+          "level": 1,
+          "category": "pygame",
+          "concepts": [
+            "display.set_mode",
+            "Clock"
+          ],
+          "prompt": "02-A 파일 위쪽의 준비 구간입니다. 화면을 먼저 만들고 제목을 지정한 뒤 FPS와 시계를 준비합니다. while 안에서 반복 생성하지 않습니다. 이 문제는 발췌 코드 연습입니다. main.py 전체를 대체하거나 단독 실행하지 않습니다. 설명 주석은 따라 적지 않아도 됩니다.",
+          "answerLines": [
+            "SCREEN_WIDTH = 1200",
+            "SCREEN_HEIGHT = 700",
+            "screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))",
+            "pygame.display.set_caption('우주 방어대')",
+            "",
+            "FPS = 60",
+            "clock = pygame.time.Clock()"
+          ],
+          "hints": [
+            "화면을 먼저 만들고 제목을 지정한 뒤 FPS와 시계를 준비합니다. while 안에서 반복 생성하지 않습니다.",
+            "설명용 주석은 입력하지 않습니다. 표시된 실행 코드와 들여쓰기를 기준으로 연습하세요."
+          ],
+          "commonMistakes": [
+            {
+              "message": "set_mode(SCREEN_WIDTH, SCREEN_HEIGHT)처럼 튜플 괄호를 한 겹 빼먹는 경우"
+            },
+            {
+              "message": "pygame.Clock()으로 모듈 경로(time)를 누락하는 경우"
+            }
+          ]
+        },
+        {
+          "title": "메인 게임 루프와 창 닫기 이벤트",
+          "level": 2,
+          "category": "pygame",
+          "concepts": [
+            "while",
+            "event.get",
+            "pygame.QUIT"
+          ],
+          "prompt": "running 변수를 선언하고, QUIT 이벤트가 들어오면 루프를 멈추는 기본 메인 루프를 작성하세요. 이 문제는 발췌 코드 연습입니다. main.py 전체를 대체하거나 단독 실행하지 않습니다. 설명 주석은 따라 적지 않아도 됩니다.",
+          "answerLines": [
+            "running = True",
+            "while running:",
+            "    for event in pygame.event.get():",
+            "        if event.type == pygame.QUIT:",
+            "            running = False"
+          ],
+          "hints": [
+            "while running: 아래 들여쓰기는 4칸입니다.",
+            "for event in pygame.event.get():로 이벤트를 순회합니다."
+          ],
+          "commonMistakes": [
+            {
+              "message": "event.type == 'QUIT'처럼 문자열로 비교하는 경우"
+            },
+            {
+              "message": "들여쓰기 깊이를 통일하지 않는 경우"
+            }
+          ]
+        },
+        {
+          "title": "탐사선의 빈 생성자와 update",
+          "level": 1,
+          "category": "pygame",
+          "concepts": [
+            "class",
+            "Sprite",
+            "pass"
+          ],
+          "prompt": "02-C의 Scout 클래스 앞부분입니다. 각 메서드 안의 pass는 빈 본문 자리입니다. 이어지는 fire/reset 메서드는 전체 클래스에서 그대로 유지합니다. 이 문제는 발췌 코드 연습입니다. main.py 전체를 대체하거나 단독 실행하지 않습니다. 설명 주석은 따라 적지 않아도 됩니다.",
+          "answerLines": [
+            "class Scout(pygame.sprite.Sprite):",
+            "    def __init__(self, pulses):",
+            "        pass",
+            "",
+            "    def update(self):",
+            "        pass"
+          ],
+          "hints": [
+            "각 메서드 안의 pass는 빈 본문 자리입니다. 이어지는 fire/reset 메서드는 전체 클래스에서 그대로 유지합니다.",
+            "설명용 주석은 입력하지 않습니다. 표시된 실행 코드와 들여쓰기를 기준으로 연습하세요."
+          ],
+          "commonMistakes": [
+            {
+              "message": "콜론(:)을 누락하는 경우"
+            },
+            {
+              "message": "Sprite 대소문자를 틀리는 경우"
+            }
+          ]
+        }
+      ],
+      "quizzes": [
+        {
+          "question": "`pygame.display.set_mode((1200, 700))`에서 안쪽에 괄호가 한 번 더 있는 이유는 무엇인가요?",
+          "options": [
+            {
+              "text": "가로와 세로 길이를 하나로 묶은 '튜플(tuple)' 자료형 1개를 전달하기 위해",
+              "isCorrect": true
+            },
+            {
+              "text": "화면 해상도를 두 번 확인하는 문법적 규칙이기 때문에",
+              "isCorrect": false
+            },
+            {
+              "text": "괄호가 두 개여야 3D 그래픽 모드로 전환되기 때문에",
+              "isCorrect": false
+            },
+            {
+              "text": "단순한 오타이며 괄호 하나를 지워도 똑같이 동작한다",
+              "isCorrect": false
+            }
+          ],
+          "explanation": "정답 근거: set_mode 함수는 화면 크기를 단일 인자(튜플 또는 리스트)로 받기 때문에 (1200, 700) 형태로 전달해야 합니다. 괄호를 빼면 두 개의 인자로 인식되어 에러가 납니다.",
+          "score": 1
+        },
+        {
+          "question": "clock.tick(60)의 역할로 알맞은 것은?",
+          "options": [
+            {
+              "text": "루프를 초당 최대60회로 제한한다.",
+              "isCorrect": true
+            },
+            {
+              "text": "항상 정확히60FPS를 보장한다.",
+              "isCorrect": false
+            },
+            {
+              "text": "모든 물체를60픽셀 이동시킨다.",
+              "isCorrect": false
+            },
+            {
+              "text": "60초 후 게임을 끝낸다.",
+              "isCorrect": false
+            }
+          ],
+          "explanation": "tick은 반복 속도의 상한을 조절합니다. 이 게임은 프레임당 이동거리로 작성해 실제 FPS가 낮으면 움직임도 느려질 수 있습니다.\n오답 「항상 정확히60FPS를 보장한다.」: 기기 성능이 부족하면 실제 FPS는 낮아집니다.\n오답 「모든 물체를60픽셀 이동시킨다.」: 이동거리는 update에서 정합니다.\n오답 「60초 후 게임을 끝낸다.」: 종료 타이머가 아닙니다.",
+          "score": 1
+        },
+        {
+          "question": "`screen.fill((9, 17, 37))` 코드가 표현하는 배경의 색상은 어떤 색인가요?",
+          "options": [
+            {
+              "text": "밝은 노란색",
+              "isCorrect": false
+            },
+            {
+              "text": "선명한 에메랄드 초록색",
+              "isCorrect": false
+            },
+            {
+              "text": "깊고 어두운 우주 남색",
+              "isCorrect": true
+            },
+            {
+              "text": "완전한 새하얀 흰색",
+              "isCorrect": false
+            }
+          ],
+          "explanation": "정답 근거: RGB 값이 (9, 17, 37)로 빨강과 초록은 매우 낮고 파랑이 상대적으로 높아 매우 짙은 심야 우주 남색을 띱니다.",
+          "score": 1
+        },
+        {
+          "question": "게임 코드에서 `while running:` 무한 반복문이 반드시 필요한 이유는 무엇인가요?",
+          "options": [
+            {
+              "text": "컴퓨터의 CPU 사용량을 100%로 끌어올리기 위해",
+              "isCorrect": false
+            },
+            {
+              "text": "플레이어가 키보드를 누를 때까지 파이썬 인터프리터를 정지시키기 위해",
+              "isCorrect": false
+            },
+            {
+              "text": "외계 드론의 이미지를 1000번 복사하기 위해",
+              "isCorrect": false
+            },
+            {
+              "text": "입력 처리, 화면 그리기, 상태 갱신을 멈추지 않고 계속 반복하여 게임 창을 유지하기 위해",
+              "isCorrect": true
+            }
+          ],
+          "explanation": "정답 근거: 반복문이 없으면 코드가 위에서 아래로 1번 실행되고 바로 끝나 창이 즉시 닫혀 버립니다. 게임은 매 순간 상태를 갱신해야 하므로 루프가 필수적입니다.",
+          "score": 1
+        },
+        {
+          "question": "이 게임의 종료 코드와 스튜디오 정지 버튼을 바르게 이해한 것은?",
+          "options": [
+            {
+              "text": "스튜디오 정지가 반드시 QUIT을 보내야만 끝난다.",
+              "isCorrect": false
+            },
+            {
+              "text": "웹에서도 별도 게임창의 X를 찾아야 한다.",
+              "isCorrect": false
+            },
+            {
+              "text": "QUIT을 받으면 running을 True로 바꾼다.",
+              "isCorrect": false
+            },
+            {
+              "text": "코드는 Pygame QUIT 이벤트를 처리하고, 스튜디오 정지 버튼은 실행기를 멈춘다.",
+              "isCorrect": true
+            }
+          ],
+          "explanation": "QUIT 처리에서는 running=False로 바꾸고 루프를 벗어납니다. 학생은 스튜디오 정지로 실행을 끝낼 수 있습니다.\n오답 「스튜디오 정지가 반드시 QUIT을 보내야만 끝난다.」: 실행기를 중단하는 UI 동작과 Pygame 이벤트 처리는 구별합니다.\n오답 「웹에서도 별도 게임창의 X를 찾아야 한다.」: 스튜디오에서는 정지 버튼을 사용합니다.\n오답 「QUIT을 받으면 running을 True로 바꾼다.」: 반복 종료를 위해 False로 바꿉니다.",
+          "score": 1
+        },
+        {
+          "question": "파이썬 클래스 정의 안에서 `pass` 키워드를 사용하는 이유는 무엇인가요?",
+          "options": [
+            {
+              "text": "해당 클래스를 코드에서 영구적으로 삭제하기 위해",
+              "isCorrect": false
+            },
+            {
+              "text": "아직 구현할 본문이 없지만 문법 오류 없이 껍데기(설계도)를 유지하기 위해",
+              "isCorrect": true
+            },
+            {
+              "text": "부모 클래스의 모든 메서드를 강제로 실행하기 위해",
+              "isCorrect": false
+            },
+            {
+              "text": "다음 줄의 코드로 빠르게 점프하기 위해",
+              "isCorrect": false
+            }
+          ],
+          "explanation": "정답 근거: 파이썬은 콜론(:) 뒤에 내용이 비어있으면 문법 에러를 냅니다. pass는 '아무 일도 하지 않음'을 뜻하는 플레이스홀더로 문법 에러를 방지합니다.",
+          "score": 1
+        },
+        {
+          "question": "우주 방어대에서 정의하는 핵심 5대 클래스 이름이 올바르게 짝지어진 것은 무엇인가요?",
+          "options": [
+            {
+              "text": "Game, Player, Alien, Bullet, Laser",
+              "isCorrect": false
+            },
+            {
+              "text": "App, Hero, Monster, Attack, Defense",
+              "isCorrect": false
+            },
+            {
+              "text": "Mission, Scout, Raider, ScoutPulse, RaiderPulse",
+              "isCorrect": true
+            },
+            {
+              "text": "Stage, Ship, Drone, Missile, Bomb",
+              "isCorrect": false
+            }
+          ],
+          "explanation": "정답 근거: 교육 및 코드 품질 계약에 따라 사령부(Mission), 아군(Scout), 적(Raider), 아군탄환(ScoutPulse), 적탄환(RaiderPulse)으로 통일합니다.",
+          "score": 1
+        },
+        {
+          "question": "`class Scout(pygame.sprite.Sprite):`처럼 Sprite를 상속받는 가장 큰 이점은 무엇인가요?",
+          "options": [
+            {
+              "text": "파이썬의 실행 속도가 10배 빨라진다.",
+              "isCorrect": false
+            },
+            {
+              "text": "우주선의 비행 고도가 3차원으로 자동 계산된다.",
+              "isCorrect": false
+            },
+            {
+              "text": "키보드 입력을 작성하지 않아도 저절로 움직인다.",
+              "isCorrect": false
+            },
+            {
+              "text": "Pygame의 스프라이트 그룹(Group)에 담아 일괄 업데이트, 그리기, 충돌 검사를 할 수 있다.",
+              "isCorrect": true
+            }
+          ],
+          "explanation": "정답 근거: Sprite를 상속하면 pygame.sprite.Group에 등록할 수 있어 update(), draw(), groupcollide() 등의 강력한 그룹 일괄 처리 기능을 사용할 수 있습니다.",
+          "score": 1
+        },
+        {
+          "question": "5개의 클래스 뼈대를 작성하고 실행했는데도 게임 화면에 우주선이나 적이 전혀 나타나지 않는 이유는 무엇인가요?",
+          "options": [
+            {
+              "text": "클래스는 도면(설계도)일 뿐이며, 아직 실제 객체(인스턴스)를 생성하여 화면에 그리라는 명령을 내리지 않았기 때문에",
+              "isCorrect": true
+            },
+            {
+              "text": "Pygame이 아직 설치되지 않아서",
+              "isCorrect": false
+            },
+            {
+              "text": "클래스 이름 앞에 '#' 주석 처리가 되어 있어서",
+              "isCorrect": false
+            },
+            {
+              "text": "도현체 폰트 파일이 없어서 그래픽이 깨졌기 때문에",
+              "isCorrect": false
+            }
+          ],
+          "explanation": "정답 근거: 클래스는 설계도입니다. 실제 물건(인스턴스)을 만들어 화면에 blit하거나 draw하라는 명령이 없으면 화면에는 아무것도 나타나지 않는 것이 정상입니다.",
+          "score": 1
+        },
+        {
+          "question": "메인 루프에서 `screen.fill()`로 도화지를 칠한 뒤 `pygame.display.update()`를 호출하지 않으면 어떤 일이 벌어질까요?",
+          "options": [
+            {
+              "text": "컴퓨터 모니터가 자동으로 꺼진다.",
+              "isCorrect": false
+            },
+            {
+              "text": "메모리 도화지에 그린 내용이 실제 모니터 화면에 반영되지 않아 화면이 갱신되지 않는다.",
+              "isCorrect": true
+            },
+            {
+              "text": "파이썬이 SyntaxError를 발생시키며 즉시 멈춘다.",
+              "isCorrect": false
+            },
+            {
+              "text": "배경 색상이 자동으로 무지개색으로 바뀐다.",
+              "isCorrect": false
+            }
+          ],
+          "explanation": "정답 근거: Pygame은 더블 버퍼링 방식을 사용하므로 display.update()나 display.flip()을 호출해야 비로소 도화지의 그림이 실제 화면에 보여집니다.",
+          "score": 1
+        }
+      ]
+    },
+    {
+      "unitKey": "si03",
+      "title": "탐사선 표시와 좌우 이동",
+      "exercises": [
+        {
+          "title": "탐사선 생성자의 그림과 위치 준비",
+          "level": 2,
+          "category": "pygame",
+          "concepts": [
+            "pygame.sprite.Sprite",
+            "smoothscale",
+            "convert_alpha"
+          ],
+          "prompt": "03-A의 Scout.__init__ 안에서 사용하는 본문입니다. super는 Sprite 내부를 준비하고 image는 그림, rect는 위치를 보관합니다. 별도 raw_img 변수를 만들지 않고 Data Log의 실제 코드를 연습합니다. 이 문제는 발췌 코드 연습입니다. main.py 전체를 대체하거나 단독 실행하지 않습니다. 설명 주석은 따라 적지 않아도 됩니다.",
+          "answerLines": [
+            "super().__init__()",
+            "self.image = pygame.transform.smoothscale(",
+            "    pygame.image.load('assets/scout.png').convert_alpha(), (64, 64)",
+            ")",
+            "self.rect = self.image.get_rect()",
+            "self.rect.centerx = SCREEN_WIDTH // 2"
+          ],
+          "hints": [
+            "super는 Sprite 내부를 준비하고 image는 그림, rect는 위치를 보관합니다. 별도 raw_img 변수를 만들지 않고 Data Log의 실제 코드를 연습합니다.",
+            "설명용 주석은 입력하지 않습니다. 표시된 실행 코드와 들여쓰기를 기준으로 연습하세요."
+          ],
+          "commonMistakes": [
+            {
+              "message": "super().__init__()을 누락하여 스프라이트 그룹 등록 오류가 발생하는 경우"
+            },
+            {
+              "message": "convert_alpha()를 누락하여 투명 배경이 검게 렌더링되는 경우"
+            }
+          ]
+        },
+        {
+          "title": "이동 후 양쪽 경계 보정",
+          "level": 2,
+          "category": "pygame",
+          "concepts": [
+            "Rect",
+            "경계 보정"
+          ],
+          "prompt": "Scout.update에서 좌우 이동을 처리한 뒤의 본문입니다. 아래 코드를 입력하고 각 줄이 실행되는 순서를 설명하세요. 이 문제는 발췌 코드 연습입니다. main.py 전체를 대체하거나 단독 실행하지 않습니다. 설명 주석은 따라 적지 않아도 됩니다.",
+          "answerLines": [
+            "if self.rect.left < 0:",
+            "    self.rect.left = 0",
+            "if self.rect.right > SCREEN_WIDTH:",
+            "    self.rect.right = SCREEN_WIDTH"
+          ],
+          "hints": [
+            "Data Log의 같은 클래스·메서드와 비교합니다.",
+            "조건문 안과 밖의 들여쓰기를 구분합니다."
+          ],
+          "commonMistakes": [
+            {
+              "message": "클래스 안 메서드는4칸, 메서드 본문은8칸입니다. 연습 조각은 제시된 문맥의 들여쓰기를 기준으로 입력합니다."
+            }
+          ]
+        },
+        {
+          "title": "Scout 중앙 복귀",
+          "level": 1,
+          "category": "pygame",
+          "concepts": [
+            "메서드",
+            "centerx"
+          ],
+          "prompt": "Scout 클래스 내부에 작성하는 메서드입니다. 아래 코드를 입력하고 각 줄이 실행되는 순서를 설명하세요. 이 문제는 발췌 코드 연습입니다. main.py 전체를 대체하거나 단독 실행하지 않습니다. 설명 주석은 따라 적지 않아도 됩니다.",
+          "answerLines": [
+            "def reset(self):",
+            "    self.rect.centerx = SCREEN_WIDTH // 2"
+          ],
+          "hints": [
+            "Data Log의 같은 클래스·메서드와 비교합니다.",
+            "조건문 안과 밖의 들여쓰기를 구분합니다."
+          ],
+          "commonMistakes": [
+            {
+              "message": "클래스 안 메서드는4칸, 메서드 본문은8칸입니다. 연습 조각은 제시된 문맥의 들여쓰기를 기준으로 입력합니다."
+            }
+          ]
+        }
+      ],
+      "quizzes": [
+        {
+          "question": "`pygame.transform.smoothscale()` 함수를 사용하는 가장 큰 장점은 무엇인가요?",
+          "options": [
+            {
+              "text": "고해상도 원본 이미지를 축소할 때 계단 현상을 줄여 부드럽고 선명하게 크기를 조절해주기 때문에",
+              "isCorrect": true
+            },
+            {
+              "text": "이미지의 파일 용량을 하드디스크에서 영구적으로 줄여주기 때문에",
+              "isCorrect": false
+            },
+            {
+              "text": "우주선이 자동으로 360도 회전하도록 만들어주기 때문에",
+              "isCorrect": false
+            },
+            {
+              "text": "흑백 이미지를 컬러 이미지로 자동 변환해주기 때문에",
+              "isCorrect": false
+            }
+          ],
+          "explanation": "정답 근거: smoothscale은 쌍선형 보간법을 사용하여 픽셀 깨짐 없이 부드럽게 크기를 변환합니다. 파일 크기 변경이나 자동 회전, 흑백 변환 기능은 아닙니다.",
+          "score": 1
+        },
+        {
+          "question": "`self.rect.centerx = SCREEN_WIDTH // 2` 코드가 수행하는 배치는 무엇인가요?",
+          "options": [
+            {
+              "text": "우주선을 화면 맨 왼쪽 모서리로 이동시킨다.",
+              "isCorrect": false
+            },
+            {
+              "text": "우주선의 가로 중심을 화면 가로 폭의 정중앙(600픽셀)에 맞춘다.",
+              "isCorrect": true
+            },
+            {
+              "text": "우주선을 화면 맨 위 천장으로 이동시킨다.",
+              "isCorrect": false
+            },
+            {
+              "text": "우주선의 가로 폭을 화면 너비의 절반으로 늘린다",
+              "isCorrect": false
+            }
+          ],
+          "explanation": "정답 근거: centerx는 사각형의 수평 중심 좌표입니다. SCREEN_WIDTH(1200)의 절반인 600 지점에 우주선 중심이 오게 됩니다.",
+          "score": 1
+        },
+        {
+          "question": "`self.rect.bottom = SCREEN_HEIGHT` 코드가 수행하는 배치는 무엇인가요?",
+          "options": [
+            {
+              "text": "우주선의 윗부분을 천장에 맞춘다.",
+              "isCorrect": false
+            },
+            {
+              "text": "우주선을 화면 밖으로 퇴장시킨다.",
+              "isCorrect": false
+            },
+            {
+              "text": "우주선의 밑바닥을 화면 맨 아래 경계선(700픽셀)에 딱 맞춘다.",
+              "isCorrect": true
+            },
+            {
+              "text": "우주선의 세로 높이를 700픽셀로 잡아 늘린다",
+              "isCorrect": false
+            }
+          ],
+          "explanation": "정답 근거: bottom 속성을 SCREEN_HEIGHT로 설정하면 스프라이트의 바닥 모서리가 화면 맨 아래 경계선에 딱 맞물려 착륙한 상태가 됩니다.",
+          "score": 1
+        },
+        {
+          "question": "이벤트 루프 대신 `pygame.key.get_pressed()`를 사용하여 우주선 이동을 구현하는 이유는 무엇인가요?",
+          "options": [
+            {
+              "text": "키보드가 고장 나도 마우스로 조작할 수 있게 하기 위해",
+              "isCorrect": false
+            },
+            {
+              "text": "파이썬의 문법 규칙상 이벤트 루프에서는 if문을 쓸 수 없기 때문에",
+              "isCorrect": false
+            },
+            {
+              "text": "키보드를 누르는 순간 컴퓨터 스피커에서 비프음이 나게 하기 위해",
+              "isCorrect": false
+            },
+            {
+              "text": "키를 꾹 누르고 있을 때 매 프레임 연속적이고 부드러운 활주 비행을 구현하기 위해",
+              "isCorrect": true
+            }
+          ],
+          "explanation": "정답 근거: get_pressed()는 현재 프레임에 눌려 있는 모든 키의 상태를 즉시 반환하므로, 연속 누름에 의한 부드러운 가속과 이동 처리에 최적입니다.",
+          "score": 1
+        },
+        {
+          "question": "left=1인 기체가 왼쪽으로8픽셀 이동했다. 이동 후 left<0이면 left=0으로 보정할 때 최종 left는?",
+          "options": [
+            {
+              "text": "0",
+              "isCorrect": true
+            },
+            {
+              "text": "-7",
+              "isCorrect": false
+            },
+            {
+              "text": "1",
+              "isCorrect": false
+            },
+            {
+              "text": "8",
+              "isCorrect": false
+            }
+          ],
+          "explanation": "1-8=-7이지만 보정 조건이 참이어서 최종 left는0입니다.\n오답 「-7」: 보정하기 전 좌표입니다.\n오답 「1」: 이동 자체가 없었던 경우입니다.\n오답 「8」: 이동거리를 위치로 혼동한 값입니다.",
+          "score": 1
+        },
+        {
+          "question": "`if keys[pygame.K_RIGHT] and self.rect.right < SCREEN_WIDTH:` 조건에서 `rect.right`의 의미는 무엇인가요?",
+          "options": [
+            {
+              "text": "우주선이 올바른(Right) 상태인지 나타내는 참/거짓 값",
+              "isCorrect": false
+            },
+            {
+              "text": "스프라이트 사각형의 오른쪽 끝 x 좌표",
+              "isCorrect": true
+            },
+            {
+              "text": "우주선의 오른쪽 날개에 달린 엔진의 개수",
+              "isCorrect": false
+            },
+            {
+              "text": "우주선이 오른쪽으로 회전한 각도",
+              "isCorrect": false
+            }
+          ],
+          "explanation": "정답 근거: rect.right는 사각형의 가장 오른쪽 모서리 x 좌표를 의미합니다. 이 값이 SCREEN_WIDTH(1200)보다 작을 때만 오른쪽 전진이 가능합니다.",
+          "score": 1
+        },
+        {
+          "question": "메인 루프에서 `scouts.draw(screen)` 명령이 `screen.fill((9, 17, 37))`보다 반드시 뒤에 와야 하는 이유는 무엇인가요?",
+          "options": [
+            {
+              "text": "그렇지 않으면 우주선이 2배 빠른 속도로 비행하기 때문에",
+              "isCorrect": false
+            },
+            {
+              "text": "파이썬에서 draw 함수는 항상 맨 마지막 줄에만 적을 수 있다는 문법 규칙 때문에",
+              "isCorrect": false
+            },
+            {
+              "text": "fill을 나중에 실행하면 새로 칠한 배경색이 먼저 그린 우주선을 완전히 덮어버려 화면에 보이지 않게 되기 때문에",
+              "isCorrect": true
+            },
+            {
+              "text": "사운드 믹서가 정지되는 버그를 막기 위해",
+              "isCorrect": false
+            }
+          ],
+          "explanation": "정답 근거: 그래픽 렌더링은 도화지에 붓칠하는 순서와 같습니다. 배경을 먼저 깔고(fill) 그 위에 캐릭터를 올려야(draw) 캐릭터가 보입니다. 순서가 바뀌면 배경이 캐릭터를 덮어버립니다.",
+          "score": 1
+        },
+        {
+          "question": "`class Scout(pygame.sprite.Sprite)`의 `__init__`에서 `super().__init__()`을 호출하지 않으면 어떤 문제가 생길까요?",
+          "options": [
+            {
+              "text": "화면 해상도가 640x480으로 강제 축소된다.",
+              "isCorrect": false
+            },
+            {
+              "text": "우주선의 비행 속도가 0이 된다.",
+              "isCorrect": false
+            },
+            {
+              "text": "스페이스바 키가 영구적으로 잠긴다.",
+              "isCorrect": false
+            },
+            {
+              "text": "Sprite 부모 클래스의 내부 속성들이 초기화되지 않아 Group에 추가하거나 충돌 검사할 때 오류가 발생한다",
+              "isCorrect": true
+            }
+          ],
+          "explanation": "정답 근거: super().__init__()은 부모인 Sprite 클래스가 사용하는 내부 그룹 참조 및 식별 체계를 초기화합니다. 이를 생략하면 스프라이트 그룹 관련 연산 시 AttributeError가 발생합니다.",
+          "score": 1
+        },
+        {
+          "question": "`self.velocity = 8`에서 숫자 8이 의미하는 바는 무엇인가요?",
+          "options": [
+            {
+              "text": "1프레임(한 번의 화면 갱신)마다 우주선이 x축으로 이동하는 거리(8픽셀)",
+              "isCorrect": true
+            },
+            {
+              "text": "우주선이 발사할 수 있는 총알의 개수(8발)",
+              "isCorrect": false
+            },
+            {
+              "text": "우주선이 버틸 수 있는 최대 실드 방어력(8포인트)",
+              "isCorrect": false
+            },
+            {
+              "text": "우주선의 탑승 인원(8명)",
+              "isCorrect": false
+            }
+          ],
+          "explanation": "정답 근거: velocity는 프레임당 이동 픽셀 수를 뜻합니다. 방향키가 눌렸을 때 매 프레임 x 좌표에 8씩 더하거나 뺍니다.",
+          "score": 1
+        },
+        {
+          "question": "`Scout.reset()` 메서드에서 `rect.bottom`은 그대로 두고 `rect.centerx`만 다시 설정하는 이유는 무엇인가요?",
+          "options": [
+            {
+              "text": "세로 좌표는 파이썬에서 수정이 불가능하기 때문에",
+              "isCorrect": false
+            },
+            {
+              "text": "우주선은 원래 바닥(bottom)에 붙어서 좌우로만 다니는 비행선이므로 가로 중심만 화면 중앙으로 되돌리면 충분하기 때문에",
+              "isCorrect": true
+            },
+            {
+              "text": "적 드론이 이미 화면 바닥을 점령했기 때문에",
+              "isCorrect": false
+            },
+            {
+              "text": "reset 함수 안에서는 변수를 1개만 바꿀 수 있다는 제약 때문에",
+              "isCorrect": false
+            }
+          ],
+          "explanation": "정답 근거: 탐사선은 상하 이동을 하지 않고 항상 바닥에 위치합니다. 따라서 피격이나 라운드 리셋 시 가로 중앙 좌표만 600으로 되돌리면 원위치 복원이 완벽히 이루어집니다.",
+          "score": 1
+        }
+      ]
+    },
+    {
+      "unitKey": "si04",
+      "title": "아군 탄환과 두 발 제한",
+      "exercises": [
+        {
+          "title": "아군 탄환의 그림·좌표·그룹 준비",
+          "level": 2,
+          "category": "pygame",
+          "concepts": [
+            "pygame.Surface",
+            "SRCALPHA",
+            "pulse_group.add"
+          ],
+          "prompt": "04-A의 ScoutPulse.__init__ 본문입니다. 좌표를 받는 두 줄과 그룹 등록까지 Data Log의 같은 순서로 연결합니다. 이 문제는 발췌 코드 연습입니다. main.py 전체를 대체하거나 단독 실행하지 않습니다. 설명 주석은 따라 적지 않아도 됩니다.",
+          "answerLines": [
+            "super().__init__()",
+            "self.image = pygame.Surface((4, 16), pygame.SRCALPHA)",
+            "self.image.fill((78, 240, 255))",
+            "self.rect = self.image.get_rect()",
+            "self.rect.centerx = x",
+            "self.rect.centery = y",
+            "self.velocity = 10",
+            "pulse_group.add(self)"
+          ],
+          "hints": [
+            "좌표를 받는 두 줄과 그룹 등록까지 Data Log의 같은 순서로 연결합니다.",
+            "설명용 주석은 입력하지 않습니다. 표시된 실행 코드와 들여쓰기를 기준으로 연습하세요."
+          ],
+          "commonMistakes": [
+            {
+              "message": "SRCALPHA를 빼먹어 탄환 주변 배경이 검게 나오는 경우"
+            },
+            {
+              "message": "pulse_group.add(self)를 빼먹어 화면에 탄환이 등록되지 않는 경우"
+            }
+          ]
+        },
+        {
+          "title": "ScoutPulse 상향 이동과 화면 밖 소멸",
+          "level": 2,
+          "category": "pygame",
+          "concepts": [
+            "rect.y",
+            "rect.bottom",
+            "self.kill"
+          ],
+          "prompt": "탄환을 velocity만큼 위로 전진시키고, 화면 위 천장(bottom < 0)을 벗어나면 self.kill()을 호출하는 update 메서드를 작성하세요. 이 문제는 발췌 코드 연습입니다. main.py 전체를 대체하거나 단독 실행하지 않습니다. 설명 주석은 따라 적지 않아도 됩니다.",
+          "answerLines": [
+            "self.rect.y -= self.velocity",
+            "if self.rect.bottom < 0:",
+            "    self.kill()"
+          ],
+          "hints": [
+            "위로 이동할 때는 y 좌표를 뺍니다.",
+            "bottom < 0 이면 완전히 화면 위로 탈출한 상태입니다."
+          ],
+          "commonMistakes": [
+            {
+              "message": "y 좌표에 velocity를 더해서 탄환이 아래로 역주행하는 경우"
+            },
+            {
+              "message": "kill() 대신 pass를 써서 탄환이 소멸하지 않는 경우"
+            }
+          ]
+        },
+        {
+          "title": "Scout 2발 제한 발사",
+          "level": 2,
+          "category": "pygame",
+          "concepts": [
+            "len",
+            "ScoutPulse",
+            "shoot_sound.play"
+          ],
+          "prompt": "현재 발사된 탄환 수가 2개 미만일 때만 효과음을 재생하고 새 탄환을 생성하는 fire 메서드를 작성하세요. 이 문제는 발췌 코드 연습입니다. main.py 전체를 대체하거나 단독 실행하지 않습니다. 설명 주석은 따라 적지 않아도 됩니다.",
+          "answerLines": [
+            "if len(self.pulses) < 2:",
+            "    self.shoot_sound.play()",
+            "    ScoutPulse(self.rect.centerx, self.rect.top, self.pulses)"
+          ],
+          "hints": [
+            "len(self.pulses)로 현재 그룹의 탄환 수를 셉니다.",
+            "탄환의 출발점은 (centerx, top)입니다."
+          ],
+          "commonMistakes": [
+            {
+              "message": "len(self.pulses) <= 2 로 작성하여 최대 3발까지 발사되는 경우"
+            }
+          ]
+        }
+      ],
+      "quizzes": [
+        {
+          "question": "`pygame.Surface((4, 16), pygame.SRCALPHA)`에서 `pygame.SRCALPHA` 플래그의 역할은 무엇인가요?",
+          "options": [
+            {
+              "text": "알파 채널(투명도)을 활성화하여 배경이 투명한 맞춤형 그래픽 표면을 생성하기 위해",
+              "isCorrect": true
+            },
+            {
+              "text": "탄환의 비행 속도를 16배 빠르게 만들기 위해",
+              "isCorrect": false
+            },
+            {
+              "text": "스피커 사운드를 스테레오로 믹싱하기 위해",
+              "isCorrect": false
+            },
+            {
+              "text": "탄환이 화면 끝에서 튕겨 나오도록 반사 속성을 부여하기 위해",
+              "isCorrect": false
+            }
+          ],
+          "explanation": "정답 근거: SRCALPHA는 픽셀별 투명도(Alpha)를 지원하는 서피스를 생성하는 플래그입니다. 이것이 없으면 투명 처리가 되지 않아 주변이 검은 직사각형으로 남습니다.",
+          "score": 1
+        },
+        {
+          "question": "Pygame에서 탄환이 위쪽 하늘로 날아가도록 하려면 y 좌표를 어떻게 변경해야 하나요?",
+          "options": [
+            {
+              "text": "self.rect.y에 속도를 곱해야 한다.",
+              "isCorrect": false
+            },
+            {
+              "text": "Pygame 좌표계는 위쪽으로 갈수록 y값이 작아지므로 `self.rect.y -= self.velocity`로 빼주어야 한다.",
+              "isCorrect": true
+            },
+            {
+              "text": "Pygame 좌표계는 위쪽으로 갈수록 y값이 커지므로 `self.rect.y += self.velocity`로 더해주어야 한다.",
+              "isCorrect": false
+            },
+            {
+              "text": "y 좌표는 고정하고 x 좌표만 바꿔야 한다",
+              "isCorrect": false
+            }
+          ],
+          "explanation": "정답 근거: 컴퓨터 2D 그래픽 좌표계는 화면 왼쪽 위가 (0, 0)이고 아래로 내려갈수록 y가 증가합니다. 따라서 위로 올라가려면 y를 빼야(-=) 합니다.",
+          "score": 1
+        },
+        {
+          "question": "`pulse_group.add(self)` 코드가 탄환의 `__init__` 안에서 실행될 때 일어나는 일은 무엇인가요?",
+          "options": [
+            {
+              "text": "탄환이 화면에서 즉시 폭발하여 사라진다.",
+              "isCorrect": false
+            },
+            {
+              "text": "플레이어 탐사선의 기체 생명이 1개 증가한다.",
+              "isCorrect": false
+            },
+            {
+              "text": "새로 생성된 탄환 객체가 스스로를 전달받은 탄환 관리 스프라이트 그룹에 등록한다.",
+              "isCorrect": true
+            },
+            {
+              "text": "새로운 적 외계선이 즉시 출격한다",
+              "isCorrect": false
+            }
+          ],
+          "explanation": "정답 근거: self는 지금 생성 중인 탄환 자신을 가리킵니다. group.add(self)를 호출하면 생성과 동시에 그룹 바구니에 담기게 됩니다.",
+          "score": 1
+        },
+        {
+          "question": "탄환에 2발 제한(`len < 2`)을 걸었을 때, 화면 밖으로 나간 탄환을 처리하지 않으면 왜 추가 발사가 불가능해질까요?",
+          "options": [
+            {
+              "text": "스페이스바 키가 물리적으로 눌리지 않게 고장 나서",
+              "isCorrect": false
+            },
+            {
+              "text": "파이썬의 random 모듈이 작동을 멈추기 때문에",
+              "isCorrect": false
+            },
+            {
+              "text": "우주선의 연료 게이지가 0이 되어서",
+              "isCorrect": false
+            },
+            {
+              "text": "화면 밖으로 나갔을 뿐 메모리와 그룹 바구니 안에는 탄환 객체 2개가 여전히 살아 있어 그룹 크기가 계속 2로 유지되기 때문에",
+              "isCorrect": true
+            }
+          ],
+          "explanation": "정답 근거: 화면에 안 보인다고 객체가 사라진 것이 아닙니다. 그룹 안에 2발이 계속 남아있어 len < 2 조건이 영원히 거짓(False)이 되기 때문입니다.",
+          "score": 1
+        },
+        {
+          "question": "Pygame 스프라이트의 내장 메서드인 `self.kill()`이 수행하는 작업은 무엇인가요?",
+          "options": [
+            {
+              "text": "해당 스프라이트가 포함되어 있는 모든 스프라이트 그룹(Group)에서 이 객체를 완전히 제거한다.",
+              "isCorrect": true
+            },
+            {
+              "text": "게임을 강제로 즉시 종료하고 창을 닫는다.",
+              "isCorrect": false
+            },
+            {
+              "text": "적 외계선 55기를 일괄 폭파시킨다.",
+              "isCorrect": false
+            },
+            {
+              "text": "플레이어의 기체 생명을 즉시 0으로 만든다",
+              "isCorrect": false
+            }
+          ],
+          "explanation": "정답 근거: kill()은 스프라이트를 자신이 속한 모든 그룹에서 탈퇴시키는 Pygame 표준 메서드입니다. 그룹에서 빠지면 draw나 update 대상에서 제외되고 메모리에서도 정리됩니다.",
+          "score": 1
+        },
+        {
+          "question": "`if self.rect.bottom < 0:` 조건식이 참(True)이 되는 정확한 순간은 언제인가요?",
+          "options": [
+            {
+              "text": "탄환의 맨 윗부분이 화면 상단에 닿았을 때",
+              "isCorrect": false
+            },
+            {
+              "text": "탄환의 맨 아랫부분(bottom)마저 화면 상단 경계선(0)보다 위로 올라가 화면에서 완전히 벗어났을 때",
+              "isCorrect": true
+            },
+            {
+              "text": "탄환이 적 드론에 명중했을 때",
+              "isCorrect": false
+            },
+            {
+              "text": "탄환이 발사된 지 1초가 지났을 때",
+              "isCorrect": false
+            }
+          ],
+          "explanation": "정답 근거: rect.top < 0은 머리가 닿은 순간이지만, rect.bottom < 0은 꼬리 끝까지 0보다 작아져 화면에서 100% 자취를 감춘 완전한 퇴장 시점입니다.",
+          "score": 1
+        },
+        {
+          "question": "사용자가 스페이스바를 누른 '그 순간' 1번만 단발 사격이 발동하도록 감지하는 올바른 이벤트 조건문은 무엇인가요?",
+          "options": [
+            {
+              "text": "if event.type == pygame.MOUSEBUTTONDOWN:",
+              "isCorrect": false
+            },
+            {
+              "text": "if event.type == pygame.KEYDOWN and event.key == pygame.K_SPACE:",
+              "isCorrect": true
+            },
+            {
+              "text": "if keys[pygame.K_SPACE]:",
+              "isCorrect": false
+            },
+            {
+              "text": "if event.type == pygame.QUIT:",
+              "isCorrect": false
+            }
+          ],
+          "explanation": "정답 근거: KEYDOWN 이벤트는 키를 누른 딱 그 프레임에 1회 발생하므로 단발 사격에 적합합니다. keys[K_SPACE]는 누르고 있는 내내 참이 되어 무차별 연사가 일어납니다.",
+          "score": 1
+        },
+        {
+          "question": "탄환을 생성할 때 시작 좌표로 `(self.rect.centerx, self.rect.top)`을 넘겨주는 시각적 이유는 무엇인가요?",
+          "options": [
+            {
+              "text": "우주선 뒤쪽 배기구에서 미사일이 나가게 하기 위해",
+              "isCorrect": false
+            },
+            {
+              "text": "우주선 왼쪽 날개 끝에서 레이저가 나가게 하기 위해",
+              "isCorrect": false
+            },
+            {
+              "text": "화면 정중앙 하늘에서 탄환이 텔레포트되게 하기 위해",
+              "isCorrect": false
+            },
+            {
+              "text": "우주선 기체의 정중앙 맨 앞머리(총구)에서 광선이 뿜어져 나오는 모습을 연출하기 위해",
+              "isCorrect": true
+            }
+          ],
+          "explanation": "정답 근거: centerx는 우주선의 좌우 중심, top은 기체의 가장 뾰족한 앞머리입니다. 이 위치에서 발사해야 자연스러운 총구 발사가 연출됩니다.",
+          "score": 1
+        },
+        {
+          "question": "아군 탄환 velocity=10, 기체 velocity=8일 때 올바른 해석은?",
+          "options": [
+            {
+              "text": "탄환이 기체보다 느리면 위로 갈 수 없다.",
+              "isCorrect": false
+            },
+            {
+              "text": "한 번의 update에서 탄환 y는10 감소하고 기체는 좌우 입력에 따라 x가8 변한다.",
+              "isCorrect": true
+            },
+            {
+              "text": "모든 탄환이 초당10픽셀 움직인다.",
+              "isCorrect": false
+            },
+            {
+              "text": "기체도 위로8픽셀 이동한다.",
+              "isCorrect": false
+            }
+          ],
+          "explanation": "속도 값은 각 객체의 update에서 좌표를 바꾸는 양입니다. 서로 다른 축의 이동을 구별합니다.\n오답 「탄환이 기체보다 느리면 위로 갈 수 없다.」: 움직이는 축이 다르며 위쪽 이동은 y 감소로 정합니다.\n오답 「모든 탄환이 초당10픽셀 움직인다.」: 10은 초당이 아니라 update당 값입니다.\n오답 「기체도 위로8픽셀 이동한다.」: 기체는 수평으로만 이동합니다.",
+          "score": 1
+        },
+        {
+          "question": "`len(self.pulses) < 2` 조건문에서 현재 그룹에 탄환이 1발 발사되어 날아가고 있을 때의 동작은 무엇인가요?",
+          "options": [
+            {
+              "text": "추가 발사가 차단된다.",
+              "isCorrect": false
+            },
+            {
+              "text": "1 < 2 조건이 참이므로 추가로 1발을 더 발사할 수 있다.",
+              "isCorrect": true
+            },
+            {
+              "text": "기존에 날아가던 탄환이 강제로 폭파된다.",
+              "isCorrect": false
+            },
+            {
+              "text": "게임이 일시정지된다",
+              "isCorrect": false
+            }
+          ],
+          "explanation": "정답 근거: 현재 1발이 날아가는 중이면 len은 1이므로 1 < 2는 참입니다. 따라서 정상적으로 2번째 탄환을 쏠 수 있습니다.",
+          "score": 1
+        }
+      ]
+    },
+    {
+      "unitKey": "si05",
+      "title": "적의 설계도와 무작위 발사 조건",
+      "exercises": [
+        {
+          "title": "공유 그림과 적별 시작 위치",
+          "level": 2,
+          "category": "pygame",
+          "concepts": [
+            "topleft",
+            "starting_x",
+            "direction"
+          ],
+          "prompt": "05-A의 Raider.__init__에서 shared_image가 준비된 다음의 본문입니다. 그림은 공유하지만 rect와 starting 좌표는 적마다 따로 만듭니다. 파일을 매 적마다 다시 읽는 코드로 되돌리지 않습니다. 이 문제는 발췌 코드 연습입니다. main.py 전체를 대체하거나 단독 실행하지 않습니다. 설명 주석은 따라 적지 않아도 됩니다.",
+          "answerLines": [
+            "self.image = Raider.shared_image",
+            "self.rect = self.image.get_rect()",
+            "self.rect.topleft = (x, y)",
+            "self.starting_x = x",
+            "self.starting_y = y",
+            "self.direction = 1"
+          ],
+          "hints": [
+            "그림은 공유하지만 rect와 starting 좌표는 적마다 따로 만듭니다. 파일을 매 적마다 다시 읽는 코드로 되돌리지 않습니다.",
+            "설명용 주석은 입력하지 않습니다. 표시된 실행 코드와 들여쓰기를 기준으로 연습하세요."
+          ],
+          "commonMistakes": [
+            {
+              "message": "starting_x를 저장하지 않아 나중에 편대 재정렬 위치를 잃어버리는 경우"
+            },
+            {
+              "message": "direction을 0으로 설정하여 드론이 움직이지 않는 경우"
+            }
+          ]
+        },
+        {
+          "title": "Raider 순찰 이동과 무작위 발사 조건",
+          "level": 2,
+          "category": "pygame",
+          "concepts": [
+            "direction",
+            "random.randint",
+            "len"
+          ],
+          "prompt": "05-A의 Raider.update 본문입니다. direction×velocity로 이동하고, randint(0,1000)>999의 확률 1/1001과 공유 탄환 3발 미만 조건을 함께 검사하세요. 추첨 성공은 고정된 발사 주기를 뜻하지 않습니다. 이 문제는 발췌 코드 연습입니다. main.py 전체를 대체하거나 단독 실행하지 않습니다. 설명 주석은 따라 적지 않아도 됩니다.",
+          "answerLines": [
+            "self.rect.x += self.direction * self.velocity",
+            "if random.randint(0, 1000) > 999 and len(self.pulses) < 3:",
+            "    self.shoot_sound.play()",
+            "    self.fire()"
+          ],
+          "hints": [
+            "x좌표에 direction * velocity를 더합니다.",
+            "random.randint(0, 1000) > 999 조건과 len(self.pulses) < 3을 and로 묶습니다."
+          ],
+          "commonMistakes": [
+            {
+              "message": "direction을 곱하지 않고 더해서 반전이 안 되는 경우"
+            },
+            {
+              "message": "적 탄환 제한을 2발로 잘못 적는 경우"
+            }
+          ]
+        },
+        {
+          "title": "Raider 시작 위치 및 방향 리셋",
+          "level": 1,
+          "category": "pygame",
+          "concepts": [
+            "topleft",
+            "direction"
+          ],
+          "prompt": "드론을 태어났던 고향 좌표(starting_x, starting_y)로 되돌리고 방향을 다시 오른쪽(+1)으로 맞추는 reset 메서드를 작성하세요. 이 문제는 발췌 코드 연습입니다. main.py 전체를 대체하거나 단독 실행하지 않습니다. 설명 주석은 따라 적지 않아도 됩니다.",
+          "answerLines": [
+            "self.rect.topleft = (self.starting_x, self.starting_y)",
+            "self.direction = 1"
+          ],
+          "hints": [
+            "topleft에 튜플 (self.starting_x, self.starting_y)를 대입합니다.",
+            "direction을 다시 1로 설정합니다."
+          ],
+          "commonMistakes": [
+            {
+              "message": "direction을 리셋하지 않아 복귀 후 왼쪽으로 역주행하는 경우"
+            }
+          ]
+        }
+      ],
+      "quizzes": [
+        {
+          "question": "`Raider.__init__`에서 `starting_x`와 `starting_y` 변수를 따로 만들어 저장해두는 이유는 무엇인가요?",
+          "options": [
+            {
+              "text": "라운드가 초기화되거나 방어선 침범 후 대열을 복원할 때 드론을 원래 자기 격자 위치로 되돌리기 위해",
+              "isCorrect": true
+            },
+            {
+              "text": "우주선이 격추되었을 때 드론의 점수를 계산하기 위해",
+              "isCorrect": false
+            },
+            {
+              "text": "적 드론의 체력을 100으로 설정하기 위해",
+              "isCorrect": false
+            },
+            {
+              "text": "게임 스튜디오에 드론의 이름을 등록하기 위해",
+              "isCorrect": false
+            }
+          ],
+          "explanation": "정답 근거: 드론이 지그재그로 내려오다가 방어선 침범 등으로 리셋될 때, 원래 정렬되었던 격자 좌표로 복구해야 하므로 생성 시점의 좌표를 영구 보관합니다.",
+          "score": 1
+        },
+        {
+          "question": "`self.direction = 1` 변수가 나타내는 드론의 초기 비행 상태는 무엇인가요?",
+          "options": [
+            {
+              "text": "위쪽 방향으로 수직 상승하는 상태",
+              "isCorrect": false
+            },
+            {
+              "text": "오른쪽 방향(+1)으로 수평 행진을 시작하는 상태",
+              "isCorrect": true
+            },
+            {
+              "text": "왼쪽 방향(-1)으로 후퇴하는 상태",
+              "isCorrect": false
+            },
+            {
+              "text": "제자리에 멈춰서 정지 비행하는 상태",
+              "isCorrect": false
+            }
+          ],
+          "explanation": "정답 근거: 우주 방어대 편대는 처음 생성될 때 오른쪽(+1)으로 이동을 시작합니다. direction이 -1이면 왼쪽 이동입니다.",
+          "score": 1
+        },
+        {
+          "question": "`self.rect.x += self.direction * self.velocity` 이동 공식의 가장 큰 장점은 무엇인가요?",
+          "options": [
+            {
+              "text": "드론이 대각선으로 날아갈 수 있게 해준다.",
+              "isCorrect": false
+            },
+            {
+              "text": "방향키 입력이 없어도 우주선이 따라오게 만든다.",
+              "isCorrect": false
+            },
+            {
+              "text": "direction이 1이면 오른쪽, -1이면 왼쪽으로 코드 한 줄로 방향 전환 이동을 모두 처리할 수 있어서",
+              "isCorrect": true
+            },
+            {
+              "text": "드론이 화면 밖으로 나가면 즉시 폭발하게 만든다",
+              "isCorrect": false
+            }
+          ],
+          "explanation": "정답 근거: direction이 1이면 +velocity가 더해져 오른쪽, -1이면 -velocity가 더해져 왼쪽으로 이동하므로 if문 분기 없이 단 한 줄로 양방향 이동을 우아하게 처리합니다.",
+          "score": 1
+        },
+        {
+          "question": "random.randint(0,1000)>999의 확률과 대기시간 설명으로 알맞은 것은?",
+          "options": [
+            {
+              "text": "확률은1/1000이고 정확히16초마다 발사한다.",
+              "isCorrect": false
+            },
+            {
+              "text": "확률은1/1001이고,60FPS·한 적·탄환 제한이 없는 가정에서 평균 약16.7초다.",
+              "isCorrect": true
+            },
+            {
+              "text": "1000보다 큰 수가 없어 발사하지 않는다.",
+              "isCorrect": false
+            },
+            {
+              "text": "적55기가 있어도 전체 발사는 항상16.7초 간격이다.",
+              "isCorrect": false
+            }
+          ],
+          "explanation": "0~1000의1001가지 중1000 하나만 조건을 만족합니다. 평균은 개별 발사 시간을 보장하지 않습니다.\n오답 「확률은1/1000이고 정확히16초마다 발사한다.」: 양끝 포함1001가지이며 고정 주기가 아닙니다.\n오답 「1000보다 큰 수가 없어 발사하지 않는다.」: 조건은999보다 큰 수이며1000이 해당합니다.\n오답 「적55기가 있어도 전체 발사는 항상16.7초 간격이다.」: 각 적이 따로 추첨하고 공통 탄환 제한도 적용됩니다.",
+          "score": 1
+        },
+        {
+          "question": "적 드론의 무작위 발사 조건에 `len(self.pulses) < 3`이 함께 들어있는 이유는 무엇인가요?",
+          "options": [
+            {
+              "text": "화면 전체에 적 탄환이 동시에 3발까지만 존재하도록 제한하여 공정한 난이도를 유지하기 위해",
+              "isCorrect": true
+            },
+            {
+              "text": "플레이어가 3발을 맞으면 즉시 승리하게 만들기 위해",
+              "isCorrect": false
+            },
+            {
+              "text": "적 드론의 탄창에 총알을 3발만 채워두기 위해",
+              "isCorrect": false
+            },
+            {
+              "text": "외계 함선의 속도를 3배 빠르게 만들기 위해",
+              "isCorrect": false
+            }
+          ],
+          "explanation": "정답 근거: 적 드론 55기가 무차별로 쏘아대면 화면이 총알로 뒤덮여 피할 수 없게 됩니다. 전체 탄환 그룹의 크기를 3발 미만으로 제한해 탄막 밀도를 조절합니다.",
+          "score": 1
+        },
+        {
+          "question": "05유닛에서 `Raider.fire(self)` 메서드의 본문을 `pass`로 둔 이유는 무엇인가요?",
+          "options": [
+            {
+              "text": "외계 드론은 원래 총알을 쏠 수 없는 평화주의 로봇이기 때문에",
+              "isCorrect": false
+            },
+            {
+              "text": "RaiderPulse의 빈 설계도는 있지만 탄환 생성·이동 본문과 발사 연결을 06단원에서 완성하기 때문이다.",
+              "isCorrect": true
+            },
+            {
+              "text": "파이썬에서 fire라는 이름의 함수는 실행할 수 없기 때문에",
+              "isCorrect": false
+            },
+            {
+              "text": "플레이어 우주선이 탄환을 대신 쏘아주기 때문에",
+              "isCorrect": false
+            }
+          ],
+          "explanation": "클래스 선언은 02-C에서 했습니다. 아직 구현하지 않은 생성자와 이동을 06에서 채우고 Raider.fire에 생성 호출을 연결합니다.",
+          "score": 1
+        },
+        {
+          "question": "05유닛 코드를 작성하고 실행했을 때 화면에 보라색 외계 드론이 1대도 보이지 않았던 정상적인 이유는 무엇인가요?",
+          "options": [
+            {
+              "text": "드론이 투명 클로킹 기술을 사용하고 있어서",
+              "isCorrect": false
+            },
+            {
+              "text": "모니터 해상도가 너무 커서 드론이 화면 밖으로 밀려나서",
+              "isCorrect": false
+            },
+            {
+              "text": "클래스 설계도만 선언했을 뿐, 실제 드론 인스턴스를 생성하여 raiders 그룹에 넣는 코드를 아직 작성하지 않았기 때문에",
+              "isCorrect": true
+            },
+            {
+              "text": "scout.png 이미지가 raider.png를 가리고 있어서",
+              "isCorrect": false
+            }
+          ],
+          "explanation": "정답 근거: 클래스는 설계도입니다. 객체를 찍어내어 그룹에 담지 않으면 화면에 나타나지 않는 것이 객체지향 프로그래밍의 지극히 정상적인 동작입니다.",
+          "score": 1
+        },
+        {
+          "question": "`Raider` 이미지의 가로 및 세로 화면 표시 크기로 지정된 규격은 무엇인가요?",
+          "options": [
+            {
+              "text": "가로 128픽셀, 세로 128픽셀",
+              "isCorrect": false
+            },
+            {
+              "text": "가로 32픽셀, 세로 32픽셀",
+              "isCorrect": false
+            },
+            {
+              "text": "가로 64픽셀, 세로 64픽셀",
+              "isCorrect": false
+            },
+            {
+              "text": "가로 56픽셀, 세로 48픽셀",
+              "isCorrect": true
+            }
+          ],
+          "explanation": "정답 근거: 교육 및 에셋 계약에 따라 플레이어 우주선은 64x64, 외계 침략 드론은 56x48 크기로 smoothscale 변환합니다.",
+          "score": 1
+        },
+        {
+          "question": "메인 루프에서 `raiders.update()`를 한 번 호출했을 때 일어나는 내부 동작은 무엇인가요?",
+          "options": [
+            {
+              "text": "`raiders` 그룹 바구니에 들어 있는 모든 드론 객체의 `update()` 메서드가 각각 한 번씩 자동으로 실행된다.",
+              "isCorrect": true
+            },
+            {
+              "text": "그룹 안의 드론들이 모두 한꺼번에 삭제된다.",
+              "isCorrect": false
+            },
+            {
+              "text": "새로운 드론 55기가 그룹에 자동으로 추가된다.",
+              "isCorrect": false
+            },
+            {
+              "text": "적 드론의 점수가 100점 증가한다",
+              "isCorrect": false
+            }
+          ],
+          "explanation": "정답 근거: Pygame Sprite Group의 update()는 그룹에 포함된 모든 스프라이트 인스턴스를 순회하며 각자의 update()를 일괄 실행시켜 줍니다.",
+          "score": 1
+        },
+        {
+          "question": "비행 중인 드론의 `direction`이 -1로 바뀌면 `self.rect.x += self.direction * self.velocity` 실행 시 x 좌표는 어떻게 변하나요?",
+          "options": [
+            {
+              "text": "x 좌표가 커지면서 오른쪽으로 이동한다.",
+              "isCorrect": false
+            },
+            {
+              "text": "x 좌표가 작아지면서 왼쪽으로 이동한다.",
+              "isCorrect": true
+            },
+            {
+              "text": "y 좌표가 커지면서 아래로 떨어진다.",
+              "isCorrect": false
+            },
+            {
+              "text": "x 좌표가 변하지 않고 제자리에 멈춘다",
+              "isCorrect": false
+            }
+          ],
+          "explanation": "정답 근거: direction이 -1이므로 velocity(예: 2)와 곱하면 -2가 됩니다. x 좌표에 -2를 더하면 x값이 줄어들어 왼쪽으로 전진합니다.",
+          "score": 1
+        }
+      ]
+    },
+    {
+      "unitKey": "si06",
+      "title": "임시 편대와 적 탄환",
+      "exercises": [
+        {
+          "title": "임시 열 기 편대 생성",
+          "level": 2,
+          "category": "pygame",
+          "concepts": [
+            "for loop",
+            "grid spacing",
+            "Group.add"
+          ],
+          "prompt": "06-A의 객체 준비 구간에서 한 번 실행할 반복문입니다. Raider 생성 결과를 바로 그룹에 넣습니다. i=0부터 9까지이므로 열 기가 생깁니다. 이 문제는 발췌 코드 연습입니다. main.py 전체를 대체하거나 단독 실행하지 않습니다. 설명 주석은 따라 적지 않아도 됩니다.",
+          "answerLines": [
+            "for i in range(10):",
+            "    raiders.add(Raider(64 + i * 64, 100, 2, raider_pulses))"
+          ],
+          "hints": [
+            "Raider 생성 결과를 바로 그룹에 넣습니다. i=0부터 9까지이므로 열 기가 생깁니다.",
+            "설명용 주석은 입력하지 않습니다. 표시된 실행 코드와 들여쓰기를 기준으로 연습하세요."
+          ],
+          "commonMistakes": [
+            {
+              "message": "raiders.add(raider)를 빼먹어 그룹에 등록되지 않는 경우"
+            },
+            {
+              "message": "i * 64만 적어 첫 드론이 화면 왼쪽 구석(0)에 붙어버리는 경우"
+            }
+          ]
+        },
+        {
+          "title": "RaiderPulse 표면 생성과 하강",
+          "level": 2,
+          "category": "pygame",
+          "concepts": [
+            "Surface",
+            "rect.y +=",
+            "Raider.fire"
+          ],
+          "prompt": "붉은색(255, 92, 124) 탄환 Surface를 만들고 매 프레임 velocity만큼 아래로 전진하는 update 메서드를 작성하세요. 이 문제는 발췌 코드 연습입니다. main.py 전체를 대체하거나 단독 실행하지 않습니다. 설명 주석은 따라 적지 않아도 됩니다.",
+          "answerLines": [
+            "self.rect.y += self.velocity",
+            "if self.rect.top > SCREEN_HEIGHT:",
+            "    self.kill()"
+          ],
+          "hints": [
+            "하강 이동은 y에 더하기(+=)를 합니다.",
+            "화면 맨 아래를 벗어나는 조건은 rect.top > SCREEN_HEIGHT 입니다."
+          ],
+          "commonMistakes": [
+            {
+              "message": "위로 날아가는 플레이어 탄환처럼 y를 빼버려서 탄환이 하늘로 솟구치는 경우"
+            },
+            {
+              "message": "rect.top > 0 처럼 잘못된 부등호로 발사 즉시 사라지는 경우"
+            }
+          ]
+        },
+        {
+          "title": "Raider 발사 연결",
+          "level": 1,
+          "category": "pygame",
+          "concepts": [
+            "생성자",
+            "그룹 참조"
+          ],
+          "prompt": "Raider 클래스 내부입니다. self.pulses는 적 탄환 그룹입니다. 아래 코드를 입력하고 각 줄이 실행되는 순서를 설명하세요. 이 문제는 발췌 코드 연습입니다. main.py 전체를 대체하거나 단독 실행하지 않습니다. 설명 주석은 따라 적지 않아도 됩니다.",
+          "answerLines": [
+            "def fire(self):",
+            "    RaiderPulse(self.rect.centerx, self.rect.bottom, self.pulses)"
+          ],
+          "hints": [
+            "Data Log의 같은 클래스·메서드와 비교합니다.",
+            "조건문 안과 밖의 들여쓰기를 구분합니다."
+          ],
+          "commonMistakes": [
+            {
+              "message": "클래스 안 메서드는4칸, 메서드 본문은8칸입니다. 연습 조각은 제시된 문맥의 들여쓰기를 기준으로 입력합니다."
+            }
+          ]
+        }
+      ],
+      "quizzes": [
+        {
+          "question": "`64 + i * 64` 공식으로 10기의 드론을 생성할 때 드론들의 가로 x 좌표가 갖는 특징은 무엇인가요?",
+          "options": [
+            {
+              "text": "첫 번째 드론은 x=64, 두 번째는 x=128 ... 처럼 64픽셀 일정한 간격으로 나란히 정렬된다.",
+              "isCorrect": true
+            },
+            {
+              "text": "모든 드론이 x=64 한 지점에 겹쳐서 생성된다.",
+              "isCorrect": false
+            },
+            {
+              "text": "무작위로 아무 위치에나 흩어져서 생성된다.",
+              "isCorrect": false
+            },
+            {
+              "text": "화면 맨 오른쪽에서 왼쪽으로 거꾸로 정렬된다",
+              "isCorrect": false
+            }
+          ],
+          "explanation": "정답 근거: i가 0, 1, 2, ...로 증가하면서 64, 128, 192 등의 좌표를 만듭니다. 64픽셀 폭의 완벽한 등간격 일렬 대형이 만들어집니다.",
+          "score": 1
+        },
+        {
+          "question": "적 탄환(`RaiderPulse`)이 화면 아래쪽으로 떨어지게 하려면 y 좌표를 어떻게 수정해야 하나요?",
+          "options": [
+            {
+              "text": "y 좌표를 0으로 고정해야 한다.",
+              "isCorrect": false
+            },
+            {
+              "text": "Pygame 좌표계는 아래로 갈수록 y값이 증가하므로 `self.rect.y += self.velocity`로 더해주어야 한다.",
+              "isCorrect": true
+            },
+            {
+              "text": "Pygame 좌표계는 아래로 갈수록 y값이 감소하므로 `self.rect.y -= self.velocity`로 빼주어야 한다.",
+              "isCorrect": false
+            },
+            {
+              "text": "y 좌표 대신 x 좌표에 더해주어야 한다",
+              "isCorrect": false
+            }
+          ],
+          "explanation": "정답 근거: 화면 상단이 y=0이고 아래로 내려올수록 y값이 커집니다. 따라서 탄환이 아래로 전진하려면 y에 속도를 더해야(+=) 합니다.",
+          "score": 1
+        },
+        {
+          "question": "적 탄환의 시작 좌표를 `(self.rect.centerx, self.rect.bottom)`으로 지정하는 시각적 이유는 무엇인가요?",
+          "options": [
+            {
+              "text": "드론의 양 날개에서 미사일이 발사되게 하기 위해",
+              "isCorrect": false
+            },
+            {
+              "text": "드론이 파괴되었을 때 폭발 이펙트를 주기 위해",
+              "isCorrect": false
+            },
+            {
+              "text": "적 드론의 정중앙 아랫바닥(하부 포구)에서 붉은 탄환이 떨어지는 모습을 연출하기 위해",
+              "isCorrect": true
+            },
+            {
+              "text": "플레이어 우주선의 머리 위로 탄환을 순간이동시키기 위해",
+              "isCorrect": false
+            }
+          ],
+          "explanation": "정답 근거: centerx는 가로 중심, bottom은 드론의 맨 밑바닥입니다. 드론의 배 밑에서 레이저가 투하되는 자연스러운 연출이 됩니다.",
+          "score": 1
+        },
+        {
+          "question": "적 탄환의 top=150일 때 실수로 if self.rect.top < SCREEN_HEIGHT: self.kill()을 실행했다. 높이는700이다. 결과는?",
+          "options": [
+            {
+              "text": "바닥을 넘은 뒤에만 제거된다.",
+              "isCorrect": false
+            },
+            {
+              "text": "탄환이 위로 이동한다.",
+              "isCorrect": false
+            },
+            {
+              "text": "화면 안인데도150<700이 참이어서 탄환이 제거된다.",
+              "isCorrect": true
+            },
+            {
+              "text": "700점이 추가된다.",
+              "isCorrect": false
+            }
+          ],
+          "explanation": "아래로 나간 전체 탄환을 검사하려면 top>SCREEN_HEIGHT를 사용합니다.\n오답 「바닥을 넘은 뒤에만 제거된다.」: 이 조건은 바닥 이전 좌표에서도 참입니다.\n오답 「탄환이 위로 이동한다.」: 조건은 제거 여부를 바꾸며 이동 부호와는 별개입니다.\n오답 「700점이 추가된다.」: kill은 점수를 더하는 함수가 아닙니다.",
+          "score": 1
+        },
+        {
+          "question": "적 탄환이 화면 아래쪽 바닥(SCREEN_HEIGHT=700)을 완전히 벗어났을 때 소멸시키는 가장 올바른 조건식은 무엇인가요?",
+          "options": [
+            {
+              "text": "if self.rect.top > SCREEN_HEIGHT: self.kill()",
+              "isCorrect": true
+            },
+            {
+              "text": "if self.rect.bottom > 0: self.kill()",
+              "isCorrect": false
+            },
+            {
+              "text": "if self.rect.top < SCREEN_HEIGHT: self.kill()",
+              "isCorrect": false
+            },
+            {
+              "text": "if self.rect.y == 0: self.kill()",
+              "isCorrect": false
+            }
+          ],
+          "explanation": "정답 근거: 탄환의 맨 윗머리(top)마저 화면 높이인 700을 넘어서야 탄환 전체가 모니터 밖으로 100% 빠져나간 것입니다. 이때 kill()을 불러야 자연스럽습니다.",
+          "score": 1
+        },
+        {
+          "question": "우주 방어대에서 아군 탄환(청록)과 적 탄환(산호빛 붉은색)의 색상을 명확히 구별해 둔 게임 디자인적 이유는 무엇인가요?",
+          "options": [
+            {
+              "text": "화면의 색상 팔레트가 단조로워지는 것을 막기 위해서만",
+              "isCorrect": false
+            },
+            {
+              "text": "플레이어가 찰나의 순간에 자기가 피해야 할 위협(적 탄환)과 자기가 쏜 공격(아군 탄환)을 한눈에 식별할 수 있도록 돕기 위해",
+              "isCorrect": true
+            },
+            {
+              "text": "컴퓨터 그래픽 카드의 발열을 줄이기 위해",
+              "isCorrect": false
+            },
+            {
+              "text": "적 드론이 청록색 탄환을 무서워하기 때문에",
+              "isCorrect": false
+            }
+          ],
+          "explanation": "정답 근거: 슈팅 게임에서 아군 탄환과 적 탄환의 시각적 명도/색상 대비는 플레이어가 직관적으로 위험 요소를 회피할 수 있게 하는 필수 UX 설계입니다.",
+          "score": 1
+        },
+        {
+          "question": "06유닛에서 임시 10마리 드론 편대가 오른쪽 벽을 뚫고 화면 밖으로 탈출해 버린 이유는 무엇인가요?",
+          "options": [
+            {
+              "text": "외계선 이미지가 너무 가벼워서 바람에 날아갔기 때문에",
+              "isCorrect": false
+            },
+            {
+              "text": "컴퓨터 메모리가 부족해서 드론을 붙잡지 못했기 때문에",
+              "isCorrect": false
+            },
+            {
+              "text": "편대의 벽면 충돌 감지와 방향 반전 로직을 08유닛 사령부(Mission)에서 다룰 예정이라 아직 작성하지 않았기 때문에",
+              "isCorrect": true
+            },
+            {
+              "text": "플레이어가 스페이스바를 누르지 않아서",
+              "isCorrect": false
+            }
+          ],
+          "explanation": "정답 근거: 드론 각자는 update에서 direction*velocity로 직진만 합니다. 벽에 닿았을 때 편대 전체를 반전시키는 통솔 코드는 08유닛에서 작성하므로 정상입니다.",
+          "score": 1
+        },
+        {
+          "question": "처음부터 55기를 만들지 않고 임시로 10기 편대를 먼저 만들어 테스트한 개발적 이점은 무엇인가요?",
+          "options": [
+            {
+              "text": "임시 10기로 생성 간격, 이동, 발사 등 개별 기능을 작게 검증하여 오류 발생 시 원인을 쉽게 찾을 수 있어서",
+              "isCorrect": true
+            },
+            {
+              "text": "10기 편대가 원래 게임의 최종 보스이기 때문에",
+              "isCorrect": false
+            },
+            {
+              "text": "파이썬은 한 번에 10마리까지만 그릴 수 있다는 제약이 있어서",
+              "isCorrect": false
+            },
+            {
+              "text": "10기를 먼저 깨야 55기 편대 잠금이 해제되기 때문에",
+              "isCorrect": false
+            }
+          ],
+          "explanation": "정답 근거: 소프트웨어 개발에서 복잡한 시스템을 작은 부품 단위로 먼저 테스트(Field Test)하는 것은 디버깅 시간을 획기적으로 줄여주는 모범 관행입니다.",
+          "score": 1
+        },
+        {
+          "question": "이 시점(06유닛)에서 탄환이 우주선이나 외계선에 명중해도 폭발하지 않고 스쳐 지나가는 이유는 무엇인가요?",
+          "options": [
+            {
+              "text": "탄환의 위력이 0이라서 데미지를 주지 못해서",
+              "isCorrect": false
+            },
+            {
+              "text": "두 스프라이트 사이의 충돌 판정(collide) 코드를 10유닛에서 배울 예정이라 아직 작성하지 않았기 때문에",
+              "isCorrect": true
+            },
+            {
+              "text": "우주선의 실드가 무적 상태라서",
+              "isCorrect": false
+            },
+            {
+              "text": "Pygame이 아직 충돌 모듈을 지원하지 않아서",
+              "isCorrect": false
+            }
+          ],
+          "explanation": "정답 근거: 스프라이트 그룹 충돌 판정은 10유닛에서 완성합니다. 지금은 이동과 발사 궤적을 검증하는 단계이므로 충돌이 일어나지 않는 것이 정상입니다.",
+          "score": 1
+        },
+        {
+          "question": "`RaiderPulse` 객체의 이동 속도(velocity)로 지정된 값은 얼마인가요?",
+          "options": [
+            {
+              "text": "2픽셀",
+              "isCorrect": false
+            },
+            {
+              "text": "8픽셀",
+              "isCorrect": false
+            },
+            {
+              "text": "10픽셀",
+              "isCorrect": true
+            },
+            {
+              "text": "60픽셀",
+              "isCorrect": false
+            }
+          ],
+          "explanation": "정답 근거: 플레이어 탄환과 적 탄환 모두 velocity = 10으로 동일한 초속 광선 속도를 가집니다. 우주선은 8, 초기 드론은 1 또는 2입니다.",
+          "score": 1
+        }
+      ]
+    },
+    {
+      "unitKey": "si07",
+      "title": "Mission과 한글 HUD, 정식 편대",
+      "exercises": [
+        {
+          "title": "Mission의 값과 객체 참조 준비",
+          "level": 2,
+          "category": "pygame",
+          "concepts": [
+            "pygame.font.Font",
+            "sound loading",
+            "Mission.__init__"
+          ],
+          "prompt": "07-A의 Mission.__init__ 앞부분입니다. 점수/라운드 값과 전달받은 같은 그룹 참조를 저장합니다. 뒤의 소리·폰트 준비는 전체 파일에서 유지합니다. 이 문제는 발췌 코드 연습입니다. main.py 전체를 대체하거나 단독 실행하지 않습니다. 설명 주석은 따라 적지 않아도 됩니다.",
+          "answerLines": [
+            "self.round_number = 1",
+            "self.score = 0",
+            "self.scout = scout",
+            "self.raiders = raiders",
+            "self.scout_pulses = scout_pulses",
+            "self.raider_pulses = raider_pulses"
+          ],
+          "hints": [
+            "점수/라운드 값과 전달받은 같은 그룹 참조를 저장합니다. 뒤의 소리·폰트 준비는 전체 파일에서 유지합니다.",
+            "설명용 주석은 입력하지 않습니다. 표시된 실행 코드와 들여쓰기를 기준으로 연습하세요."
+          ],
+          "commonMistakes": [
+            {
+              "message": "pygame.font.SysFont를 사용하여 시스템 기본 폰트로 로딩하다가 한글이 깨지는 경우"
+            },
+            {
+              "message": "폰트 크기를 생략하는 경우"
+            }
+          ]
+        },
+        {
+          "title": "한글 점수를 Surface로 만들어 표시",
+          "level": 2,
+          "category": "pygame",
+          "concepts": [
+            "font.render",
+            "get_rect",
+            "screen.blit"
+          ],
+          "prompt": "07-B의 Mission.draw 본문입니다. 현재 점수로 글자 그림을 만들고 위 중앙에 정렬한 뒤 blit합니다. 이 문제는 발췌 코드 연습입니다. main.py 전체를 대체하거나 단독 실행하지 않습니다. 설명 주석은 따라 적지 않아도 됩니다.",
+          "answerLines": [
+            "score_text = self.font.render(f'점수: {self.score}', True, (240, 246, 255))",
+            "score_rect = score_text.get_rect(centerx=SCREEN_WIDTH // 2, top=10)",
+            "screen.blit(score_text, score_rect)"
+          ],
+          "hints": [
+            "현재 점수로 글자 그림을 만들고 위 중앙에 정렬한 뒤 blit합니다.",
+            "설명용 주석은 입력하지 않습니다. 표시된 실행 코드와 들여쓰기를 기준으로 연습하세요."
+          ],
+          "commonMistakes": [
+            {
+              "message": "문자열 포맷팅 f-string에 중괄호를 누락하는 경우"
+            },
+            {
+              "message": "screen.blit 인자 순서를 (rect, text)로 뒤바꾸는 경우"
+            }
+          ]
+        },
+        {
+          "title": "11열 × 5행 대규모 편대 생성 이중 루프",
+          "level": 2,
+          "category": "pygame",
+          "concepts": [
+            "nested loop",
+            "range",
+            "fleet generation"
+          ],
+          "prompt": "가로 11열(i), 세로 5행(j)으로 64픽셀 간격의 55기 Raider를 생성하여 self.raiders에 추가하는 start_new_round 코드를 작성하세요. 이 문제는 발췌 코드 연습입니다. main.py 전체를 대체하거나 단독 실행하지 않습니다. 설명 주석은 따라 적지 않아도 됩니다.",
+          "answerLines": [
+            "for i in range(11):",
+            "    for j in range(5):",
+            "        raider = Raider(64 + i * 64, 64 + j * 64, self.round_number, self.raider_pulses)",
+            "        self.raiders.add(raider)",
+            "self.new_round_sound.play()"
+          ],
+          "hints": [
+            "for i in range(11): 안에 for j in range(5): 를 중첩합니다.",
+            "x는 64 + i * 64, y는 64 + j * 64 입니다."
+          ],
+          "commonMistakes": [
+            {
+              "message": "i와 j의 반복 범위를 뒤바꾸어 행렬 대형이 왜곡되는 경우"
+            },
+            {
+              "message": "raider_pulses 대신 scout_pulses를 넘겨 적이 아군 탄환을 쏘는 경우"
+            }
+          ]
+        }
+      ],
+      "quizzes": [
+        {
+          "question": "제공한 assets/DoHyeon-Regular.ttf를 직접 로드하는 이유는?",
+          "options": [
+            {
+              "text": "게임에 필요한 한글 폰트를 함께 제공하여 기기의 기본 폰트에 의존하지 않기 위해",
+              "isCorrect": true
+            },
+            {
+              "text": "세상의 모든 문자와 이모지를 보장하기 위해",
+              "isCorrect": false
+            },
+            {
+              "text": "게임 FPS를 무조건60으로 올리기 위해",
+              "isCorrect": false
+            },
+            {
+              "text": "글자 내용을 이미지 파일 이름으로 바꾸기 위해",
+              "isCorrect": false
+            }
+          ],
+          "explanation": "프로젝트 안의 같은 폰트를 사용합니다. 게임에서는 확인된 한글과 ASCII 하이픈을 사용합니다.\n오답 「세상의 모든 문자와 이모지를 보장하기 위해」: 폰트에 없는 글리프는 표시할 수 없습니다.\n오답 「게임 FPS를 무조건60으로 올리기 위해」: 폰트 로딩은 프레임 속도 보장이 아닙니다.\n오답 「글자 내용을 이미지 파일 이름으로 바꾸기 위해」: 문자열은 font.render에서 글자 표면으로 만듭니다.",
+          "score": 1
+        },
+        {
+          "question": "도현체 폰트를 사용할 때 가운데점(`·`) 대신 하이픈(`-`) 기호를 사용해야 하는 이유는 무엇인가요?",
+          "options": [
+            {
+              "text": "파이썬에서 점(.) 기호는 문법 에러를 일으키기 때문에",
+              "isCorrect": false
+            },
+            {
+              "text": "도현체 폰트에 가운데점(·) 글리프가 내장되어 있지 않아 실제 화면에서 사각 박스(missing glyph)로 깨지기 때문에",
+              "isCorrect": true
+            },
+            {
+              "text": "하이픈을 쓰면 점수가 2배로 계산되기 때문에",
+              "isCorrect": false
+            },
+            {
+              "text": "게임 엔진이 특수문자를 인식하면 속도가 느려지기 때문에",
+              "isCorrect": false
+            }
+          ],
+          "explanation": "정답 근거: 실측 QA 결과 배달의민족 도현체에는 특수 유니코드 가운데점(·) 글리프가 없어 네모 박스로 렌더링됩니다. 따라서 지원되는 ASCII 하이픈(-)을 사용하는 것이 안전합니다.",
+          "score": 1
+        },
+        {
+          "question": "HUD에서 플레이어의 현재 점수를 화면 상단 정중앙에 배치하기 위한 Rect 정렬 방식은 무엇인가요?",
+          "options": [
+            {
+              "text": "score_rect.topleft = (0, 0)",
+              "isCorrect": false
+            },
+            {
+              "text": "score_rect.bottomright = (SCREEN_WIDTH, SCREEN_HEIGHT)",
+              "isCorrect": false
+            },
+            {
+              "text": "score_rect.centerx = SCREEN_WIDTH // 2, score_rect.top = 10",
+              "isCorrect": true
+            },
+            {
+              "text": "score_rect.centery = SCREEN_HEIGHT // 2",
+              "isCorrect": false
+            }
+          ],
+          "explanation": "정답 근거: 가로 중심을 centerx = 600으로 맞추고 위쪽 여백을 top = 10으로 주면 화면 상단 중앙에 완벽하게 정렬됩니다.",
+          "score": 1
+        },
+        {
+          "question": "화면 세로 600픽셀 지점에 붉은색 가로선(`(0, 600) ~ (SCREEN_WIDTH, 600)`)을 그어둔 게임 규칙상의 의미는 무엇인가요?",
+          "options": [
+            {
+              "text": "우주선이 넘어가서 위로 올라갈 수 있는 점프대",
+              "isCorrect": false
+            },
+            {
+              "text": "단순한 배경 장식용 그라데이션 선",
+              "isCorrect": false
+            },
+            {
+              "text": "적 드론이 발사하는 레이저의 최대 사정거리",
+              "isCorrect": false
+            },
+            {
+              "text": "외계 함선이 침범하면 기체 생명이 깎이는 '최후 방어선'",
+              "isCorrect": true
+            }
+          ],
+          "explanation": "정답 근거: y=600은 SCREEN_HEIGHT - 100 지점으로, 플레이어 우주선 바로 위의 최후 방어선입니다. 적이 이 선을 넘으면 생명이 차감됩니다.",
+          "score": 1
+        },
+        {
+          "question": "`for i in range(11): for j in range(5):` 이중 반복문이 1회 실행될 때 생성되는 총 외계 드론의 수는 몇 기인가요?",
+          "options": [
+            {
+              "text": "55기 (11 × 5)",
+              "isCorrect": true
+            },
+            {
+              "text": "16기 (11 + 5)",
+              "isCorrect": false
+            },
+            {
+              "text": "11기",
+              "isCorrect": false
+            },
+            {
+              "text": "5기",
+              "isCorrect": false
+            }
+          ],
+          "explanation": "정답 근거: 외부 루프 11번 × 내부 루프 5번 = 총 55번 반복되어 55기의 드론 객체가 생성됩니다.",
+          "score": 1
+        },
+        {
+          "question": "새로운 라운드가 시작될 때(`start_new_round`) 출격 팡파르로 재생되는 오디오 파일은 무엇인가요?",
+          "options": [
+            {
+              "text": "assets/line_alert.ogg",
+              "isCorrect": false
+            },
+            {
+              "text": "assets/wave_ready.ogg",
+              "isCorrect": true
+            },
+            {
+              "text": "assets/raider_break.ogg",
+              "isCorrect": false
+            },
+            {
+              "text": "assets/shield_hit.ogg",
+              "isCorrect": false
+            }
+          ],
+          "explanation": "정답 근거: 새 편대 출격 시에는 4음 상승 팡파르인 wave_ready.ogg가 울립니다. line_alert는 침범 경보음, raider_break는 격추음, shield_hit은 피격음입니다.",
+          "score": 1
+        },
+        {
+          "question": "07유닛에서 06유닛의 '임시 10마리 편대 생성 코드'를 삭제해야 하는 이유는 무엇인가요?",
+          "options": [
+            {
+              "text": "임시 코드를 남겨두면 파이썬 문법 에러가 발생하므로",
+              "isCorrect": false
+            },
+            {
+              "text": "컴퓨터 그래픽 카드가 65마리를 그리지 못하므로",
+              "isCorrect": false
+            },
+            {
+              "text": "정식 55기 편대와 임시 10기가 서로 겹쳐서 기괴한 유령 편대가 만들어지는 것을 방지하기 위해",
+              "isCorrect": true
+            },
+            {
+              "text": "10마리 편대는 보너스 스테이지용이기 때문에",
+              "isCorrect": false
+            }
+          ],
+          "explanation": "정답 근거: 임시 10마리를 지우지 않고 start_new_round를 호출하면 10마리와 55기가 한 화면에 겹쳐서 나타나 대형이 망가집니다.",
+          "score": 1
+        },
+        {
+          "question": "드론을 생성할 때 `velocity = self.round_number`를 넘겨주는 설계 의도는 무엇인가요?",
+          "options": [
+            {
+              "text": "라운드가 진행될수록 드론들의 체력을 높이기 위해",
+              "isCorrect": false
+            },
+            {
+              "text": "라운드가 진행될수록 드론의 크기를 작게 만들기 위해",
+              "isCorrect": false
+            },
+            {
+              "text": "드론이 쏘는 미사일의 색상을 바꾸기 위해",
+              "isCorrect": false
+            },
+            {
+              "text": "1라운드는 속도 1, 2라운드는 속도 2처럼 라운드가 올라갈수록 적의 행진 속도를 점차 빠르게 높여 난이도를 상승시키기 위해",
+              "isCorrect": true
+            }
+          ],
+          "explanation": "정답 근거: 속도를 현재 라운드 번호로 연동하면 라운드가 올라갈 때마다 외계 편대의 기동 속도가 자연스럽게 증가하여 긴장감이 배가됩니다.",
+          "score": 1
+        },
+        {
+          "question": "`font.render()`의 두 번째 인자인 `True` (안티앨리어싱)의 시각적 효과는 무엇인가요?",
+          "options": [
+            {
+              "text": "글자의 경계선 외곽을 부드럽게 뭉개어 픽셀 계단 현상 없이 매끄럽게 글자를 표현한다.",
+              "isCorrect": true
+            },
+            {
+              "text": "글자 주변에 화려한 네온 빛 무지개 그림자를 입힌다.",
+              "isCorrect": false
+            },
+            {
+              "text": "글자를 90도 회전시켜 세로쓰기로 만든다.",
+              "isCorrect": false
+            },
+            {
+              "text": "글자의 색상을 자동으로 반전시킨다",
+              "isCorrect": false
+            }
+          ],
+          "explanation": "정답 근거: 안티앨리어싱(Anti-aliasing)은 곡선이나 대각선 모서리에 중간 톤의 픽셀을 채워 계단 현상을 없애고 부드러운 가독성을 제공합니다.",
+          "score": 1
+        },
+        {
+          "question": "사령부(Mission) 클래스가 `scout`, `raiders`, `scout_pulses`, `raider_pulses`를 모두 참조(보관)하고 있는 이유는 무엇인가요?",
+          "options": [
+            {
+              "text": "게임을 저장할 때 하드디스크 용량을 절약하기 위해",
+              "isCorrect": false
+            },
+            {
+              "text": "사령부가 게임의 모든 구성 요소들을 총괄하여 상호작용, 충돌 판정, 리셋 등을 중앙에서 지휘하기 위해",
+              "isCorrect": true
+            },
+            {
+              "text": "파이썬에서 클래스는 변수를 4개만 가질 수 있다는 규칙 때문에",
+              "isCorrect": false
+            },
+            {
+              "text": "플레이어가 적 드론을 직접 조종할 수 있게 하기 위해",
+              "isCorrect": false
+            }
+          ],
+          "explanation": "정답 근거: Mission은 중재자(Mediator) 역할을 하는 총괄 관리자입니다. 모든 참가자 객체들의 참조를 가지고 있어야 충돌 판정이나 리셋을 지휘할 수 있습니다.",
+          "score": 1
+        }
+      ]
+    },
+    {
+      "unitKey": "si08",
+      "title": "편대 반전과 방어선 침범",
+      "exercises": [
+        {
+          "title": "편대 벽면 도달 감지 1단계 검사",
+          "level": 2,
+          "category": "pygame",
+          "concepts": [
+            "shift flag",
+            "rect.left",
+            "rect.right"
+          ],
+          "prompt": "모든 드론을 순회하여 단 1대라도 좌우 벽(left <= 0 또는 right >= SCREEN_WIDTH)에 닿았는지 검사하여 shift를 True로 켜는 코드를 작성하세요. 이 문제는 발췌 코드 연습입니다. main.py 전체를 대체하거나 단독 실행하지 않습니다. 설명 주석은 따라 적지 않아도 됩니다.",
+          "answerLines": [
+            "shift = False",
+            "for raider in self.raiders:",
+            "    if raider.rect.left <= 0 or raider.rect.right >= SCREEN_WIDTH:",
+            "        shift = True"
+          ],
+          "hints": [
+            "초기 shift는 False로 시작합니다.",
+            "or 연산자로 왼쪽 벽과 오른쪽 벽을 동시에 검사합니다."
+          ],
+          "commonMistakes": [
+            {
+              "message": "and 연산자를 써서 한 드론이 양쪽 벽에 동시에 닿아야 참이 되도록 잘못 적는 경우"
+            },
+            {
+              "message": "루프 안에서 즉시 방향을 바꿔 대열이 흩어지는 경우"
+            }
+          ]
+        },
+        {
+          "title": "편대 하강 및 방향 반전 2단계 실행",
+          "level": 2,
+          "category": "pygame",
+          "concepts": [
+            "direction *= -1",
+            "rect.y +=",
+            "breach check"
+          ],
+          "prompt": "shift가 True일 때 모든 드론을 10*round_number만큼 내리고 방향을 반전한 뒤 벽에서 한 걸음 떼어놓는 코드를 작성하세요. 이 문제는 발췌 코드 연습입니다. main.py 전체를 대체하거나 단독 실행하지 않습니다. 설명 주석은 따라 적지 않아도 됩니다.",
+          "answerLines": [
+            "if shift:",
+            "    for raider in self.raiders:",
+            "        raider.rect.y += 10 * self.round_number",
+            "        raider.direction *= -1",
+            "        raider.rect.x += raider.direction * raider.velocity"
+          ],
+          "hints": [
+            "y에 10 * self.round_number를 더합니다.",
+            "direction에 -1을 곱하여 부호를 반전합니다."
+          ],
+          "commonMistakes": [
+            {
+              "message": "direction = -1로 고정하여 한 번만 반전되고 이후 벽에 끼이는 경우"
+            }
+          ]
+        },
+        {
+          "title": "침범 후 생명은 반복문 밖에서 한 번 차감",
+          "level": 2,
+          "category": "pygame",
+          "concepts": [
+            "breach",
+            "SCREEN_HEIGHT - 100",
+            "lives -="
+          ],
+          "prompt": "08-B의 Mission.shift_raiders에서 적 전체 조사와 하강 반복이 끝난 다음의 처리입니다. breach는 앞의 for 안에서 침범을 발견하면 True로 바꾼 값입니다. 여기에는 for가 없으며 침범한 적 수와 관계없이 생명을 한 번만 차감합니다. 이 문제는 발췌 코드 연습입니다. main.py 전체를 대체하거나 단독 실행하지 않습니다. 설명 주석은 따라 적지 않아도 됩니다.",
+          "answerLines": [
+            "if breach:",
+            "    self.breach_sound.play()",
+            "    self.scout.lives -= 1",
+            "    self.check_game_status('외계 함선이 방어선을 침범했습니다!', 'Enter 키를 눌러 계속하세요')"
+          ],
+          "hints": [
+            "breach는 앞의 for 안에서 침범을 발견하면 True로 바꾼 값입니다. 여기에는 for가 없으며 침범한 적 수와 관계없이 생명을 한 번만 차감합니다.",
+            "설명용 주석은 입력하지 않습니다. 표시된 실행 코드와 들여쓰기를 기준으로 연습하세요."
+          ],
+          "commonMistakes": [
+            {
+              "message": "들여쓰기 위치를 잘못 두어 적 드론 55마리 각각마다 기체가 55번 깎이는 경우"
+            }
+          ]
+        }
+      ],
+      "quizzes": [
+        {
+          "question": "편대의 벽면 반전을 드론 각자 처리하지 않고, 사령부에서 '1단계 감지 → 2단계 일괄 반전'의 2단계 알고리즘으로 처리하는 이유는 무엇인가요?",
+          "options": [
+            {
+              "text": "드론 각자가 따로 돌면 대형이 어긋나 엉망으로 흩어지므로, 55기 전원이 한 치의 오차도 없이 군무처럼 동시에 방향을 바꾸고 하강하게 통솔하기 위해",
+              "isCorrect": true
+            },
+            {
+              "text": "파이썬에서 for 루프는 1개만 쓸 수 있기 때문에",
+              "isCorrect": false
+            },
+            {
+              "text": "플레이어 우주선의 속도를 늦추기 위해",
+              "isCorrect": false
+            },
+            {
+              "text": "적 드론이 레이저를 쏘지 못하게 막기 위해",
+              "isCorrect": false
+            }
+          ],
+          "explanation": "정답 근거: 벽에 먼저 닿은 녀석만 혼자 돌아서면 대형이 깨집니다. 사령부가 전체 상태를 보고 전원에게 일괄 하강 및 반전 명령을 내려야 완벽한 대형이 유지됩니다.",
+          "score": 1
+        },
+        {
+          "question": "`raider.direction *= -1` 연산이 만들어내는 수학적 효과는 무엇인가요?",
+          "options": [
+            {
+              "text": "방향을 0으로 만들어 비행을 정지시킨다.",
+              "isCorrect": false
+            },
+            {
+              "text": "+1(오른쪽)은 -1(왼쪽)로, -1(왼쪽)은 +1(오른쪽)로 부호가 뒤집히며 반대 방향으로 반전된다.",
+              "isCorrect": true
+            },
+            {
+              "text": "이동 속도가 2배로 빨라진다.",
+              "isCorrect": false
+            },
+            {
+              "text": "드론이 화면 아래로 10픽셀 강하한다",
+              "isCorrect": false
+            }
+          ],
+          "explanation": "정답 근거: 어떤 수에 -1을 곱하면 부호가 반전됩니다. 1 * -1 = -1, -1 * -1 = 1 이 되므로 깔끔하게 왕복 방향 반전이 이루어집니다.",
+          "score": 1
+        },
+        {
+          "question": "`raider.rect.y += 10 * self.round_number` 공식이 실행될 때 일어나는 편대의 변화는 무엇인가요?",
+          "options": [
+            {
+              "text": "모든 드론이 하늘 높이 솟구쳐 올라간다.",
+              "isCorrect": false
+            },
+            {
+              "text": "드론들의 가로 크기가 10픽셀 커진다.",
+              "isCorrect": false
+            },
+            {
+              "text": "모든 드론이 아래쪽(플레이어 방향)으로 일괄 10픽셀(또는 라운드 배수)만큼 뚝 강하한다.",
+              "isCorrect": true
+            },
+            {
+              "text": "드론의 목숨이 10개 증가한다",
+              "isCorrect": false
+            }
+          ],
+          "explanation": "정답 근거: y에 양수를 더하면 아래로 내려옵니다. 벽에 부딪힐 때마다 한 계단씩 하강하여 플레이어를 압박하는 클래식 인베이더의 진격 방식입니다.",
+          "score": 1
+        },
+        {
+          "question": "방향 반전 직후 `raider.rect.x += raider.direction * raider.velocity`를 한 번 실행해 주는 결정적인 이유는 무엇인가요?",
+          "options": [
+            {
+              "text": "드론의 엔진 소리를 스피커로 출력하기 위해",
+              "isCorrect": false
+            },
+            {
+              "text": "플레이어에게 공격할 시간을 주기 위해",
+              "isCorrect": false
+            },
+            {
+              "text": "점수를 10점 깎기 위해",
+              "isCorrect": false
+            },
+            {
+              "text": "드론을 벽면에서 즉시 반대 방향으로 한 걸음 떼어놓아, 다음 프레임에 벽면 감지가 또 걸려서 무한 하강하는 버그를 방지하기 위해",
+              "isCorrect": true
+            }
+          ],
+          "explanation": "정답 근거: 벽에 닿은 상태 그대로 두면 다음 프레임에도 left<=0이 참이 되어 제자리에서 드르륵 계속 아래로 곤두박질치는 버그가 생깁니다. 즉시 벽에서 벗겨내야 합니다.",
+          "score": 1
+        },
+        {
+          "question": "방어선 y=600에서 raider.rect.bottom>=600이 처음 참이 되는 bottom 값은?",
+          "options": [
+            {
+              "text": "599",
+              "isCorrect": false
+            },
+            {
+              "text": "600",
+              "isCorrect": true
+            },
+            {
+              "text": "601",
+              "isCorrect": false
+            },
+            {
+              "text": "700",
+              "isCorrect": false
+            }
+          ],
+          "explanation": "이상(>=)이므로 방어선에 닿는 순간600부터 침범으로 판단합니다.\n오답 「599」: 600보다 작아 조건이 거짓입니다.\n오답 「601」: 참이지만 최초 값은600입니다.\n오답 「700」: 화면 바닥과 방어선을 혼동했습니다.",
+          "score": 1
+        },
+        {
+          "question": "외계 함선이 최후 방어선을 돌파했을 때 울리는 사이렌 경보음의 오디오 파일명은 무엇인가요?",
+          "options": [
+            {
+              "text": "assets/scout_pulse.ogg",
+              "isCorrect": false
+            },
+            {
+              "text": "assets/line_alert.ogg",
+              "isCorrect": true
+            },
+            {
+              "text": "assets/raider_break.ogg",
+              "isCorrect": false
+            },
+            {
+              "text": "assets/wave_ready.ogg",
+              "isCorrect": false
+            }
+          ],
+          "explanation": "정답 근거: 방어선 침범 경보음은 교대 사이렌 파형인 line_alert.ogg 입니다.",
+          "score": 1
+        },
+        {
+          "question": "방어선 침범 시 플레이어에게 가해지는 페널티는 무엇인가요?",
+          "options": [
+            {
+              "text": "점수가 0점으로 초기화된다.",
+              "isCorrect": false
+            },
+            {
+              "text": "플레이어의 비행 속도가 절반으로 느려진다.",
+              "isCorrect": false
+            },
+            {
+              "text": "남은 기체 생명이 1대 깎인다 (`self.scout.lives -= 1`).",
+              "isCorrect": true
+            },
+            {
+              "text": "스페이스바 발사가 10초간 금지된다",
+              "isCorrect": false
+            }
+          ],
+          "explanation": "정답 근거: 적이 방어선을 뚫으면 플레이어의 기체 생명이 1개 차감됩니다. 0이 되면 게임이 종료됩니다.",
+          "score": 1
+        },
+        {
+          "question": "08단원에서 침범 후 다시 하강할 때 기체가 또 줄 수 있는 이유는?",
+          "options": [
+            {
+              "text": "check_game_status가 아직 pass여서 적 위치 복원과 대기가 구현되지 않았기 때문이다.",
+              "isCorrect": true
+            },
+            {
+              "text": "생명은 매 프레임 반드시 감소하도록 만들었다.",
+              "isCorrect": false
+            },
+            {
+              "text": "폰트를 로드하면 생명이 감소한다.",
+              "isCorrect": false
+            },
+            {
+              "text": "Group은 항상 같은 Sprite를55번 복제한다.",
+              "isCorrect": false
+            }
+          ],
+          "explanation": "09단원에서 탄환 정리·위치 복원·일시정지를 연결합니다.08에서는 확인 후 임시 시험값을 복원합니다.\n오답 「생명은 매 프레임 반드시 감소하도록 만들었다.」: 생명 차감은 경계 하강에서 침범을 확인했을 때입니다.\n오답 「폰트를 로드하면 생명이 감소한다.」: 폰트와 생명 규칙은 관계없습니다.\n오답 「Group은 항상 같은 Sprite를55번 복제한다.」: 그룹은 추가한 객체들을 관리합니다.",
+          "score": 1
+        },
+        {
+          "question": "벽면 도달 여부 검사식에서 `raider.rect.left <= 0 or raider.rect.right >= SCREEN_WIDTH` 처럼 `or`를 쓴 이유는 무엇인가요?",
+          "options": [
+            {
+              "text": "편대의 맨 왼쪽 드론이든 맨 오른쪽 드론이든, 둘 중 어느 쪽이든 벽에 닿기만 하면 즉시 방향을 반전시켜야 하므로",
+              "isCorrect": true
+            },
+            {
+              "text": "and를 쓰면 파이썬에서 문법 오류가 나기 때문에",
+              "isCorrect": false
+            },
+            {
+              "text": "or를 쓰면 드론의 비행 속도가 빨라지기 때문에",
+              "isCorrect": false
+            },
+            {
+              "text": "화면 왼쪽 벽만 검사하고 오른쪽 벽은 무시하기 위해",
+              "isCorrect": false
+            }
+          ],
+          "explanation": "정답 근거: 왼쪽 벽에 닿았거나 또는 오른쪽 벽에 닿았을 때 모두 반전이 일어나야 하므로 논리합(or) 연산자가 정확한 조건식입니다.",
+          "score": 1
+        },
+        {
+          "question": "테스트를 위해 임시로 수정한 값(예: round_number = 5 또는 lives = 1)을 확인 후 반드시 원래대로 되돌려야 하는 이유는 무엇인가요?",
+          "options": [
+            {
+              "text": "원래대로 돌리지 않아도 아무 차이가 없기 때문에",
+              "isCorrect": false
+            },
+            {
+              "text": "임시 값으로 두면 정상적인 1라운드 시작 규칙과 목숨 5개의 밸런스가 왜곡되어 이후 검증에 혼선을 주기 때문에",
+              "isCorrect": true
+            },
+            {
+              "text": "파이썬 인터프리터가 임시 코드를 기억하지 못하기 때문에",
+              "isCorrect": false
+            },
+            {
+              "text": "메타센스 게임 스튜디오가 자동으로 코드를 지워버리기 때문에",
+              "isCorrect": false
+            }
+          ],
+          "explanation": "정답 근거: 빠른 실험을 위해 바꾼 값은 검증 후 반드시 원래 기준값으로 복원해야 전체 커리큘럼의 정합성이 유지됩니다.",
+          "score": 1
+        }
+      ]
+    },
+    {
+      "unitKey": "si09",
+      "title": "전장 정돈과 일시정지",
+      "exercises": [
+        {
+          "title": "Mission.pause_game 상태 전환",
+          "level": 1,
+          "category": "pygame",
+          "concepts": [
+            "state machine",
+            "pause_game"
+          ],
+          "prompt": "사령부의 state를 'paused'로 변경하고 전달받은 main_text와 sub_text를 저장하는 pause_game 메서드를 작성하세요. 이 문제는 발췌 코드 연습입니다. main.py 전체를 대체하거나 단독 실행하지 않습니다. 설명 주석은 따라 적지 않아도 됩니다.",
+          "answerLines": [
+            "self.state = 'paused'",
+            "self.pause_main_text = main_text",
+            "self.pause_sub_text = sub_text"
+          ],
+          "hints": [
+            "self.state에 문자열 'paused'를 대입합니다.",
+            "self.pause_main_text, self.pause_sub_text에 인자를 대입합니다."
+          ],
+          "commonMistakes": [
+            {
+              "message": "내부에서 while 루프를 돌아 브라우저를 멈추게 만드는 경우"
+            }
+          ]
+        },
+        {
+          "title": "반투명 대기 화면 덮기",
+          "level": 2,
+          "category": "pygame",
+          "concepts": [
+            "SRCALPHA",
+            "overlay",
+            "font.render"
+          ],
+          "prompt": "09-C의 Mission.draw에서 paused/game_over 조건 안의 앞부분입니다. 전장을 먼저 그린 뒤 알파 180의 막을 덮습니다. 뒤에서 안내 제목과 보조 문구를 그립니다. 이 문제는 발췌 코드 연습입니다. main.py 전체를 대체하거나 단독 실행하지 않습니다. 설명 주석은 따라 적지 않아도 됩니다.",
+          "answerLines": [
+            "overlay = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)",
+            "overlay.fill((0, 0, 0, 180))",
+            "screen.blit(overlay, (0, 0))"
+          ],
+          "hints": [
+            "전장을 먼저 그린 뒤 알파 180의 막을 덮습니다. 뒤에서 안내 제목과 보조 문구를 그립니다.",
+            "설명용 주석은 입력하지 않습니다. 표시된 실행 코드와 들여쓰기를 기준으로 연습하세요."
+          ],
+          "commonMistakes": [
+            {
+              "message": "일반 Surface를 만들어 투명도가 적용되지 않고 화면이 새까맣게 가려지는 경우"
+            }
+          ]
+        },
+        {
+          "title": "상태 확인의 첫 단계: 전장 정돈",
+          "level": 2,
+          "category": "pygame",
+          "concepts": [
+            "empty",
+            "reset",
+            "순서"
+          ],
+          "prompt": "Mission.check_game_status 본문의 첫 부분입니다. 생명 분기는 이 코드 뒤에 이어집니다. 아래 코드를 입력하고 각 줄이 실행되는 순서를 설명하세요. 이 문제는 발췌 코드 연습입니다. main.py 전체를 대체하거나 단독 실행하지 않습니다. 설명 주석은 따라 적지 않아도 됩니다.",
+          "answerLines": [
+            "self.scout_pulses.empty()",
+            "self.raider_pulses.empty()",
+            "self.scout.reset()",
+            "for raider in self.raiders:",
+            "    raider.reset()"
+          ],
+          "hints": [
+            "Data Log의 같은 클래스·메서드와 비교합니다.",
+            "조건문 안과 밖의 들여쓰기를 구분합니다."
+          ],
+          "commonMistakes": [
+            {
+              "message": "클래스 안 메서드는4칸, 메서드 본문은8칸입니다. 연습 조각은 제시된 문맥의 들여쓰기를 기준으로 입력합니다."
+            }
+          ]
+        }
+      ],
+      "quizzes": [
+        {
+          "question": "이 웹 실행기에서 별도의 동기 대기 while 대신 기존 메인 루프와 state를 쓰는 이유는?",
+          "options": [
+            {
+              "text": "state를 쓰면 모든 성능 문제가 없어진다.",
+              "isCorrect": false
+            },
+            {
+              "text": "Python에서는 while을 쓸 수 없기 때문에",
+              "isCorrect": false
+            },
+            {
+              "text": "최상위 루프의 제어권 양도를 유지하면서 게임 update만 건너뛰기 위해",
+              "isCorrect": true
+            },
+            {
+              "text": "메서드는 변수 값을 바꿀 수 없기 때문에",
+              "isCorrect": false
+            }
+          ],
+          "explanation": "메서드 안의 동기 중첩 루프는 실행기가 최상위에서 양보하는 흐름을 우회해 브라우저 응답을 막을 수 있습니다.\n오답 「state를 쓰면 모든 성능 문제가 없어진다.」: 상태 변수만으로 모든 지연이 해결되지는 않습니다.\n오답 「Python에서는 while을 쓸 수 없기 때문에」: 게임의 최상위 while은 계속 사용합니다.\n오답 「메서드는 변수 값을 바꿀 수 없기 때문에」: 메서드에서 상태와 안내 문구를 바꿉니다.",
+          "score": 1
+        },
+        {
+          "question": "최상위 루프를 유지하면서 `mission.state` 변수를 활용하는 '상태 머신(State Machine)' 패턴의 작동 원리는 무엇인가요?",
+          "options": [
+            {
+              "text": "게임을 강제로 클라우드 서버에 백업하는 방식",
+              "isCorrect": false
+            },
+            {
+              "text": "메인 루프는 계속 돌리되, state가 'paused'일 때는 캐릭터 이동/사격(update)을 쉬고 안내창만 그리도록 분기하는 방식",
+              "isCorrect": true
+            },
+            {
+              "text": "적 드론의 체력을 0으로 바꾸는 방식",
+              "isCorrect": false
+            },
+            {
+              "text": "스페이스바와 방향키의 역할을 서로 바꾸는 방식",
+              "isCorrect": false
+            }
+          ],
+          "explanation": "정답 근거: 메인 루프를 멈추지 않고 계속 돌리면서, state 값에 따라 update를 실행할지 말지, 화면에 오버레이를 그릴지 말지만 분기하므로 브라우저와 100% 호환됩니다.",
+          "score": 1
+        },
+        {
+          "question": "`overlay.fill((0, 0, 0, 180))`에서 마지막 숫자 180이 담당하는 그래픽 효과는 무엇인가요?",
+          "options": [
+            {
+              "text": "오버레이 창을 180도 거꾸로 뒤집는 각도",
+              "isCorrect": false
+            },
+            {
+              "text": "오버레이의 가로 크기(180픽셀)",
+              "isCorrect": false
+            },
+            {
+              "text": "뒷배경의 우주 전장이 은은하게 비쳐 보이는 반투명 알파(Alpha, 불투명도) 값",
+              "isCorrect": true
+            },
+            {
+              "text": "오버레이가 화면에 유지되는 시간(180초)",
+              "isCorrect": false
+            }
+          ],
+          "explanation": "정답 근거: RGBA에서 A(알파)는 투명도입니다. 0은 완전 투명, 255는 완전 불투명이며 180은 어두운 반투명 선글라스 같은 효과를 냅니다.",
+          "score": 1
+        },
+        {
+          "question": "일시정지 상태에서 사용자가 `Enter` 키를 눌렀을 때 실행되는 상태 복구 코드는 무엇인가요?",
+          "options": [
+            {
+              "text": "running = False",
+              "isCorrect": false
+            },
+            {
+              "text": "self.scout.lives = 0",
+              "isCorrect": false
+            },
+            {
+              "text": "pygame.quit()",
+              "isCorrect": false
+            },
+            {
+              "text": "mission.state = 'playing'",
+              "isCorrect": true
+            }
+          ],
+          "explanation": "정답 근거: Enter 키가 눌리면 state를 다시 'playing'으로 전환하여 메인 루프가 캐릭터들의 update()를 정상적으로 재개하도록 만듭니다.",
+          "score": 1
+        },
+        {
+          "question": "`self.scout_pulses.empty()`와 `self.raider_pulses.empty()`를 비상 정돈 시 호출하는 이유는 무엇인가요?",
+          "options": [
+            {
+              "text": "침범이나 피격 직후 날아다니던 잔여 미사일을 깨끗이 청소하여, 리셋 직후의 플레이어가 억울하게 즉시 연속 피격당하는 불상사를 방지하기 위해",
+              "isCorrect": true
+            },
+            {
+              "text": "점수를 초기화하기 위해",
+              "isCorrect": false
+            },
+            {
+              "text": "컴퓨터 하드디스크의 임시 파일을 삭제하기 위해",
+              "isCorrect": false
+            },
+            {
+              "text": "탄환의 색상을 바꾸기 위해",
+              "isCorrect": false
+            }
+          ],
+          "explanation": "정답 근거: 리셋된 플레이어 위치에 날아가던 적 탄환이 그대로 남아있으면 부활하자마자 다시 맞는 억울한 버그가 생깁니다. 모든 잔여 탄환을 비워 안전을 확보합니다.",
+          "score": 1
+        },
+        {
+          "question": "`for raider in self.raiders: raider.reset()`이 실행될 때 각 적 드론들이 이동하는 위치는 어디인가요?",
+          "options": [
+            {
+              "text": "화면 맨 아래 바닥",
+              "isCorrect": false
+            },
+            {
+              "text": "05유닛 생성 시점에 기억해 두었던 각자의 고유 시작 격자 좌표(`starting_x`, `starting_y`)",
+              "isCorrect": true
+            },
+            {
+              "text": "화면 정중앙 (600, 350)",
+              "isCorrect": false
+            },
+            {
+              "text": "화면 맨 오른쪽 밖",
+              "isCorrect": false
+            }
+          ],
+          "explanation": "정답 근거: Raider.reset()은 05유닛에서 기억해 둔 starting_x, starting_y로 topleft를 재배치하므로, 편대가 원래의 깔끔한 격자 대형으로 일제히 복귀합니다.",
+          "score": 1
+        },
+        {
+          "question": "`Mission.check_game_status`에서 `self.scout.lives <= 0`일 때 호출되는 메서드는 무엇인가요?",
+          "options": [
+            {
+              "text": "self.start_new_round()",
+              "isCorrect": false
+            },
+            {
+              "text": "self.shift_raiders()",
+              "isCorrect": false
+            },
+            {
+              "text": "self.reset_game()",
+              "isCorrect": true
+            },
+            {
+              "text": "self.pause_game()",
+              "isCorrect": false
+            }
+          ],
+          "explanation": "정답 근거: 기체 생명이 0 이하가 되면 게임이 끝난 것이므로 게임 전체를 초기화하고 최종 점수를 안내하는 reset_game()을 호출합니다.",
+          "score": 1
+        },
+        {
+          "question": "일시정지(`state == 'paused'`) 중에 스페이스바를 눌러도 총알이 발사되지 않는 코드적 이유는 무엇인가요?",
+          "options": [
+            {
+              "text": "스페이스바 키보드 전원이 차단되어서",
+              "isCorrect": false
+            },
+            {
+              "text": "우주선이 탄환 그룹에서 삭제되어서",
+              "isCorrect": false
+            },
+            {
+              "text": "사운드 파일이 일시정지되어서",
+              "isCorrect": false
+            },
+            {
+              "text": "이벤트 처리 조건문에 `if event.key == pygame.K_SPACE and mission.state == 'playing':` 처럼 playing 상태일 때만 fire를 부르도록 가드(Guard)를 걸어두었기 때문에",
+              "isCorrect": true
+            }
+          ],
+          "explanation": "정답 근거: state == 'playing' 가드 조건문을 걸어두었기 때문에, 일시정지 상태에서는 스페이스바를 아무리 눌러도 fire()가 호출되지 않습니다.",
+          "score": 1
+        },
+        {
+          "question": "09유닛에서 게임을 처음 실행했을 때 곧바로 게임이 시작되지 않고 '라운드 1 / Enter를 눌러 시작하세요'가 먼저 떴던 이유는 무엇인가요?",
+          "options": [
+            {
+              "text": "start_new_round() 끝에 미리 넣어두었던 pause_game(...) 호출이 이제 정상 작동하여 플레이어가 준비할 시간을 주기 때문에",
+              "isCorrect": true
+            },
+            {
+              "text": "게임 로딩에 버그가 생겨 멈춘 것이기 때문에",
+              "isCorrect": false
+            },
+            {
+              "text": "컴퓨터가 플레이어의 얼굴을 인식할 때까지 대기한 것이기 때문에",
+              "isCorrect": false
+            },
+            {
+              "text": "적 드론들이 아직 출격 준비를 마치지 못해서",
+              "isCorrect": false
+            }
+          ],
+          "explanation": "정답 근거: 07유닛에서 start_new_round() 끝에 적어두었던 pause_game()이 이제 진짜 state='paused'로 동작하기 때문에 시작 시 카운트다운처럼 대기하게 됩니다.",
+          "score": 1
+        },
+        {
+          "question": "비상 정돈 후 재개할 때 드론의 이동 방향(`raider.direction`)을 다시 1로 리셋해 주는 이유는 무엇인가요?",
+          "options": [
+            {
+              "text": "왼쪽으로 날아가는 드론은 점수가 없기 때문에",
+              "isCorrect": false
+            },
+            {
+              "text": "편대의 초기 행진 규칙(오른쪽 전진)과 일치시켜 모든 드론이 한 방향으로 가지런히 다시 출발하게 만들기 위해",
+              "isCorrect": true
+            },
+            {
+              "text": "파이썬에서 direction은 음수를 가질 수 없기 때문에",
+              "isCorrect": false
+            },
+            {
+              "text": "우주선의 속도와 맞추기 위해",
+              "isCorrect": false
+            }
+          ],
+          "explanation": "정답 근거: 일부 드론이 왼쪽으로 가던 중에 리셋되었더라도, 편대 대열 전체가 다시 오른쪽(+1)으로 통일되어 전진해야 대형이 깨지지 않습니다.",
+          "score": 1
+        }
+      ]
+    },
+    {
+      "unitKey": "si10",
+      "title": "게임오버, 충돌, 다음 라운드",
+      "exercises": [
+        {
+          "title": "게임오버 문구 유지",
+          "level": 2,
+          "category": "pygame",
+          "concepts": [
+            "상태",
+            "게임오버"
+          ],
+          "prompt": "Mission 클래스 내부입니다. 새 게임 초기화는 Enter에서 restart_game으로 따로 실행합니다. 아래 코드를 입력하고 각 줄이 실행되는 순서를 설명하세요. 이 문제는 발췌 코드 연습입니다. main.py 전체를 대체하거나 단독 실행하지 않습니다. 설명 주석은 따라 적지 않아도 됩니다.",
+          "answerLines": [
+            "def reset_game(self):",
+            "    self.pause_game(f'최종 점수: {self.score}', 'Enter 키를 눌러 다시 도전하세요')",
+            "    self.state = 'game_over'"
+          ],
+          "hints": [
+            "Data Log의 같은 클래스·메서드와 비교합니다.",
+            "조건문 안과 밖의 들여쓰기를 구분합니다."
+          ],
+          "commonMistakes": [
+            {
+              "message": "클래스 안 메서드는4칸, 메서드 본문은8칸입니다. 연습 조각은 제시된 문맥의 들여쓰기를 기준으로 입력합니다."
+            }
+          ]
+        },
+        {
+          "title": "격추된 적 수만큼 점수 계산",
+          "level": 3,
+          "category": "pygame",
+          "concepts": [
+            "groupcollide",
+            "목록 길이",
+            "점수"
+          ],
+          "prompt": "Mission.check_collisions 본문 중 아군 탄환과 적의 검사입니다. 아래 코드를 입력하고 각 줄이 실행되는 순서를 설명하세요. 이 문제는 발췌 코드 연습입니다. main.py 전체를 대체하거나 단독 실행하지 않습니다. 설명 주석은 따라 적지 않아도 됩니다.",
+          "answerLines": [
+            "hits = pygame.sprite.groupcollide(self.scout_pulses, self.raiders, True, True)",
+            "if hits:",
+            "    self.raider_break_sound.play()",
+            "    for killed_raiders in hits.values():",
+            "        self.score += 100 * len(killed_raiders)"
+          ],
+          "hints": [
+            "Data Log의 같은 클래스·메서드와 비교합니다.",
+            "조건문 안과 밖의 들여쓰기를 구분합니다."
+          ],
+          "commonMistakes": [
+            {
+              "message": "클래스 안 메서드는4칸, 메서드 본문은8칸입니다. 연습 조각은 제시된 문맥의 들여쓰기를 기준으로 입력합니다."
+            }
+          ]
+        },
+        {
+          "title": "라운드 정복과 보너스 점수",
+          "level": 2,
+          "category": "pygame",
+          "concepts": [
+            "not self.raiders",
+            "round bonus",
+            "start_new_round"
+          ],
+          "prompt": "적 편대가 전멸(not self.raiders)했을 때 1000*round_number 보너스를 지급하고 라운드를 1 올린 뒤 새 라운드를 시작하는 check_round_completion을 작성하세요. 이 문제는 발췌 코드 연습입니다. main.py 전체를 대체하거나 단독 실행하지 않습니다. 설명 주석은 따라 적지 않아도 됩니다.",
+          "answerLines": [
+            "if not self.raiders:",
+            "    self.score += 1000 * self.round_number",
+            "    self.round_number += 1",
+            "    self.start_new_round()"
+          ],
+          "hints": [
+            "if not self.raiders: 는 그룹에 스프라이트가 0개일 때 참입니다.",
+            "보너스 점수는 1000 * self.round_number 입니다."
+          ],
+          "commonMistakes": [
+            {
+              "message": "라운드 번호를 먼저 올리고 보너스를 계산하여 점수가 과도하게 지급되는 경우"
+            },
+            {
+              "message": "start_new_round() 호출을 누락하여 빈 화면으로 남는 경우"
+            }
+          ]
+        }
+      ],
+      "quizzes": [
+        {
+          "question": "10유닛에서 충돌 검사(check_collisions)보다 전체 게임 리셋(reset_game)을 먼저 구현한 교육적/개발적 이유는 무엇인가요?",
+          "options": [
+            {
+              "text": "패배했을 때 안전하게 게임오버를 띄우고 다시 살아나는 부활 장치를 먼저 확보해야, 충돌 테스트 시 게임이 튕기지 않고 안심하고 검증할 수 있어서",
+              "isCorrect": true
+            },
+            {
+              "text": "파이썬 완성 소스 코드에서 reset_game이 맨 위에 적혀 있어서",
+              "isCorrect": false
+            },
+            {
+              "text": "충돌을 먼저 만들면 게임 엔진이 과열되기 때문에",
+              "isCorrect": false
+            },
+            {
+              "text": "플레이어가 1라운드를 건너뛸 수 있게 하기 위해",
+              "isCorrect": false
+            }
+          ],
+          "explanation": "정답 근거: 안전망(부활 장치)이 없는 상태에서 사망 조건을 먼저 만들면 에러로 프로그램이 중단됩니다. 리셋을 먼저 완성해두면 피격/사망 테스트를 즉시 안전하게 수행할 수 있습니다.",
+          "score": 1
+        },
+        {
+          "question": "`pygame.sprite.groupcollide(self.scout_pulses, self.raiders, True, True)`에서 두 개의 `True` 인수가 의미하는 바는 무엇인가요?",
+          "options": [
+            {
+              "text": "소리와 진동을 둘 다 켠다는 뜻",
+              "isCorrect": false
+            },
+            {
+              "text": "충돌한 아군 탄환도 소멸시키고(True), 맞은 적 외계선도 함께 소멸시킨다(True)는 뜻",
+              "isCorrect": true
+            },
+            {
+              "text": "점수를 2배로 계산하고 체력을 2개 깎는다는 뜻",
+              "isCorrect": false
+            },
+            {
+              "text": "두 그룹의 크기를 2배로 늘린다는 뜻",
+              "isCorrect": false
+            }
+          ],
+          "explanation": "정답 근거: groupcollide(group1, group2, dokill1, dokill2)에서 dokill1=True는 맞힌 탄환을 그룹에서 삭제하고, dokill2=True는 맞은 적을 그룹에서 삭제(폭파)합니다.",
+          "score": 1
+        },
+        {
+          "question": "적 격추 점수를 계산할 때 단순히 `self.score += 100`을 하지 않고 `for killed in hits.values(): self.score += 100 * len(killed)` 처럼 작성하는 정밀한 이유는 무엇인가요?",
+          "options": [
+            {
+              "text": "드론의 크기가 매번 달라지기 때문에",
+              "isCorrect": false
+            },
+            {
+              "text": "파이썬에서 곱하기는 100만 지원하기 때문에",
+              "isCorrect": false
+            },
+            {
+              "text": "탄환 1발의 충돌 영역에 동시에 2기 이상의 적이 닿아 격추되었을 때도 격추된 마릿수만큼 정확하게 200점, 300점을 정직하게 합산하기 위해",
+              "isCorrect": true
+            },
+            {
+              "text": "사운드 재생 횟수를 늘리기 위해",
+              "isCorrect": false
+            }
+          ],
+          "explanation": "정답 근거: groupcollide는 탄환 1개(키)에 충돌한 적들의 리스트(값)를 반환합니다. 1발로 2마리를 동시에 맞혔을 때 len(killed)가 2가 되므로 정확한 스코어링이 보장됩니다.",
+          "score": 1
+        },
+        {
+          "question": "플레이어 탐사선과 적 탄환의 충돌을 검사할 때 사용하는 Pygame 함수는 무엇인가요?",
+          "options": [
+            {
+              "text": "pygame.sprite.collide_mask_all()",
+              "isCorrect": false
+            },
+            {
+              "text": "pygame.draw.circle()",
+              "isCorrect": false
+            },
+            {
+              "text": "pygame.key.get_mods()",
+              "isCorrect": false
+            },
+            {
+              "text": "pygame.sprite.spritecollide(self.scout, self.raider_pulses, True)",
+              "isCorrect": true
+            }
+          ],
+          "explanation": "정답 근거: 단일 스프라이트(scout)와 그룹(raider_pulses) 사이의 충돌은 spritecollide() 함수를 사용하며, True로 전달하여 맞힌 적 탄환을 소멸시킵니다.",
+          "score": 1
+        },
+        {
+          "question": "적 격추 시 실제로 구현된 화면·소리 변화는?",
+          "options": [
+            {
+              "text": "파편 수백 개가 생성된다.",
+              "isCorrect": false
+            },
+            {
+              "text": "배경음악이 새 파일로 바뀐다.",
+              "isCorrect": false
+            },
+            {
+              "text": "적이 파란색으로만 바뀌고 남아 있다.",
+              "isCorrect": false
+            },
+            {
+              "text": "적 스프라이트와 아군 탄환이 제거되고 raider_break.ogg가 재생된다.",
+              "isCorrect": true
+            }
+          ],
+          "explanation": "실제 코드의 제거와 Sound.play에 해당하는 관찰 결과입니다.\n오답 「파편 수백 개가 생성된다.」: 파편 애니메이션은 구현하지 않았습니다.\n오답 「배경음악이 새 파일로 바뀐다.」: 배경음악 전환 기능은 없습니다.\n오답 「적이 파란색으로만 바뀌고 남아 있다.」: 충돌한 적은 그룹에서 제거됩니다.",
+          "score": 1
+        },
+        {
+          "question": "플레이어 탐사선에 적의 붉은 레이저가 직격했을 때 재생되는 충격음 오디오 파일은 무엇인가요?",
+          "options": [
+            {
+              "text": "assets/wave_ready.ogg",
+              "isCorrect": false
+            },
+            {
+              "text": "assets/shield_hit.ogg",
+              "isCorrect": true
+            },
+            {
+              "text": "assets/raider_pulse.ogg",
+              "isCorrect": false
+            },
+            {
+              "text": "assets/raider_break.ogg",
+              "isCorrect": false
+            }
+          ],
+          "explanation": "정답 근거: 플레이어 기체 실드 피격음은 둔탁한 타격음인 shield_hit.ogg 입니다.",
+          "score": 1
+        },
+        {
+          "question": "`if not self.raiders:` 조건문이 참(True)이 되는 게임상의 순간은 언제인가요?",
+          "options": [
+            {
+              "text": "게임이 시작된 지 1초가 지났을 때",
+              "isCorrect": false
+            },
+            {
+              "text": "적 드론들이 플레이어를 포위했을 때",
+              "isCorrect": false
+            },
+            {
+              "text": "55기의 외계 편대를 1기도 남김없이 모두 격추하여 raiders 그룹이 완전히 비었을 때",
+              "isCorrect": true
+            },
+            {
+              "text": "플레이어의 기체가 파괴되었을 때",
+              "isCorrect": false
+            }
+          ],
+          "explanation": "정답 근거: 파이썬에서 빈 컬렉션/스프라이트 그룹은 불리언으로 False로 평가됩니다. 따라서 not self.raiders는 바구니가 완전히 비어 모든 적을 소탕했을 때 참이 됩니다.",
+          "score": 1
+        },
+        {
+          "question": "현재 2라운드를 클리어했을 때 플레이어가 지급받는 라운드 정복 보너스 점수와 그 공식은 무엇인가요?",
+          "options": [
+            {
+              "text": "500점 (고정 점수)",
+              "isCorrect": false
+            },
+            {
+              "text": "100점 (적 1기 점수)",
+              "isCorrect": false
+            },
+            {
+              "text": "5500점 (55기 × 100)",
+              "isCorrect": false
+            },
+            {
+              "text": "2000점 (`1000 * self.round_number` = 1000 × 2)",
+              "isCorrect": true
+            }
+          ],
+          "explanation": "정답 근거: 라운드 보너스는 1000 * self.round_number 공식으로 계산됩니다. 2라운드를 완료했으므로 1000 * 2 = 2000점의 대규모 보너스가 주어집니다.",
+          "score": 1
+        },
+        {
+          "question": "다음 라운드로 넘어갈 때 적들의 비행 속도가 더 빨라지는 코드적 이유는 무엇인가요?",
+          "options": [
+            {
+              "text": "`round_number`가 1 증가한 상태에서 `start_new_round()`가 호출되어, 새 드론들의 `velocity`에 더 큰 라운드 숫자가 전달되기 때문에",
+              "isCorrect": true
+            },
+            {
+              "text": "플레이어의 기체 속도가 느려져서 상대적으로 빨라 보이는 착시 현상 때문에",
+              "isCorrect": false
+            },
+            {
+              "text": "컴퓨터의 FPS가 60에서 120으로 올라가기 때문에",
+              "isCorrect": false
+            },
+            {
+              "text": "적 드론 이미지가 더 가벼워지기 때문에",
+              "isCorrect": false
+            }
+          ],
+          "explanation": "정답 근거: round_number += 1 이후 start_new_round()에서 Raider 생성 시 velocity=self.round_number를 넘겨주므로 1라운드(속도 1)보다 2라운드(속도 2) 편대가 훨씬 빠릅니다.",
+          "score": 1
+        },
+        {
+          "question": "생명1,점수0에서 마지막 적을 격추하고 같은 프레임에 적 탄환에 맞았다. 처리 직후 결과는?",
+          "options": [
+            {
+              "text": "최종점수100과 game_over를 유지하고 라운드 보너스를 더하지 않는다.",
+              "isCorrect": true
+            },
+            {
+              "text": "점수1100으로 다음 라운드를 시작한다.",
+              "isCorrect": false
+            },
+            {
+              "text": "격추점수도 무조건0으로 돌아간다.",
+              "isCorrect": false
+            },
+            {
+              "text": "적을 먼저 맞혔으므로 생명이 줄지 않는다.",
+              "isCorrect": false
+            }
+          ],
+          "explanation": "아군 격추점수100을 더한 뒤 기체 피격으로 game_over가 됩니다. update의 상태 검사와 return이 라운드 완료로 덮이는 일을 막습니다.\n오답 「점수1100으로 다음 라운드를 시작한다.」: 피격에서 상태가 바뀌면 이후 완료 검사를 중단합니다.\n오답 「격추점수도 무조건0으로 돌아간다.」: 초기화는 Enter 새 게임 때 실행합니다.\n오답 「적을 먼저 맞혔으므로 생명이 줄지 않는다.」: 같은 충돌 검사에서 기체 피격도 처리합니다.",
+          "score": 1
+        }
+      ]
+    }
+  ]
+}

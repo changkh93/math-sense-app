@@ -1,0 +1,777 @@
+[
+  {
+    "path": "explorer/run/0.png",
+    "size": [
+      64,
+      64
+    ],
+    "bytes": 5565,
+    "mode": "RGBA",
+    "alphaBounds": [
+      7,
+      10,
+      56,
+      64
+    ]
+  },
+  {
+    "path": "explorer/run/1.png",
+    "size": [
+      64,
+      64
+    ],
+    "bytes": 5206,
+    "mode": "RGBA",
+    "alphaBounds": [
+      10,
+      9,
+      51,
+      64
+    ]
+  },
+  {
+    "path": "explorer/run/2.png",
+    "size": [
+      64,
+      64
+    ],
+    "bytes": 5245,
+    "mode": "RGBA",
+    "alphaBounds": [
+      6,
+      11,
+      52,
+      64
+    ]
+  },
+  {
+    "path": "explorer/run/3.png",
+    "size": [
+      64,
+      64
+    ],
+    "bytes": 5350,
+    "mode": "RGBA",
+    "alphaBounds": [
+      6,
+      11,
+      53,
+      64
+    ]
+  },
+  {
+    "path": "explorer/idle/0.png",
+    "size": [
+      64,
+      64
+    ],
+    "bytes": 5171,
+    "mode": "RGBA",
+    "alphaBounds": [
+      13,
+      8,
+      49,
+      64
+    ]
+  },
+  {
+    "path": "explorer/idle/1.png",
+    "size": [
+      64,
+      64
+    ],
+    "bytes": 4980,
+    "mode": "RGBA",
+    "alphaBounds": [
+      14,
+      8,
+      49,
+      64
+    ]
+  },
+  {
+    "path": "explorer/idle/2.png",
+    "size": [
+      64,
+      64
+    ],
+    "bytes": 5090,
+    "mode": "RGBA",
+    "alphaBounds": [
+      12,
+      8,
+      47,
+      64
+    ]
+  },
+  {
+    "path": "explorer/idle/3.png",
+    "size": [
+      64,
+      64
+    ],
+    "bytes": 5034,
+    "mode": "RGBA",
+    "alphaBounds": [
+      15,
+      8,
+      50,
+      64
+    ]
+  },
+  {
+    "path": "explorer/jump/0.png",
+    "size": [
+      64,
+      64
+    ],
+    "bytes": 4948,
+    "mode": "RGBA",
+    "alphaBounds": [
+      9,
+      16,
+      54,
+      64
+    ]
+  },
+  {
+    "path": "explorer/jump/1.png",
+    "size": [
+      64,
+      64
+    ],
+    "bytes": 4990,
+    "mode": "RGBA",
+    "alphaBounds": [
+      11,
+      12,
+      58,
+      64
+    ]
+  },
+  {
+    "path": "explorer/jump/2.png",
+    "size": [
+      64,
+      64
+    ],
+    "bytes": 4785,
+    "mode": "RGBA",
+    "alphaBounds": [
+      12,
+      15,
+      56,
+      64
+    ]
+  },
+  {
+    "path": "explorer/jump/3.png",
+    "size": [
+      64,
+      64
+    ],
+    "bytes": 5523,
+    "mode": "RGBA",
+    "alphaBounds": [
+      4,
+      9,
+      56,
+      64
+    ]
+  },
+  {
+    "path": "explorer/fire/0.png",
+    "size": [
+      64,
+      64
+    ],
+    "bytes": 5565,
+    "mode": "RGBA",
+    "alphaBounds": [
+      12,
+      9,
+      57,
+      64
+    ]
+  },
+  {
+    "path": "explorer/fire/1.png",
+    "size": [
+      64,
+      64
+    ],
+    "bytes": 5436,
+    "mode": "RGBA",
+    "alphaBounds": [
+      10,
+      10,
+      56,
+      64
+    ]
+  },
+  {
+    "path": "explorer/fire/2.png",
+    "size": [
+      64,
+      64
+    ],
+    "bytes": 6260,
+    "mode": "RGBA",
+    "alphaBounds": [
+      5,
+      10,
+      63,
+      64
+    ]
+  },
+  {
+    "path": "explorer/fire/3.png",
+    "size": [
+      64,
+      64
+    ],
+    "bytes": 5475,
+    "mode": "RGBA",
+    "alphaBounds": [
+      1,
+      9,
+      50,
+      64
+    ]
+  },
+  {
+    "path": "robot/teal/walk/0.png",
+    "size": [
+      64,
+      64
+    ],
+    "bytes": 5465,
+    "mode": "RGBA",
+    "alphaBounds": [
+      9,
+      6,
+      54,
+      64
+    ]
+  },
+  {
+    "path": "robot/teal/walk/1.png",
+    "size": [
+      64,
+      64
+    ],
+    "bytes": 5380,
+    "mode": "RGBA",
+    "alphaBounds": [
+      8,
+      6,
+      54,
+      64
+    ]
+  },
+  {
+    "path": "robot/teal/walk/2.png",
+    "size": [
+      64,
+      64
+    ],
+    "bytes": 5194,
+    "mode": "RGBA",
+    "alphaBounds": [
+      4,
+      6,
+      53,
+      64
+    ]
+  },
+  {
+    "path": "robot/teal/walk/3.png",
+    "size": [
+      64,
+      64
+    ],
+    "bytes": 5318,
+    "mode": "RGBA",
+    "alphaBounds": [
+      11,
+      6,
+      54,
+      64
+    ]
+  },
+  {
+    "path": "robot/teal/down/0.png",
+    "size": [
+      64,
+      64
+    ],
+    "bytes": 4747,
+    "mode": "RGBA",
+    "alphaBounds": [
+      15,
+      5,
+      50,
+      64
+    ]
+  },
+  {
+    "path": "robot/teal/down/1.png",
+    "size": [
+      64,
+      64
+    ],
+    "bytes": 4709,
+    "mode": "RGBA",
+    "alphaBounds": [
+      2,
+      8,
+      50,
+      64
+    ]
+  },
+  {
+    "path": "robot/teal/down/2.png",
+    "size": [
+      64,
+      64
+    ],
+    "bytes": 4095,
+    "mode": "RGBA",
+    "alphaBounds": [
+      7,
+      20,
+      51,
+      64
+    ]
+  },
+  {
+    "path": "robot/teal/down/3.png",
+    "size": [
+      64,
+      64
+    ],
+    "bytes": 3385,
+    "mode": "RGBA",
+    "alphaBounds": [
+      3,
+      40,
+      59,
+      64
+    ]
+  },
+  {
+    "path": "robot/amber/walk/0.png",
+    "size": [
+      64,
+      64
+    ],
+    "bytes": 4986,
+    "mode": "RGBA",
+    "alphaBounds": [
+      13,
+      8,
+      62,
+      64
+    ]
+  },
+  {
+    "path": "robot/amber/walk/1.png",
+    "size": [
+      64,
+      64
+    ],
+    "bytes": 4290,
+    "mode": "RGBA",
+    "alphaBounds": [
+      16,
+      8,
+      63,
+      64
+    ]
+  },
+  {
+    "path": "robot/amber/walk/2.png",
+    "size": [
+      64,
+      64
+    ],
+    "bytes": 4945,
+    "mode": "RGBA",
+    "alphaBounds": [
+      2,
+      8,
+      63,
+      64
+    ]
+  },
+  {
+    "path": "robot/amber/walk/3.png",
+    "size": [
+      64,
+      64
+    ],
+    "bytes": 4604,
+    "mode": "RGBA",
+    "alphaBounds": [
+      13,
+      8,
+      50,
+      64
+    ]
+  },
+  {
+    "path": "robot/amber/down/0.png",
+    "size": [
+      64,
+      64
+    ],
+    "bytes": 4264,
+    "mode": "RGBA",
+    "alphaBounds": [
+      3,
+      8,
+      48,
+      64
+    ]
+  },
+  {
+    "path": "robot/amber/down/1.png",
+    "size": [
+      64,
+      64
+    ],
+    "bytes": 4083,
+    "mode": "RGBA",
+    "alphaBounds": [
+      2,
+      11,
+      60,
+      64
+    ]
+  },
+  {
+    "path": "robot/amber/down/2.png",
+    "size": [
+      64,
+      64
+    ],
+    "bytes": 4002,
+    "mode": "RGBA",
+    "alphaBounds": [
+      6,
+      24,
+      63,
+      64
+    ]
+  },
+  {
+    "path": "robot/amber/down/3.png",
+    "size": [
+      64,
+      64
+    ],
+    "bytes": 3449,
+    "mode": "RGBA",
+    "alphaBounds": [
+      1,
+      41,
+      62,
+      64
+    ]
+  },
+  {
+    "path": "tiles/1.png",
+    "size": [
+      32,
+      32
+    ],
+    "bytes": 2666,
+    "mode": "RGBA",
+    "alphaBounds": [
+      0,
+      0,
+      32,
+      32
+    ]
+  },
+  {
+    "path": "tiles/2.png",
+    "size": [
+      32,
+      32
+    ],
+    "bytes": 2597,
+    "mode": "RGBA",
+    "alphaBounds": [
+      0,
+      0,
+      32,
+      32
+    ]
+  },
+  {
+    "path": "tiles/3.png",
+    "size": [
+      32,
+      32
+    ],
+    "bytes": 2266,
+    "mode": "RGBA",
+    "alphaBounds": [
+      0,
+      0,
+      32,
+      32
+    ]
+  },
+  {
+    "path": "tiles/4.png",
+    "size": [
+      32,
+      32
+    ],
+    "bytes": 2307,
+    "mode": "RGBA",
+    "alphaBounds": [
+      0,
+      0,
+      32,
+      32
+    ]
+  },
+  {
+    "path": "tiles/5.png",
+    "size": [
+      32,
+      32
+    ],
+    "bytes": 2186,
+    "mode": "RGBA",
+    "alphaBounds": [
+      0,
+      0,
+      32,
+      32
+    ]
+  },
+  {
+    "path": "tiles/6.png",
+    "size": [
+      32,
+      32
+    ],
+    "bytes": 2668,
+    "mode": "RGBA",
+    "alphaBounds": [
+      0,
+      0,
+      32,
+      32
+    ]
+  },
+  {
+    "path": "gate/teal/0.png",
+    "size": [
+      72,
+      72
+    ],
+    "bytes": 11751,
+    "mode": "RGBA",
+    "alphaBounds": [
+      0,
+      0,
+      72,
+      72
+    ]
+  },
+  {
+    "path": "gate/teal/1.png",
+    "size": [
+      72,
+      72
+    ],
+    "bytes": 11773,
+    "mode": "RGBA",
+    "alphaBounds": [
+      0,
+      0,
+      72,
+      72
+    ]
+  },
+  {
+    "path": "gate/teal/2.png",
+    "size": [
+      72,
+      72
+    ],
+    "bytes": 11667,
+    "mode": "RGBA",
+    "alphaBounds": [
+      0,
+      0,
+      72,
+      72
+    ]
+  },
+  {
+    "path": "gate/teal/3.png",
+    "size": [
+      72,
+      72
+    ],
+    "bytes": 11716,
+    "mode": "RGBA",
+    "alphaBounds": [
+      0,
+      0,
+      72,
+      72
+    ]
+  },
+  {
+    "path": "gate/violet/0.png",
+    "size": [
+      72,
+      72
+    ],
+    "bytes": 12096,
+    "mode": "RGBA",
+    "alphaBounds": [
+      0,
+      0,
+      72,
+      72
+    ]
+  },
+  {
+    "path": "gate/violet/1.png",
+    "size": [
+      72,
+      72
+    ],
+    "bytes": 12129,
+    "mode": "RGBA",
+    "alphaBounds": [
+      0,
+      0,
+      72,
+      72
+    ]
+  },
+  {
+    "path": "gate/violet/2.png",
+    "size": [
+      72,
+      72
+    ],
+    "bytes": 12070,
+    "mode": "RGBA",
+    "alphaBounds": [
+      0,
+      0,
+      72,
+      72
+    ]
+  },
+  {
+    "path": "gate/violet/3.png",
+    "size": [
+      72,
+      72
+    ],
+    "bytes": 12040,
+    "mode": "RGBA",
+    "alphaBounds": [
+      0,
+      0,
+      72,
+      72
+    ]
+  },
+  {
+    "path": "crystal/0.png",
+    "size": [
+      64,
+      64
+    ],
+    "bytes": 7068,
+    "mode": "RGBA",
+    "alphaBounds": [
+      7,
+      2,
+      56,
+      64
+    ]
+  },
+  {
+    "path": "crystal/1.png",
+    "size": [
+      64,
+      64
+    ],
+    "bytes": 5785,
+    "mode": "RGBA",
+    "alphaBounds": [
+      12,
+      6,
+      51,
+      64
+    ]
+  },
+  {
+    "path": "crystal/2.png",
+    "size": [
+      64,
+      64
+    ],
+    "bytes": 5295,
+    "mode": "RGBA",
+    "alphaBounds": [
+      17,
+      2,
+      46,
+      64
+    ]
+  },
+  {
+    "path": "crystal/3.png",
+    "size": [
+      64,
+      64
+    ],
+    "bytes": 5860,
+    "mode": "RGBA",
+    "alphaBounds": [
+      12,
+      6,
+      51,
+      64
+    ]
+  },
+  {
+    "path": "pulse.png",
+    "size": [
+      32,
+      24
+    ],
+    "bytes": 2072,
+    "mode": "RGBA",
+    "alphaBounds": [
+      0,
+      0,
+      32,
+      24
+    ]
+  },
+  {
+    "path": "background.png",
+    "size": [
+      1280,
+      736
+    ],
+    "bytes": 1011547,
+    "mode": "RGB",
+    "alphaBounds": null
+  }
+]

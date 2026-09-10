@@ -1,0 +1,272 @@
+{
+  "space-invaders": {
+    "01": [
+      {
+        "before": "\n원강의 51강의 제작 순서에 대응합니다. [강의 위치](https://www.udemy.com/course/the-art-of-doing-video-game-creation-with-python-and-pygame/learn/lecture/27597170)는 순서 참고용이며 이 문서만으로 실습합니다.\n",
+        "after": ""
+      },
+      {
+        "before": "\n[빈 시작 프로젝트 백업](/space-invaders/space-invaders-starter.mspygame.json)은 내 프로젝트 → 백업 파일 복원으로 열 수 있습니다. [시작 ZIP](/space-invaders/space-invaders-starter.zip)은 압축을 푼 후 프로젝트 가져오기로 폴더를 선택합니다. 스튜디오 상단 프로젝트 다운로드 버튼은 .mspygame.json 백업을 저장합니다. 자동 저장은 같은 기기·브라우저의 초안 저장이므로 수업 후 백업도 보관합니다.\n\n[에셋 출처와 이용 안내](/space-invaders/ASSETS.md), [폰트 라이선스](/space-invaders/OFL-DoHyeon.txt)를 함께 제공합니다. 그림·소리는 새로 제작했고, 한글 폰트는 라이선스와 함께 제공하는 도현체입니다.\n",
+        "after": ""
+      },
+      {
+        "before": "[이 단계 누적 코드 01-A.py](/space-invaders/checkpoints/01-A.py)와 비교할 수 있습니다.\n\n",
+        "after": ""
+      },
+      {
+        "before": "- [ ] Quiz Battle의 출제 범위에서 **현재 유닛만**을 선택해 이 단원의 10문항으로 복습합니다. 기본값인 이전 과정 전체를 선택하면 다른 게임 프로젝트의 앞선 과정도 포함됩니다.\n",
+        "after": "- [ ] Quiz Battle에서 같은 단원의 문제은행으로 복습합니다.\n"
+      }
+    ],
+    "02": [
+      {
+        "before": "원강의 52강의 제작 순서에 대응합니다. [강의 위치](https://www.udemy.com/course/the-art-of-doing-video-game-creation-with-python-and-pygame/learn/lecture/27597174)는 순서 참고용이며 이 문서만으로 실습합니다.\n\n",
+        "after": ""
+      },
+      {
+        "before": "각 단계에서 먼저 정지를 누르고 main.py를 수정합니다. 여러 편집이 있으면 전부 마친 후 실행합니다. 실행 후 게임 화면을 클릭해야 키 입력이 게임에 전달됩니다. 코드는 왼쪽 공백까지 입력하며, 잘 모르겠는 이름은 바로 아래 설명에서 확인합니다. 단계 파일은 직접 작성한 코드와 비교·복구할 때 사용합니다.\n",
+        "after": "각 단계에서 먼저 정지를 누르고 main.py를 수정합니다. 실행 후 게임 화면을 클릭해야 키 입력이 게임에 전달됩니다. \n"
+      }
+    ],
+    "03": [
+      {
+        "before": "원강의 53강의 제작 순서에 대응합니다. [강의 위치](https://www.udemy.com/course/the-art-of-doing-video-game-creation-with-python-and-pygame/learn/lecture/27597176)는 순서 참고용이며 이 문서만으로 실습합니다.\n",
+        "after": ""
+      },
+      {
+        "before": "각 단계에서 먼저 정지를 누르고 main.py를 수정합니다. 여러 편집이 있으면 전부 마친 후 실행합니다. 실행 후 게임 화면을 클릭해야 키 입력이 게임에 전달됩니다. 코드는 왼쪽 공백까지 입력하며, 잘 모르겠는 이름은 바로 아래 설명에서 확인합니다. 단계 파일은 직접 작성한 코드와 비교·복구할 때 사용합니다.\n",
+        "after": "각 단계에서 먼저 정지를 누르고 main.py를 수정합니다. 실행 후 게임 화면을 클릭해야 키 입력이 게임에 전달됩니다. 코드는 왼쪽 공백까지 입력하며, 잘 모르겠는 이름은 바로 아래 설명에서 확인합니다. 단계 파일은 직접 작성한 코드와 비교·복구할 때 사용합니다.\n"
+      }
+    ],
+    "04": [
+      {
+        "before": "원강의 54강의 제작 순서에 대응합니다. [강의 위치](https://www.udemy.com/course/the-art-of-doing-video-game-creation-with-python-and-pygame/learn/lecture/27597182)는 순서 참고용이며 이 문서만으로 실습합니다.\n",
+        "after": ""
+      }
+    ],
+    "05": [
+      {
+        "before": "\n원강의 55강의 제작 순서에 대응합니다. [강의 위치](https://www.udemy.com/course/the-art-of-doing-video-game-creation-with-python-and-pygame/learn/lecture/27597186)는 순서 참고용이며 이 문서만으로 실습합니다.\n",
+        "after": ""
+      }
+    ],
+    "06": [
+      {
+        "before": "\n원강의 56강의 제작 순서에 대응합니다. [강의 위치](https://www.udemy.com/course/the-art-of-doing-video-game-creation-with-python-and-pygame/learn/lecture/27597190)는 순서 참고용이며 이 문서만으로 실습합니다.\n",
+        "after": ""
+      }
+    ],
+    "07": [
+      {
+        "before": "\n원강의 57강의 제작 순서에 대응합니다. [강의 위치](https://www.udemy.com/course/the-art-of-doing-video-game-creation-with-python-and-pygame/learn/lecture/27597194)는 순서 참고용이며 이 문서만으로 실습합니다.\n",
+        "after": ""
+      }
+    ],
+    "08": [
+      {
+        "before": "원강의 58강의 제작 순서에 대응합니다. [강의 위치](https://www.udemy.com/course/the-art-of-doing-video-game-creation-with-python-and-pygame/learn/lecture/27597200)는 순서 참고용이며 이 문서만으로 실습합니다.\n",
+        "after": ""
+      }
+    ],
+    "09": [
+      {
+        "before": "원강의 59강의 제작 순서에 대응합니다. [강의 위치](https://www.udemy.com/course/the-art-of-doing-video-game-creation-with-python-and-pygame/learn/lecture/27597202)는 순서 참고용이며 이 문서만으로 실습합니다.\n",
+        "after": ""
+      }
+    ],
+    "10": [
+      {
+        "before": "\n원강의 60강의 제작 순서에 대응합니다. [강의 위치](https://www.udemy.com/course/the-art-of-doing-video-game-creation-with-python-and-pygame/learn/lecture/27597204)는 순서 참고용이며 이 문서만으로 실습합니다.\n",
+        "after": ""
+      }
+    ]
+  },
+  "mars-expedition": {
+    "01": [
+      {
+        "before": "\n원강의 61강의 제작 순서에 대응합니다. 영상 없이 이 문서만 보고 작성합니다. [강의 위치](https://www.udemy.com/course/the-art-of-doing-video-game-creation-with-python-and-pygame/learn/lecture/27613350)는 순서를 확인하기 위한 참고입니다.\n",
+        "after": ""
+      }
+    ],
+    "02": [
+      {
+        "before": "\n원강의 62강의 제작 순서에 대응합니다. 영상 없이 이 문서만 보고 작성합니다. [강의 위치](https://www.udemy.com/course/the-art-of-doing-video-game-creation-with-python-and-pygame/learn/lecture/27613356)는 순서를 확인하기 위한 참고입니다.\n",
+        "after": ""
+      }
+    ],
+    "03": [
+      {
+        "before": "\n원강의 63강의 제작 순서에 대응합니다. 영상 없이 이 문서만 보고 작성합니다. [강의 위치](https://www.udemy.com/course/the-art-of-doing-video-game-creation-with-python-and-pygame/learn/lecture/27613362)는 순서를 확인하기 위한 참고입니다.\n",
+        "after": ""
+      }
+    ],
+    "04": [
+      {
+        "before": "\n원강의 64강의 제작 순서에 대응합니다. 영상 없이 이 문서만 보고 작성합니다. [강의 위치](https://www.udemy.com/course/the-art-of-doing-video-game-creation-with-python-and-pygame/learn/lecture/27613366)는 순서를 확인하기 위한 참고입니다.\n",
+        "after": ""
+      }
+    ],
+    "05": [
+      {
+        "before": "\n원강의 65강의 제작 순서에 대응합니다. 영상 없이 이 문서만 보고 작성합니다. [강의 위치](https://www.udemy.com/course/the-art-of-doing-video-game-creation-with-python-and-pygame/learn/lecture/27613372)는 순서를 확인하기 위한 참고입니다.\n",
+        "after": ""
+      }
+    ],
+    "06": [
+      {
+        "before": "\n원강의 66강의 제작 순서에 대응합니다. 영상 없이 이 문서만 보고 작성합니다. [강의 위치](https://www.udemy.com/course/the-art-of-doing-video-game-creation-with-python-and-pygame/learn/lecture/27613380)는 순서를 확인하기 위한 참고입니다.\n",
+        "after": ""
+      }
+    ],
+    "07": [
+      {
+        "before": "\n원강의 67강의 제작 순서에 대응합니다. 영상 없이 이 문서만 보고 작성합니다. [강의 위치](https://www.udemy.com/course/the-art-of-doing-video-game-creation-with-python-and-pygame/learn/lecture/27626132)는 순서를 확인하기 위한 참고입니다.\n",
+        "after": ""
+      }
+    ],
+    "08": [
+      {
+        "before": "\n원강의 68강의 제작 순서에 대응합니다. 영상 없이 이 문서만 보고 작성합니다. [강의 위치](https://www.udemy.com/course/the-art-of-doing-video-game-creation-with-python-and-pygame/learn/lecture/27626134)는 순서를 확인하기 위한 참고입니다.\n",
+        "after": ""
+      }
+    ],
+    "09": [
+      {
+        "before": "\n원강의 69강의 제작 순서에 대응합니다. 영상 없이 이 문서만 보고 작성합니다. [강의 위치](https://www.udemy.com/course/the-art-of-doing-video-game-creation-with-python-and-pygame/learn/lecture/27716078)는 순서를 확인하기 위한 참고입니다.\n",
+        "after": ""
+      }
+    ],
+    "10": [
+      {
+        "before": "\n원강의 70강의 제작 순서에 대응합니다. 영상 없이 이 문서만 보고 작성합니다. [강의 위치](https://www.udemy.com/course/the-art-of-doing-video-game-creation-with-python-and-pygame/learn/lecture/27701364)는 순서를 확인하기 위한 참고입니다.\n",
+        "after": ""
+      }
+    ],
+    "11": [
+      {
+        "before": "\n원강의 71강의 제작 순서에 대응합니다. 영상 없이 이 문서만 보고 작성합니다. [강의 위치](https://www.udemy.com/course/the-art-of-doing-video-game-creation-with-python-and-pygame/learn/lecture/27701386)는 순서를 확인하기 위한 참고입니다.\n",
+        "after": ""
+      }
+    ],
+    "12": [
+      {
+        "before": "\n원강의 72강의 제작 순서에 대응합니다. 영상 없이 이 문서만 보고 작성합니다. [강의 위치](https://www.udemy.com/course/the-art-of-doing-video-game-creation-with-python-and-pygame/learn/lecture/27701392)는 순서를 확인하기 위한 참고입니다.\n",
+        "after": ""
+      }
+    ],
+    "13": [
+      {
+        "before": "\n원강의 73강의 제작 순서에 대응합니다. 영상 없이 이 문서만 보고 작성합니다. [강의 위치](https://www.udemy.com/course/the-art-of-doing-video-game-creation-with-python-and-pygame/learn/lecture/27701402)는 순서를 확인하기 위한 참고입니다.\n",
+        "after": ""
+      }
+    ],
+    "14": [
+      {
+        "before": "\n원강의 74강의 제작 순서에 대응합니다. 영상 없이 이 문서만 보고 작성합니다. [강의 위치](https://www.udemy.com/course/the-art-of-doing-video-game-creation-with-python-and-pygame/learn/lecture/27701404)는 순서를 확인하기 위한 참고입니다.\n",
+        "after": ""
+      }
+    ],
+    "15": [
+      {
+        "before": "\n원강의 75강의 제작 순서에 대응합니다. 영상 없이 이 문서만 보고 작성합니다. [강의 위치](https://www.udemy.com/course/the-art-of-doing-video-game-creation-with-python-and-pygame/learn/lecture/27701408)는 순서를 확인하기 위한 참고입니다.\n",
+        "after": ""
+      }
+    ],
+    "16": [
+      {
+        "before": "원강의 76강의 제작 순서에 대응합니다. 영상 없이 이 문서만 보고 작성합니다. [강의 위치](https://www.udemy.com/course/the-art-of-doing-video-game-creation-with-python-and-pygame/learn/lecture/27701410)는 순서를 확인하기 위한 참고입니다.\n",
+        "after": ""
+      }
+    ],
+    "17": [
+      {
+        "before": "\n원강의 77강의 제작 순서에 대응합니다. 영상 없이 이 문서만 보고 작성합니다. [강의 위치](https://www.udemy.com/course/the-art-of-doing-video-game-creation-with-python-and-pygame/learn/lecture/27701414)는 순서를 확인하기 위한 참고입니다.\n",
+        "after": ""
+      }
+    ],
+    "18": [
+      {
+        "before": "\n원강의 78강의 제작 순서에 대응합니다. 영상 없이 이 문서만 보고 작성합니다. [강의 위치](https://www.udemy.com/course/the-art-of-doing-video-game-creation-with-python-and-pygame/learn/lecture/27704198)는 순서를 확인하기 위한 참고입니다.\n",
+        "after": ""
+      }
+    ],
+    "19": [
+      {
+        "before": "\n원강의 79강의 제작 순서에 대응합니다. 영상 없이 이 문서만 보고 작성합니다. [강의 위치](https://www.udemy.com/course/the-art-of-doing-video-game-creation-with-python-and-pygame/learn/lecture/27704204)는 순서를 확인하기 위한 참고입니다.\n",
+        "after": ""
+      }
+    ],
+    "20": [
+      {
+        "before": "원강의 80강의 제작 순서에 대응합니다. 영상 없이 이 문서만 보고 작성합니다. [강의 위치](https://www.udemy.com/course/the-art-of-doing-video-game-creation-with-python-and-pygame/learn/lecture/27704208)는 순서를 확인하기 위한 참고입니다.\n",
+        "after": ""
+      }
+    ],
+    "21": [
+      {
+        "before": "\n원강의 81강의 제작 순서에 대응합니다. 영상 없이 이 문서만 보고 작성합니다. [강의 위치](https://www.udemy.com/course/the-art-of-doing-video-game-creation-with-python-and-pygame/learn/lecture/27704210)는 순서를 확인하기 위한 참고입니다.\n",
+        "after": ""
+      }
+    ],
+    "22": [
+      {
+        "before": "\n원강의 82강의 제작 순서에 대응합니다. 영상 없이 이 문서만 보고 작성합니다. [강의 위치](https://www.udemy.com/course/the-art-of-doing-video-game-creation-with-python-and-pygame/learn/lecture/27704216)는 순서를 확인하기 위한 참고입니다.\n",
+        "after": ""
+      }
+    ],
+    "23": [
+      {
+        "before": "\n원강의 83강의 제작 순서에 대응합니다. 영상 없이 이 문서만 보고 작성합니다. [강의 위치](https://www.udemy.com/course/the-art-of-doing-video-game-creation-with-python-and-pygame/learn/lecture/27704222)는 순서를 확인하기 위한 참고입니다.\n",
+        "after": ""
+      }
+    ],
+    "24": [
+      {
+        "before": "\n원강의 84강의 제작 순서에 대응합니다. 영상 없이 이 문서만 보고 작성합니다. [강의 위치](https://www.udemy.com/course/the-art-of-doing-video-game-creation-with-python-and-pygame/learn/lecture/27705568)는 순서를 확인하기 위한 참고입니다.\n",
+        "after": ""
+      }
+    ],
+    "25": [
+      {
+        "before": "\n원강의 85강의 제작 순서에 대응합니다. 영상 없이 이 문서만 보고 작성합니다. [강의 위치](https://www.udemy.com/course/the-art-of-doing-video-game-creation-with-python-and-pygame/learn/lecture/27705570)는 순서를 확인하기 위한 참고입니다.\n",
+        "after": ""
+      }
+    ],
+    "26": [
+      {
+        "before": "\n원강의 86강의 제작 순서에 대응합니다. 영상 없이 이 문서만 보고 작성합니다. [강의 위치](https://www.udemy.com/course/the-art-of-doing-video-game-creation-with-python-and-pygame/learn/lecture/27705572)는 순서를 확인하기 위한 참고입니다.\n",
+        "after": ""
+      }
+    ],
+    "27": [
+      {
+        "before": "\n원강의 87강의 제작 순서에 대응합니다. 영상 없이 이 문서만 보고 작성합니다. [강의 위치](https://www.udemy.com/course/the-art-of-doing-video-game-creation-with-python-and-pygame/learn/lecture/27705574)는 순서를 확인하기 위한 참고입니다.\n",
+        "after": ""
+      }
+    ],
+    "28": [
+      {
+        "before": "\n원강의 88강의 제작 순서에 대응합니다. 영상 없이 이 문서만 보고 작성합니다. [강의 위치](https://www.udemy.com/course/the-art-of-doing-video-game-creation-with-python-and-pygame/learn/lecture/27705578)는 순서를 확인하기 위한 참고입니다.\n",
+        "after": ""
+      }
+    ],
+    "29": [
+      {
+        "before": "\n원강의 89강의 제작 순서에 대응합니다. 영상 없이 이 문서만 보고 작성합니다. [강의 위치](https://www.udemy.com/course/the-art-of-doing-video-game-creation-with-python-and-pygame/learn/lecture/27709208)는 순서를 확인하기 위한 참고입니다.\n",
+        "after": ""
+      }
+    ],
+    "30": [
+      {
+        "before": "\n원강의 90강의 제작 순서에 대응합니다. 영상 없이 이 문서만 보고 작성합니다. [강의 위치](https://www.udemy.com/course/the-art-of-doing-video-game-creation-with-python-and-pygame/learn/lecture/27709214)는 순서를 확인하기 위한 참고입니다.\n",
+        "after": ""
+      }
+    ],
+    "31": [
+      {
+        "before": "원강의 91강의 제작 순서에 대응합니다. 영상 없이 이 문서만 보고 작성합니다. [강의 위치](https://www.udemy.com/course/the-art-of-doing-video-game-creation-with-python-and-pygame/learn/lecture/27709226)는 순서를 확인하기 위한 참고입니다.\n",
+        "after": ""
+      }
+    ]
+  }
+}

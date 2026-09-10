@@ -1,0 +1,68 @@
+test_game_over_preserves_final_score_until_enter (__main__.GameplayAcceptance) ... FAIL
+test_last_enemy_and_last_life_same_frame_keeps_game_over (__main__.GameplayAcceptance) ... FAIL
+test_movement_clamps_both_edges_after_step (__main__.GameplayAcceptance) ... test_multiple_kills_score_each_enemy (__main__.GameplayAcceptance) ... ok
+test_new_wave_clears_old_bullets_and_awards_current_round_bonus (__main__.GameplayAcceptance) ... FAIL
+test_two_bullet_limit_and_offscreen_cleanup (__main__.GameplayAcceptance) ... ok
+test_update_stops_when_breach_pauses_game (__main__.GameplayAcceptance) ... FAIL
+
+======================================================================
+FAIL: test_game_over_preserves_final_score_until_enter (__main__.GameplayAcceptance)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/selah/Documents/수학감각_방학특가용ppt/pdf완성본/math-sense-app/docs/collaboration/tasks/20260909-space-invaders-curriculum/verify-gameplay.py", line 51, in test_game_over_preserves_final_score_until_enter
+    self.assertEqual(self.mission.state, 'game_over')
+AssertionError: 'paused' != 'game_over'
+- paused
++ game_over
+
+
+======================================================================
+FAIL: test_last_enemy_and_last_life_same_frame_keeps_game_over (__main__.GameplayAcceptance)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/selah/Documents/수학감각_방학특가용ppt/pdf완성본/math-sense-app/docs/collaboration/tasks/20260909-space-invaders-curriculum/verify-gameplay.py", line 97, in test_last_enemy_and_last_life_same_frame_keeps_game_over
+    self.assertEqual(self.mission.state, 'game_over')
+AssertionError: 'paused' != 'game_over'
+- paused
++ game_over
+
+
+======================================================================
+FAIL: test_movement_clamps_both_edges_after_step (__main__.GameplayAcceptance) (key=1073741904)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/selah/Documents/수학감각_방학특가용ppt/pdf완성본/math-sense-app/docs/collaboration/tasks/20260909-space-invaders-curriculum/verify-gameplay.py", line 62, in test_movement_clamps_both_edges_after_step
+    self.assertGreaterEqual(self.scout.rect.left, 0)
+AssertionError: -7 not greater than or equal to 0
+
+======================================================================
+FAIL: test_movement_clamps_both_edges_after_step (__main__.GameplayAcceptance) (key=1073741903)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/selah/Documents/수학감각_방학특가용ppt/pdf완성본/math-sense-app/docs/collaboration/tasks/20260909-space-invaders-curriculum/verify-gameplay.py", line 63, in test_movement_clamps_both_edges_after_step
+    self.assertLessEqual(self.scout.rect.right, 1200)
+AssertionError: 1207 not less than or equal to 1200
+
+======================================================================
+FAIL: test_new_wave_clears_old_bullets_and_awards_current_round_bonus (__main__.GameplayAcceptance)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/selah/Documents/수학감각_방학특가용ppt/pdf완성본/math-sense-app/docs/collaboration/tasks/20260909-space-invaders-curriculum/verify-gameplay.py", line 75, in test_new_wave_clears_old_bullets_and_awards_current_round_bonus
+    self.assertEqual(len(self.ns['scout_pulses']), 0)
+AssertionError: 1 != 0
+
+======================================================================
+FAIL: test_update_stops_when_breach_pauses_game (__main__.GameplayAcceptance)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/selah/Documents/수학감각_방학특가용ppt/pdf완성본/math-sense-app/docs/collaboration/tasks/20260909-space-invaders-curriculum/verify-gameplay.py", line 84, in test_update_stops_when_breach_pauses_game
+    collisions.assert_not_called()
+  File "/Users/selah/opt/anaconda3/lib/python3.9/unittest/mock.py", line 868, in assert_not_called
+    raise AssertionError(msg)
+AssertionError: Expected 'check_collisions' to not have been called. Called 1 times.
+Calls: [call()].
+
+----------------------------------------------------------------------
+Ran 7 tests in 11.763s
+
+FAILED (failures=6)

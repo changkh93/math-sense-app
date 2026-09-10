@@ -1,0 +1,253 @@
+{
+  "verifiedFrom": "Authenticated Udemy visible course sidebar, 2026-09-10 KST",
+  "lectures": [
+    {
+      "number": 61,
+      "section": 10,
+      "title": "Creating a Tile Map",
+      "lectureId": "27613350",
+      "titleVerified": true,
+      "internalOrderVerified": true
+    },
+    {
+      "number": 62,
+      "section": 10,
+      "title": "Designing a Level",
+      "lectureId": "27613356",
+      "titleVerified": true,
+      "internalOrderVerified": true
+    },
+    {
+      "number": 63,
+      "section": 10,
+      "title": "Using 2 Dimensional Vectors for Player Movement Part 1",
+      "lectureId": null,
+      "titleVerified": true,
+      "internalOrderVerified": false
+    },
+    {
+      "number": 64,
+      "section": 10,
+      "title": "Using 2 Dimensional Vectors for Player Movement Part 2",
+      "lectureId": null,
+      "titleVerified": true,
+      "internalOrderVerified": false
+    },
+    {
+      "number": 65,
+      "section": 10,
+      "title": "Adding Gravity",
+      "lectureId": null,
+      "titleVerified": true,
+      "internalOrderVerified": false
+    },
+    {
+      "number": 66,
+      "section": 10,
+      "title": "Adding Jumping and Wrap Around Movement",
+      "lectureId": null,
+      "titleVerified": true,
+      "internalOrderVerified": false
+    },
+    {
+      "number": 67,
+      "section": 10,
+      "title": "Sprite Animation",
+      "lectureId": null,
+      "titleVerified": true,
+      "internalOrderVerified": false
+    },
+    {
+      "number": 68,
+      "section": 10,
+      "title": "Collision Masks",
+      "lectureId": null,
+      "titleVerified": true,
+      "internalOrderVerified": false
+    },
+    {
+      "number": 69,
+      "section": 11,
+      "title": "Zombie Knight Preview",
+      "lectureId": null,
+      "titleVerified": true,
+      "internalOrderVerified": false
+    },
+    {
+      "number": 70,
+      "section": 11,
+      "title": "Zombie Knight Asset Gathering",
+      "lectureId": null,
+      "titleVerified": true,
+      "internalOrderVerified": false
+    },
+    {
+      "number": 71,
+      "section": 11,
+      "title": "Zombie Knight Setup 1",
+      "lectureId": null,
+      "titleVerified": true,
+      "internalOrderVerified": false
+    },
+    {
+      "number": 72,
+      "section": 11,
+      "title": "Zombie Knight Setup 2",
+      "lectureId": null,
+      "titleVerified": true,
+      "internalOrderVerified": false
+    },
+    {
+      "number": 73,
+      "section": 11,
+      "title": "Zombie Knight Creating Our Tile Map",
+      "lectureId": null,
+      "titleVerified": true,
+      "internalOrderVerified": false
+    },
+    {
+      "number": 74,
+      "section": 11,
+      "title": "Zombie Knight Tile Class",
+      "lectureId": null,
+      "titleVerified": true,
+      "internalOrderVerified": false
+    },
+    {
+      "number": 75,
+      "section": 11,
+      "title": "Zombie Knight Ruby Maker Class",
+      "lectureId": null,
+      "titleVerified": true,
+      "internalOrderVerified": false
+    },
+    {
+      "number": 76,
+      "section": 11,
+      "title": "Zombie Knight Portal Class",
+      "lectureId": null,
+      "titleVerified": true,
+      "internalOrderVerified": false
+    },
+    {
+      "number": 77,
+      "section": 11,
+      "title": "Zombie Knight Game Class 1",
+      "lectureId": null,
+      "titleVerified": true,
+      "internalOrderVerified": false
+    },
+    {
+      "number": 78,
+      "section": 12,
+      "title": "Zombie Knight Player Class 1",
+      "lectureId": null,
+      "titleVerified": true,
+      "internalOrderVerified": false
+    },
+    {
+      "number": 79,
+      "section": 12,
+      "title": "Zombie Knight Player Class 2",
+      "lectureId": null,
+      "titleVerified": true,
+      "internalOrderVerified": false
+    },
+    {
+      "number": 80,
+      "section": 12,
+      "title": "Zombie Knight Player Class 3",
+      "lectureId": null,
+      "titleVerified": true,
+      "internalOrderVerified": false
+    },
+    {
+      "number": 81,
+      "section": 12,
+      "title": "Zombie Knight Player Class 4",
+      "lectureId": null,
+      "titleVerified": true,
+      "internalOrderVerified": false
+    },
+    {
+      "number": 82,
+      "section": 12,
+      "title": "Zombie Knight Zombie Class 1",
+      "lectureId": null,
+      "titleVerified": true,
+      "internalOrderVerified": false
+    },
+    {
+      "number": 83,
+      "section": 12,
+      "title": "Zombie Knight Zombie Class 2",
+      "lectureId": null,
+      "titleVerified": true,
+      "internalOrderVerified": false
+    },
+    {
+      "number": 84,
+      "section": 12,
+      "title": "Zombie Knight Zombie Class 3",
+      "lectureId": null,
+      "titleVerified": true,
+      "internalOrderVerified": false
+    },
+    {
+      "number": 85,
+      "section": 12,
+      "title": "Zombie Knight Zombie Class 4",
+      "lectureId": null,
+      "titleVerified": true,
+      "internalOrderVerified": false
+    },
+    {
+      "number": 86,
+      "section": 12,
+      "title": "Zombie Knight Zombie Class 5",
+      "lectureId": null,
+      "titleVerified": true,
+      "internalOrderVerified": false
+    },
+    {
+      "number": 87,
+      "section": 13,
+      "title": "Zombie Knight Ruby Class 1",
+      "lectureId": null,
+      "titleVerified": true,
+      "internalOrderVerified": false
+    },
+    {
+      "number": 88,
+      "section": 13,
+      "title": "Zombie Knight Ruby Class 2",
+      "lectureId": null,
+      "titleVerified": true,
+      "internalOrderVerified": false
+    },
+    {
+      "number": 89,
+      "section": 13,
+      "title": "Zombie Knight Game Class 2",
+      "lectureId": null,
+      "titleVerified": true,
+      "internalOrderVerified": false
+    },
+    {
+      "number": 90,
+      "section": 13,
+      "title": "Zombie Knight Game Class 3",
+      "lectureId": null,
+      "titleVerified": true,
+      "internalOrderVerified": false
+    },
+    {
+      "number": 91,
+      "section": 13,
+      "title": "Let's Play Zombie Knight!",
+      "lectureId": null,
+      "titleVerified": true,
+      "internalOrderVerified": false
+    }
+  ]
+}

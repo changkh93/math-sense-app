@@ -1,0 +1,1219 @@
+{
+  "initial": {
+    "header": "",
+    "helpers": "",
+    "classes": {},
+    "setup": "",
+    "loop": ""
+  },
+  "steps": [
+    {
+      "id": "01-A",
+      "previous": null,
+      "edits": [
+        {
+          "key": "header",
+          "before": "",
+          "after": "import pygame\n\npygame.init()\nSCREEN_WIDTH, SCREEN_HEIGHT = 960, 640\nTILE_SIZE = 32\nFPS = 60\nscreen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))\npygame.display.set_caption('화성 탐사대 - 기초 실험')\nclock = pygame.time.Clock()"
+        },
+        {
+          "key": "loop",
+          "before": "",
+          "after": "running = True\nwhile running:\n    seconds = min(clock.tick(FPS) / 1000, 0.05)\n    for event in pygame.event.get():\n        if event.type == pygame.QUIT:\n            running = False\n    if not running:\n        break\n    screen.fill((15, 25, 42))\n    pygame.display.update()\n\npygame.quit()"
+        }
+      ]
+    },
+    {
+      "id": "01-B",
+      "previous": "01-A",
+      "edits": [
+        {
+          "key": "setup",
+          "before": "",
+          "after": "level_map = [[0 for column in range(30)] for row in range(20)]"
+        }
+      ]
+    },
+    {
+      "id": "01-C",
+      "previous": "01-B",
+      "edits": [
+        {
+          "key": "setup",
+          "before": "level_map = [[0 for column in range(30)] for row in range(20)]",
+          "after": "level_map = [[0 for column in range(30)] for row in range(20)]\nlevel_map[19] = [1] * 30\nlevel_map[18] = [2] * 10 + [6] * 10 + [2] * 10\nlevel_map[14][4:12] = [3] + [4] * 6 + [5]\nlevel_map[10][14:22] = [3] + [4] * 6 + [5]\nlevel_map[6][5:13] = [3] + [4] * 6 + [5]"
+        }
+      ]
+    },
+    {
+      "id": "02-A",
+      "previous": "01-C",
+      "edits": [
+        {
+          "key": "helpers",
+          "before": "",
+          "after": "image_cache = {}\n\n\ndef load_image(path, size):\n    key = (path, size)\n    if key not in image_cache:\n        image_cache[key] = pygame.transform.smoothscale(pygame.image.load(path).convert_alpha(), size)\n    return image_cache[key]"
+        },
+        {
+          "key": "classes",
+          "before": {},
+          "after": {
+            "Terrain": {
+              "__init__": "    def __init__(self, x, y, kind, tiles, subgroup=None):\n        super().__init__(tiles)\n        self.image = load_image(f'assets/tiles/{kind}.png', (TILE_SIZE, TILE_SIZE))\n        self.rect = self.image.get_rect(topleft=(x, y))\n        if subgroup is not None:\n            subgroup.add(self)"
+            }
+          }
+        },
+        {
+          "key": "setup",
+          "before": "level_map = [[0 for column in range(30)] for row in range(20)]\nlevel_map[19] = [1] * 30\nlevel_map[18] = [2] * 10 + [6] * 10 + [2] * 10\nlevel_map[14][4:12] = [3] + [4] * 6 + [5]\nlevel_map[10][14:22] = [3] + [4] * 6 + [5]\nlevel_map[6][5:13] = [3] + [4] * 6 + [5]",
+          "after": "tiles = pygame.sprite.Group()\nplatforms = pygame.sprite.Group()\nhazards = pygame.sprite.Group()\nexplorers = pygame.sprite.Group()\nlevel_map = [[0 for column in range(30)] for row in range(20)]\nlevel_map[19] = [1] * 30\nlevel_map[18] = [2] * 10 + [6] * 10 + [2] * 10\nlevel_map[14][4:12] = [3] + [4] * 6 + [5]\nlevel_map[10][14:22] = [3] + [4] * 6 + [5]\nlevel_map[6][5:13] = [3] + [4] * 6 + [5]\n\nfor row, cells in enumerate(level_map):\n    for column, kind in enumerate(cells):\n        x, y = column * TILE_SIZE, row * TILE_SIZE\n        if kind == 1:\n            Terrain(x, y, kind, tiles)\n        elif 2 <= kind <= 5:\n            Terrain(x, y, kind, tiles, platforms)\n        elif kind == 6:\n            Terrain(x, y, kind, tiles, hazards)"
+        },
+        {
+          "key": "loop",
+          "before": "running = True\nwhile running:\n    seconds = min(clock.tick(FPS) / 1000, 0.05)\n    for event in pygame.event.get():\n        if event.type == pygame.QUIT:\n            running = False\n    if not running:\n        break\n    screen.fill((15, 25, 42))\n    pygame.display.update()\n\npygame.quit()",
+          "after": "running = True\nwhile running:\n    seconds = min(clock.tick(FPS) / 1000, 0.05)\n    for event in pygame.event.get():\n        if event.type == pygame.QUIT:\n            running = False\n    if not running:\n        break\n    screen.fill((15, 25, 42))\n    tiles.draw(screen)\n    pygame.display.update()\n\npygame.quit()"
+        }
+      ]
+    },
+    {
+      "id": "02-B",
+      "previous": "02-A",
+      "edits": [
+        {
+          "key": "setup",
+          "before": "tiles = pygame.sprite.Group()\nplatforms = pygame.sprite.Group()\nhazards = pygame.sprite.Group()\nexplorers = pygame.sprite.Group()\nlevel_map = [[0 for column in range(30)] for row in range(20)]\nlevel_map[19] = [1] * 30\nlevel_map[18] = [2] * 10 + [6] * 10 + [2] * 10\nlevel_map[14][4:12] = [3] + [4] * 6 + [5]\nlevel_map[10][14:22] = [3] + [4] * 6 + [5]\nlevel_map[6][5:13] = [3] + [4] * 6 + [5]\n\nfor row, cells in enumerate(level_map):\n    for column, kind in enumerate(cells):\n        x, y = column * TILE_SIZE, row * TILE_SIZE\n        if kind == 1:\n            Terrain(x, y, kind, tiles)\n        elif 2 <= kind <= 5:\n            Terrain(x, y, kind, tiles, platforms)\n        elif kind == 6:\n            Terrain(x, y, kind, tiles, hazards)",
+          "after": "tiles = pygame.sprite.Group()\nplatforms = pygame.sprite.Group()\nhazards = pygame.sprite.Group()\nexplorers = pygame.sprite.Group()\nlevel_map = [[0 for column in range(30)] for row in range(20)]\nlevel_map[19] = [1] * 30\nlevel_map[18] = [2] * 10 + [6] * 10 + [2] * 10\nlevel_map[14][4:12] = [3] + [4] * 6 + [5]\nlevel_map[10][14:22] = [3] + [4] * 6 + [5]\nlevel_map[6][5:13] = [3] + [4] * 6 + [5]\n\nfor row, cells in enumerate(level_map):\n    for column, kind in enumerate(cells):\n        x, y = column * TILE_SIZE, row * TILE_SIZE\n        if kind == 1:\n            Terrain(x, y, kind, tiles)\n        elif 2 <= kind <= 5:\n            Terrain(x, y, kind, tiles, platforms)\n        elif kind == 6:\n            Terrain(x, y, kind, tiles, hazards)\n\nbackground = load_image('assets/background.png', (SCREEN_WIDTH, SCREEN_HEIGHT))"
+        },
+        {
+          "key": "loop",
+          "before": "running = True\nwhile running:\n    seconds = min(clock.tick(FPS) / 1000, 0.05)\n    for event in pygame.event.get():\n        if event.type == pygame.QUIT:\n            running = False\n    if not running:\n        break\n    screen.fill((15, 25, 42))\n    tiles.draw(screen)\n    pygame.display.update()\n\npygame.quit()",
+          "after": "running = True\nwhile running:\n    seconds = min(clock.tick(FPS) / 1000, 0.05)\n    for event in pygame.event.get():\n        if event.type == pygame.QUIT:\n            running = False\n    if not running:\n        break\n    screen.blit(background, (0, 0))\n    tiles.draw(screen)\n    pygame.display.update()\n\npygame.quit()"
+        }
+      ]
+    },
+    {
+      "id": "03-A",
+      "previous": "02-B",
+      "edits": [
+        {
+          "key": "classes",
+          "before": {
+            "Terrain": {
+              "__init__": "    def __init__(self, x, y, kind, tiles, subgroup=None):\n        super().__init__(tiles)\n        self.image = load_image(f'assets/tiles/{kind}.png', (TILE_SIZE, TILE_SIZE))\n        self.rect = self.image.get_rect(topleft=(x, y))\n        if subgroup is not None:\n            subgroup.add(self)"
+            }
+          },
+          "after": {
+            "Terrain": {
+              "__init__": "    def __init__(self, x, y, kind, tiles, subgroup=None):\n        super().__init__(tiles)\n        self.image = load_image(f'assets/tiles/{kind}.png', (TILE_SIZE, TILE_SIZE))\n        self.rect = self.image.get_rect(topleft=(x, y))\n        if subgroup is not None:\n            subgroup.add(self)"
+            },
+            "Explorer": {
+              "__init__": "    def __init__(self, x, y, platforms, hazards):\n        super().__init__()\n        self.image = load_image('assets/explorer/idle/0.png', (64, 64))\n        self.rect = self.image.get_rect(midbottom=(x, y))",
+              "update": "    def update(self, seconds=1 / FPS):\n        pass"
+            }
+          }
+        },
+        {
+          "key": "setup",
+          "before": "tiles = pygame.sprite.Group()\nplatforms = pygame.sprite.Group()\nhazards = pygame.sprite.Group()\nexplorers = pygame.sprite.Group()\nlevel_map = [[0 for column in range(30)] for row in range(20)]\nlevel_map[19] = [1] * 30\nlevel_map[18] = [2] * 10 + [6] * 10 + [2] * 10\nlevel_map[14][4:12] = [3] + [4] * 6 + [5]\nlevel_map[10][14:22] = [3] + [4] * 6 + [5]\nlevel_map[6][5:13] = [3] + [4] * 6 + [5]\n\nfor row, cells in enumerate(level_map):\n    for column, kind in enumerate(cells):\n        x, y = column * TILE_SIZE, row * TILE_SIZE\n        if kind == 1:\n            Terrain(x, y, kind, tiles)\n        elif 2 <= kind <= 5:\n            Terrain(x, y, kind, tiles, platforms)\n        elif kind == 6:\n            Terrain(x, y, kind, tiles, hazards)\n\nbackground = load_image('assets/background.png', (SCREEN_WIDTH, SCREEN_HEIGHT))",
+          "after": "tiles = pygame.sprite.Group()\nplatforms = pygame.sprite.Group()\nhazards = pygame.sprite.Group()\nexplorers = pygame.sprite.Group()\nlevel_map = [[0 for column in range(30)] for row in range(20)]\nlevel_map[19] = [1] * 30\nlevel_map[18] = [2] * 10 + [6] * 10 + [2] * 10\nlevel_map[14][4:12] = [3] + [4] * 6 + [5]\nlevel_map[10][14:22] = [3] + [4] * 6 + [5]\nlevel_map[6][5:13] = [3] + [4] * 6 + [5]\nlevel_map[17][8] = 9\n\nfor row, cells in enumerate(level_map):\n    for column, kind in enumerate(cells):\n        x, y = column * TILE_SIZE, row * TILE_SIZE\n        if kind == 1:\n            Terrain(x, y, kind, tiles)\n        elif 2 <= kind <= 5:\n            Terrain(x, y, kind, tiles, platforms)\n        elif kind == 6:\n            Terrain(x, y, kind, tiles, hazards)\n        elif kind == 9:\n            explorer = Explorer(x, y, platforms, hazards)\n            explorers.add(explorer)\n\nbackground = load_image('assets/background.png', (SCREEN_WIDTH, SCREEN_HEIGHT))"
+        },
+        {
+          "key": "loop",
+          "before": "running = True\nwhile running:\n    seconds = min(clock.tick(FPS) / 1000, 0.05)\n    for event in pygame.event.get():\n        if event.type == pygame.QUIT:\n            running = False\n    if not running:\n        break\n    screen.blit(background, (0, 0))\n    tiles.draw(screen)\n    pygame.display.update()\n\npygame.quit()",
+          "after": "running = True\nwhile running:\n    seconds = min(clock.tick(FPS) / 1000, 0.05)\n    for event in pygame.event.get():\n        if event.type == pygame.QUIT:\n            running = False\n    if not running:\n        break\n    explorers.update(seconds)\n    screen.blit(background, (0, 0))\n    tiles.draw(screen)\n    explorers.draw(screen)\n    pygame.display.update()\n\npygame.quit()"
+        }
+      ]
+    },
+    {
+      "id": "03-B",
+      "previous": "03-A",
+      "edits": [
+        {
+          "key": "header",
+          "before": "import pygame\n\npygame.init()\nSCREEN_WIDTH, SCREEN_HEIGHT = 960, 640\nTILE_SIZE = 32\nFPS = 60\nscreen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))\npygame.display.set_caption('화성 탐사대 - 기초 실험')\nclock = pygame.time.Clock()",
+          "after": "import pygame\n\npygame.init()\nVector = pygame.math.Vector2\nSCREEN_WIDTH, SCREEN_HEIGHT = 960, 640\nTILE_SIZE = 32\nFPS = 60\nscreen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))\npygame.display.set_caption('화성 탐사대 - 기초 실험')\nclock = pygame.time.Clock()"
+        },
+        {
+          "key": "setup",
+          "before": "tiles = pygame.sprite.Group()\nplatforms = pygame.sprite.Group()\nhazards = pygame.sprite.Group()\nexplorers = pygame.sprite.Group()\nlevel_map = [[0 for column in range(30)] for row in range(20)]\nlevel_map[19] = [1] * 30\nlevel_map[18] = [2] * 10 + [6] * 10 + [2] * 10\nlevel_map[14][4:12] = [3] + [4] * 6 + [5]\nlevel_map[10][14:22] = [3] + [4] * 6 + [5]\nlevel_map[6][5:13] = [3] + [4] * 6 + [5]\nlevel_map[17][8] = 9\n\nfor row, cells in enumerate(level_map):\n    for column, kind in enumerate(cells):\n        x, y = column * TILE_SIZE, row * TILE_SIZE\n        if kind == 1:\n            Terrain(x, y, kind, tiles)\n        elif 2 <= kind <= 5:\n            Terrain(x, y, kind, tiles, platforms)\n        elif kind == 6:\n            Terrain(x, y, kind, tiles, hazards)\n        elif kind == 9:\n            explorer = Explorer(x, y, platforms, hazards)\n            explorers.add(explorer)\n\nbackground = load_image('assets/background.png', (SCREEN_WIDTH, SCREEN_HEIGHT))",
+          "after": "tiles = pygame.sprite.Group()\nplatforms = pygame.sprite.Group()\nhazards = pygame.sprite.Group()\nexplorers = pygame.sprite.Group()\nlevel_map = [[0 for column in range(30)] for row in range(20)]\nlevel_map[19] = [1] * 30\nlevel_map[18] = [2] * 10 + [6] * 10 + [2] * 10\nlevel_map[14][4:12] = [3] + [4] * 6 + [5]\nlevel_map[10][14:22] = [3] + [4] * 6 + [5]\nlevel_map[6][5:13] = [3] + [4] * 6 + [5]\nlevel_map[17][8] = 9\n\nfor row, cells in enumerate(level_map):\n    for column, kind in enumerate(cells):\n        x, y = column * TILE_SIZE, row * TILE_SIZE\n        if kind == 1:\n            Terrain(x, y, kind, tiles)\n        elif 2 <= kind <= 5:\n            Terrain(x, y, kind, tiles, platforms)\n        elif kind == 6:\n            Terrain(x, y, kind, tiles, hazards)\n        elif kind == 9:\n            explorer = Explorer(x, y + TILE_SIZE, platforms, hazards)\n            explorers.add(explorer)\n\nbackground = load_image('assets/background.png', (SCREEN_WIDTH, SCREEN_HEIGHT))"
+        },
+        {
+          "key": "Explorer.__init__",
+          "before": "    def __init__(self, x, y, platforms, hazards):\n        super().__init__()\n        self.image = load_image('assets/explorer/idle/0.png', (64, 64))\n        self.rect = self.image.get_rect(midbottom=(x, y))",
+          "after": "    def __init__(self, x, y, platforms, hazards):\n        super().__init__()\n        self.image = load_image('assets/explorer/idle/0.png', (64, 64))\n        self.rect = self.image.get_rect(midbottom=(x, y))\n        self.position = Vector(x, y)\n        self.velocity = Vector(0, 0)\n        self.acceleration = Vector(0, 0)"
+        }
+      ]
+    },
+    {
+      "id": "04-A",
+      "previous": "03-B",
+      "edits": [
+        {
+          "key": "Explorer.update",
+          "before": "    def update(self, seconds=1 / FPS):\n        pass",
+          "after": "    def update(self, seconds=1 / FPS):\n        keys = pygame.key.get_pressed()\n        if keys[pygame.K_LEFT]:\n            self.rect.x -= 10\n        elif keys[pygame.K_RIGHT]:\n            self.rect.x += 10"
+        }
+      ]
+    },
+    {
+      "id": "04-B",
+      "previous": "04-A",
+      "edits": [
+        {
+          "key": "Explorer.__init__",
+          "before": "    def __init__(self, x, y, platforms, hazards):\n        super().__init__()\n        self.image = load_image('assets/explorer/idle/0.png', (64, 64))\n        self.rect = self.image.get_rect(midbottom=(x, y))\n        self.position = Vector(x, y)\n        self.velocity = Vector(0, 0)\n        self.acceleration = Vector(0, 0)",
+          "after": "    def __init__(self, x, y, platforms, hazards):\n        super().__init__()\n        self.image = load_image('assets/explorer/idle/0.png', (64, 64))\n        self.rect = self.image.get_rect(midbottom=(x, y))\n        self.position = Vector(x, y)\n        self.velocity = Vector(0, 0)\n        self.acceleration = Vector(0, 0)\n        self.horizontal_acceleration = 2\n        self.friction = 0.15"
+        },
+        {
+          "key": "Explorer.update",
+          "before": "    def update(self, seconds=1 / FPS):\n        keys = pygame.key.get_pressed()\n        if keys[pygame.K_LEFT]:\n            self.rect.x -= 10\n        elif keys[pygame.K_RIGHT]:\n            self.rect.x += 10",
+          "after": "    def update(self, seconds=1 / FPS):\n        keys = pygame.key.get_pressed()\n        if keys[pygame.K_LEFT]:\n            self.acceleration.x = -self.horizontal_acceleration\n        elif keys[pygame.K_RIGHT]:\n            self.acceleration.x = self.horizontal_acceleration"
+        }
+      ]
+    },
+    {
+      "id": "04-C",
+      "previous": "04-B",
+      "edits": [
+        {
+          "key": "Explorer.update",
+          "before": "    def update(self, seconds=1 / FPS):\n        keys = pygame.key.get_pressed()\n        if keys[pygame.K_LEFT]:\n            self.acceleration.x = -self.horizontal_acceleration\n        elif keys[pygame.K_RIGHT]:\n            self.acceleration.x = self.horizontal_acceleration",
+          "after": "    def update(self, seconds=1 / FPS):\n        keys = pygame.key.get_pressed()\n        if keys[pygame.K_LEFT]:\n            self.acceleration.x = -self.horizontal_acceleration\n        elif keys[pygame.K_RIGHT]:\n            self.acceleration.x = self.horizontal_acceleration\n        scale = min(seconds * FPS, 3)\n        self.position += self.velocity * scale + 0.5 * self.acceleration * scale * scale\n        self.velocity += self.acceleration * scale\n        self.rect.midbottom = self.position"
+        }
+      ]
+    },
+    {
+      "id": "04-D",
+      "previous": "04-C",
+      "edits": [
+        {
+          "key": "Explorer.update",
+          "before": "    def update(self, seconds=1 / FPS):\n        keys = pygame.key.get_pressed()\n        if keys[pygame.K_LEFT]:\n            self.acceleration.x = -self.horizontal_acceleration\n        elif keys[pygame.K_RIGHT]:\n            self.acceleration.x = self.horizontal_acceleration\n        scale = min(seconds * FPS, 3)\n        self.position += self.velocity * scale + 0.5 * self.acceleration * scale * scale\n        self.velocity += self.acceleration * scale\n        self.rect.midbottom = self.position",
+          "after": "    def update(self, seconds=1 / FPS):\n        self.acceleration = Vector(0, 0)\n        keys = pygame.key.get_pressed()\n        if keys[pygame.K_LEFT]:\n            self.acceleration.x = -self.horizontal_acceleration\n        elif keys[pygame.K_RIGHT]:\n            self.acceleration.x = self.horizontal_acceleration\n        self.acceleration.x -= self.velocity.x * self.friction\n        scale = min(seconds * FPS, 3)\n        self.position += self.velocity * scale + 0.5 * self.acceleration * scale * scale\n        self.velocity += self.acceleration * scale\n        self.rect.midbottom = self.position"
+        }
+      ]
+    },
+    {
+      "id": "05-A",
+      "previous": "04-D",
+      "edits": [
+        {
+          "key": "Explorer.__init__",
+          "before": "    def __init__(self, x, y, platforms, hazards):\n        super().__init__()\n        self.image = load_image('assets/explorer/idle/0.png', (64, 64))\n        self.rect = self.image.get_rect(midbottom=(x, y))\n        self.position = Vector(x, y)\n        self.velocity = Vector(0, 0)\n        self.acceleration = Vector(0, 0)\n        self.horizontal_acceleration = 2\n        self.friction = 0.15",
+          "after": "    def __init__(self, x, y, platforms, hazards):\n        super().__init__()\n        self.image = load_image('assets/explorer/idle/0.png', (64, 64))\n        self.rect = self.image.get_rect(midbottom=(x, y))\n        self.position = Vector(x, y)\n        self.velocity = Vector(0, 0)\n        self.acceleration = Vector(0, 0)\n        self.horizontal_acceleration = 2\n        self.friction = 0.15\n        self.gravity = 0.5\n        self.platforms = platforms\n        self.hazards = hazards\n        self.start = Vector(x, y)\n        self.previous_rect = self.rect.copy()\n        self.grounded = False"
+        },
+        {
+          "key": "setup",
+          "before": "tiles = pygame.sprite.Group()\nplatforms = pygame.sprite.Group()\nhazards = pygame.sprite.Group()\nexplorers = pygame.sprite.Group()\nlevel_map = [[0 for column in range(30)] for row in range(20)]\nlevel_map[19] = [1] * 30\nlevel_map[18] = [2] * 10 + [6] * 10 + [2] * 10\nlevel_map[14][4:12] = [3] + [4] * 6 + [5]\nlevel_map[10][14:22] = [3] + [4] * 6 + [5]\nlevel_map[6][5:13] = [3] + [4] * 6 + [5]\nlevel_map[17][8] = 9\n\nfor row, cells in enumerate(level_map):\n    for column, kind in enumerate(cells):\n        x, y = column * TILE_SIZE, row * TILE_SIZE\n        if kind == 1:\n            Terrain(x, y, kind, tiles)\n        elif 2 <= kind <= 5:\n            Terrain(x, y, kind, tiles, platforms)\n        elif kind == 6:\n            Terrain(x, y, kind, tiles, hazards)\n        elif kind == 9:\n            explorer = Explorer(x, y + TILE_SIZE, platforms, hazards)\n            explorers.add(explorer)\n\nbackground = load_image('assets/background.png', (SCREEN_WIDTH, SCREEN_HEIGHT))",
+          "after": "tiles = pygame.sprite.Group()\nplatforms = pygame.sprite.Group()\nhazards = pygame.sprite.Group()\nexplorers = pygame.sprite.Group()\nlevel_map = [[0 for column in range(30)] for row in range(20)]\nlevel_map[19] = [1] * 30\nlevel_map[18] = [2] * 10 + [6] * 10 + [2] * 10\nlevel_map[14][4:12] = [3] + [4] * 6 + [5]\nlevel_map[10][14:22] = [3] + [4] * 6 + [5]\nlevel_map[6][5:13] = [3] + [4] * 6 + [5]\nlevel_map[5][8] = 9\n\nfor row, cells in enumerate(level_map):\n    for column, kind in enumerate(cells):\n        x, y = column * TILE_SIZE, row * TILE_SIZE\n        if kind == 1:\n            Terrain(x, y, kind, tiles)\n        elif 2 <= kind <= 5:\n            Terrain(x, y, kind, tiles, platforms)\n        elif kind == 6:\n            Terrain(x, y, kind, tiles, hazards)\n        elif kind == 9:\n            explorer = Explorer(x, y + TILE_SIZE, platforms, hazards)\n            explorers.add(explorer)\n\nbackground = load_image('assets/background.png', (SCREEN_WIDTH, SCREEN_HEIGHT))"
+        },
+        {
+          "key": "Explorer.update",
+          "before": "    def update(self, seconds=1 / FPS):\n        self.acceleration = Vector(0, 0)\n        keys = pygame.key.get_pressed()\n        if keys[pygame.K_LEFT]:\n            self.acceleration.x = -self.horizontal_acceleration\n        elif keys[pygame.K_RIGHT]:\n            self.acceleration.x = self.horizontal_acceleration\n        self.acceleration.x -= self.velocity.x * self.friction\n        scale = min(seconds * FPS, 3)\n        self.position += self.velocity * scale + 0.5 * self.acceleration * scale * scale\n        self.velocity += self.acceleration * scale\n        self.rect.midbottom = self.position",
+          "after": "    def update(self, seconds=1 / FPS):\n        self.previous_rect = self.rect.copy()\n        self.acceleration = Vector(0, self.gravity)\n        keys = pygame.key.get_pressed()\n        if keys[pygame.K_LEFT]:\n            self.acceleration.x = -self.horizontal_acceleration\n        elif keys[pygame.K_RIGHT]:\n            self.acceleration.x = self.horizontal_acceleration\n        self.acceleration.x -= self.velocity.x * self.friction\n        scale = min(seconds * FPS, 3)\n        self.position += self.velocity * scale + 0.5 * self.acceleration * scale * scale\n        self.velocity += self.acceleration * scale\n        self.rect.midbottom = self.position"
+        }
+      ]
+    },
+    {
+      "id": "05-B",
+      "previous": "05-A",
+      "edits": [
+        {
+          "key": "Explorer.update",
+          "before": "    def update(self, seconds=1 / FPS):\n        self.previous_rect = self.rect.copy()\n        self.acceleration = Vector(0, self.gravity)\n        keys = pygame.key.get_pressed()\n        if keys[pygame.K_LEFT]:\n            self.acceleration.x = -self.horizontal_acceleration\n        elif keys[pygame.K_RIGHT]:\n            self.acceleration.x = self.horizontal_acceleration\n        self.acceleration.x -= self.velocity.x * self.friction\n        scale = min(seconds * FPS, 3)\n        self.position += self.velocity * scale + 0.5 * self.acceleration * scale * scale\n        self.velocity += self.acceleration * scale\n        self.rect.midbottom = self.position",
+          "after": "    def update(self, seconds=1 / FPS):\n        self.previous_rect = self.rect.copy()\n        self.acceleration = Vector(0, self.gravity)\n        keys = pygame.key.get_pressed()\n        if keys[pygame.K_LEFT]:\n            self.acceleration.x = -self.horizontal_acceleration\n        elif keys[pygame.K_RIGHT]:\n            self.acceleration.x = self.horizontal_acceleration\n        self.acceleration.x -= self.velocity.x * self.friction\n        scale = min(seconds * FPS, 3)\n        self.position += self.velocity * scale + 0.5 * self.acceleration * scale * scale\n        self.velocity += self.acceleration * scale\n        self.rect.midbottom = self.position\n        self.grounded = False\n        for tile in sorted(self.platforms, key=lambda tile: tile.rect.top):\n            if self.rect.right <= tile.rect.left or self.rect.left >= tile.rect.right:\n                continue\n            if self.previous_rect.bottom <= tile.rect.top + 1 <= self.rect.bottom + 1:\n                self.position.y = tile.rect.top\n                self.velocity.y = 0\n                self.rect.midbottom = self.position\n                self.grounded = True\n                break\n        if pygame.sprite.spritecollide(self, self.hazards, False):\n            print('지열 위험 구역에 닿았습니다')"
+        }
+      ]
+    },
+    {
+      "id": "06-A",
+      "previous": "05-B",
+      "edits": [
+        {
+          "key": "Explorer.__init__",
+          "before": "    def __init__(self, x, y, platforms, hazards):\n        super().__init__()\n        self.image = load_image('assets/explorer/idle/0.png', (64, 64))\n        self.rect = self.image.get_rect(midbottom=(x, y))\n        self.position = Vector(x, y)\n        self.velocity = Vector(0, 0)\n        self.acceleration = Vector(0, 0)\n        self.horizontal_acceleration = 2\n        self.friction = 0.15\n        self.gravity = 0.5\n        self.platforms = platforms\n        self.hazards = hazards\n        self.start = Vector(x, y)\n        self.previous_rect = self.rect.copy()\n        self.grounded = False",
+          "after": "    def __init__(self, x, y, platforms, hazards):\n        super().__init__()\n        self.image = load_image('assets/explorer/idle/0.png', (64, 64))\n        self.rect = self.image.get_rect(midbottom=(x, y))\n        self.position = Vector(x, y)\n        self.velocity = Vector(0, 0)\n        self.acceleration = Vector(0, 0)\n        self.horizontal_acceleration = 2\n        self.friction = 0.15\n        self.gravity = 0.5\n        self.platforms = platforms\n        self.hazards = hazards\n        self.start = Vector(x, y)\n        self.previous_rect = self.rect.copy()\n        self.grounded = False\n        self.jump_speed = 15"
+        },
+        {
+          "key": "Explorer.jump",
+          "before": "",
+          "after": "    def jump(self):\n        if self.grounded:\n            self.velocity.y = -self.jump_speed\n            self.grounded = False"
+        },
+        {
+          "key": "loop",
+          "before": "running = True\nwhile running:\n    seconds = min(clock.tick(FPS) / 1000, 0.05)\n    for event in pygame.event.get():\n        if event.type == pygame.QUIT:\n            running = False\n    if not running:\n        break\n    explorers.update(seconds)\n    screen.blit(background, (0, 0))\n    tiles.draw(screen)\n    explorers.draw(screen)\n    pygame.display.update()\n\npygame.quit()",
+          "after": "running = True\nwhile running:\n    seconds = min(clock.tick(FPS) / 1000, 0.05)\n    for event in pygame.event.get():\n        if event.type == pygame.QUIT:\n            running = False\n        elif event.type == pygame.KEYDOWN and event.key == pygame.K_SPACE:\n            explorer.jump()\n    if not running:\n        break\n    explorers.update(seconds)\n    screen.blit(background, (0, 0))\n    tiles.draw(screen)\n    explorers.draw(screen)\n    pygame.display.update()\n\npygame.quit()"
+        },
+        {
+          "key": "Explorer.update",
+          "before": "    def update(self, seconds=1 / FPS):\n        self.previous_rect = self.rect.copy()\n        self.acceleration = Vector(0, self.gravity)\n        keys = pygame.key.get_pressed()\n        if keys[pygame.K_LEFT]:\n            self.acceleration.x = -self.horizontal_acceleration\n        elif keys[pygame.K_RIGHT]:\n            self.acceleration.x = self.horizontal_acceleration\n        self.acceleration.x -= self.velocity.x * self.friction\n        scale = min(seconds * FPS, 3)\n        self.position += self.velocity * scale + 0.5 * self.acceleration * scale * scale\n        self.velocity += self.acceleration * scale\n        self.rect.midbottom = self.position\n        self.grounded = False\n        for tile in sorted(self.platforms, key=lambda tile: tile.rect.top):\n            if self.rect.right <= tile.rect.left or self.rect.left >= tile.rect.right:\n                continue\n            if self.previous_rect.bottom <= tile.rect.top + 1 <= self.rect.bottom + 1:\n                self.position.y = tile.rect.top\n                self.velocity.y = 0\n                self.rect.midbottom = self.position\n                self.grounded = True\n                break\n        if pygame.sprite.spritecollide(self, self.hazards, False):\n            print('지열 위험 구역에 닿았습니다')",
+          "after": "    def update(self, seconds=1 / FPS):\n        self.previous_rect = self.rect.copy()\n        self.acceleration = Vector(0, self.gravity)\n        keys = pygame.key.get_pressed()\n        if keys[pygame.K_LEFT]:\n            self.acceleration.x = -self.horizontal_acceleration\n        elif keys[pygame.K_RIGHT]:\n            self.acceleration.x = self.horizontal_acceleration\n        self.acceleration.x -= self.velocity.x * self.friction\n        scale = min(seconds * FPS, 3)\n        self.position += self.velocity * scale + 0.5 * self.acceleration * scale * scale\n        self.velocity += self.acceleration * scale\n        self.rect.midbottom = self.position\n        self.grounded = False\n        for tile in sorted(self.platforms, key=lambda tile: tile.rect.top):\n            if self.rect.right <= tile.rect.left or self.rect.left >= tile.rect.right:\n                continue\n            if self.velocity.y >= 0 and self.previous_rect.bottom <= tile.rect.top + 1 <= self.rect.bottom + 1:\n                self.position.y = tile.rect.top\n                self.velocity.y = 0\n                self.rect.midbottom = self.position\n                self.grounded = True\n                break\n        if pygame.sprite.spritecollide(self, self.hazards, False):\n            print('지열 위험 구역에 닿았습니다')"
+        }
+      ]
+    },
+    {
+      "id": "06-B",
+      "previous": "06-A",
+      "edits": [
+        {
+          "key": "Explorer.update",
+          "before": "    def update(self, seconds=1 / FPS):\n        self.previous_rect = self.rect.copy()\n        self.acceleration = Vector(0, self.gravity)\n        keys = pygame.key.get_pressed()\n        if keys[pygame.K_LEFT]:\n            self.acceleration.x = -self.horizontal_acceleration\n        elif keys[pygame.K_RIGHT]:\n            self.acceleration.x = self.horizontal_acceleration\n        self.acceleration.x -= self.velocity.x * self.friction\n        scale = min(seconds * FPS, 3)\n        self.position += self.velocity * scale + 0.5 * self.acceleration * scale * scale\n        self.velocity += self.acceleration * scale\n        self.rect.midbottom = self.position\n        self.grounded = False\n        for tile in sorted(self.platforms, key=lambda tile: tile.rect.top):\n            if self.rect.right <= tile.rect.left or self.rect.left >= tile.rect.right:\n                continue\n            if self.velocity.y >= 0 and self.previous_rect.bottom <= tile.rect.top + 1 <= self.rect.bottom + 1:\n                self.position.y = tile.rect.top\n                self.velocity.y = 0\n                self.rect.midbottom = self.position\n                self.grounded = True\n                break\n        if pygame.sprite.spritecollide(self, self.hazards, False):\n            print('지열 위험 구역에 닿았습니다')",
+          "after": "    def update(self, seconds=1 / FPS):\n        self.previous_rect = self.rect.copy()\n        self.acceleration = Vector(0, self.gravity)\n        keys = pygame.key.get_pressed()\n        if keys[pygame.K_LEFT]:\n            self.acceleration.x = -self.horizontal_acceleration\n        elif keys[pygame.K_RIGHT]:\n            self.acceleration.x = self.horizontal_acceleration\n        self.acceleration.x -= self.velocity.x * self.friction\n        scale = min(seconds * FPS, 3)\n        self.position += self.velocity * scale + 0.5 * self.acceleration * scale * scale\n        self.velocity += self.acceleration * scale\n        self.position.x %= SCREEN_WIDTH\n        self.rect.midbottom = self.position\n        self.grounded = False\n        for tile in sorted(self.platforms, key=lambda tile: tile.rect.top):\n            if self.rect.right <= tile.rect.left or self.rect.left >= tile.rect.right:\n                continue\n            if self.velocity.y >= 0 and self.previous_rect.bottom <= tile.rect.top + 1 <= self.rect.bottom + 1:\n                self.position.y = tile.rect.top\n                self.velocity.y = 0\n                self.rect.midbottom = self.position\n                self.grounded = True\n                break\n        if pygame.sprite.spritecollide(self, self.hazards, False):\n            self.position = self.start.copy()\n            self.velocity = Vector(0, 0)\n            self.rect.midbottom = self.position\n            self.grounded = False"
+        }
+      ]
+    },
+    {
+      "id": "06-C",
+      "previous": "06-B",
+      "edits": [
+        {
+          "key": "Explorer.update",
+          "before": "    def update(self, seconds=1 / FPS):\n        self.previous_rect = self.rect.copy()\n        self.acceleration = Vector(0, self.gravity)\n        keys = pygame.key.get_pressed()\n        if keys[pygame.K_LEFT]:\n            self.acceleration.x = -self.horizontal_acceleration\n        elif keys[pygame.K_RIGHT]:\n            self.acceleration.x = self.horizontal_acceleration\n        self.acceleration.x -= self.velocity.x * self.friction\n        scale = min(seconds * FPS, 3)\n        self.position += self.velocity * scale + 0.5 * self.acceleration * scale * scale\n        self.velocity += self.acceleration * scale\n        self.position.x %= SCREEN_WIDTH\n        self.rect.midbottom = self.position\n        self.grounded = False\n        for tile in sorted(self.platforms, key=lambda tile: tile.rect.top):\n            if self.rect.right <= tile.rect.left or self.rect.left >= tile.rect.right:\n                continue\n            if self.velocity.y >= 0 and self.previous_rect.bottom <= tile.rect.top + 1 <= self.rect.bottom + 1:\n                self.position.y = tile.rect.top\n                self.velocity.y = 0\n                self.rect.midbottom = self.position\n                self.grounded = True\n                break\n        if pygame.sprite.spritecollide(self, self.hazards, False):\n            self.position = self.start.copy()\n            self.velocity = Vector(0, 0)\n            self.rect.midbottom = self.position\n            self.grounded = False",
+          "after": "    def update(self, seconds=1 / FPS):\n        self.move(seconds)\n        self.check_collisions()"
+        },
+        {
+          "key": "Explorer.move",
+          "before": "",
+          "after": "    def move(self, seconds):\n        self.previous_rect = self.rect.copy()\n        self.acceleration = Vector(0, self.gravity)\n        keys = pygame.key.get_pressed()\n        if keys[pygame.K_LEFT]:\n            self.acceleration.x = -self.horizontal_acceleration\n        elif keys[pygame.K_RIGHT]:\n            self.acceleration.x = self.horizontal_acceleration\n        self.acceleration.x -= self.velocity.x * self.friction\n        scale = min(seconds * FPS, 3)\n        self.position += self.velocity * scale + 0.5 * self.acceleration * scale * scale\n        self.velocity += self.acceleration * scale\n        self.position.x %= SCREEN_WIDTH\n        self.rect.midbottom = self.position"
+        },
+        {
+          "key": "Explorer.check_collisions",
+          "before": "",
+          "after": "    def check_collisions(self):\n        self.grounded = False\n        for tile in sorted(self.platforms, key=lambda tile: tile.rect.top):\n            if self.rect.right <= tile.rect.left or self.rect.left >= tile.rect.right:\n                continue\n            if self.velocity.y >= 0 and self.previous_rect.bottom <= tile.rect.top + 1 <= self.rect.bottom + 1:\n                self.position.y = tile.rect.top\n                self.velocity.y = 0\n                self.rect.midbottom = self.position\n                self.grounded = True\n                break\n        if pygame.sprite.spritecollide(self, self.hazards, False):\n            self.position = self.start.copy()\n            self.velocity = Vector(0, 0)\n            self.rect.midbottom = self.position\n            self.grounded = False"
+        }
+      ]
+    },
+    {
+      "id": "07-A",
+      "previous": "06-C",
+      "edits": [
+        {
+          "key": "Explorer.__init__",
+          "before": "    def __init__(self, x, y, platforms, hazards):\n        super().__init__()\n        self.image = load_image('assets/explorer/idle/0.png', (64, 64))\n        self.rect = self.image.get_rect(midbottom=(x, y))\n        self.position = Vector(x, y)\n        self.velocity = Vector(0, 0)\n        self.acceleration = Vector(0, 0)\n        self.horizontal_acceleration = 2\n        self.friction = 0.15\n        self.gravity = 0.5\n        self.platforms = platforms\n        self.hazards = hazards\n        self.start = Vector(x, y)\n        self.previous_rect = self.rect.copy()\n        self.grounded = False\n        self.jump_speed = 15",
+          "after": "    def __init__(self, x, y, platforms, hazards):\n        super().__init__()\n        self.frames = {}\n        for action in ['run']:\n            right = [load_image(f'assets/explorer/{action}/{index}.png', (64, 64)) for index in range(4)]\n            self.frames[(action, 1)] = right\n            self.frames[(action, -1)] = [pygame.transform.flip(frame, True, False) for frame in right]\n        self.facing = 1\n        self.action = 'run'\n        self.frame = 0.0\n        self.image = self.frames[('run', 1)][0]\n        self.rect = self.image.get_rect(midbottom=(x, y))\n        self.start = Vector(x, y)\n        self.position = Vector(x, y)\n        self.velocity = Vector(0, 0)\n        self.acceleration = Vector(0, 0)\n        self.horizontal_acceleration = 2\n        self.friction = 0.15\n        self.gravity = 0.5\n        self.jump_speed = 15\n        self.platforms = platforms\n        self.hazards = hazards\n        self.previous_rect = self.rect.copy()\n        self.grounded = False"
+        }
+      ]
+    },
+    {
+      "id": "07-B",
+      "previous": "07-A",
+      "edits": [
+        {
+          "key": "Explorer.animate",
+          "before": "",
+          "after": "    def animate(self, frames, seconds, speed):\n        self.frame = (self.frame + seconds * speed) % len(frames)\n        self.image = frames[int(self.frame)]"
+        },
+        {
+          "key": "Explorer.update",
+          "before": "    def update(self, seconds=1 / FPS):\n        self.move(seconds)\n        self.check_collisions()",
+          "after": "    def update(self, seconds=1 / FPS):\n        self.move(seconds)\n        self.check_collisions()\n        self.animate(self.frames[('run', 1)], seconds, 8)"
+        }
+      ]
+    },
+    {
+      "id": "07-C",
+      "previous": "07-B",
+      "edits": [
+        {
+          "key": "Explorer.__init__",
+          "before": "    def __init__(self, x, y, platforms, hazards):\n        super().__init__()\n        self.frames = {}\n        for action in ['run']:\n            right = [load_image(f'assets/explorer/{action}/{index}.png', (64, 64)) for index in range(4)]\n            self.frames[(action, 1)] = right\n            self.frames[(action, -1)] = [pygame.transform.flip(frame, True, False) for frame in right]\n        self.facing = 1\n        self.action = 'run'\n        self.frame = 0.0\n        self.image = self.frames[('run', 1)][0]\n        self.rect = self.image.get_rect(midbottom=(x, y))\n        self.start = Vector(x, y)\n        self.position = Vector(x, y)\n        self.velocity = Vector(0, 0)\n        self.acceleration = Vector(0, 0)\n        self.horizontal_acceleration = 2\n        self.friction = 0.15\n        self.gravity = 0.5\n        self.jump_speed = 15\n        self.platforms = platforms\n        self.hazards = hazards\n        self.previous_rect = self.rect.copy()\n        self.grounded = False",
+          "after": "    def __init__(self, x, y, platforms, hazards):\n        super().__init__()\n        self.frames = {}\n        for action in ['run', 'idle']:\n            right = [load_image(f'assets/explorer/{action}/{index}.png', (64, 64)) for index in range(4)]\n            self.frames[(action, 1)] = right\n            self.frames[(action, -1)] = [pygame.transform.flip(frame, True, False) for frame in right]\n        self.facing = 1\n        self.action = 'idle'\n        self.frame = 0.0\n        self.image = self.frames[('idle', 1)][0]\n        self.rect = self.image.get_rect(midbottom=(x, y))\n        self.start = Vector(x, y)\n        self.position = Vector(x, y)\n        self.velocity = Vector(0, 0)\n        self.acceleration = Vector(0, 0)\n        self.horizontal_acceleration = 2\n        self.friction = 0.15\n        self.gravity = 0.5\n        self.jump_speed = 15\n        self.platforms = platforms\n        self.hazards = hazards\n        self.previous_rect = self.rect.copy()\n        self.grounded = False"
+        },
+        {
+          "key": "Explorer.move",
+          "before": "    def move(self, seconds):\n        self.previous_rect = self.rect.copy()\n        self.acceleration = Vector(0, self.gravity)\n        keys = pygame.key.get_pressed()\n        if keys[pygame.K_LEFT]:\n            self.acceleration.x = -self.horizontal_acceleration\n        elif keys[pygame.K_RIGHT]:\n            self.acceleration.x = self.horizontal_acceleration\n        self.acceleration.x -= self.velocity.x * self.friction\n        scale = min(seconds * FPS, 3)\n        self.position += self.velocity * scale + 0.5 * self.acceleration * scale * scale\n        self.velocity += self.acceleration * scale\n        self.position.x %= SCREEN_WIDTH\n        self.rect.midbottom = self.position",
+          "after": "    def move(self, seconds):\n        scale = min(seconds * FPS, 3)\n        self.previous_rect = self.rect.copy()\n        self.acceleration = Vector(0, self.gravity)\n        keys = pygame.key.get_pressed()\n        if keys[pygame.K_LEFT]:\n            self.acceleration.x = -self.horizontal_acceleration\n            self.facing = -1\n        elif keys[pygame.K_RIGHT]:\n            self.acceleration.x = self.horizontal_acceleration\n            self.facing = 1\n        self.acceleration.x -= self.velocity.x * self.friction\n        self.position += self.velocity * scale + 0.5 * self.acceleration * scale * scale\n        self.velocity += self.acceleration * scale\n        self.velocity.y = min(25, self.velocity.y)\n        self.position.x %= SCREEN_WIDTH\n        self.rect.midbottom = self.position"
+        },
+        {
+          "key": "Explorer.update",
+          "before": "    def update(self, seconds=1 / FPS):\n        self.move(seconds)\n        self.check_collisions()\n        self.animate(self.frames[('run', 1)], seconds, 8)",
+          "after": "    def update(self, seconds=1 / FPS):\n        self.move(seconds)\n        self.check_collisions()\n        action = 'run' if pygame.key.get_pressed()[pygame.K_LEFT] or pygame.key.get_pressed()[pygame.K_RIGHT] else 'idle'\n        if action != self.action:\n            self.action = action\n            self.frame = 0.0\n        self.animate(self.frames[(action, self.facing)], seconds, 8 if action == 'run' else 4)"
+        }
+      ]
+    },
+    {
+      "id": "08-A",
+      "previous": "07-C",
+      "edits": [
+        {
+          "key": "Terrain.__init__",
+          "before": "    def __init__(self, x, y, kind, tiles, subgroup=None):\n        super().__init__(tiles)\n        self.image = load_image(f'assets/tiles/{kind}.png', (TILE_SIZE, TILE_SIZE))\n        self.rect = self.image.get_rect(topleft=(x, y))\n        if subgroup is not None:\n            subgroup.add(self)",
+          "after": "    def __init__(self, x, y, kind, tiles, subgroup=None):\n        super().__init__(tiles)\n        self.image = load_image(f'assets/tiles/{kind}.png', (TILE_SIZE, TILE_SIZE))\n        self.rect = self.image.get_rect(topleft=(x, y))\n        self.mask = pygame.mask.from_surface(self.image)\n        if subgroup is not None:\n            subgroup.add(self)"
+        },
+        {
+          "key": "Explorer.animate",
+          "before": "    def animate(self, frames, seconds, speed):\n        self.frame = (self.frame + seconds * speed) % len(frames)\n        self.image = frames[int(self.frame)]",
+          "after": "    def animate(self, frames, seconds, speed):\n        self.frame = (self.frame + seconds * speed) % len(frames)\n        self.image = frames[int(self.frame)]\n        self.mask = pygame.mask.from_surface(self.image)"
+        },
+        {
+          "key": "setup",
+          "before": "tiles = pygame.sprite.Group()\nplatforms = pygame.sprite.Group()\nhazards = pygame.sprite.Group()\nexplorers = pygame.sprite.Group()\nlevel_map = [[0 for column in range(30)] for row in range(20)]\nlevel_map[19] = [1] * 30\nlevel_map[18] = [2] * 10 + [6] * 10 + [2] * 10\nlevel_map[14][4:12] = [3] + [4] * 6 + [5]\nlevel_map[10][14:22] = [3] + [4] * 6 + [5]\nlevel_map[6][5:13] = [3] + [4] * 6 + [5]\nlevel_map[5][8] = 9\n\nfor row, cells in enumerate(level_map):\n    for column, kind in enumerate(cells):\n        x, y = column * TILE_SIZE, row * TILE_SIZE\n        if kind == 1:\n            Terrain(x, y, kind, tiles)\n        elif 2 <= kind <= 5:\n            Terrain(x, y, kind, tiles, platforms)\n        elif kind == 6:\n            Terrain(x, y, kind, tiles, hazards)\n        elif kind == 9:\n            explorer = Explorer(x, y + TILE_SIZE, platforms, hazards)\n            explorers.add(explorer)\n\nbackground = load_image('assets/background.png', (SCREEN_WIDTH, SCREEN_HEIGHT))",
+          "after": "tiles = pygame.sprite.Group()\nplatforms = pygame.sprite.Group()\nhazards = pygame.sprite.Group()\nexplorers = pygame.sprite.Group()\nlevel_map = [[0 for column in range(30)] for row in range(20)]\nlevel_map[19] = [1] * 30\nlevel_map[18] = [2] * 10 + [6] * 10 + [2] * 10\nlevel_map[14][4:12] = [3] + [4] * 6 + [5]\nlevel_map[10][14:22] = [3] + [4] * 6 + [5]\nlevel_map[6][5:13] = [3] + [4] * 6 + [5]\nlevel_map[5][8] = 9\n\nfor row, cells in enumerate(level_map):\n    for column, kind in enumerate(cells):\n        x, y = column * TILE_SIZE, row * TILE_SIZE\n        if kind == 1:\n            Terrain(x, y, kind, tiles)\n        elif 2 <= kind <= 5:\n            Terrain(x, y, kind, tiles, platforms)\n        elif kind == 6:\n            Terrain(x, y, kind, tiles, hazards)\n        elif kind == 9:\n            explorer = Explorer(x, y + TILE_SIZE, platforms, hazards)\n            explorers.add(explorer)\n\nbackground = load_image('assets/background.png', (SCREEN_WIDTH, SCREEN_HEIGHT))\nshow_debug = True"
+        },
+        {
+          "key": "loop",
+          "before": "running = True\nwhile running:\n    seconds = min(clock.tick(FPS) / 1000, 0.05)\n    for event in pygame.event.get():\n        if event.type == pygame.QUIT:\n            running = False\n        elif event.type == pygame.KEYDOWN and event.key == pygame.K_SPACE:\n            explorer.jump()\n    if not running:\n        break\n    explorers.update(seconds)\n    screen.blit(background, (0, 0))\n    tiles.draw(screen)\n    explorers.draw(screen)\n    pygame.display.update()\n\npygame.quit()",
+          "after": "running = True\nwhile running:\n    seconds = min(clock.tick(FPS) / 1000, 0.05)\n    for event in pygame.event.get():\n        if event.type == pygame.QUIT:\n            running = False\n        elif event.type == pygame.KEYDOWN:\n            if event.key == pygame.K_SPACE:\n                explorer.jump()\n            elif event.key == pygame.K_d:\n                show_debug = not show_debug\n    if not running:\n        break\n    explorers.update(seconds)\n    screen.blit(background, (0, 0))\n    tiles.draw(screen)\n    explorers.draw(screen)\n    if show_debug:\n        for tile in platforms:\n            pygame.draw.rect(screen, (70, 165, 255), tile.rect, 1)\n        pygame.draw.rect(screen, (255, 210, 100), explorer.rect, 1)\n        outline = explorer.mask.outline()\n        if len(outline) > 1:\n            points = [(x + explorer.rect.x, y + explorer.rect.y) for x, y in outline]\n            pygame.draw.lines(screen, (90, 255, 130), True, points, 1)\n    pygame.display.update()\n\npygame.quit()"
+        }
+      ]
+    },
+    {
+      "id": "08-B",
+      "previous": "08-A",
+      "edits": [
+        {
+          "key": "Explorer.check_collisions",
+          "before": "    def check_collisions(self):\n        self.grounded = False\n        for tile in sorted(self.platforms, key=lambda tile: tile.rect.top):\n            if self.rect.right <= tile.rect.left or self.rect.left >= tile.rect.right:\n                continue\n            if self.velocity.y >= 0 and self.previous_rect.bottom <= tile.rect.top + 1 <= self.rect.bottom + 1:\n                self.position.y = tile.rect.top\n                self.velocity.y = 0\n                self.rect.midbottom = self.position\n                self.grounded = True\n                break\n        if pygame.sprite.spritecollide(self, self.hazards, False):\n            self.position = self.start.copy()\n            self.velocity = Vector(0, 0)\n            self.rect.midbottom = self.position\n            self.grounded = False",
+          "after": "    def check_collisions(self):\n        self.grounded = False\n        for tile in sorted(self.platforms, key=lambda tile: tile.rect.top):\n            if self.rect.centerx + 12 <= tile.rect.left or self.rect.centerx - 12 >= tile.rect.right:\n                continue\n            if self.velocity.y >= 0 and self.previous_rect.bottom <= tile.rect.top + 1 <= self.rect.bottom + 1:\n                self.position.y = tile.rect.top\n                self.velocity.y = 0\n                self.rect.midbottom = self.position\n                self.grounded = True\n                break\n        if pygame.sprite.spritecollide(self, self.hazards, False, pygame.sprite.collide_mask):\n            self.position = self.start.copy()\n            self.velocity = Vector(0, 0)\n            self.rect.midbottom = self.position\n            self.grounded = False"
+        }
+      ]
+    },
+    {
+      "id": "09-A",
+      "previous": "08-B",
+      "edits": []
+    },
+    {
+      "id": "10-A",
+      "previous": "09-A",
+      "edits": [
+        {
+          "key": "header",
+          "before": "import pygame\n\npygame.init()\nVector = pygame.math.Vector2\nSCREEN_WIDTH, SCREEN_HEIGHT = 960, 640\nTILE_SIZE = 32\nFPS = 60\nscreen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))\npygame.display.set_caption('화성 탐사대 - 기초 실험')\nclock = pygame.time.Clock()",
+          "after": "import pygame\n\npygame.init()\nscreen = pygame.display.set_mode((640, 360))\nclock = pygame.time.Clock()\nfont = pygame.font.Font('assets/fonts/DoHyeon-Regular.ttf', 32)\nexplorer_image = pygame.image.load('assets/explorer/idle/0.png').convert_alpha()\nsample_sound = pygame.mixer.Sound('assets/sounds/collect.ogg')"
+        },
+        {
+          "key": "helpers",
+          "before": "image_cache = {}\n\n\ndef load_image(path, size):\n    key = (path, size)\n    if key not in image_cache:\n        image_cache[key] = pygame.transform.smoothscale(pygame.image.load(path).convert_alpha(), size)\n    return image_cache[key]",
+          "after": ""
+        },
+        {
+          "key": "classes",
+          "before": {
+            "Terrain": {
+              "__init__": "    def __init__(self, x, y, kind, tiles, subgroup=None):\n        super().__init__(tiles)\n        self.image = load_image(f'assets/tiles/{kind}.png', (TILE_SIZE, TILE_SIZE))\n        self.rect = self.image.get_rect(topleft=(x, y))\n        self.mask = pygame.mask.from_surface(self.image)\n        if subgroup is not None:\n            subgroup.add(self)"
+            },
+            "Explorer": {
+              "__init__": "    def __init__(self, x, y, platforms, hazards):\n        super().__init__()\n        self.frames = {}\n        for action in ['run', 'idle']:\n            right = [load_image(f'assets/explorer/{action}/{index}.png', (64, 64)) for index in range(4)]\n            self.frames[(action, 1)] = right\n            self.frames[(action, -1)] = [pygame.transform.flip(frame, True, False) for frame in right]\n        self.facing = 1\n        self.action = 'idle'\n        self.frame = 0.0\n        self.image = self.frames[('idle', 1)][0]\n        self.rect = self.image.get_rect(midbottom=(x, y))\n        self.start = Vector(x, y)\n        self.position = Vector(x, y)\n        self.velocity = Vector(0, 0)\n        self.acceleration = Vector(0, 0)\n        self.horizontal_acceleration = 2\n        self.friction = 0.15\n        self.gravity = 0.5\n        self.jump_speed = 15\n        self.platforms = platforms\n        self.hazards = hazards\n        self.previous_rect = self.rect.copy()\n        self.grounded = False",
+              "update": "    def update(self, seconds=1 / FPS):\n        self.move(seconds)\n        self.check_collisions()\n        action = 'run' if pygame.key.get_pressed()[pygame.K_LEFT] or pygame.key.get_pressed()[pygame.K_RIGHT] else 'idle'\n        if action != self.action:\n            self.action = action\n            self.frame = 0.0\n        self.animate(self.frames[(action, self.facing)], seconds, 8 if action == 'run' else 4)",
+              "jump": "    def jump(self):\n        if self.grounded:\n            self.velocity.y = -self.jump_speed\n            self.grounded = False",
+              "move": "    def move(self, seconds):\n        scale = min(seconds * FPS, 3)\n        self.previous_rect = self.rect.copy()\n        self.acceleration = Vector(0, self.gravity)\n        keys = pygame.key.get_pressed()\n        if keys[pygame.K_LEFT]:\n            self.acceleration.x = -self.horizontal_acceleration\n            self.facing = -1\n        elif keys[pygame.K_RIGHT]:\n            self.acceleration.x = self.horizontal_acceleration\n            self.facing = 1\n        self.acceleration.x -= self.velocity.x * self.friction\n        self.position += self.velocity * scale + 0.5 * self.acceleration * scale * scale\n        self.velocity += self.acceleration * scale\n        self.velocity.y = min(25, self.velocity.y)\n        self.position.x %= SCREEN_WIDTH\n        self.rect.midbottom = self.position",
+              "check_collisions": "    def check_collisions(self):\n        self.grounded = False\n        for tile in sorted(self.platforms, key=lambda tile: tile.rect.top):\n            if self.rect.centerx + 12 <= tile.rect.left or self.rect.centerx - 12 >= tile.rect.right:\n                continue\n            if self.velocity.y >= 0 and self.previous_rect.bottom <= tile.rect.top + 1 <= self.rect.bottom + 1:\n                self.position.y = tile.rect.top\n                self.velocity.y = 0\n                self.rect.midbottom = self.position\n                self.grounded = True\n                break\n        if pygame.sprite.spritecollide(self, self.hazards, False, pygame.sprite.collide_mask):\n            self.position = self.start.copy()\n            self.velocity = Vector(0, 0)\n            self.rect.midbottom = self.position\n            self.grounded = False",
+              "animate": "    def animate(self, frames, seconds, speed):\n        self.frame = (self.frame + seconds * speed) % len(frames)\n        self.image = frames[int(self.frame)]\n        self.mask = pygame.mask.from_surface(self.image)"
+            }
+          },
+          "after": {}
+        },
+        {
+          "key": "setup",
+          "before": "tiles = pygame.sprite.Group()\nplatforms = pygame.sprite.Group()\nhazards = pygame.sprite.Group()\nexplorers = pygame.sprite.Group()\nlevel_map = [[0 for column in range(30)] for row in range(20)]\nlevel_map[19] = [1] * 30\nlevel_map[18] = [2] * 10 + [6] * 10 + [2] * 10\nlevel_map[14][4:12] = [3] + [4] * 6 + [5]\nlevel_map[10][14:22] = [3] + [4] * 6 + [5]\nlevel_map[6][5:13] = [3] + [4] * 6 + [5]\nlevel_map[5][8] = 9\n\nfor row, cells in enumerate(level_map):\n    for column, kind in enumerate(cells):\n        x, y = column * TILE_SIZE, row * TILE_SIZE\n        if kind == 1:\n            Terrain(x, y, kind, tiles)\n        elif 2 <= kind <= 5:\n            Terrain(x, y, kind, tiles, platforms)\n        elif kind == 6:\n            Terrain(x, y, kind, tiles, hazards)\n        elif kind == 9:\n            explorer = Explorer(x, y + TILE_SIZE, platforms, hazards)\n            explorers.add(explorer)\n\nbackground = load_image('assets/background.png', (SCREEN_WIDTH, SCREEN_HEIGHT))\nshow_debug = True",
+          "after": ""
+        },
+        {
+          "key": "loop",
+          "before": "running = True\nwhile running:\n    seconds = min(clock.tick(FPS) / 1000, 0.05)\n    for event in pygame.event.get():\n        if event.type == pygame.QUIT:\n            running = False\n        elif event.type == pygame.KEYDOWN:\n            if event.key == pygame.K_SPACE:\n                explorer.jump()\n            elif event.key == pygame.K_d:\n                show_debug = not show_debug\n    if not running:\n        break\n    explorers.update(seconds)\n    screen.blit(background, (0, 0))\n    tiles.draw(screen)\n    explorers.draw(screen)\n    if show_debug:\n        for tile in platforms:\n            pygame.draw.rect(screen, (70, 165, 255), tile.rect, 1)\n        pygame.draw.rect(screen, (255, 210, 100), explorer.rect, 1)\n        outline = explorer.mask.outline()\n        if len(outline) > 1:\n            points = [(x + explorer.rect.x, y + explorer.rect.y) for x, y in outline]\n            pygame.draw.lines(screen, (90, 255, 130), True, points, 1)\n    pygame.display.update()\n\npygame.quit()",
+          "after": "running = True\nwhile running:\n    clock.tick(60)\n    for event in pygame.event.get():\n        if event.type == pygame.QUIT:\n            running = False\n        elif event.type == pygame.KEYDOWN and event.key == pygame.K_SPACE:\n            sample_sound.play()\n    if not running:\n        break\n    screen.fill((15, 25, 42))\n    screen.blit(explorer_image, (288, 120))\n    screen.blit(font.render('화성 탐사대 준비 완료', True, (110, 235, 215)), (160, 220))\n    pygame.display.update()\n\npygame.quit()"
+        }
+      ]
+    },
+    {
+      "id": "11-A",
+      "previous": "10-A",
+      "edits": [
+        {
+          "key": "header",
+          "before": "import pygame\n\npygame.init()\nscreen = pygame.display.set_mode((640, 360))\nclock = pygame.time.Clock()\nfont = pygame.font.Font('assets/fonts/DoHyeon-Regular.ttf', 32)\nexplorer_image = pygame.image.load('assets/explorer/idle/0.png').convert_alpha()\nsample_sound = pygame.mixer.Sound('assets/sounds/collect.ogg')",
+          "after": "import random\nimport pygame\n\npygame.init()\nVector = pygame.math.Vector2\nSCREEN_WIDTH, SCREEN_HEIGHT = 1280, 736\nTILE_SIZE = 32\nFPS = 60\nscreen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))\npygame.display.set_caption('화성 탐사대: 신호 복구')\nclock = pygame.time.Clock()"
+        },
+        {
+          "key": "helpers",
+          "before": "",
+          "after": ""
+        },
+        {
+          "key": "classes",
+          "before": {},
+          "after": {}
+        },
+        {
+          "key": "setup",
+          "before": "",
+          "after": ""
+        },
+        {
+          "key": "loop",
+          "before": "running = True\nwhile running:\n    clock.tick(60)\n    for event in pygame.event.get():\n        if event.type == pygame.QUIT:\n            running = False\n        elif event.type == pygame.KEYDOWN and event.key == pygame.K_SPACE:\n            sample_sound.play()\n    if not running:\n        break\n    screen.fill((15, 25, 42))\n    screen.blit(explorer_image, (288, 120))\n    screen.blit(font.render('화성 탐사대 준비 완료', True, (110, 235, 215)), (160, 220))\n    pygame.display.update()\n\npygame.quit()",
+          "after": "running = True\nwhile running:\n    seconds = min(clock.tick(FPS) / 1000, 0.05)\n    for event in pygame.event.get():\n        if event.type == pygame.QUIT:\n            running = False\n    if not running:\n        break\n    screen.fill((15, 25, 42))\n    pygame.display.update()\n\npygame.quit()"
+        }
+      ]
+    },
+    {
+      "id": "11-B",
+      "previous": "11-A",
+      "edits": [
+        {
+          "key": "helpers",
+          "before": "",
+          "after": "# 같은 그림과 소리는 한 번만 읽고, 위치와 게임 상태는 객체마다 보관합니다.\nimage_cache = {}\nsound_cache = {}\n\n\ndef load_image(path, size):\n    key = (path, size)\n    if key not in image_cache:\n        original = pygame.image.load(path).convert_alpha()\n        image_cache[key] = pygame.transform.smoothscale(original, size)\n    return image_cache[key]\n\n\ndef load_frames(folder, size=(64, 64)):\n    return [load_image(f'assets/{folder}/{index}.png', size) for index in range(4)]\n\n\ndef load_sound(name):\n    if name not in sound_cache:\n        sound_cache[name] = pygame.mixer.Sound(f'assets/sounds/{name}.ogg')\n    return sound_cache[name]"
+        },
+        {
+          "key": "classes",
+          "before": {},
+          "after": {
+            "Expedition": {
+              "__init__": "    def __init__(self, explorer, robots, platforms, gates, pulses, crystals):\n        pass",
+              "update": "    def update(self, seconds):\n        pass",
+              "draw": "    def draw(self):\n        pass",
+              "add_robot": "    def add_robot(self, seconds):\n        pass",
+              "check_collisions": "    def check_collisions(self):\n        pass",
+              "check_round_completion": "    def check_round_completion(self):\n        pass",
+              "check_game_over": "    def check_game_over(self):\n        pass",
+              "start_new_round": "    def start_new_round(self):\n        pass",
+              "pause_game": "    def pause_game(self, message, hint, state='paused'):\n        pass",
+              "reset_game": "    def reset_game(self):\n        pass"
+            },
+            "Terrain": {
+              "__init__": "    def __init__(self, x, y, tile_kind, all_tiles, platforms=None):\n        pass"
+            }
+          }
+        },
+        {
+          "key": "setup",
+          "before": "",
+          "after": "background = load_image('assets/background.png', (SCREEN_WIDTH, SCREEN_HEIGHT))"
+        },
+        {
+          "key": "loop",
+          "before": "running = True\nwhile running:\n    seconds = min(clock.tick(FPS) / 1000, 0.05)\n    for event in pygame.event.get():\n        if event.type == pygame.QUIT:\n            running = False\n    if not running:\n        break\n    screen.fill((15, 25, 42))\n    pygame.display.update()\n\npygame.quit()",
+          "after": "running = True\nwhile running:\n    seconds = min(clock.tick(FPS) / 1000, 0.05)\n    for event in pygame.event.get():\n        if event.type == pygame.QUIT:\n            running = False\n    if not running:\n        break\n    screen.blit(background, (0, 0))\n    pygame.display.update()\n\npygame.quit()"
+        }
+      ]
+    },
+    {
+      "id": "12-A",
+      "previous": "11-B",
+      "edits": [
+        {
+          "key": "classes",
+          "before": {
+            "Expedition": {
+              "__init__": "    def __init__(self, explorer, robots, platforms, gates, pulses, crystals):\n        pass",
+              "update": "    def update(self, seconds):\n        pass",
+              "draw": "    def draw(self):\n        pass",
+              "add_robot": "    def add_robot(self, seconds):\n        pass",
+              "check_collisions": "    def check_collisions(self):\n        pass",
+              "check_round_completion": "    def check_round_completion(self):\n        pass",
+              "check_game_over": "    def check_game_over(self):\n        pass",
+              "start_new_round": "    def start_new_round(self):\n        pass",
+              "pause_game": "    def pause_game(self, message, hint, state='paused'):\n        pass",
+              "reset_game": "    def reset_game(self):\n        pass"
+            },
+            "Terrain": {
+              "__init__": "    def __init__(self, x, y, tile_kind, all_tiles, platforms=None):\n        pass"
+            }
+          },
+          "after": {
+            "Expedition": {
+              "__init__": "    def __init__(self, explorer, robots, platforms, gates, pulses, crystals):\n        pass",
+              "update": "    def update(self, seconds):\n        pass",
+              "draw": "    def draw(self):\n        pass",
+              "add_robot": "    def add_robot(self, seconds):\n        pass",
+              "check_collisions": "    def check_collisions(self):\n        pass",
+              "check_round_completion": "    def check_round_completion(self):\n        pass",
+              "check_game_over": "    def check_game_over(self):\n        pass",
+              "start_new_round": "    def start_new_round(self):\n        pass",
+              "pause_game": "    def pause_game(self, message, hint, state='paused'):\n        pass",
+              "reset_game": "    def reset_game(self):\n        pass"
+            },
+            "Terrain": {
+              "__init__": "    def __init__(self, x, y, tile_kind, all_tiles, platforms=None):\n        pass"
+            },
+            "Explorer": {
+              "__init__": "    def __init__(self, x, y, platforms, gates, pulses):\n        pass",
+              "update": "    def update(self, seconds=1 / FPS):\n        pass",
+              "move": "    def move(self, seconds):\n        pass",
+              "check_collisions": "    def check_collisions(self):\n        pass",
+              "check_animations": "    def check_animations(self, seconds):\n        pass",
+              "jump": "    def jump(self):\n        pass",
+              "fire": "    def fire(self):\n        pass",
+              "reset": "    def reset(self):\n        pass",
+              "animate": "    def animate(self, frames, seconds, speed):\n        pass"
+            },
+            "Pulse": {
+              "__init__": "    def __init__(self, x, y, pulses, direction):\n        pass",
+              "update": "    def update(self, seconds=1 / FPS):\n        pass"
+            },
+            "Robot": {
+              "__init__": "    def __init__(self, platforms, gates, minimum_speed, maximum_speed):\n        pass",
+              "update": "    def update(self, seconds=1 / FPS):\n        pass",
+              "move": "    def move(self, seconds):\n        pass",
+              "check_collisions": "    def check_collisions(self):\n        pass",
+              "check_animations": "    def check_animations(self, seconds):\n        pass",
+              "animate": "    def animate(self, frames, seconds, speed, loop):\n        pass"
+            },
+            "SignalSource": {
+              "__init__": "    def __init__(self, x, y, all_tiles):\n        pass",
+              "update": "    def update(self, seconds=1 / FPS):\n        pass",
+              "animate": "    def animate(self, seconds):\n        pass"
+            },
+            "Crystal": {
+              "__init__": "    def __init__(self, platforms, gates):\n        pass",
+              "update": "    def update(self, seconds=1 / FPS):\n        pass",
+              "move": "    def move(self, seconds):\n        pass",
+              "check_collisions": "    def check_collisions(self):\n        pass",
+              "animate": "    def animate(self, seconds):\n        pass"
+            },
+            "Gate": {
+              "__init__": "    def __init__(self, x, y, channel, gates):\n        pass",
+              "update": "    def update(self, seconds=1 / FPS):\n        pass",
+              "animate": "    def animate(self, seconds):\n        pass"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "13-A",
+      "previous": "12-A",
+      "edits": [
+        {
+          "key": "setup",
+          "before": "background = load_image('assets/background.png', (SCREEN_WIDTH, SCREEN_HEIGHT))",
+          "after": "all_tiles = pygame.sprite.Group()\nplatforms = pygame.sprite.Group()\nexplorers = pygame.sprite.Group()\npulses = pygame.sprite.Group()\nrobots = pygame.sprite.Group()\ngates = pygame.sprite.Group()\ncrystals = pygame.sprite.Group()\n\n# 0 빈칸 / 1 흙 / 2-5 발판 / 6 신호원 / 7-8 게이트 / 9 탐사원\nlevel_map = [[0 for column in range(40)] for row in range(23)]\nfor row, spans in [(3, [(0, 15), (25, 40)]), (8, [(11, 29)]),\n                   (10, [(0, 6), (34, 40)]), (15, [(0, 16), (24, 40)]), (18, [(18, 22)])]:\n    for start, end in spans:\n        level_map[row][start:end] = [3] + [4] * (end - start - 2) + [5]\nlevel_map[21] = [2] * 40\nlevel_map[22] = [1] * 40\nlevel_map[3][20] = 6\nlevel_map[2][1], level_map[2][38] = 7, 8\nlevel_map[20][1], level_map[20][38] = 8, 7\nlevel_map[17][20] = 9\n\n\n\nbackground = load_image('assets/background.png', (SCREEN_WIDTH, SCREEN_HEIGHT))"
+        }
+      ]
+    },
+    {
+      "id": "14-A",
+      "previous": "13-A",
+      "edits": [
+        {
+          "key": "setup",
+          "before": "all_tiles = pygame.sprite.Group()\nplatforms = pygame.sprite.Group()\nexplorers = pygame.sprite.Group()\npulses = pygame.sprite.Group()\nrobots = pygame.sprite.Group()\ngates = pygame.sprite.Group()\ncrystals = pygame.sprite.Group()\n\n# 0 빈칸 / 1 흙 / 2-5 발판 / 6 신호원 / 7-8 게이트 / 9 탐사원\nlevel_map = [[0 for column in range(40)] for row in range(23)]\nfor row, spans in [(3, [(0, 15), (25, 40)]), (8, [(11, 29)]),\n                   (10, [(0, 6), (34, 40)]), (15, [(0, 16), (24, 40)]), (18, [(18, 22)])]:\n    for start, end in spans:\n        level_map[row][start:end] = [3] + [4] * (end - start - 2) + [5]\nlevel_map[21] = [2] * 40\nlevel_map[22] = [1] * 40\nlevel_map[3][20] = 6\nlevel_map[2][1], level_map[2][38] = 7, 8\nlevel_map[20][1], level_map[20][38] = 8, 7\nlevel_map[17][20] = 9\n\n\n\nbackground = load_image('assets/background.png', (SCREEN_WIDTH, SCREEN_HEIGHT))",
+          "after": "all_tiles = pygame.sprite.Group()\nplatforms = pygame.sprite.Group()\nexplorers = pygame.sprite.Group()\npulses = pygame.sprite.Group()\nrobots = pygame.sprite.Group()\ngates = pygame.sprite.Group()\ncrystals = pygame.sprite.Group()\n\n# 0 빈칸 / 1 흙 / 2-5 발판 / 6 신호원 / 7-8 게이트 / 9 탐사원\nlevel_map = [[0 for column in range(40)] for row in range(23)]\nfor row, spans in [(3, [(0, 15), (25, 40)]), (8, [(11, 29)]),\n                   (10, [(0, 6), (34, 40)]), (15, [(0, 16), (24, 40)]), (18, [(18, 22)])]:\n    for start, end in spans:\n        level_map[row][start:end] = [3] + [4] * (end - start - 2) + [5]\nlevel_map[21] = [2] * 40\nlevel_map[22] = [1] * 40\nlevel_map[3][20] = 6\nlevel_map[2][1], level_map[2][38] = 7, 8\nlevel_map[20][1], level_map[20][38] = 8, 7\nlevel_map[17][20] = 9\n\nfor row, cells in enumerate(level_map):\n    for column, kind in enumerate(cells):\n        x, y = column * TILE_SIZE, row * TILE_SIZE\n        if kind == 1:\n            Terrain(x, y, kind, all_tiles)\n        elif 2 <= kind <= 5:\n            Terrain(x, y, kind, all_tiles, platforms)\n        elif kind in (6, 7, 8, 9):\n            pass\n\nbackground = load_image('assets/background.png', (SCREEN_WIDTH, SCREEN_HEIGHT))"
+        }
+      ]
+    },
+    {
+      "id": "14-B",
+      "previous": "14-A",
+      "edits": [
+        {
+          "key": "Terrain.__init__",
+          "before": "    def __init__(self, x, y, tile_kind, all_tiles, platforms=None):\n        pass",
+          "after": "    def __init__(self, x, y, tile_kind, all_tiles, platforms=None):\n        super().__init__(all_tiles)\n        self.image = load_image(f'assets/tiles/{tile_kind}.png', (TILE_SIZE, TILE_SIZE))\n        self.rect = self.image.get_rect(topleft=(x, y))\n        if platforms is not None:\n            platforms.add(self)"
+        },
+        {
+          "key": "loop",
+          "before": "running = True\nwhile running:\n    seconds = min(clock.tick(FPS) / 1000, 0.05)\n    for event in pygame.event.get():\n        if event.type == pygame.QUIT:\n            running = False\n    if not running:\n        break\n    screen.blit(background, (0, 0))\n    pygame.display.update()\n\npygame.quit()",
+          "after": "running = True\nwhile running:\n    seconds = min(clock.tick(FPS) / 1000, 0.05)\n    for event in pygame.event.get():\n        if event.type == pygame.QUIT:\n            running = False\n    if not running:\n        break\n    screen.blit(background, (0, 0))\n    all_tiles.draw(screen)\n    pygame.display.update()\n\npygame.quit()"
+        }
+      ]
+    },
+    {
+      "id": "15-A",
+      "previous": "14-B",
+      "edits": [
+        {
+          "key": "SignalSource.__init__",
+          "before": "    def __init__(self, x, y, all_tiles):\n        pass",
+          "after": "    def __init__(self, x, y, all_tiles):\n        super().__init__(all_tiles)\n        self.frames = load_frames('crystal', (64, 64))\n        self.frame = 0.0\n        self.image = self.frames[0]\n        self.rect = self.image.get_rect(midbottom=(x, y))"
+        },
+        {
+          "key": "setup",
+          "before": "all_tiles = pygame.sprite.Group()\nplatforms = pygame.sprite.Group()\nexplorers = pygame.sprite.Group()\npulses = pygame.sprite.Group()\nrobots = pygame.sprite.Group()\ngates = pygame.sprite.Group()\ncrystals = pygame.sprite.Group()\n\n# 0 빈칸 / 1 흙 / 2-5 발판 / 6 신호원 / 7-8 게이트 / 9 탐사원\nlevel_map = [[0 for column in range(40)] for row in range(23)]\nfor row, spans in [(3, [(0, 15), (25, 40)]), (8, [(11, 29)]),\n                   (10, [(0, 6), (34, 40)]), (15, [(0, 16), (24, 40)]), (18, [(18, 22)])]:\n    for start, end in spans:\n        level_map[row][start:end] = [3] + [4] * (end - start - 2) + [5]\nlevel_map[21] = [2] * 40\nlevel_map[22] = [1] * 40\nlevel_map[3][20] = 6\nlevel_map[2][1], level_map[2][38] = 7, 8\nlevel_map[20][1], level_map[20][38] = 8, 7\nlevel_map[17][20] = 9\n\nfor row, cells in enumerate(level_map):\n    for column, kind in enumerate(cells):\n        x, y = column * TILE_SIZE, row * TILE_SIZE\n        if kind == 1:\n            Terrain(x, y, kind, all_tiles)\n        elif 2 <= kind <= 5:\n            Terrain(x, y, kind, all_tiles, platforms)\n        elif kind in (6, 7, 8, 9):\n            pass\n\nbackground = load_image('assets/background.png', (SCREEN_WIDTH, SCREEN_HEIGHT))",
+          "after": "all_tiles = pygame.sprite.Group()\nplatforms = pygame.sprite.Group()\nexplorers = pygame.sprite.Group()\npulses = pygame.sprite.Group()\nrobots = pygame.sprite.Group()\ngates = pygame.sprite.Group()\ncrystals = pygame.sprite.Group()\n\n# 0 빈칸 / 1 흙 / 2-5 발판 / 6 신호원 / 7-8 게이트 / 9 탐사원\nlevel_map = [[0 for column in range(40)] for row in range(23)]\nfor row, spans in [(3, [(0, 15), (25, 40)]), (8, [(11, 29)]),\n                   (10, [(0, 6), (34, 40)]), (15, [(0, 16), (24, 40)]), (18, [(18, 22)])]:\n    for start, end in spans:\n        level_map[row][start:end] = [3] + [4] * (end - start - 2) + [5]\nlevel_map[21] = [2] * 40\nlevel_map[22] = [1] * 40\nlevel_map[3][20] = 6\nlevel_map[2][1], level_map[2][38] = 7, 8\nlevel_map[20][1], level_map[20][38] = 8, 7\nlevel_map[17][20] = 9\n\nfor row, cells in enumerate(level_map):\n    for column, kind in enumerate(cells):\n        x, y = column * TILE_SIZE, row * TILE_SIZE\n        if kind == 1:\n            Terrain(x, y, kind, all_tiles)\n        elif 2 <= kind <= 5:\n            Terrain(x, y, kind, all_tiles, platforms)\n        elif kind == 6:\n            SignalSource(x, y, all_tiles)\n        elif kind in (7, 8, 9):\n            pass\n\nbackground = load_image('assets/background.png', (SCREEN_WIDTH, SCREEN_HEIGHT))"
+        }
+      ]
+    },
+    {
+      "id": "15-B",
+      "previous": "15-A",
+      "edits": [
+        {
+          "key": "SignalSource.animate",
+          "before": "    def animate(self, seconds):\n        pass",
+          "after": "    def animate(self, seconds):\n        self.frame = (self.frame + seconds * 6) % len(self.frames)\n        self.image = self.frames[int(self.frame)]"
+        },
+        {
+          "key": "SignalSource.update",
+          "before": "    def update(self, seconds=1 / FPS):\n        pass",
+          "after": "    def update(self, seconds=1 / FPS):\n        self.animate(seconds)"
+        },
+        {
+          "key": "loop",
+          "before": "running = True\nwhile running:\n    seconds = min(clock.tick(FPS) / 1000, 0.05)\n    for event in pygame.event.get():\n        if event.type == pygame.QUIT:\n            running = False\n    if not running:\n        break\n    screen.blit(background, (0, 0))\n    all_tiles.draw(screen)\n    pygame.display.update()\n\npygame.quit()",
+          "after": "running = True\nwhile running:\n    seconds = min(clock.tick(FPS) / 1000, 0.05)\n    for event in pygame.event.get():\n        if event.type == pygame.QUIT:\n            running = False\n    if not running:\n        break\n    all_tiles.update(seconds)\n    screen.blit(background, (0, 0))\n    all_tiles.draw(screen)\n    pygame.display.update()\n\npygame.quit()"
+        }
+      ]
+    },
+    {
+      "id": "16-A",
+      "previous": "15-B",
+      "edits": [
+        {
+          "key": "Gate.__init__",
+          "before": "    def __init__(self, x, y, channel, gates):\n        pass",
+          "after": "    def __init__(self, x, y, channel, gates):\n        super().__init__(gates)\n        self.channel = channel\n        self.frames = load_frames(f'gate/{channel}', (72, 72))\n        self.frame = float(random.randrange(len(self.frames)))\n        self.image = self.frames[int(self.frame)]\n        self.rect = self.image.get_rect(midbottom=(x, y))"
+        },
+        {
+          "key": "setup",
+          "before": "all_tiles = pygame.sprite.Group()\nplatforms = pygame.sprite.Group()\nexplorers = pygame.sprite.Group()\npulses = pygame.sprite.Group()\nrobots = pygame.sprite.Group()\ngates = pygame.sprite.Group()\ncrystals = pygame.sprite.Group()\n\n# 0 빈칸 / 1 흙 / 2-5 발판 / 6 신호원 / 7-8 게이트 / 9 탐사원\nlevel_map = [[0 for column in range(40)] for row in range(23)]\nfor row, spans in [(3, [(0, 15), (25, 40)]), (8, [(11, 29)]),\n                   (10, [(0, 6), (34, 40)]), (15, [(0, 16), (24, 40)]), (18, [(18, 22)])]:\n    for start, end in spans:\n        level_map[row][start:end] = [3] + [4] * (end - start - 2) + [5]\nlevel_map[21] = [2] * 40\nlevel_map[22] = [1] * 40\nlevel_map[3][20] = 6\nlevel_map[2][1], level_map[2][38] = 7, 8\nlevel_map[20][1], level_map[20][38] = 8, 7\nlevel_map[17][20] = 9\n\nfor row, cells in enumerate(level_map):\n    for column, kind in enumerate(cells):\n        x, y = column * TILE_SIZE, row * TILE_SIZE\n        if kind == 1:\n            Terrain(x, y, kind, all_tiles)\n        elif 2 <= kind <= 5:\n            Terrain(x, y, kind, all_tiles, platforms)\n        elif kind == 6:\n            SignalSource(x, y, all_tiles)\n        elif kind in (7, 8, 9):\n            pass\n\nbackground = load_image('assets/background.png', (SCREEN_WIDTH, SCREEN_HEIGHT))",
+          "after": "all_tiles = pygame.sprite.Group()\nplatforms = pygame.sprite.Group()\nexplorers = pygame.sprite.Group()\npulses = pygame.sprite.Group()\nrobots = pygame.sprite.Group()\ngates = pygame.sprite.Group()\ncrystals = pygame.sprite.Group()\n\n# 0 빈칸 / 1 흙 / 2-5 발판 / 6 신호원 / 7-8 게이트 / 9 탐사원\nlevel_map = [[0 for column in range(40)] for row in range(23)]\nfor row, spans in [(3, [(0, 15), (25, 40)]), (8, [(11, 29)]),\n                   (10, [(0, 6), (34, 40)]), (15, [(0, 16), (24, 40)]), (18, [(18, 22)])]:\n    for start, end in spans:\n        level_map[row][start:end] = [3] + [4] * (end - start - 2) + [5]\nlevel_map[21] = [2] * 40\nlevel_map[22] = [1] * 40\nlevel_map[3][20] = 6\nlevel_map[2][1], level_map[2][38] = 7, 8\nlevel_map[20][1], level_map[20][38] = 8, 7\nlevel_map[17][20] = 9\n\nfor row, cells in enumerate(level_map):\n    for column, kind in enumerate(cells):\n        x, y = column * TILE_SIZE, row * TILE_SIZE\n        if kind == 1:\n            Terrain(x, y, kind, all_tiles)\n        elif 2 <= kind <= 5:\n            Terrain(x, y, kind, all_tiles, platforms)\n        elif kind == 6:\n            SignalSource(x, y, all_tiles)\n        elif kind in (7, 8):\n            Gate(x + TILE_SIZE // 2, y + TILE_SIZE, 'teal' if kind == 7 else 'violet', gates)\n        elif kind == 9:\n            pass\n\nbackground = load_image('assets/background.png', (SCREEN_WIDTH, SCREEN_HEIGHT))"
+        },
+        {
+          "key": "loop",
+          "before": "running = True\nwhile running:\n    seconds = min(clock.tick(FPS) / 1000, 0.05)\n    for event in pygame.event.get():\n        if event.type == pygame.QUIT:\n            running = False\n    if not running:\n        break\n    all_tiles.update(seconds)\n    screen.blit(background, (0, 0))\n    all_tiles.draw(screen)\n    pygame.display.update()\n\npygame.quit()",
+          "after": "running = True\nwhile running:\n    seconds = min(clock.tick(FPS) / 1000, 0.05)\n    for event in pygame.event.get():\n        if event.type == pygame.QUIT:\n            running = False\n    if not running:\n        break\n    all_tiles.update(seconds)\n    screen.blit(background, (0, 0))\n    all_tiles.draw(screen)\n    gates.draw(screen)\n    pygame.display.update()\n\npygame.quit()"
+        }
+      ]
+    },
+    {
+      "id": "16-B",
+      "previous": "16-A",
+      "edits": [
+        {
+          "key": "Gate.update",
+          "before": "    def update(self, seconds=1 / FPS):\n        pass",
+          "after": "    def update(self, seconds=1 / FPS):\n        self.animate(seconds)"
+        },
+        {
+          "key": "Gate.animate",
+          "before": "    def animate(self, seconds):\n        pass",
+          "after": "    def animate(self, seconds):\n        self.frame = (self.frame + seconds * 6) % len(self.frames)\n        self.image = self.frames[int(self.frame)]"
+        },
+        {
+          "key": "loop",
+          "before": "running = True\nwhile running:\n    seconds = min(clock.tick(FPS) / 1000, 0.05)\n    for event in pygame.event.get():\n        if event.type == pygame.QUIT:\n            running = False\n    if not running:\n        break\n    all_tiles.update(seconds)\n    screen.blit(background, (0, 0))\n    all_tiles.draw(screen)\n    gates.draw(screen)\n    pygame.display.update()\n\npygame.quit()",
+          "after": "running = True\nwhile running:\n    seconds = min(clock.tick(FPS) / 1000, 0.05)\n    for event in pygame.event.get():\n        if event.type == pygame.QUIT:\n            running = False\n    if not running:\n        break\n    all_tiles.update(seconds)\n    gates.update(seconds)\n    screen.blit(background, (0, 0))\n    all_tiles.draw(screen)\n    gates.draw(screen)\n    pygame.display.update()\n\npygame.quit()"
+        }
+      ]
+    },
+    {
+      "id": "17-A",
+      "previous": "16-B",
+      "edits": [
+        {
+          "key": "Expedition.__init__",
+          "before": "    def __init__(self, explorer, robots, platforms, gates, pulses, crystals):\n        pass",
+          "after": "    def __init__(self, explorer, robots, platforms, gates, pulses, crystals):\n        self.round_duration = 30\n        self.score = 0\n        self.round_number = 1\n        self.remaining = self.round_duration\n        self.elapsed = 0.0\n        self.title_font = pygame.font.Font('assets/fonts/DoHyeon-Regular.ttf', 42)\n        self.hud_font = pygame.font.Font('assets/fonts/DoHyeon-Regular.ttf', 23)"
+        },
+        {
+          "key": "Expedition.draw",
+          "before": "    def draw(self):\n        pass",
+          "after": "    def draw(self):\n        pygame.draw.rect(screen, (13, 24, 40), (0, SCREEN_HEIGHT - 58, SCREEN_WIDTH, 58))\n        rows = [\n            (f'점수 {self.score}', (16, SCREEN_HEIGHT - 56), 'topleft'),\n            (f'에너지 {100}', (16, SCREEN_HEIGHT - 29), 'topleft'),\n            (f'탐사 {self.round_number}', (SCREEN_WIDTH - 16, SCREEN_HEIGHT - 56), 'topright'),\n            (f'신호 복구까지 {self.remaining}초', (SCREEN_WIDTH - 16, SCREEN_HEIGHT - 29), 'topright'),\n        ]\n        for text, point, anchor in rows:\n            surface = self.hud_font.render(text, True, (237, 244, 252))\n            rect = surface.get_rect(**{anchor: point})\n            screen.blit(surface, rect)\n        title = self.title_font.render('화성 탐사대', True, (101, 229, 217))\n        screen.blit(title, title.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT - 29)))"
+        },
+        {
+          "key": "setup",
+          "before": "all_tiles = pygame.sprite.Group()\nplatforms = pygame.sprite.Group()\nexplorers = pygame.sprite.Group()\npulses = pygame.sprite.Group()\nrobots = pygame.sprite.Group()\ngates = pygame.sprite.Group()\ncrystals = pygame.sprite.Group()\n\n# 0 빈칸 / 1 흙 / 2-5 발판 / 6 신호원 / 7-8 게이트 / 9 탐사원\nlevel_map = [[0 for column in range(40)] for row in range(23)]\nfor row, spans in [(3, [(0, 15), (25, 40)]), (8, [(11, 29)]),\n                   (10, [(0, 6), (34, 40)]), (15, [(0, 16), (24, 40)]), (18, [(18, 22)])]:\n    for start, end in spans:\n        level_map[row][start:end] = [3] + [4] * (end - start - 2) + [5]\nlevel_map[21] = [2] * 40\nlevel_map[22] = [1] * 40\nlevel_map[3][20] = 6\nlevel_map[2][1], level_map[2][38] = 7, 8\nlevel_map[20][1], level_map[20][38] = 8, 7\nlevel_map[17][20] = 9\n\nfor row, cells in enumerate(level_map):\n    for column, kind in enumerate(cells):\n        x, y = column * TILE_SIZE, row * TILE_SIZE\n        if kind == 1:\n            Terrain(x, y, kind, all_tiles)\n        elif 2 <= kind <= 5:\n            Terrain(x, y, kind, all_tiles, platforms)\n        elif kind == 6:\n            SignalSource(x, y, all_tiles)\n        elif kind in (7, 8):\n            Gate(x + TILE_SIZE // 2, y + TILE_SIZE, 'teal' if kind == 7 else 'violet', gates)\n        elif kind == 9:\n            pass\n\nbackground = load_image('assets/background.png', (SCREEN_WIDTH, SCREEN_HEIGHT))",
+          "after": "all_tiles = pygame.sprite.Group()\nplatforms = pygame.sprite.Group()\nexplorers = pygame.sprite.Group()\npulses = pygame.sprite.Group()\nrobots = pygame.sprite.Group()\ngates = pygame.sprite.Group()\ncrystals = pygame.sprite.Group()\n\n# 0 빈칸 / 1 흙 / 2-5 발판 / 6 신호원 / 7-8 게이트 / 9 탐사원\nlevel_map = [[0 for column in range(40)] for row in range(23)]\nfor row, spans in [(3, [(0, 15), (25, 40)]), (8, [(11, 29)]),\n                   (10, [(0, 6), (34, 40)]), (15, [(0, 16), (24, 40)]), (18, [(18, 22)])]:\n    for start, end in spans:\n        level_map[row][start:end] = [3] + [4] * (end - start - 2) + [5]\nlevel_map[21] = [2] * 40\nlevel_map[22] = [1] * 40\nlevel_map[3][20] = 6\nlevel_map[2][1], level_map[2][38] = 7, 8\nlevel_map[20][1], level_map[20][38] = 8, 7\nlevel_map[17][20] = 9\n\nfor row, cells in enumerate(level_map):\n    for column, kind in enumerate(cells):\n        x, y = column * TILE_SIZE, row * TILE_SIZE\n        if kind == 1:\n            Terrain(x, y, kind, all_tiles)\n        elif 2 <= kind <= 5:\n            Terrain(x, y, kind, all_tiles, platforms)\n        elif kind == 6:\n            SignalSource(x, y, all_tiles)\n        elif kind in (7, 8):\n            Gate(x + TILE_SIZE // 2, y + TILE_SIZE, 'teal' if kind == 7 else 'violet', gates)\n        elif kind == 9:\n            pass\n\nbackground = load_image('assets/background.png', (SCREEN_WIDTH, SCREEN_HEIGHT))\nmission = Expedition(None, robots, platforms, gates, pulses, crystals)"
+        },
+        {
+          "key": "loop",
+          "before": "running = True\nwhile running:\n    seconds = min(clock.tick(FPS) / 1000, 0.05)\n    for event in pygame.event.get():\n        if event.type == pygame.QUIT:\n            running = False\n    if not running:\n        break\n    all_tiles.update(seconds)\n    gates.update(seconds)\n    screen.blit(background, (0, 0))\n    all_tiles.draw(screen)\n    gates.draw(screen)\n    pygame.display.update()\n\npygame.quit()",
+          "after": "running = True\nwhile running:\n    seconds = min(clock.tick(FPS) / 1000, 0.05)\n    for event in pygame.event.get():\n        if event.type == pygame.QUIT:\n            running = False\n    if not running:\n        break\n    all_tiles.update(seconds)\n    gates.update(seconds)\n    screen.blit(background, (0, 0))\n    all_tiles.draw(screen)\n    gates.draw(screen)\n    mission.draw()\n    pygame.display.update()\n\npygame.quit()"
+        }
+      ]
+    },
+    {
+      "id": "17-B",
+      "previous": "17-A",
+      "edits": [
+        {
+          "key": "Expedition.update",
+          "before": "    def update(self, seconds):\n        pass",
+          "after": "    def update(self, seconds):\n        self.elapsed += seconds\n        self.remaining = max(0, self.round_duration - int(self.elapsed + 1e-9))"
+        },
+        {
+          "key": "loop",
+          "before": "running = True\nwhile running:\n    seconds = min(clock.tick(FPS) / 1000, 0.05)\n    for event in pygame.event.get():\n        if event.type == pygame.QUIT:\n            running = False\n    if not running:\n        break\n    all_tiles.update(seconds)\n    gates.update(seconds)\n    screen.blit(background, (0, 0))\n    all_tiles.draw(screen)\n    gates.draw(screen)\n    mission.draw()\n    pygame.display.update()\n\npygame.quit()",
+          "after": "running = True\nwhile running:\n    seconds = min(clock.tick(FPS) / 1000, 0.05)\n    for event in pygame.event.get():\n        if event.type == pygame.QUIT:\n            running = False\n    if not running:\n        break\n    all_tiles.update(seconds)\n    gates.update(seconds)\n    mission.update(seconds)\n    screen.blit(background, (0, 0))\n    all_tiles.draw(screen)\n    gates.draw(screen)\n    mission.draw()\n    pygame.display.update()\n\npygame.quit()"
+        }
+      ]
+    },
+    {
+      "id": "18-A",
+      "previous": "17-B",
+      "edits": [
+        {
+          "key": "Explorer.__init__",
+          "before": "    def __init__(self, x, y, platforms, gates, pulses):\n        pass",
+          "after": "    def __init__(self, x, y, platforms, gates, pulses):\n        super().__init__()\n        self.horizontal_acceleration = 2\n        self.friction = 0.15\n        self.gravity = 0.8\n        self.jump_speed = 18\n        self.starting_health = 100\n        self.frames = {}\n        for action in ['run', 'idle', 'jump', 'fire']:\n            right = load_frames(f'explorer/{action}')\n            self.frames[(action, 1)] = right\n            self.frames[(action, -1)] = [pygame.transform.flip(frame, True, False) for frame in right]\n        self.facing = 1\n        self.action = 'idle'\n        self.frame = 0.0\n        self.image = self.frames[('idle', 1)][0]\n        self.rect = self.image.get_rect(midbottom=(x, y))\n        self.platforms, self.gates, self.pulses = platforms, gates, pulses\n        self.jump_sound = load_sound('jump')\n        self.fire_sound = load_sound('pulse')\n        self.portal_sound = load_sound('portal')\n        self.hit_sound = load_sound('hurt')\n        self.start = Vector(x, y)\n        self.position = Vector(x, y)\n        self.velocity = Vector(0, 0)\n        self.acceleration = Vector(0, self.gravity)\n        self.health = self.starting_health\n        self.grounded = False\n        self.previous_rect = self.rect.copy()\n        self.fire_remaining = 0.0\n        self.hurt_remaining = 0.0\n        self.portal_remaining = 0.0"
+        }
+      ]
+    },
+    {
+      "id": "19-A",
+      "previous": "18-A",
+      "edits": [
+        {
+          "key": "setup",
+          "before": "all_tiles = pygame.sprite.Group()\nplatforms = pygame.sprite.Group()\nexplorers = pygame.sprite.Group()\npulses = pygame.sprite.Group()\nrobots = pygame.sprite.Group()\ngates = pygame.sprite.Group()\ncrystals = pygame.sprite.Group()\n\n# 0 빈칸 / 1 흙 / 2-5 발판 / 6 신호원 / 7-8 게이트 / 9 탐사원\nlevel_map = [[0 for column in range(40)] for row in range(23)]\nfor row, spans in [(3, [(0, 15), (25, 40)]), (8, [(11, 29)]),\n                   (10, [(0, 6), (34, 40)]), (15, [(0, 16), (24, 40)]), (18, [(18, 22)])]:\n    for start, end in spans:\n        level_map[row][start:end] = [3] + [4] * (end - start - 2) + [5]\nlevel_map[21] = [2] * 40\nlevel_map[22] = [1] * 40\nlevel_map[3][20] = 6\nlevel_map[2][1], level_map[2][38] = 7, 8\nlevel_map[20][1], level_map[20][38] = 8, 7\nlevel_map[17][20] = 9\n\nfor row, cells in enumerate(level_map):\n    for column, kind in enumerate(cells):\n        x, y = column * TILE_SIZE, row * TILE_SIZE\n        if kind == 1:\n            Terrain(x, y, kind, all_tiles)\n        elif 2 <= kind <= 5:\n            Terrain(x, y, kind, all_tiles, platforms)\n        elif kind == 6:\n            SignalSource(x, y, all_tiles)\n        elif kind in (7, 8):\n            Gate(x + TILE_SIZE // 2, y + TILE_SIZE, 'teal' if kind == 7 else 'violet', gates)\n        elif kind == 9:\n            pass\n\nbackground = load_image('assets/background.png', (SCREEN_WIDTH, SCREEN_HEIGHT))\nmission = Expedition(None, robots, platforms, gates, pulses, crystals)",
+          "after": "all_tiles = pygame.sprite.Group()\nplatforms = pygame.sprite.Group()\nexplorers = pygame.sprite.Group()\npulses = pygame.sprite.Group()\nrobots = pygame.sprite.Group()\ngates = pygame.sprite.Group()\ncrystals = pygame.sprite.Group()\n\n# 0 빈칸 / 1 흙 / 2-5 발판 / 6 신호원 / 7-8 게이트 / 9 탐사원\nlevel_map = [[0 for column in range(40)] for row in range(23)]\nfor row, spans in [(3, [(0, 15), (25, 40)]), (8, [(11, 29)]),\n                   (10, [(0, 6), (34, 40)]), (15, [(0, 16), (24, 40)]), (18, [(18, 22)])]:\n    for start, end in spans:\n        level_map[row][start:end] = [3] + [4] * (end - start - 2) + [5]\nlevel_map[21] = [2] * 40\nlevel_map[22] = [1] * 40\nlevel_map[3][20] = 6\nlevel_map[2][1], level_map[2][38] = 7, 8\nlevel_map[20][1], level_map[20][38] = 8, 7\nlevel_map[17][20] = 9\n\nfor row, cells in enumerate(level_map):\n    for column, kind in enumerate(cells):\n        x, y = column * TILE_SIZE, row * TILE_SIZE\n        if kind == 1:\n            Terrain(x, y, kind, all_tiles)\n        elif 2 <= kind <= 5:\n            Terrain(x, y, kind, all_tiles, platforms)\n        elif kind == 6:\n            SignalSource(x, y, all_tiles)\n        elif kind in (7, 8):\n            Gate(x + TILE_SIZE // 2, y + TILE_SIZE, 'teal' if kind == 7 else 'violet', gates)\n        elif kind == 9:\n            explorer = Explorer(x, y + TILE_SIZE, platforms, gates, pulses)\n            explorers.add(explorer)\n\nbackground = load_image('assets/background.png', (SCREEN_WIDTH, SCREEN_HEIGHT))\nmission = Expedition(None, robots, platforms, gates, pulses, crystals)"
+        },
+        {
+          "key": "loop",
+          "before": "running = True\nwhile running:\n    seconds = min(clock.tick(FPS) / 1000, 0.05)\n    for event in pygame.event.get():\n        if event.type == pygame.QUIT:\n            running = False\n    if not running:\n        break\n    all_tiles.update(seconds)\n    gates.update(seconds)\n    mission.update(seconds)\n    screen.blit(background, (0, 0))\n    all_tiles.draw(screen)\n    gates.draw(screen)\n    mission.draw()\n    pygame.display.update()\n\npygame.quit()",
+          "after": "running = True\nwhile running:\n    seconds = min(clock.tick(FPS) / 1000, 0.05)\n    for event in pygame.event.get():\n        if event.type == pygame.QUIT:\n            running = False\n    if not running:\n        break\n    all_tiles.update(seconds)\n    gates.update(seconds)\n    explorers.update(seconds)\n    mission.update(seconds)\n    screen.blit(background, (0, 0))\n    all_tiles.draw(screen)\n    gates.draw(screen)\n    explorers.draw(screen)\n    mission.draw()\n    pygame.display.update()\n\npygame.quit()"
+        }
+      ]
+    },
+    {
+      "id": "19-B",
+      "previous": "19-A",
+      "edits": [
+        {
+          "key": "Explorer.update",
+          "before": "    def update(self, seconds=1 / FPS):\n        pass",
+          "after": "    def update(self, seconds=1 / FPS):\n        self.fire_remaining = max(0, self.fire_remaining - seconds)\n        self.hurt_remaining = max(0, self.hurt_remaining - seconds)\n        self.portal_remaining = max(0, self.portal_remaining - seconds)\n        self.move(seconds)\n        self.check_collisions()\n        self.check_animations(seconds)"
+        },
+        {
+          "key": "Explorer.move",
+          "before": "    def move(self, seconds):\n        pass",
+          "after": "    def move(self, seconds):\n        scale = min(seconds * FPS, 3)\n        self.previous_rect = self.rect.copy()\n        self.acceleration = Vector(0, self.gravity)\n        keys = pygame.key.get_pressed()\n        if keys[pygame.K_LEFT]:\n            self.acceleration.x = -self.horizontal_acceleration\n            self.facing = -1\n        elif keys[pygame.K_RIGHT]:\n            self.acceleration.x = self.horizontal_acceleration\n            self.facing = 1\n        self.acceleration.x -= self.velocity.x * self.friction\n        self.position += self.velocity * scale + 0.5 * self.acceleration * scale * scale\n        self.velocity += self.acceleration * scale\n        self.velocity.y = min(self.velocity.y, 25)\n        self.position.x %= SCREEN_WIDTH\n        self.rect.midbottom = self.position"
+        }
+      ]
+    },
+    {
+      "id": "20-A",
+      "previous": "19-B",
+      "edits": [
+        {
+          "key": "Explorer.check_collisions",
+          "before": "    def check_collisions(self):\n        pass",
+          "after": "    def check_collisions(self):\n        self.grounded = False\n        # 발의 지지 폭은 일정하게 유지합니다. 팔을 펴도 발판 판정이 넓어지지 않습니다.\n        left, right = self.rect.centerx - 12, self.rect.centerx + 12\n        for tile in sorted(self.platforms, key=lambda tile: tile.rect.top):\n            if right <= tile.rect.left or left >= tile.rect.right:\n                continue\n            if self.velocity.y >= 0 and self.previous_rect.bottom <= tile.rect.top + 1 <= self.rect.bottom + 1:\n                self.position.y = tile.rect.top\n                self.velocity.y = 0\n                self.rect.midbottom = self.position\n                self.grounded = True\n                break\n            if self.velocity.y < 0 and self.previous_rect.top >= tile.rect.bottom and self.rect.top <= tile.rect.bottom:\n                self.rect.top = tile.rect.bottom\n                self.position.update(self.rect.midbottom)\n                self.velocity.y = 0\n                break"
+        },
+        {
+          "key": "Explorer.jump",
+          "before": "    def jump(self):\n        pass",
+          "after": "    def jump(self):\n        if self.grounded:\n            self.jump_sound.play()\n            self.velocity.y = -self.jump_speed\n            self.grounded = False"
+        },
+        {
+          "key": "loop",
+          "before": "running = True\nwhile running:\n    seconds = min(clock.tick(FPS) / 1000, 0.05)\n    for event in pygame.event.get():\n        if event.type == pygame.QUIT:\n            running = False\n    if not running:\n        break\n    all_tiles.update(seconds)\n    gates.update(seconds)\n    explorers.update(seconds)\n    mission.update(seconds)\n    screen.blit(background, (0, 0))\n    all_tiles.draw(screen)\n    gates.draw(screen)\n    explorers.draw(screen)\n    mission.draw()\n    pygame.display.update()\n\npygame.quit()",
+          "after": "running = True\nwhile running:\n    seconds = min(clock.tick(FPS) / 1000, 0.05)\n    for event in pygame.event.get():\n        if event.type == pygame.QUIT:\n            running = False\n        elif event.type == pygame.KEYDOWN and event.key == pygame.K_SPACE:\n            explorer.jump()\n    if not running:\n        break\n    all_tiles.update(seconds)\n    gates.update(seconds)\n    explorers.update(seconds)\n    mission.update(seconds)\n    screen.blit(background, (0, 0))\n    all_tiles.draw(screen)\n    gates.draw(screen)\n    explorers.draw(screen)\n    mission.draw()\n    pygame.display.update()\n\npygame.quit()"
+        }
+      ]
+    },
+    {
+      "id": "20-B",
+      "previous": "20-A",
+      "edits": [
+        {
+          "key": "Explorer.check_collisions",
+          "before": "    def check_collisions(self):\n        self.grounded = False\n        # 발의 지지 폭은 일정하게 유지합니다. 팔을 펴도 발판 판정이 넓어지지 않습니다.\n        left, right = self.rect.centerx - 12, self.rect.centerx + 12\n        for tile in sorted(self.platforms, key=lambda tile: tile.rect.top):\n            if right <= tile.rect.left or left >= tile.rect.right:\n                continue\n            if self.velocity.y >= 0 and self.previous_rect.bottom <= tile.rect.top + 1 <= self.rect.bottom + 1:\n                self.position.y = tile.rect.top\n                self.velocity.y = 0\n                self.rect.midbottom = self.position\n                self.grounded = True\n                break\n            if self.velocity.y < 0 and self.previous_rect.top >= tile.rect.bottom and self.rect.top <= tile.rect.bottom:\n                self.rect.top = tile.rect.bottom\n                self.position.update(self.rect.midbottom)\n                self.velocity.y = 0\n                break",
+          "after": "    def check_collisions(self):\n        self.grounded = False\n        # 발의 지지 폭은 일정하게 유지합니다. 팔을 펴도 발판 판정이 넓어지지 않습니다.\n        left, right = self.rect.centerx - 12, self.rect.centerx + 12\n        for tile in sorted(self.platforms, key=lambda tile: tile.rect.top):\n            if right <= tile.rect.left or left >= tile.rect.right:\n                continue\n            if self.velocity.y >= 0 and self.previous_rect.bottom <= tile.rect.top + 1 <= self.rect.bottom + 1:\n                self.position.y = tile.rect.top\n                self.velocity.y = 0\n                self.rect.midbottom = self.position\n                self.grounded = True\n                break\n            if self.velocity.y < 0 and self.previous_rect.top >= tile.rect.bottom and self.rect.top <= tile.rect.bottom:\n                self.rect.top = tile.rect.bottom\n                self.position.update(self.rect.midbottom)\n                self.velocity.y = 0\n                break\n        for gate in self.gates:\n            if self.portal_remaining <= 0 and self.rect.colliderect(gate.rect):\n                target = next((other for other in self.gates if other is not gate and other.channel == gate.channel), None)\n                if target is not None:\n                    self.position.x = target.rect.centerx + (80 if target.rect.centerx < SCREEN_WIDTH / 2 else -80)\n                    self.position.y = target.rect.bottom\n                    self.rect.midbottom = self.position\n                    self.previous_rect = self.rect.copy()\n                    self.portal_remaining = 0.4\n                    self.portal_sound.play()\n                    break\n        if self.position.y > SCREEN_HEIGHT + 128:\n            self.reset()"
+        },
+        {
+          "key": "Explorer.reset",
+          "before": "    def reset(self):\n        pass",
+          "after": "    def reset(self):\n        self.position = self.start.copy()\n        self.velocity = Vector(0, 0)\n        self.acceleration = Vector(0, self.gravity)\n        self.rect.midbottom = self.position\n        self.previous_rect = self.rect.copy()\n        self.grounded = False\n        self.fire_remaining = 0.0\n        self.hurt_remaining = 0.0\n        self.portal_remaining = 0.0\n        self.action = 'idle'\n        self.frame = 0.0\n        self.facing = 1\n        self.image = self.frames[('idle', 1)][0]"
+        }
+      ]
+    },
+    {
+      "id": "21-A",
+      "previous": "20-B",
+      "edits": [
+        {
+          "key": "Explorer.animate",
+          "before": "    def animate(self, frames, seconds, speed):\n        pass",
+          "after": "    def animate(self, frames, seconds, speed):\n        self.frame = (self.frame + seconds * speed) % len(frames)\n        self.image = frames[int(self.frame)]"
+        },
+        {
+          "key": "Explorer.check_animations",
+          "before": "    def check_animations(self, seconds):\n        pass",
+          "after": "    def check_animations(self, seconds):\n        if self.fire_remaining > 0:\n            action = 'fire'\n        elif not self.grounded:\n            action = 'jump'\n        elif abs(self.acceleration.x + self.velocity.x * self.friction) > 0.1:\n            action = 'run'\n        else:\n            action = 'idle'\n        if action != self.action:\n            self.frame = 0.0\n            self.action = action\n        self.animate(self.frames[(action, self.facing)], seconds, 8 if action != 'idle' else 4)"
+        }
+      ]
+    },
+    {
+      "id": "21-B",
+      "previous": "21-A",
+      "edits": [
+        {
+          "key": "Pulse.__init__",
+          "before": "    def __init__(self, x, y, pulses, direction):\n        pass",
+          "after": "    def __init__(self, x, y, pulses, direction):\n        super().__init__(pulses)\n        self.speed = 20 * direction\n        self.range = 500\n        self.image = load_image('assets/pulse.png', (32, 24))\n        if direction < 0:\n            self.image = pygame.transform.flip(self.image, True, False)\n        self.rect = self.image.get_rect(center=(x, y))\n        self.x = float(x)\n        self.start_x = x"
+        },
+        {
+          "key": "Pulse.update",
+          "before": "    def update(self, seconds=1 / FPS):\n        pass",
+          "after": "    def update(self, seconds=1 / FPS):\n        self.x += self.speed * min(seconds * FPS, 3)\n        self.rect.centerx = round(self.x)\n        if abs(self.x - self.start_x) >= self.range:\n            self.kill()"
+        },
+        {
+          "key": "Explorer.fire",
+          "before": "    def fire(self):\n        pass",
+          "after": "    def fire(self):\n        if self.fire_remaining <= 0:\n            self.fire_sound.play()\n            Pulse(self.rect.centerx, self.rect.centery, self.pulses, self.facing)\n            self.fire_remaining = 0.35\n            self.frame = 0.0"
+        },
+        {
+          "key": "loop",
+          "before": "running = True\nwhile running:\n    seconds = min(clock.tick(FPS) / 1000, 0.05)\n    for event in pygame.event.get():\n        if event.type == pygame.QUIT:\n            running = False\n        elif event.type == pygame.KEYDOWN and event.key == pygame.K_SPACE:\n            explorer.jump()\n    if not running:\n        break\n    all_tiles.update(seconds)\n    gates.update(seconds)\n    explorers.update(seconds)\n    mission.update(seconds)\n    screen.blit(background, (0, 0))\n    all_tiles.draw(screen)\n    gates.draw(screen)\n    explorers.draw(screen)\n    mission.draw()\n    pygame.display.update()\n\npygame.quit()",
+          "after": "running = True\nwhile running:\n    seconds = min(clock.tick(FPS) / 1000, 0.05)\n    for event in pygame.event.get():\n        if event.type == pygame.QUIT:\n            running = False\n        elif event.type == pygame.KEYDOWN:\n            if event.key == pygame.K_SPACE:\n                explorer.jump()\n            elif event.key == pygame.K_UP:\n                explorer.fire()\n    if not running:\n        break\n    all_tiles.update(seconds)\n    gates.update(seconds)\n    explorers.update(seconds)\n    pulses.update(seconds)\n    mission.update(seconds)\n    screen.blit(background, (0, 0))\n    all_tiles.draw(screen)\n    gates.draw(screen)\n    explorers.draw(screen)\n    pulses.draw(screen)\n    mission.draw()\n    pygame.display.update()\n\npygame.quit()"
+        }
+      ]
+    },
+    {
+      "id": "22-A",
+      "previous": "21-B",
+      "edits": [
+        {
+          "key": "Robot.__init__",
+          "before": "    def __init__(self, platforms, gates, minimum_speed, maximum_speed):\n        pass",
+          "after": "    def __init__(self, platforms, gates, minimum_speed, maximum_speed):\n        super().__init__()\n        self.gravity = 3\n        self.rise_delay = 2.0\n        self.variant = random.choice(['teal', 'amber'])\n        self.walk_frames = load_frames(f'robot/{self.variant}/walk')\n        self.down_frames = load_frames(f'robot/{self.variant}/down')\n        self.rise_frames = list(reversed(self.down_frames))\n        self.direction = random.choice([-1, 1])\n        if self.direction < 0:\n            self.walk_frames = [pygame.transform.flip(frame, True, False) for frame in self.walk_frames]\n            self.down_frames = [pygame.transform.flip(frame, True, False) for frame in self.down_frames]\n            self.rise_frames = list(reversed(self.down_frames))\n        self.frame = 0.0\n        self.image = self.walk_frames[0]\n        self.rect = self.image.get_rect(midbottom=(random.randint(100, SCREEN_WIDTH - 100), -64))\n        self.platforms, self.gates = platforms, gates\n        self.hit_sound = load_sound('robot_down')\n        self.kick_sound = load_sound('robot_clear')\n        self.portal_sound = load_sound('portal')\n        self.position = Vector(self.rect.midbottom)\n        self.velocity = Vector(self.direction * random.randint(minimum_speed, maximum_speed), 0)\n        self.acceleration = Vector(0, self.gravity)\n        self.previous_rect = self.rect.copy()\n        self.state = 'walking'\n        self.down_elapsed = 0.0\n        self.portal_remaining = 0.0"
+        }
+      ]
+    },
+    {
+      "id": "23-A",
+      "previous": "22-A",
+      "edits": [
+        {
+          "key": "Robot.update",
+          "before": "    def update(self, seconds=1 / FPS):\n        pass",
+          "after": "    def update(self, seconds=1 / FPS):\n        self.portal_remaining = max(0, self.portal_remaining - seconds)\n        self.move(seconds)\n        self.check_collisions()\n        self.check_animations(seconds)"
+        },
+        {
+          "key": "Robot.move",
+          "before": "    def move(self, seconds):\n        pass",
+          "after": "    def move(self, seconds):\n        self.previous_rect = self.rect.copy()\n        if self.state != 'walking':\n            return\n        scale = min(seconds * FPS, 3)\n        self.position += self.velocity * scale + 0.5 * self.acceleration * scale * scale\n        self.velocity += self.acceleration * scale\n        self.velocity.y = min(self.velocity.y, 25)\n        self.position.x %= SCREEN_WIDTH\n        self.rect.midbottom = self.position"
+        },
+        {
+          "key": "Robot.check_collisions",
+          "before": "    def check_collisions(self):\n        pass",
+          "after": "    def check_collisions(self):\n        if self.state != 'walking':\n            return\n        for tile in sorted(self.platforms, key=lambda tile: tile.rect.top):\n            if self.rect.centerx + 12 <= tile.rect.left or self.rect.centerx - 12 >= tile.rect.right:\n                continue\n            if self.previous_rect.bottom <= tile.rect.top + 1 <= self.rect.bottom + 1:\n                self.position.y = tile.rect.top\n                self.velocity.y = 0\n                self.rect.midbottom = self.position\n                break\n        for gate in self.gates:\n            if self.portal_remaining <= 0 and self.rect.colliderect(gate.rect):\n                target = next((other for other in self.gates if other is not gate and other.channel == gate.channel), None)\n                if target is not None:\n                    self.position.update(target.rect.centerx + (80 if target.rect.centerx < SCREEN_WIDTH / 2 else -80), target.rect.bottom)\n                    self.rect.midbottom = self.position\n                    self.portal_remaining = 0.4\n                    self.portal_sound.play()\n                    break\n        if self.position.y > SCREEN_HEIGHT + 128:\n            self.position.update(SCREEN_WIDTH / 2, -64)\n            self.rect.midbottom = self.position\n            self.velocity.y = 0"
+        },
+        {
+          "key": "loop",
+          "before": "running = True\nwhile running:\n    seconds = min(clock.tick(FPS) / 1000, 0.05)\n    for event in pygame.event.get():\n        if event.type == pygame.QUIT:\n            running = False\n        elif event.type == pygame.KEYDOWN:\n            if event.key == pygame.K_SPACE:\n                explorer.jump()\n            elif event.key == pygame.K_UP:\n                explorer.fire()\n    if not running:\n        break\n    all_tiles.update(seconds)\n    gates.update(seconds)\n    explorers.update(seconds)\n    pulses.update(seconds)\n    mission.update(seconds)\n    screen.blit(background, (0, 0))\n    all_tiles.draw(screen)\n    gates.draw(screen)\n    explorers.draw(screen)\n    pulses.draw(screen)\n    mission.draw()\n    pygame.display.update()\n\npygame.quit()",
+          "after": "running = True\nwhile running:\n    seconds = min(clock.tick(FPS) / 1000, 0.05)\n    for event in pygame.event.get():\n        if event.type == pygame.QUIT:\n            running = False\n        elif event.type == pygame.KEYDOWN:\n            if event.key == pygame.K_SPACE:\n                explorer.jump()\n            elif event.key == pygame.K_UP:\n                explorer.fire()\n            elif event.key == pygame.K_RETURN:\n                robots.add(Robot(platforms, gates, 2, 7))\n    if not running:\n        break\n    all_tiles.update(seconds)\n    gates.update(seconds)\n    explorers.update(seconds)\n    pulses.update(seconds)\n    robots.update(seconds)\n    mission.update(seconds)\n    screen.blit(background, (0, 0))\n    all_tiles.draw(screen)\n    gates.draw(screen)\n    explorers.draw(screen)\n    pulses.draw(screen)\n    robots.draw(screen)\n    mission.draw()\n    pygame.display.update()\n\npygame.quit()"
+        }
+      ]
+    },
+    {
+      "id": "24-A",
+      "previous": "23-A",
+      "edits": [
+        {
+          "key": "Robot.animate",
+          "before": "    def animate(self, frames, seconds, speed, loop):\n        pass",
+          "after": "    def animate(self, frames, seconds, speed, loop):\n        self.frame += seconds * speed\n        finished = self.frame >= len(frames)\n        self.frame = self.frame % len(frames) if loop else min(self.frame, len(frames) - 1e-6)\n        self.image = frames[int(self.frame)]\n        return finished"
+        },
+        {
+          "key": "Robot.check_animations",
+          "before": "    def check_animations(self, seconds):\n        pass",
+          "after": "    def check_animations(self, seconds):\n        if self.state == 'walking':\n            self.animate(self.walk_frames, seconds, 8, True)"
+        }
+      ]
+    },
+    {
+      "id": "24-B",
+      "previous": "24-A",
+      "edits": [
+        {
+          "key": "Expedition.__init__",
+          "before": "    def __init__(self, explorer, robots, platforms, gates, pulses, crystals):\n        self.round_duration = 30\n        self.score = 0\n        self.round_number = 1\n        self.remaining = self.round_duration\n        self.elapsed = 0.0\n        self.title_font = pygame.font.Font('assets/fonts/DoHyeon-Regular.ttf', 42)\n        self.hud_font = pygame.font.Font('assets/fonts/DoHyeon-Regular.ttf', 23)",
+          "after": "    def __init__(self, explorer, robots, platforms, gates, pulses, crystals):\n        self.round_duration = 30\n        self.score = 0\n        self.round_number = 1\n        self.remaining = self.round_duration\n        self.elapsed = 0.0\n        self.title_font = pygame.font.Font('assets/fonts/DoHyeon-Regular.ttf', 42)\n        self.hud_font = pygame.font.Font('assets/fonts/DoHyeon-Regular.ttf', 23)\n        self.explorer = explorer\n        self.robots = robots\n        self.platforms = platforms\n        self.gates = gates\n        self.pulses = pulses\n        self.crystals = crystals"
+        },
+        {
+          "key": "setup",
+          "before": "all_tiles = pygame.sprite.Group()\nplatforms = pygame.sprite.Group()\nexplorers = pygame.sprite.Group()\npulses = pygame.sprite.Group()\nrobots = pygame.sprite.Group()\ngates = pygame.sprite.Group()\ncrystals = pygame.sprite.Group()\n\n# 0 빈칸 / 1 흙 / 2-5 발판 / 6 신호원 / 7-8 게이트 / 9 탐사원\nlevel_map = [[0 for column in range(40)] for row in range(23)]\nfor row, spans in [(3, [(0, 15), (25, 40)]), (8, [(11, 29)]),\n                   (10, [(0, 6), (34, 40)]), (15, [(0, 16), (24, 40)]), (18, [(18, 22)])]:\n    for start, end in spans:\n        level_map[row][start:end] = [3] + [4] * (end - start - 2) + [5]\nlevel_map[21] = [2] * 40\nlevel_map[22] = [1] * 40\nlevel_map[3][20] = 6\nlevel_map[2][1], level_map[2][38] = 7, 8\nlevel_map[20][1], level_map[20][38] = 8, 7\nlevel_map[17][20] = 9\n\nfor row, cells in enumerate(level_map):\n    for column, kind in enumerate(cells):\n        x, y = column * TILE_SIZE, row * TILE_SIZE\n        if kind == 1:\n            Terrain(x, y, kind, all_tiles)\n        elif 2 <= kind <= 5:\n            Terrain(x, y, kind, all_tiles, platforms)\n        elif kind == 6:\n            SignalSource(x, y, all_tiles)\n        elif kind in (7, 8):\n            Gate(x + TILE_SIZE // 2, y + TILE_SIZE, 'teal' if kind == 7 else 'violet', gates)\n        elif kind == 9:\n            explorer = Explorer(x, y + TILE_SIZE, platforms, gates, pulses)\n            explorers.add(explorer)\n\nbackground = load_image('assets/background.png', (SCREEN_WIDTH, SCREEN_HEIGHT))\nmission = Expedition(None, robots, platforms, gates, pulses, crystals)",
+          "after": "all_tiles = pygame.sprite.Group()\nplatforms = pygame.sprite.Group()\nexplorers = pygame.sprite.Group()\npulses = pygame.sprite.Group()\nrobots = pygame.sprite.Group()\ngates = pygame.sprite.Group()\ncrystals = pygame.sprite.Group()\n\n# 0 빈칸 / 1 흙 / 2-5 발판 / 6 신호원 / 7-8 게이트 / 9 탐사원\nlevel_map = [[0 for column in range(40)] for row in range(23)]\nfor row, spans in [(3, [(0, 15), (25, 40)]), (8, [(11, 29)]),\n                   (10, [(0, 6), (34, 40)]), (15, [(0, 16), (24, 40)]), (18, [(18, 22)])]:\n    for start, end in spans:\n        level_map[row][start:end] = [3] + [4] * (end - start - 2) + [5]\nlevel_map[21] = [2] * 40\nlevel_map[22] = [1] * 40\nlevel_map[3][20] = 6\nlevel_map[2][1], level_map[2][38] = 7, 8\nlevel_map[20][1], level_map[20][38] = 8, 7\nlevel_map[17][20] = 9\n\nfor row, cells in enumerate(level_map):\n    for column, kind in enumerate(cells):\n        x, y = column * TILE_SIZE, row * TILE_SIZE\n        if kind == 1:\n            Terrain(x, y, kind, all_tiles)\n        elif 2 <= kind <= 5:\n            Terrain(x, y, kind, all_tiles, platforms)\n        elif kind == 6:\n            SignalSource(x, y, all_tiles)\n        elif kind in (7, 8):\n            Gate(x + TILE_SIZE // 2, y + TILE_SIZE, 'teal' if kind == 7 else 'violet', gates)\n        elif kind == 9:\n            explorer = Explorer(x, y + TILE_SIZE, platforms, gates, pulses)\n            explorers.add(explorer)\n\nbackground = load_image('assets/background.png', (SCREEN_WIDTH, SCREEN_HEIGHT))\nmission = Expedition(explorer, robots, platforms, gates, pulses, crystals)"
+        },
+        {
+          "key": "Expedition.check_collisions",
+          "before": "    def check_collisions(self):\n        pass",
+          "after": "    def check_collisions(self):\n        collisions = pygame.sprite.groupcollide(self.pulses, self.robots, True, False)\n        for targets in collisions.values():\n            for robot in targets:\n                if robot.state == 'walking':\n                    robot.hit_sound.play()\n                    robot.state = 'falling'\n                    robot.frame = 0.0\n                    robot.down_elapsed = 0.0"
+        },
+        {
+          "key": "Expedition.update",
+          "before": "    def update(self, seconds):\n        self.elapsed += seconds\n        self.remaining = max(0, self.round_duration - int(self.elapsed + 1e-9))",
+          "after": "    def update(self, seconds):\n        self.check_collisions()\n        self.elapsed += seconds\n        self.remaining = max(0, self.round_duration - int(self.elapsed + 1e-9))"
+        },
+        {
+          "key": "Robot.check_animations",
+          "before": "    def check_animations(self, seconds):\n        if self.state == 'walking':\n            self.animate(self.walk_frames, seconds, 8, True)",
+          "after": "    def check_animations(self, seconds):\n        if self.state == 'walking':\n            self.animate(self.walk_frames, seconds, 8, True)\n        elif self.state == 'falling':\n            if self.animate(self.down_frames, seconds, 6, False):\n                self.state = 'down'\n                self.down_elapsed = 0.0"
+        }
+      ]
+    },
+    {
+      "id": "25-A",
+      "previous": "24-B",
+      "edits": [
+        {
+          "key": "Robot.check_animations",
+          "before": "    def check_animations(self, seconds):\n        if self.state == 'walking':\n            self.animate(self.walk_frames, seconds, 8, True)\n        elif self.state == 'falling':\n            if self.animate(self.down_frames, seconds, 6, False):\n                self.state = 'down'\n                self.down_elapsed = 0.0",
+          "after": "    def check_animations(self, seconds):\n        if self.state == 'walking':\n            self.animate(self.walk_frames, seconds, 8, True)\n        elif self.state == 'falling':\n            if self.animate(self.down_frames, seconds, 6, False):\n                self.state = 'down'\n                self.down_elapsed = 0.0\n        elif self.state == 'down':\n            self.down_elapsed += seconds\n            if self.down_elapsed >= self.rise_delay:\n                self.state = 'rising'\n                self.frame = 0.0\n        elif self.state == 'rising':\n            if self.animate(self.rise_frames, seconds, 6, False):\n                self.state = 'walking'\n                self.frame = 0.0"
+        }
+      ]
+    },
+    {
+      "id": "25-B",
+      "previous": "25-A",
+      "edits": [
+        {
+          "key": "Expedition.check_collisions",
+          "before": "    def check_collisions(self):\n        collisions = pygame.sprite.groupcollide(self.pulses, self.robots, True, False)\n        for targets in collisions.values():\n            for robot in targets:\n                if robot.state == 'walking':\n                    robot.hit_sound.play()\n                    robot.state = 'falling'\n                    robot.frame = 0.0\n                    robot.down_elapsed = 0.0",
+          "after": "    def check_collisions(self):\n        collisions = pygame.sprite.groupcollide(self.pulses, self.robots, True, False)\n        for targets in collisions.values():\n            for robot in targets:\n                if robot.state == 'walking':\n                    robot.hit_sound.play()\n                    robot.state = 'falling'\n                    robot.frame = 0.0\n                    robot.down_elapsed = 0.0\n        for robot in pygame.sprite.spritecollide(self.explorer, self.robots, False):\n            if robot.state != 'walking':\n                robot.kick_sound.play()\n                robot.kill()\n                self.score += 25\n            elif self.explorer.hurt_remaining <= 0:\n                self.explorer.health = max(0, self.explorer.health - 20)\n                self.explorer.hit_sound.play()\n                self.explorer.hurt_remaining = 1.0\n                self.explorer.position.x = (self.explorer.position.x - 128 * robot.direction) % SCREEN_WIDTH\n                self.explorer.rect.midbottom = self.explorer.position\n                if self.explorer.health <= 0:\n                    return"
+        },
+        {
+          "key": "Expedition.draw",
+          "before": "    def draw(self):\n        pygame.draw.rect(screen, (13, 24, 40), (0, SCREEN_HEIGHT - 58, SCREEN_WIDTH, 58))\n        rows = [\n            (f'점수 {self.score}', (16, SCREEN_HEIGHT - 56), 'topleft'),\n            (f'에너지 {100}', (16, SCREEN_HEIGHT - 29), 'topleft'),\n            (f'탐사 {self.round_number}', (SCREEN_WIDTH - 16, SCREEN_HEIGHT - 56), 'topright'),\n            (f'신호 복구까지 {self.remaining}초', (SCREEN_WIDTH - 16, SCREEN_HEIGHT - 29), 'topright'),\n        ]\n        for text, point, anchor in rows:\n            surface = self.hud_font.render(text, True, (237, 244, 252))\n            rect = surface.get_rect(**{anchor: point})\n            screen.blit(surface, rect)\n        title = self.title_font.render('화성 탐사대', True, (101, 229, 217))\n        screen.blit(title, title.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT - 29)))",
+          "after": "    def draw(self):\n        pygame.draw.rect(screen, (13, 24, 40), (0, SCREEN_HEIGHT - 58, SCREEN_WIDTH, 58))\n        rows = [\n            (f'점수 {self.score}', (16, SCREEN_HEIGHT - 56), 'topleft'),\n            (f'에너지 {self.explorer.health}', (16, SCREEN_HEIGHT - 29), 'topleft'),\n            (f'탐사 {self.round_number}', (SCREEN_WIDTH - 16, SCREEN_HEIGHT - 56), 'topright'),\n            (f'신호 복구까지 {self.remaining}초', (SCREEN_WIDTH - 16, SCREEN_HEIGHT - 29), 'topright'),\n        ]\n        for text, point, anchor in rows:\n            surface = self.hud_font.render(text, True, (237, 244, 252))\n            rect = surface.get_rect(**{anchor: point})\n            screen.blit(surface, rect)\n        title = self.title_font.render('화성 탐사대', True, (101, 229, 217))\n        screen.blit(title, title.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT - 29)))"
+        }
+      ]
+    },
+    {
+      "id": "26-A",
+      "previous": "25-B",
+      "edits": [
+        {
+          "key": "Expedition.__init__",
+          "before": "    def __init__(self, explorer, robots, platforms, gates, pulses, crystals):\n        self.round_duration = 30\n        self.score = 0\n        self.round_number = 1\n        self.remaining = self.round_duration\n        self.elapsed = 0.0\n        self.title_font = pygame.font.Font('assets/fonts/DoHyeon-Regular.ttf', 42)\n        self.hud_font = pygame.font.Font('assets/fonts/DoHyeon-Regular.ttf', 23)\n        self.explorer = explorer\n        self.robots = robots\n        self.platforms = platforms\n        self.gates = gates\n        self.pulses = pulses\n        self.crystals = crystals",
+          "after": "    def __init__(self, explorer, robots, platforms, gates, pulses, crystals):\n        self.round_duration = 30\n        self.score = 0\n        self.round_number = 1\n        self.remaining = self.round_duration\n        self.elapsed = 0.0\n        self.title_font = pygame.font.Font('assets/fonts/DoHyeon-Regular.ttf', 42)\n        self.hud_font = pygame.font.Font('assets/fonts/DoHyeon-Regular.ttf', 23)\n        self.explorer = explorer\n        self.robots = robots\n        self.platforms = platforms\n        self.gates = gates\n        self.pulses = pulses\n        self.crystals = crystals\n        self.initial_spawn_interval = 5\n        self.spawn_interval = self.initial_spawn_interval\n        self.spawn_elapsed = 0.0"
+        },
+        {
+          "key": "Expedition.add_robot",
+          "before": "    def add_robot(self, seconds):\n        pass",
+          "after": "    def add_robot(self, seconds):\n        self.spawn_elapsed += seconds\n        if self.spawn_elapsed + 1e-9 >= self.spawn_interval:\n            self.spawn_elapsed = max(0.0, self.spawn_elapsed - self.spawn_interval)\n            self.robots.add(Robot(self.platforms, self.gates, self.round_number, self.round_number + 5))"
+        },
+        {
+          "key": "Expedition.update",
+          "before": "    def update(self, seconds):\n        self.check_collisions()\n        self.elapsed += seconds\n        self.remaining = max(0, self.round_duration - int(self.elapsed + 1e-9))",
+          "after": "    def update(self, seconds):\n        self.check_collisions()\n        self.elapsed += seconds\n        self.remaining = max(0, self.round_duration - int(self.elapsed + 1e-9))\n        self.add_robot(seconds)"
+        }
+      ]
+    },
+    {
+      "id": "27-A",
+      "previous": "26-A",
+      "edits": [
+        {
+          "key": "Crystal.__init__",
+          "before": "    def __init__(self, platforms, gates):\n        pass",
+          "after": "    def __init__(self, platforms, gates):\n        super().__init__()\n        self.gravity = 3\n        self.frames = load_frames('crystal', (32, 32))\n        self.frame = 0.0\n        self.image = self.frames[0]\n        self.rect = self.image.get_rect(midbottom=(SCREEN_WIDTH // 2, 100))\n        self.platforms, self.gates = platforms, gates\n        self.position = Vector(self.rect.midbottom)\n        self.velocity = Vector(random.choice([-5, 5]), 0)\n        self.acceleration = Vector(0, self.gravity)\n        self.previous_rect = self.rect.copy()\n        self.portal_sound = load_sound('portal')\n        self.portal_remaining = 0.0"
+        }
+      ]
+    },
+    {
+      "id": "27-B",
+      "previous": "27-A",
+      "edits": [
+        {
+          "key": "Crystal.update",
+          "before": "    def update(self, seconds=1 / FPS):\n        pass",
+          "after": "    def update(self, seconds=1 / FPS):\n        self.portal_remaining = max(0, self.portal_remaining - seconds)\n        self.animate(seconds)\n        self.move(seconds)\n        self.check_collisions()"
+        },
+        {
+          "key": "Crystal.move",
+          "before": "    def move(self, seconds):\n        pass",
+          "after": "    def move(self, seconds):\n        self.previous_rect = self.rect.copy()\n        scale = min(seconds * FPS, 3)\n        self.position += self.velocity * scale + 0.5 * self.acceleration * scale * scale\n        self.velocity += self.acceleration * scale\n        self.velocity.y = min(self.velocity.y, 25)\n        self.position.x %= SCREEN_WIDTH\n        self.rect.midbottom = self.position"
+        },
+        {
+          "key": "Crystal.check_collisions",
+          "before": "    def check_collisions(self):\n        pass",
+          "after": "    def check_collisions(self):\n        for tile in sorted(self.platforms, key=lambda tile: tile.rect.top):\n            if self.rect.right <= tile.rect.left or self.rect.left >= tile.rect.right:\n                continue\n            if self.previous_rect.bottom <= tile.rect.top + 1 <= self.rect.bottom + 1:\n                self.position.y = tile.rect.top\n                self.velocity.y = 0\n                self.rect.midbottom = self.position\n                break\n        for gate in self.gates:\n            if self.portal_remaining <= 0 and self.rect.colliderect(gate.rect):\n                target = next((other for other in self.gates if other is not gate and other.channel == gate.channel), None)\n                if target is not None:\n                    self.position.update(target.rect.centerx + (80 if target.rect.centerx < SCREEN_WIDTH / 2 else -80), target.rect.bottom)\n                    self.rect.midbottom = self.position\n                    self.portal_remaining = 0.4\n                    self.portal_sound.play()\n                    break"
+        },
+        {
+          "key": "Crystal.animate",
+          "before": "    def animate(self, seconds):\n        pass",
+          "after": "    def animate(self, seconds):\n        self.frame = (self.frame + seconds * 6) % len(self.frames)\n        self.image = self.frames[int(self.frame)]"
+        },
+        {
+          "key": "Expedition.check_collisions",
+          "before": "    def check_collisions(self):\n        collisions = pygame.sprite.groupcollide(self.pulses, self.robots, True, False)\n        for targets in collisions.values():\n            for robot in targets:\n                if robot.state == 'walking':\n                    robot.hit_sound.play()\n                    robot.state = 'falling'\n                    robot.frame = 0.0\n                    robot.down_elapsed = 0.0\n        for robot in pygame.sprite.spritecollide(self.explorer, self.robots, False):\n            if robot.state != 'walking':\n                robot.kick_sound.play()\n                robot.kill()\n                self.score += 25\n            elif self.explorer.hurt_remaining <= 0:\n                self.explorer.health = max(0, self.explorer.health - 20)\n                self.explorer.hit_sound.play()\n                self.explorer.hurt_remaining = 1.0\n                self.explorer.position.x = (self.explorer.position.x - 128 * robot.direction) % SCREEN_WIDTH\n                self.explorer.rect.midbottom = self.explorer.position\n                if self.explorer.health <= 0:\n                    return",
+          "after": "    def check_collisions(self):\n        collisions = pygame.sprite.groupcollide(self.pulses, self.robots, True, False)\n        for targets in collisions.values():\n            for robot in targets:\n                if robot.state == 'walking':\n                    robot.hit_sound.play()\n                    robot.state = 'falling'\n                    robot.frame = 0.0\n                    robot.down_elapsed = 0.0\n        for robot in pygame.sprite.spritecollide(self.explorer, self.robots, False):\n            if robot.state != 'walking':\n                robot.kick_sound.play()\n                robot.kill()\n                self.score += 25\n                self.crystals.add(Crystal(self.platforms, self.gates))\n            elif self.explorer.hurt_remaining <= 0:\n                self.explorer.health = max(0, self.explorer.health - 20)\n                self.explorer.hit_sound.play()\n                self.explorer.hurt_remaining = 1.0\n                self.explorer.position.x = (self.explorer.position.x - 128 * robot.direction) % SCREEN_WIDTH\n                self.explorer.rect.midbottom = self.explorer.position\n                if self.explorer.health <= 0:\n                    return"
+        },
+        {
+          "key": "loop",
+          "before": "running = True\nwhile running:\n    seconds = min(clock.tick(FPS) / 1000, 0.05)\n    for event in pygame.event.get():\n        if event.type == pygame.QUIT:\n            running = False\n        elif event.type == pygame.KEYDOWN:\n            if event.key == pygame.K_SPACE:\n                explorer.jump()\n            elif event.key == pygame.K_UP:\n                explorer.fire()\n            elif event.key == pygame.K_RETURN:\n                robots.add(Robot(platforms, gates, 2, 7))\n    if not running:\n        break\n    all_tiles.update(seconds)\n    gates.update(seconds)\n    explorers.update(seconds)\n    pulses.update(seconds)\n    robots.update(seconds)\n    mission.update(seconds)\n    screen.blit(background, (0, 0))\n    all_tiles.draw(screen)\n    gates.draw(screen)\n    explorers.draw(screen)\n    pulses.draw(screen)\n    robots.draw(screen)\n    mission.draw()\n    pygame.display.update()\n\npygame.quit()",
+          "after": "running = True\nwhile running:\n    seconds = min(clock.tick(FPS) / 1000, 0.05)\n    for event in pygame.event.get():\n        if event.type == pygame.QUIT:\n            running = False\n        elif event.type == pygame.KEYDOWN:\n            if event.key == pygame.K_SPACE:\n                explorer.jump()\n            elif event.key == pygame.K_UP:\n                explorer.fire()\n            elif event.key == pygame.K_RETURN:\n                robots.add(Robot(platforms, gates, 2, 7))\n    if not running:\n        break\n    all_tiles.update(seconds)\n    gates.update(seconds)\n    explorers.update(seconds)\n    pulses.update(seconds)\n    robots.update(seconds)\n    crystals.update(seconds)\n    mission.update(seconds)\n    screen.blit(background, (0, 0))\n    all_tiles.draw(screen)\n    gates.draw(screen)\n    explorers.draw(screen)\n    pulses.draw(screen)\n    robots.draw(screen)\n    crystals.draw(screen)\n    mission.draw()\n    pygame.display.update()\n\npygame.quit()"
+        }
+      ]
+    },
+    {
+      "id": "28-A",
+      "previous": "27-B",
+      "edits": [
+        {
+          "key": "Expedition.__init__",
+          "before": "    def __init__(self, explorer, robots, platforms, gates, pulses, crystals):\n        self.round_duration = 30\n        self.score = 0\n        self.round_number = 1\n        self.remaining = self.round_duration\n        self.elapsed = 0.0\n        self.title_font = pygame.font.Font('assets/fonts/DoHyeon-Regular.ttf', 42)\n        self.hud_font = pygame.font.Font('assets/fonts/DoHyeon-Regular.ttf', 23)\n        self.explorer = explorer\n        self.robots = robots\n        self.platforms = platforms\n        self.gates = gates\n        self.pulses = pulses\n        self.crystals = crystals\n        self.initial_spawn_interval = 5\n        self.spawn_interval = self.initial_spawn_interval\n        self.spawn_elapsed = 0.0",
+          "after": "    def __init__(self, explorer, robots, platforms, gates, pulses, crystals):\n        self.round_duration = 30\n        self.score = 0\n        self.round_number = 1\n        self.remaining = self.round_duration\n        self.elapsed = 0.0\n        self.title_font = pygame.font.Font('assets/fonts/DoHyeon-Regular.ttf', 42)\n        self.hud_font = pygame.font.Font('assets/fonts/DoHyeon-Regular.ttf', 23)\n        self.explorer = explorer\n        self.robots = robots\n        self.platforms = platforms\n        self.gates = gates\n        self.pulses = pulses\n        self.crystals = crystals\n        self.initial_spawn_interval = 5\n        self.spawn_interval = self.initial_spawn_interval\n        self.spawn_elapsed = 0.0\n        self.pickup_sound = load_sound('collect')\n        self.lost_sound = load_sound('signal_lost')\n        pygame.mixer.music.load('assets/sounds/expedition.ogg')"
+        },
+        {
+          "key": "Expedition.check_collisions",
+          "before": "    def check_collisions(self):\n        collisions = pygame.sprite.groupcollide(self.pulses, self.robots, True, False)\n        for targets in collisions.values():\n            for robot in targets:\n                if robot.state == 'walking':\n                    robot.hit_sound.play()\n                    robot.state = 'falling'\n                    robot.frame = 0.0\n                    robot.down_elapsed = 0.0\n        for robot in pygame.sprite.spritecollide(self.explorer, self.robots, False):\n            if robot.state != 'walking':\n                robot.kick_sound.play()\n                robot.kill()\n                self.score += 25\n                self.crystals.add(Crystal(self.platforms, self.gates))\n            elif self.explorer.hurt_remaining <= 0:\n                self.explorer.health = max(0, self.explorer.health - 20)\n                self.explorer.hit_sound.play()\n                self.explorer.hurt_remaining = 1.0\n                self.explorer.position.x = (self.explorer.position.x - 128 * robot.direction) % SCREEN_WIDTH\n                self.explorer.rect.midbottom = self.explorer.position\n                if self.explorer.health <= 0:\n                    return",
+          "after": "    def check_collisions(self):\n        collisions = pygame.sprite.groupcollide(self.pulses, self.robots, True, False)\n        for targets in collisions.values():\n            for robot in targets:\n                if robot.state == 'walking':\n                    robot.hit_sound.play()\n                    robot.state = 'falling'\n                    robot.frame = 0.0\n                    robot.down_elapsed = 0.0\n        for robot in pygame.sprite.spritecollide(self.explorer, self.robots, False):\n            if robot.state != 'walking':\n                robot.kick_sound.play()\n                robot.kill()\n                self.score += 25\n                self.crystals.add(Crystal(self.platforms, self.gates))\n            elif self.explorer.hurt_remaining <= 0:\n                self.explorer.health = max(0, self.explorer.health - 20)\n                self.explorer.hit_sound.play()\n                self.explorer.hurt_remaining = 1.0\n                self.explorer.position.x = (self.explorer.position.x - 128 * robot.direction) % SCREEN_WIDTH\n                self.explorer.rect.midbottom = self.explorer.position\n                if self.explorer.health <= 0:\n                    return\n        collected = pygame.sprite.spritecollide(self.explorer, self.crystals, True)\n        if collected:\n            self.pickup_sound.play()\n            self.score += 100 * len(collected)\n            self.explorer.health = min(self.explorer.starting_health, self.explorer.health + 10 * len(collected))"
+        }
+      ]
+    },
+    {
+      "id": "28-B",
+      "previous": "28-A",
+      "edits": [
+        {
+          "key": "Expedition.check_collisions",
+          "before": "    def check_collisions(self):\n        collisions = pygame.sprite.groupcollide(self.pulses, self.robots, True, False)\n        for targets in collisions.values():\n            for robot in targets:\n                if robot.state == 'walking':\n                    robot.hit_sound.play()\n                    robot.state = 'falling'\n                    robot.frame = 0.0\n                    robot.down_elapsed = 0.0\n        for robot in pygame.sprite.spritecollide(self.explorer, self.robots, False):\n            if robot.state != 'walking':\n                robot.kick_sound.play()\n                robot.kill()\n                self.score += 25\n                self.crystals.add(Crystal(self.platforms, self.gates))\n            elif self.explorer.hurt_remaining <= 0:\n                self.explorer.health = max(0, self.explorer.health - 20)\n                self.explorer.hit_sound.play()\n                self.explorer.hurt_remaining = 1.0\n                self.explorer.position.x = (self.explorer.position.x - 128 * robot.direction) % SCREEN_WIDTH\n                self.explorer.rect.midbottom = self.explorer.position\n                if self.explorer.health <= 0:\n                    return\n        collected = pygame.sprite.spritecollide(self.explorer, self.crystals, True)\n        if collected:\n            self.pickup_sound.play()\n            self.score += 100 * len(collected)\n            self.explorer.health = min(self.explorer.starting_health, self.explorer.health + 10 * len(collected))",
+          "after": "    def check_collisions(self):\n        collisions = pygame.sprite.groupcollide(self.pulses, self.robots, True, False)\n        for targets in collisions.values():\n            for robot in targets:\n                if robot.state == 'walking':\n                    robot.hit_sound.play()\n                    robot.state = 'falling'\n                    robot.frame = 0.0\n                    robot.down_elapsed = 0.0\n        for robot in pygame.sprite.spritecollide(self.explorer, self.robots, False):\n            if robot.state != 'walking':\n                robot.kick_sound.play()\n                robot.kill()\n                self.score += 25\n                self.crystals.add(Crystal(self.platforms, self.gates))\n            elif self.explorer.hurt_remaining <= 0:\n                self.explorer.health = max(0, self.explorer.health - 20)\n                self.explorer.hit_sound.play()\n                self.explorer.hurt_remaining = 1.0\n                self.explorer.position.x = (self.explorer.position.x - 128 * robot.direction) % SCREEN_WIDTH\n                self.explorer.rect.midbottom = self.explorer.position\n                if self.explorer.health <= 0:\n                    return\n        collected = pygame.sprite.spritecollide(self.explorer, self.crystals, True)\n        if collected:\n            self.pickup_sound.play()\n            self.score += 100 * len(collected)\n            self.explorer.health = min(self.explorer.starting_health, self.explorer.health + 10 * len(collected))\n        for robot in list(self.robots):\n            if robot.state != 'walking':\n                continue\n            lost = pygame.sprite.spritecollide(robot, self.crystals, True)\n            if lost:\n                self.lost_sound.play()\n                for _ in lost:\n                    self.robots.add(Robot(self.platforms, self.gates, self.round_number, self.round_number + 5))"
+        }
+      ]
+    },
+    {
+      "id": "29-A",
+      "previous": "28-B",
+      "edits": [
+        {
+          "key": "Expedition.__init__",
+          "before": "    def __init__(self, explorer, robots, platforms, gates, pulses, crystals):\n        self.round_duration = 30\n        self.score = 0\n        self.round_number = 1\n        self.remaining = self.round_duration\n        self.elapsed = 0.0\n        self.title_font = pygame.font.Font('assets/fonts/DoHyeon-Regular.ttf', 42)\n        self.hud_font = pygame.font.Font('assets/fonts/DoHyeon-Regular.ttf', 23)\n        self.explorer = explorer\n        self.robots = robots\n        self.platforms = platforms\n        self.gates = gates\n        self.pulses = pulses\n        self.crystals = crystals\n        self.initial_spawn_interval = 5\n        self.spawn_interval = self.initial_spawn_interval\n        self.spawn_elapsed = 0.0\n        self.pickup_sound = load_sound('collect')\n        self.lost_sound = load_sound('signal_lost')\n        pygame.mixer.music.load('assets/sounds/expedition.ogg')",
+          "after": "    def __init__(self, explorer, robots, platforms, gates, pulses, crystals):\n        self.round_duration = 30\n        self.score = 0\n        self.round_number = 1\n        self.remaining = self.round_duration\n        self.elapsed = 0.0\n        self.title_font = pygame.font.Font('assets/fonts/DoHyeon-Regular.ttf', 42)\n        self.hud_font = pygame.font.Font('assets/fonts/DoHyeon-Regular.ttf', 23)\n        self.explorer = explorer\n        self.robots = robots\n        self.platforms = platforms\n        self.gates = gates\n        self.pulses = pulses\n        self.crystals = crystals\n        self.initial_spawn_interval = 5\n        self.spawn_interval = self.initial_spawn_interval\n        self.spawn_elapsed = 0.0\n        self.pickup_sound = load_sound('collect')\n        self.lost_sound = load_sound('signal_lost')\n        pygame.mixer.music.load('assets/sounds/expedition.ogg')\n        self.state = 'playing'\n        self.message = ''\n        self.hint = ''"
+        },
+        {
+          "key": "Expedition.update",
+          "before": "    def update(self, seconds):\n        self.check_collisions()\n        self.elapsed += seconds\n        self.remaining = max(0, self.round_duration - int(self.elapsed + 1e-9))\n        self.add_robot(seconds)",
+          "after": "    def update(self, seconds):\n        if self.state != 'playing':\n            return\n        self.check_collisions()\n        self.elapsed += seconds\n        self.remaining = max(0, self.round_duration - int(self.elapsed + 1e-9))\n        self.check_round_completion()\n        if self.state != 'playing':\n            return\n        self.add_robot(seconds)"
+        },
+        {
+          "key": "Expedition.draw",
+          "before": "    def draw(self):\n        pygame.draw.rect(screen, (13, 24, 40), (0, SCREEN_HEIGHT - 58, SCREEN_WIDTH, 58))\n        rows = [\n            (f'점수 {self.score}', (16, SCREEN_HEIGHT - 56), 'topleft'),\n            (f'에너지 {self.explorer.health}', (16, SCREEN_HEIGHT - 29), 'topleft'),\n            (f'탐사 {self.round_number}', (SCREEN_WIDTH - 16, SCREEN_HEIGHT - 56), 'topright'),\n            (f'신호 복구까지 {self.remaining}초', (SCREEN_WIDTH - 16, SCREEN_HEIGHT - 29), 'topright'),\n        ]\n        for text, point, anchor in rows:\n            surface = self.hud_font.render(text, True, (237, 244, 252))\n            rect = surface.get_rect(**{anchor: point})\n            screen.blit(surface, rect)\n        title = self.title_font.render('화성 탐사대', True, (101, 229, 217))\n        screen.blit(title, title.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT - 29)))",
+          "after": "    def draw(self):\n        pygame.draw.rect(screen, (13, 24, 40), (0, SCREEN_HEIGHT - 58, SCREEN_WIDTH, 58))\n        rows = [\n            (f'점수 {self.score}', (16, SCREEN_HEIGHT - 56), 'topleft'),\n            (f'에너지 {self.explorer.health}', (16, SCREEN_HEIGHT - 29), 'topleft'),\n            (f'탐사 {self.round_number}', (SCREEN_WIDTH - 16, SCREEN_HEIGHT - 56), 'topright'),\n            (f'신호 복구까지 {self.remaining}초', (SCREEN_WIDTH - 16, SCREEN_HEIGHT - 29), 'topright'),\n        ]\n        for text, point, anchor in rows:\n            surface = self.hud_font.render(text, True, (237, 244, 252))\n            rect = surface.get_rect(**{anchor: point})\n            screen.blit(surface, rect)\n        title = self.title_font.render('화성 탐사대', True, (101, 229, 217))\n        screen.blit(title, title.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT - 29)))\n        if self.state != 'playing':\n            veil = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)\n            veil.fill((5, 12, 25, 210))\n            screen.blit(veil, (0, 0))\n            main = self.title_font.render(self.message, True, (116, 237, 223))\n            sub = self.hud_font.render(self.hint, True, (242, 243, 248))\n            screen.blit(main, main.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2 - 28)))\n            screen.blit(sub, sub.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2 + 32)))"
+        },
+        {
+          "key": "Expedition.check_round_completion",
+          "before": "    def check_round_completion(self):\n        pass",
+          "after": "    def check_round_completion(self):\n        if self.remaining <= 0:\n            self.pause_game('이번 탐사의 신호를 복구했습니다', 'Enter - 다음 탐사', 'round_clear')"
+        },
+        {
+          "key": "Expedition.start_new_round",
+          "before": "    def start_new_round(self):\n        pass",
+          "after": "    def start_new_round(self):\n        self.round_number += 1\n        self.spawn_interval = max(1, self.initial_spawn_interval - self.round_number + 1)\n        self.remaining = self.round_duration\n        self.elapsed = 0.0\n        self.spawn_elapsed = 0.0\n        self.robots.empty()\n        self.pulses.empty()\n        self.crystals.empty()\n        self.explorer.reset()\n        self.state = 'playing'\n        pygame.mixer.music.unpause()"
+        },
+        {
+          "key": "Expedition.pause_game",
+          "before": "    def pause_game(self, message, hint, state='paused'):\n        pass",
+          "after": "    def pause_game(self, message, hint, state='paused'):\n        self.message, self.hint, self.state = message, hint, state\n        pygame.mixer.music.pause()"
+        },
+        {
+          "key": "loop",
+          "before": "running = True\nwhile running:\n    seconds = min(clock.tick(FPS) / 1000, 0.05)\n    for event in pygame.event.get():\n        if event.type == pygame.QUIT:\n            running = False\n        elif event.type == pygame.KEYDOWN:\n            if event.key == pygame.K_SPACE:\n                explorer.jump()\n            elif event.key == pygame.K_UP:\n                explorer.fire()\n            elif event.key == pygame.K_RETURN:\n                robots.add(Robot(platforms, gates, 2, 7))\n    if not running:\n        break\n    all_tiles.update(seconds)\n    gates.update(seconds)\n    explorers.update(seconds)\n    pulses.update(seconds)\n    robots.update(seconds)\n    crystals.update(seconds)\n    mission.update(seconds)\n    screen.blit(background, (0, 0))\n    all_tiles.draw(screen)\n    gates.draw(screen)\n    explorers.draw(screen)\n    pulses.draw(screen)\n    robots.draw(screen)\n    crystals.draw(screen)\n    mission.draw()\n    pygame.display.update()\n\npygame.quit()",
+          "after": "running = True\nwhile running:\n    seconds = min(clock.tick(FPS) / 1000, 0.05)\n    for event in pygame.event.get():\n        if event.type == pygame.QUIT:\n            running = False\n        elif event.type == pygame.KEYDOWN:\n            if event.key == pygame.K_RETURN:\n                if mission.state == 'title':\n                    mission.state = 'playing'\n                    pygame.mixer.music.play(-1)\n                elif mission.state == 'round_clear':\n                    mission.start_new_round()\n                elif mission.state == 'playing':\n                    robots.add(Robot(platforms, gates, 2, 7))\n            elif mission.state == 'playing':\n                if event.key == pygame.K_SPACE:\n                    explorer.jump()\n                elif event.key == pygame.K_UP:\n                    explorer.fire()\n    if not running:\n        break\n    if mission.state == 'playing':\n        all_tiles.update(seconds)\n        gates.update(seconds)\n        explorers.update(seconds)\n        pulses.update(seconds)\n        robots.update(seconds)\n        crystals.update(seconds)\n        mission.update(seconds)\n    screen.blit(background, (0, 0))\n    all_tiles.draw(screen)\n    gates.draw(screen)\n    explorers.draw(screen)\n    pulses.draw(screen)\n    robots.draw(screen)\n    crystals.draw(screen)\n    mission.draw()\n    pygame.display.update()\n\npygame.quit()"
+        }
+      ]
+    },
+    {
+      "id": "29-B",
+      "previous": "29-A",
+      "edits": [
+        {
+          "key": "setup",
+          "before": "all_tiles = pygame.sprite.Group()\nplatforms = pygame.sprite.Group()\nexplorers = pygame.sprite.Group()\npulses = pygame.sprite.Group()\nrobots = pygame.sprite.Group()\ngates = pygame.sprite.Group()\ncrystals = pygame.sprite.Group()\n\n# 0 빈칸 / 1 흙 / 2-5 발판 / 6 신호원 / 7-8 게이트 / 9 탐사원\nlevel_map = [[0 for column in range(40)] for row in range(23)]\nfor row, spans in [(3, [(0, 15), (25, 40)]), (8, [(11, 29)]),\n                   (10, [(0, 6), (34, 40)]), (15, [(0, 16), (24, 40)]), (18, [(18, 22)])]:\n    for start, end in spans:\n        level_map[row][start:end] = [3] + [4] * (end - start - 2) + [5]\nlevel_map[21] = [2] * 40\nlevel_map[22] = [1] * 40\nlevel_map[3][20] = 6\nlevel_map[2][1], level_map[2][38] = 7, 8\nlevel_map[20][1], level_map[20][38] = 8, 7\nlevel_map[17][20] = 9\n\nfor row, cells in enumerate(level_map):\n    for column, kind in enumerate(cells):\n        x, y = column * TILE_SIZE, row * TILE_SIZE\n        if kind == 1:\n            Terrain(x, y, kind, all_tiles)\n        elif 2 <= kind <= 5:\n            Terrain(x, y, kind, all_tiles, platforms)\n        elif kind == 6:\n            SignalSource(x, y, all_tiles)\n        elif kind in (7, 8):\n            Gate(x + TILE_SIZE // 2, y + TILE_SIZE, 'teal' if kind == 7 else 'violet', gates)\n        elif kind == 9:\n            explorer = Explorer(x, y + TILE_SIZE, platforms, gates, pulses)\n            explorers.add(explorer)\n\nbackground = load_image('assets/background.png', (SCREEN_WIDTH, SCREEN_HEIGHT))\nmission = Expedition(explorer, robots, platforms, gates, pulses, crystals)",
+          "after": "all_tiles = pygame.sprite.Group()\nplatforms = pygame.sprite.Group()\nexplorers = pygame.sprite.Group()\npulses = pygame.sprite.Group()\nrobots = pygame.sprite.Group()\ngates = pygame.sprite.Group()\ncrystals = pygame.sprite.Group()\n\n# 0 빈칸 / 1 흙 / 2-5 발판 / 6 신호원 / 7-8 게이트 / 9 탐사원\nlevel_map = [[0 for column in range(40)] for row in range(23)]\nfor row, spans in [(3, [(0, 15), (25, 40)]), (8, [(11, 29)]),\n                   (10, [(0, 6), (34, 40)]), (15, [(0, 16), (24, 40)]), (18, [(18, 22)])]:\n    for start, end in spans:\n        level_map[row][start:end] = [3] + [4] * (end - start - 2) + [5]\nlevel_map[21] = [2] * 40\nlevel_map[22] = [1] * 40\nlevel_map[3][20] = 6\nlevel_map[2][1], level_map[2][38] = 7, 8\nlevel_map[20][1], level_map[20][38] = 8, 7\nlevel_map[17][20] = 9\n\nfor row, cells in enumerate(level_map):\n    for column, kind in enumerate(cells):\n        x, y = column * TILE_SIZE, row * TILE_SIZE\n        if kind == 1:\n            Terrain(x, y, kind, all_tiles)\n        elif 2 <= kind <= 5:\n            Terrain(x, y, kind, all_tiles, platforms)\n        elif kind == 6:\n            SignalSource(x, y, all_tiles)\n        elif kind in (7, 8):\n            Gate(x + TILE_SIZE // 2, y + TILE_SIZE, 'teal' if kind == 7 else 'violet', gates)\n        elif kind == 9:\n            explorer = Explorer(x, y + TILE_SIZE, platforms, gates, pulses)\n            explorers.add(explorer)\n\nbackground = load_image('assets/background.png', (SCREEN_WIDTH, SCREEN_HEIGHT))\nmission = Expedition(explorer, robots, platforms, gates, pulses, crystals)\nmission.pause_game('화성 탐사대: 신호 복구', 'Enter - 시작 / 방향키 - 이동 / Space - 점프 / 위쪽키 - 펄스', 'title')"
+        }
+      ]
+    },
+    {
+      "id": "30-A",
+      "previous": "29-B",
+      "edits": [
+        {
+          "key": "Expedition.__init__",
+          "before": "    def __init__(self, explorer, robots, platforms, gates, pulses, crystals):\n        self.round_duration = 30\n        self.score = 0\n        self.round_number = 1\n        self.remaining = self.round_duration\n        self.elapsed = 0.0\n        self.title_font = pygame.font.Font('assets/fonts/DoHyeon-Regular.ttf', 42)\n        self.hud_font = pygame.font.Font('assets/fonts/DoHyeon-Regular.ttf', 23)\n        self.explorer = explorer\n        self.robots = robots\n        self.platforms = platforms\n        self.gates = gates\n        self.pulses = pulses\n        self.crystals = crystals\n        self.initial_spawn_interval = 5\n        self.spawn_interval = self.initial_spawn_interval\n        self.spawn_elapsed = 0.0\n        self.pickup_sound = load_sound('collect')\n        self.lost_sound = load_sound('signal_lost')\n        pygame.mixer.music.load('assets/sounds/expedition.ogg')\n        self.state = 'playing'\n        self.message = ''\n        self.hint = ''",
+          "after": "    def __init__(self, explorer, robots, platforms, gates, pulses, crystals):\n        self.round_duration = 30\n        self.initial_spawn_interval = 5\n        self.score = 0\n        self.round_number = 1\n        self.remaining = self.round_duration\n        self.spawn_interval = self.initial_spawn_interval\n        self.elapsed = 0.0\n        self.spawn_elapsed = 0.0\n        self.explorer = explorer\n        self.robots = robots\n        self.platforms = platforms\n        self.gates = gates\n        self.pulses = pulses\n        self.crystals = crystals\n        self.title_font = pygame.font.Font('assets/fonts/DoHyeon-Regular.ttf', 42)\n        self.hud_font = pygame.font.Font('assets/fonts/DoHyeon-Regular.ttf', 23)\n        self.pickup_sound = load_sound('collect')\n        self.lost_sound = load_sound('signal_lost')\n        pygame.mixer.music.load('assets/sounds/expedition.ogg')\n        self.state = 'playing'\n        self.message = ''\n        self.hint = ''"
+        },
+        {
+          "key": "Expedition.update",
+          "before": "    def update(self, seconds):\n        if self.state != 'playing':\n            return\n        self.check_collisions()\n        self.elapsed += seconds\n        self.remaining = max(0, self.round_duration - int(self.elapsed + 1e-9))\n        self.check_round_completion()\n        if self.state != 'playing':\n            return\n        self.add_robot(seconds)",
+          "after": "    def update(self, seconds):\n        if self.state != 'playing':\n            return\n        self.check_collisions()\n        self.check_game_over()\n        if self.state != 'playing':\n            return\n        self.elapsed += seconds\n        self.remaining = max(0, self.round_duration - int(self.elapsed + 1e-9))\n        self.check_round_completion()\n        if self.state != 'playing':\n            return\n        self.add_robot(seconds)"
+        },
+        {
+          "key": "Expedition.check_game_over",
+          "before": "    def check_game_over(self):\n        pass",
+          "after": "    def check_game_over(self):\n        if self.explorer.health <= 0:\n            pygame.mixer.music.stop()\n            self.pause_game(f'탐사 종료 - 최종 점수 {self.score}', 'Enter - 새 탐사 시작', 'game_over')"
+        },
+        {
+          "key": "Expedition.reset_game",
+          "before": "    def reset_game(self):\n        pass",
+          "after": "    def reset_game(self):\n        self.score = 0\n        self.round_number = 1\n        self.remaining = self.round_duration\n        self.spawn_interval = self.initial_spawn_interval\n        self.elapsed = 0.0\n        self.spawn_elapsed = 0.0\n        self.explorer.health = self.explorer.starting_health\n        self.explorer.reset()\n        self.robots.empty()\n        self.pulses.empty()\n        self.crystals.empty()\n        self.state = 'playing'\n        pygame.mixer.music.play(-1)"
+        },
+        {
+          "key": "loop",
+          "before": "running = True\nwhile running:\n    seconds = min(clock.tick(FPS) / 1000, 0.05)\n    for event in pygame.event.get():\n        if event.type == pygame.QUIT:\n            running = False\n        elif event.type == pygame.KEYDOWN:\n            if event.key == pygame.K_RETURN:\n                if mission.state == 'title':\n                    mission.state = 'playing'\n                    pygame.mixer.music.play(-1)\n                elif mission.state == 'round_clear':\n                    mission.start_new_round()\n                elif mission.state == 'playing':\n                    robots.add(Robot(platforms, gates, 2, 7))\n            elif mission.state == 'playing':\n                if event.key == pygame.K_SPACE:\n                    explorer.jump()\n                elif event.key == pygame.K_UP:\n                    explorer.fire()\n    if not running:\n        break\n    if mission.state == 'playing':\n        all_tiles.update(seconds)\n        gates.update(seconds)\n        explorers.update(seconds)\n        pulses.update(seconds)\n        robots.update(seconds)\n        crystals.update(seconds)\n        mission.update(seconds)\n    screen.blit(background, (0, 0))\n    all_tiles.draw(screen)\n    gates.draw(screen)\n    explorers.draw(screen)\n    pulses.draw(screen)\n    robots.draw(screen)\n    crystals.draw(screen)\n    mission.draw()\n    pygame.display.update()\n\npygame.quit()",
+          "after": "running = True\nwhile running:\n    seconds = min(clock.tick(FPS) / 1000, 0.05)\n    for event in pygame.event.get():\n        if event.type == pygame.QUIT:\n            running = False\n        elif event.type == pygame.KEYDOWN:\n            if event.key == pygame.K_RETURN:\n                if mission.state == 'title':\n                    mission.state = 'playing'\n                    pygame.mixer.music.play(-1)\n                elif mission.state == 'round_clear':\n                    mission.start_new_round()\n                elif mission.state == 'game_over':\n                    mission.reset_game()\n                elif mission.state == 'playing':\n                    robots.add(Robot(platforms, gates, 2, 7))\n            elif mission.state == 'playing':\n                if event.key == pygame.K_SPACE:\n                    explorer.jump()\n                elif event.key == pygame.K_UP:\n                    explorer.fire()\n    if not running:\n        break\n    if mission.state == 'playing':\n        all_tiles.update(seconds)\n        gates.update(seconds)\n        explorers.update(seconds)\n        pulses.update(seconds)\n        robots.update(seconds)\n        crystals.update(seconds)\n        mission.update(seconds)\n    screen.blit(background, (0, 0))\n    all_tiles.draw(screen)\n    gates.draw(screen)\n    explorers.draw(screen)\n    pulses.draw(screen)\n    robots.draw(screen)\n    crystals.draw(screen)\n    mission.draw()\n    pygame.display.update()\n\npygame.quit()"
+        }
+      ]
+    },
+    {
+      "id": "30-B",
+      "previous": "30-A",
+      "edits": [
+        {
+          "key": "Terrain.__init__",
+          "before": "    def __init__(self, x, y, tile_kind, all_tiles, platforms=None):\n        super().__init__(all_tiles)\n        self.image = load_image(f'assets/tiles/{tile_kind}.png', (TILE_SIZE, TILE_SIZE))\n        self.rect = self.image.get_rect(topleft=(x, y))\n        if platforms is not None:\n            platforms.add(self)",
+          "after": "    def __init__(self, x, y, tile_kind, all_tiles, platforms=None):\n        super().__init__(all_tiles)\n        self.image = load_image(f'assets/tiles/{tile_kind}.png', (TILE_SIZE, TILE_SIZE))\n        self.rect = self.image.get_rect(topleft=(x, y))\n        self.mask = pygame.mask.from_surface(self.image)\n        if platforms is not None:\n            platforms.add(self)"
+        },
+        {
+          "key": "Explorer.__init__",
+          "before": "    def __init__(self, x, y, platforms, gates, pulses):\n        super().__init__()\n        self.horizontal_acceleration = 2\n        self.friction = 0.15\n        self.gravity = 0.8\n        self.jump_speed = 18\n        self.starting_health = 100\n        self.frames = {}\n        for action in ['run', 'idle', 'jump', 'fire']:\n            right = load_frames(f'explorer/{action}')\n            self.frames[(action, 1)] = right\n            self.frames[(action, -1)] = [pygame.transform.flip(frame, True, False) for frame in right]\n        self.facing = 1\n        self.action = 'idle'\n        self.frame = 0.0\n        self.image = self.frames[('idle', 1)][0]\n        self.rect = self.image.get_rect(midbottom=(x, y))\n        self.platforms, self.gates, self.pulses = platforms, gates, pulses\n        self.jump_sound = load_sound('jump')\n        self.fire_sound = load_sound('pulse')\n        self.portal_sound = load_sound('portal')\n        self.hit_sound = load_sound('hurt')\n        self.start = Vector(x, y)\n        self.position = Vector(x, y)\n        self.velocity = Vector(0, 0)\n        self.acceleration = Vector(0, self.gravity)\n        self.health = self.starting_health\n        self.grounded = False\n        self.previous_rect = self.rect.copy()\n        self.fire_remaining = 0.0\n        self.hurt_remaining = 0.0\n        self.portal_remaining = 0.0",
+          "after": "    def __init__(self, x, y, platforms, gates, pulses):\n        super().__init__()\n        self.horizontal_acceleration = 2\n        self.friction = 0.15\n        self.gravity = 0.8\n        self.jump_speed = 18\n        self.starting_health = 100\n        self.frames = {}\n        for action in ['run', 'idle', 'jump', 'fire']:\n            right = load_frames(f'explorer/{action}')\n            self.frames[(action, 1)] = right\n            self.frames[(action, -1)] = [pygame.transform.flip(frame, True, False) for frame in right]\n        self.facing = 1\n        self.action = 'idle'\n        self.frame = 0.0\n        self.image = self.frames[('idle', 1)][0]\n        self.rect = self.image.get_rect(midbottom=(x, y))\n        self.mask = pygame.mask.from_surface(self.image)\n        self.platforms, self.gates, self.pulses = platforms, gates, pulses\n        self.jump_sound = load_sound('jump')\n        self.fire_sound = load_sound('pulse')\n        self.portal_sound = load_sound('portal')\n        self.hit_sound = load_sound('hurt')\n        self.start = Vector(x, y)\n        self.position = Vector(x, y)\n        self.velocity = Vector(0, 0)\n        self.acceleration = Vector(0, self.gravity)\n        self.health = self.starting_health\n        self.grounded = False\n        self.previous_rect = self.rect.copy()\n        self.fire_remaining = 0.0\n        self.hurt_remaining = 0.0\n        self.portal_remaining = 0.0"
+        },
+        {
+          "key": "Explorer.animate",
+          "before": "    def animate(self, frames, seconds, speed):\n        self.frame = (self.frame + seconds * speed) % len(frames)\n        self.image = frames[int(self.frame)]",
+          "after": "    def animate(self, frames, seconds, speed):\n        self.frame = (self.frame + seconds * speed) % len(frames)\n        self.image = frames[int(self.frame)]\n        self.mask = pygame.mask.from_surface(self.image)"
+        },
+        {
+          "key": "Explorer.reset",
+          "before": "    def reset(self):\n        self.position = self.start.copy()\n        self.velocity = Vector(0, 0)\n        self.acceleration = Vector(0, self.gravity)\n        self.rect.midbottom = self.position\n        self.previous_rect = self.rect.copy()\n        self.grounded = False\n        self.fire_remaining = 0.0\n        self.hurt_remaining = 0.0\n        self.portal_remaining = 0.0\n        self.action = 'idle'\n        self.frame = 0.0\n        self.facing = 1\n        self.image = self.frames[('idle', 1)][0]",
+          "after": "    def reset(self):\n        self.position = self.start.copy()\n        self.velocity = Vector(0, 0)\n        self.acceleration = Vector(0, self.gravity)\n        self.rect.midbottom = self.position\n        self.previous_rect = self.rect.copy()\n        self.grounded = False\n        self.fire_remaining = 0.0\n        self.hurt_remaining = 0.0\n        self.portal_remaining = 0.0\n        self.action = 'idle'\n        self.frame = 0.0\n        self.facing = 1\n        self.image = self.frames[('idle', 1)][0]\n        self.mask = pygame.mask.from_surface(self.image)"
+        },
+        {
+          "key": "Pulse.__init__",
+          "before": "    def __init__(self, x, y, pulses, direction):\n        super().__init__(pulses)\n        self.speed = 20 * direction\n        self.range = 500\n        self.image = load_image('assets/pulse.png', (32, 24))\n        if direction < 0:\n            self.image = pygame.transform.flip(self.image, True, False)\n        self.rect = self.image.get_rect(center=(x, y))\n        self.x = float(x)\n        self.start_x = x",
+          "after": "    def __init__(self, x, y, pulses, direction):\n        super().__init__(pulses)\n        self.speed = 20 * direction\n        self.range = 500\n        self.image = load_image('assets/pulse.png', (32, 24))\n        if direction < 0:\n            self.image = pygame.transform.flip(self.image, True, False)\n        self.rect = self.image.get_rect(center=(x, y))\n        self.mask = pygame.mask.from_surface(self.image)\n        self.x = float(x)\n        self.start_x = x"
+        },
+        {
+          "key": "Robot.__init__",
+          "before": "    def __init__(self, platforms, gates, minimum_speed, maximum_speed):\n        super().__init__()\n        self.gravity = 3\n        self.rise_delay = 2.0\n        self.variant = random.choice(['teal', 'amber'])\n        self.walk_frames = load_frames(f'robot/{self.variant}/walk')\n        self.down_frames = load_frames(f'robot/{self.variant}/down')\n        self.rise_frames = list(reversed(self.down_frames))\n        self.direction = random.choice([-1, 1])\n        if self.direction < 0:\n            self.walk_frames = [pygame.transform.flip(frame, True, False) for frame in self.walk_frames]\n            self.down_frames = [pygame.transform.flip(frame, True, False) for frame in self.down_frames]\n            self.rise_frames = list(reversed(self.down_frames))\n        self.frame = 0.0\n        self.image = self.walk_frames[0]\n        self.rect = self.image.get_rect(midbottom=(random.randint(100, SCREEN_WIDTH - 100), -64))\n        self.platforms, self.gates = platforms, gates\n        self.hit_sound = load_sound('robot_down')\n        self.kick_sound = load_sound('robot_clear')\n        self.portal_sound = load_sound('portal')\n        self.position = Vector(self.rect.midbottom)\n        self.velocity = Vector(self.direction * random.randint(minimum_speed, maximum_speed), 0)\n        self.acceleration = Vector(0, self.gravity)\n        self.previous_rect = self.rect.copy()\n        self.state = 'walking'\n        self.down_elapsed = 0.0\n        self.portal_remaining = 0.0",
+          "after": "    def __init__(self, platforms, gates, minimum_speed, maximum_speed):\n        super().__init__()\n        self.gravity = 3\n        self.rise_delay = 2.0\n        self.variant = random.choice(['teal', 'amber'])\n        self.walk_frames = load_frames(f'robot/{self.variant}/walk')\n        self.down_frames = load_frames(f'robot/{self.variant}/down')\n        self.rise_frames = list(reversed(self.down_frames))\n        self.direction = random.choice([-1, 1])\n        if self.direction < 0:\n            self.walk_frames = [pygame.transform.flip(frame, True, False) for frame in self.walk_frames]\n            self.down_frames = [pygame.transform.flip(frame, True, False) for frame in self.down_frames]\n            self.rise_frames = list(reversed(self.down_frames))\n        self.frame = 0.0\n        self.image = self.walk_frames[0]\n        self.rect = self.image.get_rect(midbottom=(random.randint(100, SCREEN_WIDTH - 100), -64))\n        self.mask = pygame.mask.from_surface(self.image)\n        self.platforms, self.gates = platforms, gates\n        self.hit_sound = load_sound('robot_down')\n        self.kick_sound = load_sound('robot_clear')\n        self.portal_sound = load_sound('portal')\n        self.position = Vector(self.rect.midbottom)\n        self.velocity = Vector(self.direction * random.randint(minimum_speed, maximum_speed), 0)\n        self.acceleration = Vector(0, self.gravity)\n        self.previous_rect = self.rect.copy()\n        self.state = 'walking'\n        self.down_elapsed = 0.0\n        self.portal_remaining = 0.0"
+        },
+        {
+          "key": "Robot.animate",
+          "before": "    def animate(self, frames, seconds, speed, loop):\n        self.frame += seconds * speed\n        finished = self.frame >= len(frames)\n        self.frame = self.frame % len(frames) if loop else min(self.frame, len(frames) - 1e-6)\n        self.image = frames[int(self.frame)]\n        return finished",
+          "after": "    def animate(self, frames, seconds, speed, loop):\n        self.frame += seconds * speed\n        finished = self.frame >= len(frames)\n        self.frame = self.frame % len(frames) if loop else min(self.frame, len(frames) - 1e-6)\n        self.image = frames[int(self.frame)]\n        self.mask = pygame.mask.from_surface(self.image)\n        return finished"
+        },
+        {
+          "key": "Crystal.__init__",
+          "before": "    def __init__(self, platforms, gates):\n        super().__init__()\n        self.gravity = 3\n        self.frames = load_frames('crystal', (32, 32))\n        self.frame = 0.0\n        self.image = self.frames[0]\n        self.rect = self.image.get_rect(midbottom=(SCREEN_WIDTH // 2, 100))\n        self.platforms, self.gates = platforms, gates\n        self.position = Vector(self.rect.midbottom)\n        self.velocity = Vector(random.choice([-5, 5]), 0)\n        self.acceleration = Vector(0, self.gravity)\n        self.previous_rect = self.rect.copy()\n        self.portal_sound = load_sound('portal')\n        self.portal_remaining = 0.0",
+          "after": "    def __init__(self, platforms, gates):\n        super().__init__()\n        self.gravity = 3\n        self.frames = load_frames('crystal', (32, 32))\n        self.frame = 0.0\n        self.image = self.frames[0]\n        self.rect = self.image.get_rect(midbottom=(SCREEN_WIDTH // 2, 100))\n        self.mask = pygame.mask.from_surface(self.image)\n        self.platforms, self.gates = platforms, gates\n        self.position = Vector(self.rect.midbottom)\n        self.velocity = Vector(random.choice([-5, 5]), 0)\n        self.acceleration = Vector(0, self.gravity)\n        self.previous_rect = self.rect.copy()\n        self.portal_sound = load_sound('portal')\n        self.portal_remaining = 0.0"
+        },
+        {
+          "key": "Crystal.animate",
+          "before": "    def animate(self, seconds):\n        self.frame = (self.frame + seconds * 6) % len(self.frames)\n        self.image = self.frames[int(self.frame)]",
+          "after": "    def animate(self, seconds):\n        self.frame = (self.frame + seconds * 6) % len(self.frames)\n        self.image = self.frames[int(self.frame)]\n        self.mask = pygame.mask.from_surface(self.image)"
+        },
+        {
+          "key": "Expedition.check_collisions",
+          "before": "    def check_collisions(self):\n        collisions = pygame.sprite.groupcollide(self.pulses, self.robots, True, False)\n        for targets in collisions.values():\n            for robot in targets:\n                if robot.state == 'walking':\n                    robot.hit_sound.play()\n                    robot.state = 'falling'\n                    robot.frame = 0.0\n                    robot.down_elapsed = 0.0\n        for robot in pygame.sprite.spritecollide(self.explorer, self.robots, False):\n            if robot.state != 'walking':\n                robot.kick_sound.play()\n                robot.kill()\n                self.score += 25\n                self.crystals.add(Crystal(self.platforms, self.gates))\n            elif self.explorer.hurt_remaining <= 0:\n                self.explorer.health = max(0, self.explorer.health - 20)\n                self.explorer.hit_sound.play()\n                self.explorer.hurt_remaining = 1.0\n                self.explorer.position.x = (self.explorer.position.x - 128 * robot.direction) % SCREEN_WIDTH\n                self.explorer.rect.midbottom = self.explorer.position\n                if self.explorer.health <= 0:\n                    return\n        collected = pygame.sprite.spritecollide(self.explorer, self.crystals, True)\n        if collected:\n            self.pickup_sound.play()\n            self.score += 100 * len(collected)\n            self.explorer.health = min(self.explorer.starting_health, self.explorer.health + 10 * len(collected))\n        for robot in list(self.robots):\n            if robot.state != 'walking':\n                continue\n            lost = pygame.sprite.spritecollide(robot, self.crystals, True)\n            if lost:\n                self.lost_sound.play()\n                for _ in lost:\n                    self.robots.add(Robot(self.platforms, self.gates, self.round_number, self.round_number + 5))",
+          "after": "    def check_collisions(self):\n        collisions = pygame.sprite.groupcollide(self.pulses, self.robots, True, False, pygame.sprite.collide_mask)\n        for targets in collisions.values():\n            for robot in targets:\n                if robot.state == 'walking':\n                    robot.hit_sound.play()\n                    robot.state = 'falling'\n                    robot.frame = 0.0\n                    robot.down_elapsed = 0.0\n        for robot in pygame.sprite.spritecollide(self.explorer, self.robots, False, pygame.sprite.collide_mask):\n            if robot.state != 'walking':\n                robot.kick_sound.play()\n                robot.kill()\n                self.score += 25\n                self.crystals.add(Crystal(self.platforms, self.gates))\n            elif self.explorer.hurt_remaining <= 0:\n                self.explorer.health = max(0, self.explorer.health - 20)\n                self.explorer.hit_sound.play()\n                self.explorer.hurt_remaining = 1.0\n                self.explorer.position.x = (self.explorer.position.x - 128 * robot.direction) % SCREEN_WIDTH\n                self.explorer.rect.midbottom = self.explorer.position\n                if self.explorer.health <= 0:\n                    return\n        collected = pygame.sprite.spritecollide(self.explorer, self.crystals, True, pygame.sprite.collide_mask)\n        if collected:\n            self.pickup_sound.play()\n            self.score += 100 * len(collected)\n            self.explorer.health = min(self.explorer.starting_health, self.explorer.health + 10 * len(collected))\n        for robot in list(self.robots):\n            if robot.state != 'walking':\n                continue\n            lost = pygame.sprite.spritecollide(robot, self.crystals, True, pygame.sprite.collide_mask)\n            if lost:\n                self.lost_sound.play()\n                for _ in lost:\n                    self.robots.add(Robot(self.platforms, self.gates, self.round_number, self.round_number + 5))"
+        }
+      ]
+    },
+    {
+      "id": "31-A",
+      "previous": "30-B",
+      "edits": [
+        {
+          "key": "loop",
+          "before": "running = True\nwhile running:\n    seconds = min(clock.tick(FPS) / 1000, 0.05)\n    for event in pygame.event.get():\n        if event.type == pygame.QUIT:\n            running = False\n        elif event.type == pygame.KEYDOWN:\n            if event.key == pygame.K_RETURN:\n                if mission.state == 'title':\n                    mission.state = 'playing'\n                    pygame.mixer.music.play(-1)\n                elif mission.state == 'round_clear':\n                    mission.start_new_round()\n                elif mission.state == 'game_over':\n                    mission.reset_game()\n                elif mission.state == 'playing':\n                    robots.add(Robot(platforms, gates, 2, 7))\n            elif mission.state == 'playing':\n                if event.key == pygame.K_SPACE:\n                    explorer.jump()\n                elif event.key == pygame.K_UP:\n                    explorer.fire()\n    if not running:\n        break\n    if mission.state == 'playing':\n        all_tiles.update(seconds)\n        gates.update(seconds)\n        explorers.update(seconds)\n        pulses.update(seconds)\n        robots.update(seconds)\n        crystals.update(seconds)\n        mission.update(seconds)\n    screen.blit(background, (0, 0))\n    all_tiles.draw(screen)\n    gates.draw(screen)\n    explorers.draw(screen)\n    pulses.draw(screen)\n    robots.draw(screen)\n    crystals.draw(screen)\n    mission.draw()\n    pygame.display.update()\n\npygame.quit()",
+          "after": "running = True\nwhile running:\n    seconds = min(clock.tick(FPS) / 1000, 0.05)\n    for event in pygame.event.get():\n        if event.type == pygame.QUIT:\n            running = False\n        elif event.type == pygame.KEYDOWN:\n            if event.key == pygame.K_RETURN:\n                if mission.state == 'title':\n                    mission.state = 'playing'\n                    pygame.mixer.music.play(-1)\n                elif mission.state == 'round_clear':\n                    mission.start_new_round()\n                elif mission.state == 'game_over':\n                    mission.reset_game()\n            elif mission.state == 'playing':\n                if event.key == pygame.K_SPACE:\n                    explorer.jump()\n                elif event.key == pygame.K_UP:\n                    explorer.fire()\n    if not running:\n        break\n    if mission.state == 'playing':\n        all_tiles.update(seconds)\n        gates.update(seconds)\n        explorers.update(seconds)\n        pulses.update(seconds)\n        robots.update(seconds)\n        crystals.update(seconds)\n        mission.update(seconds)\n    screen.blit(background, (0, 0))\n    all_tiles.draw(screen)\n    gates.draw(screen)\n    explorers.draw(screen)\n    pulses.draw(screen)\n    robots.draw(screen)\n    crystals.draw(screen)\n    mission.draw()\n    pygame.display.update()\n\npygame.quit()"
+        }
+      ]
+    },
+    {
+      "id": "31-B",
+      "previous": "31-A",
+      "edits": []
+    }
+  ]
+}

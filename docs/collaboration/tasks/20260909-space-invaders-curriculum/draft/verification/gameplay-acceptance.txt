@@ -1,0 +1,12 @@
+test_game_over_preserves_final_score_until_enter (__main__.GameplayAcceptance.test_game_over_preserves_final_score_until_enter) ... ok
+test_last_enemy_and_last_life_same_frame_keeps_game_over (__main__.GameplayAcceptance.test_last_enemy_and_last_life_same_frame_keeps_game_over) ... ok
+test_movement_clamps_both_edges_after_step (__main__.GameplayAcceptance.test_movement_clamps_both_edges_after_step) ... ok
+test_multiple_kills_score_each_enemy (__main__.GameplayAcceptance.test_multiple_kills_score_each_enemy) ... ok
+test_new_wave_clears_old_bullets_and_awards_current_round_bonus (__main__.GameplayAcceptance.test_new_wave_clears_old_bullets_and_awards_current_round_bonus) ... ok
+test_two_bullet_limit_and_offscreen_cleanup (__main__.GameplayAcceptance.test_two_bullet_limit_and_offscreen_cleanup) ... ok
+test_update_stops_when_breach_pauses_game (__main__.GameplayAcceptance.test_update_stops_when_breach_pauses_game) ... ok
+
+----------------------------------------------------------------------
+Ran 7 tests in 6.559s
+
+OK

@@ -1,0 +1,49 @@
+{
+  "checkedAt": "2026-09-10T00:29:16.359Z",
+  "changes": [
+    {
+      "path": "chapters/chap_gameproj_space_invaders_v1",
+      "field": "title"
+    },
+    {
+      "path": "units/unit_space_invaders_01",
+      "field": "learningContents"
+    },
+    {
+      "path": "units/unit_space_invaders_02",
+      "field": "learningContents"
+    },
+    {
+      "path": "units/unit_space_invaders_03",
+      "field": "learningContents"
+    },
+    {
+      "path": "units/unit_space_invaders_04",
+      "field": "learningContents"
+    },
+    {
+      "path": "units/unit_space_invaders_05",
+      "field": "learningContents"
+    },
+    {
+      "path": "units/unit_space_invaders_06",
+      "field": "learningContents"
+    },
+    {
+      "path": "units/unit_space_invaders_07",
+      "field": "learningContents"
+    },
+    {
+      "path": "units/unit_space_invaders_08",
+      "field": "learningContents"
+    },
+    {
+      "path": "units/unit_space_invaders_09",
+      "field": "learningContents"
+    },
+    {
+      "path": "units/unit_space_invaders_10",
+      "field": "learningContents"
+    }
+  ]
+}

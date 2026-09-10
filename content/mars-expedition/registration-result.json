@@ -1,0 +1,18 @@
+{
+  "verifiedAt": "2026-09-10T00:32:40.380Z",
+  "regionId": "reg_python_game_project",
+  "chapterIds": [
+    "chap_gameproj_mars_foundations_v1",
+    "chap_gameproj_mars_base_v1",
+    "chap_gameproj_mars_robots_v1",
+    "chap_gameproj_mars_signals_v1"
+  ],
+  "hash": "0a449ad6bc324f187d71ca58fcfc7f13115343d99a208b5fd7e86119b022af01",
+  "counts": {
+    "chapters": 4,
+    "units": 31,
+    "quizzes": 310,
+    "codeExercises": 62
+  },
+  "documentsVerified": 407
+}

@@ -1,0 +1,36 @@
+.source-code-modal {
+  box-sizing: border-box;
+  width: min(1100px, 94vw);
+  height: min(860px, 88dvh);
+  max-width: 94vw;
+  max-height: 88dvh;
+  padding: 0;
+  border: 1px solid rgba(82, 221, 239, .5);
+  border-radius: 16px;
+  background: #101827;
+  color: #ecf3fa;
+  box-shadow: 0 24px 100px #0009;
+  overflow: hidden;
+  font-family: inherit;
+}
+.source-code-modal[open] { display: flex; flex-direction: column; }
+.source-code-modal::backdrop { background: #030713c9; backdrop-filter: blur(4px); }
+.source-code-modal__header { display: flex; justify-content: space-between; align-items: center; padding: 18px 22px; gap: 16px; }
+.source-code-modal__header p { margin: 0 0 4px; color: #82dce7; font-size: 12px; }
+.source-code-modal__header h2 { margin: 0; font-size: 22px; color: #fff; overflow-wrap: anywhere; }
+.source-code-modal button, .source-code-modal a { display: inline-flex; align-items: center; justify-content: center; gap: 7px; padding: 9px 12px; border: 1px solid #435366; border-radius: 8px; background: #1b293b; color: #ecf3fa; font: inherit; font-size: 13px; cursor: pointer; text-decoration: none; }
+.source-code-modal button:disabled { opacity: .5; cursor: wait; }
+.source-code-modal :focus-visible { outline: 2px solid #78efff; outline-offset: 2px; }
+.source-code-modal__toolbar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; padding: 0 22px 14px; gap: 10px; font-size: 13px; color: #b6c7d9; }
+.source-code-modal__toolbar > div { display: flex; flex-wrap: wrap; gap: 8px; }
+.source-code-modal__code { flex: 1; min-height: 0; margin: 0 14px; padding: 20px; overflow: auto; overscroll-behavior: contain; scrollbar-gutter: stable; border: 1px solid #2a3a4c; border-radius: 8px; background: #080e19; color: #e7edf7; font-family: 'Fira Code', Consolas, Monaco, monospace; font-size: 14px; line-height: 1.65; white-space: pre; tab-size: 4; text-align: left; }
+.source-code-modal__code code { font: inherit; }
+.source-code-modal__message { flex: 1; min-height: 0; padding: 24px; overflow: auto; }
+.source-code-modal__footer { padding: 12px 22px; color: #b6c7d9; font-size: 12px; line-height: 1.5; }
+@media (max-width: 600px) {
+  .source-code-modal { width: 96vw; max-width: 96vw; height: 92dvh; max-height: 92dvh; border-radius: 12px; }
+  .source-code-modal__header { padding: 14px; }
+  .source-code-modal__toolbar { padding: 0 14px 12px; }
+  .source-code-modal__code { margin: 0 8px; padding: 12px; font-size: 13px; }
+  .source-code-modal__footer { padding: 10px 14px; }
+}

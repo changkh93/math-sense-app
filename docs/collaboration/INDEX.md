@@ -1,12 +1,15 @@
 # MetaSense collaboration task index
 
-Setup: installed 2026-09-06. No external job dispatched; no cross-app round trip completed yet.
+Setup: installed 2026-09-06. Space Invaders packets 01/02 returned through user relay; locally repaired, verified, registered and Hosting-deployed on 2026-09-10. No automated external dispatch. The user approved deploying the whole current web build; older rows retain their own prior verification status, and no functions/rules were deployed in this release.
 
 Codex maintains this index. The user only relays packets and returns reports.
 For an existing task, read its STATE.md and actual artifacts before continuing.
 
 | ID | Goal | Phase | State file | Next action |
 |---|---|---|---|---|
+| 20260910-curriculum-teaching-review | 두 게임 Data Log 원리·주석·단계 연결과 평가 전수 검토 | DONE | [STATE](tasks/20260910-curriculum-teaching-review/STATE.md) | 41단원/90단계 보강, Code Trace 오류 수정, 사용자 삭제 링크 보존. 547문서·237운영파일 검증 완료 |
+| 20260910-zombie-knight-curriculum | 화성 탐사대: 신호 복구 4활동 커리큘럼 제작 | COMPLETE | [STATE](tasks/20260910-zombie-knight-curriculum/STATE.md) | Codex 직접 제작·운영 반영 완료: 4챕터/31단원, 59누적코드, 62 Code Trace, 310문항, 새 에셋·한글 폰트. 실행·동작·모달·운영 167파일 검증. 외부 작업 없음 |
+| 20260909-space-invaders-curriculum | 게임 스튜디오 기반 Space Invaders 4활동·한글 에셋 커리큘럼 | DONE | [STATE](tasks/20260909-space-invaders-curriculum/STATE.md) | 직접 수정·등록140문서·Hosting 배포 완료; 31단계/15시험/29Trace/100문항, 운영70파일 해시·실제 게임 실행 검증; 코드 링크 스크롤 모달 배포·운영 한글 확인 |
 | 20260909-studio-turtle | 초급 ColabTurtlePlus 집 그리기·거북이 경주 지원 | DONE (local) | [STATE](tasks/20260909-studio-turtle/STATE.md) | 두 수업 예제·정지/재실행·pygame 전환·브라우저 시각 검증 완료; 배포 전 |
 | 20260909-python-game-studio-implementation | pygame 온라인 IDE·업로드·메타센스 통합 구현 | DONE (local MVP) | [STATE](tasks/20260909-python-game-studio-implementation/STATE.md) | 실행기 과다 콘솔 로그 정리·Chrome 실행/출력 검증 완료; 과제 인덱스 운영 READY, 웹 배포 전 |
 | 20260909-python-game-studio-design | pygame 온라인 IDE 가능성·메타센스 통합 설계 | DONE (design only) | [STATE](tasks/20260909-python-game-studio-design/STATE.md) | 초기 구현은 python-game-studio-implementation 기록 참조 |

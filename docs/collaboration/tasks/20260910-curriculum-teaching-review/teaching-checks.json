@@ -1,0 +1,18 @@
+[
+  {
+    "course": "space-invaders",
+    "units": 10,
+    "steps": 31,
+    "traces": 29,
+    "quizzes": 100,
+    "executedNumericAnswers": 0
+  },
+  {
+    "course": "mars-expedition",
+    "units": 31,
+    "steps": 59,
+    "traces": 62,
+    "quizzes": 310,
+    "executedNumericAnswers": 155
+  }
+]

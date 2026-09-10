@@ -1,0 +1,509 @@
+{
+  "initial": {
+    "intro": "",
+    "classes": {},
+    "setup": "",
+    "loop": ""
+  },
+  "steps": [
+    {
+      "id": "01-A",
+      "previous": null,
+      "edits": [
+        {
+          "kind": "component",
+          "key": "intro",
+          "before": "",
+          "after": "import pygame\n\npygame.init()\nprint(\"우주 방어대 수업 준비 완료!\")\nprint(\"Pygame 버전:\", pygame.__version__)"
+        }
+      ]
+    },
+    {
+      "id": "02-A",
+      "previous": "01-A",
+      "edits": [
+        {
+          "kind": "component",
+          "key": "intro",
+          "before": "import pygame\n\npygame.init()\nprint(\"우주 방어대 수업 준비 완료!\")\nprint(\"Pygame 버전:\", pygame.__version__)",
+          "after": "import pygame\nimport random\n\npygame.init()\n\nSCREEN_WIDTH = 1200\nSCREEN_HEIGHT = 700\nscreen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))\npygame.display.set_caption('우주 방어대')\n\nFPS = 60\nclock = pygame.time.Clock()"
+        },
+        {
+          "kind": "component",
+          "key": "loop",
+          "before": "",
+          "after": "running = True\nwhile running:\n    for event in pygame.event.get():\n        if event.type == pygame.QUIT:\n            running = False\n\n    if not running:\n        break\n\n    screen.fill((9, 17, 37))\n    pygame.display.update()\n    clock.tick(FPS)\n\npygame.quit()"
+        }
+      ]
+    },
+    {
+      "id": "02-B",
+      "previous": "02-A",
+      "edits": [
+        {
+          "kind": "component",
+          "key": "loop",
+          "before": "running = True\nwhile running:\n    for event in pygame.event.get():\n        if event.type == pygame.QUIT:\n            running = False\n\n    if not running:\n        break\n\n    screen.fill((9, 17, 37))\n    pygame.display.update()\n    clock.tick(FPS)\n\npygame.quit()",
+          "after": "running = True\nwhile running:\n    for event in pygame.event.get():\n        if event.type == pygame.QUIT:\n            running = False\n\n    if not running:\n        break\n\n    screen.fill((15, 45, 65))\n    pygame.display.update()\n    clock.tick(FPS)\n\npygame.quit()"
+        }
+      ]
+    },
+    {
+      "id": "02-C",
+      "previous": "02-B",
+      "edits": [
+        {
+          "kind": "component",
+          "key": "loop",
+          "before": "running = True\nwhile running:\n    for event in pygame.event.get():\n        if event.type == pygame.QUIT:\n            running = False\n\n    if not running:\n        break\n\n    screen.fill((15, 45, 65))\n    pygame.display.update()\n    clock.tick(FPS)\n\npygame.quit()",
+          "after": "running = True\nwhile running:\n    for event in pygame.event.get():\n        if event.type == pygame.QUIT:\n            running = False\n\n    if not running:\n        break\n\n    screen.fill((9, 17, 37))\n    pygame.display.update()\n    clock.tick(FPS)\n\npygame.quit()"
+        },
+        {
+          "kind": "component",
+          "key": "classes",
+          "before": {},
+          "after": {
+            "Mission": {
+              "__init__": "    def __init__(self, scout, raiders, scout_pulses, raider_pulses):\n        pass",
+              "update": "    def update(self):\n        pass",
+              "draw": "    def draw(self):\n        pass",
+              "shift_raiders": "    def shift_raiders(self):\n        pass",
+              "check_collisions": "    def check_collisions(self):\n        pass",
+              "check_round_completion": "    def check_round_completion(self):\n        pass",
+              "start_new_round": "    def start_new_round(self):\n        pass",
+              "check_game_status": "    def check_game_status(self, main_text, sub_text):\n        pass",
+              "pause_game": "    def pause_game(self, main_text, sub_text):\n        pass",
+              "reset_game": "    def reset_game(self):\n        pass"
+            },
+            "Scout": {
+              "__init__": "    def __init__(self, pulses):\n        pass",
+              "update": "    def update(self):\n        pass",
+              "fire": "    def fire(self):\n        pass",
+              "reset": "    def reset(self):\n        pass"
+            },
+            "Raider": {
+              "__init__": "    def __init__(self, x, y, velocity, pulse_group):\n        pass",
+              "update": "    def update(self):\n        pass",
+              "fire": "    def fire(self):\n        pass",
+              "reset": "    def reset(self):\n        pass"
+            },
+            "ScoutPulse": {
+              "__init__": "    def __init__(self, x, y, pulse_group):\n        pass",
+              "update": "    def update(self):\n        pass"
+            },
+            "RaiderPulse": {
+              "__init__": "    def __init__(self, x, y, pulse_group):\n        pass",
+              "update": "    def update(self):\n        pass"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "03-A",
+      "previous": "02-C",
+      "edits": [
+        {
+          "kind": "component",
+          "key": "setup",
+          "before": "",
+          "after": "# --- 스프라이트 그룹 및 객체 생성 ---\nscout_pulses = pygame.sprite.Group()\nraider_pulses = pygame.sprite.Group()\n\nscouts = pygame.sprite.Group()\nscout = Scout(scout_pulses)\nscouts.add(scout)\n\nraiders = pygame.sprite.Group()\n\nmission = Mission(scout, raiders, scout_pulses, raider_pulses)"
+        },
+        {
+          "kind": "component",
+          "key": "loop",
+          "before": "running = True\nwhile running:\n    for event in pygame.event.get():\n        if event.type == pygame.QUIT:\n            running = False\n\n    if not running:\n        break\n\n    screen.fill((9, 17, 37))\n    pygame.display.update()\n    clock.tick(FPS)\n\npygame.quit()",
+          "after": "running = True\nwhile running:\n    for event in pygame.event.get():\n        if event.type == pygame.QUIT:\n            running = False\n\n    if not running:\n        break\n\n    screen.fill((9, 17, 37))\n    scouts.update()\n    raiders.update()\n    scout_pulses.update()\n    raider_pulses.update()\n    mission.update()\n\n    scouts.draw(screen)\n    raiders.draw(screen)\n    scout_pulses.draw(screen)\n    raider_pulses.draw(screen)\n    mission.draw()\n\n    pygame.display.update()\n    clock.tick(FPS)\n\npygame.quit()"
+        },
+        {
+          "kind": "method",
+          "key": "Scout.__init__",
+          "before": "    def __init__(self, pulses):\n        pass",
+          "after": "    def __init__(self, pulses):\n        super().__init__()\n        self.image = pygame.transform.smoothscale(\n            pygame.image.load('assets/scout.png').convert_alpha(), (64, 64)\n        )\n        self.rect = self.image.get_rect()\n        self.rect.centerx = SCREEN_WIDTH // 2\n        self.rect.bottom = SCREEN_HEIGHT\n        self.lives = 5\n        self.velocity = 8\n        self.pulses = pulses\n        self.shoot_sound = pygame.mixer.Sound('assets/scout_pulse.ogg')"
+        }
+      ]
+    },
+    {
+      "id": "03-B",
+      "previous": "03-A",
+      "edits": [
+        {
+          "kind": "method",
+          "key": "Scout.update",
+          "before": "    def update(self):\n        pass",
+          "after": "    def update(self):\n        keys = pygame.key.get_pressed()\n        if keys[pygame.K_LEFT] and self.rect.left > 0:\n            self.rect.x -= self.velocity\n        if keys[pygame.K_RIGHT] and self.rect.right < SCREEN_WIDTH:\n            self.rect.x += self.velocity\n\n        if self.rect.left < 0:\n            self.rect.left = 0\n        if self.rect.right > SCREEN_WIDTH:\n            self.rect.right = SCREEN_WIDTH"
+        }
+      ]
+    },
+    {
+      "id": "03-C",
+      "previous": "03-B",
+      "edits": [
+        {
+          "kind": "method",
+          "key": "Scout.reset",
+          "before": "    def reset(self):\n        pass",
+          "after": "    def reset(self):\n        self.rect.centerx = SCREEN_WIDTH // 2"
+        }
+      ]
+    },
+    {
+      "id": "04-A",
+      "previous": "03-C",
+      "edits": [
+        {
+          "kind": "method",
+          "key": "ScoutPulse.__init__",
+          "before": "    def __init__(self, x, y, pulse_group):\n        pass",
+          "after": "    def __init__(self, x, y, pulse_group):\n        super().__init__()\n        self.image = pygame.Surface((4, 16), pygame.SRCALPHA)\n        self.image.fill((78, 240, 255))\n        self.rect = self.image.get_rect()\n        self.rect.centerx = x\n        self.rect.centery = y\n        self.velocity = 10\n        pulse_group.add(self)"
+        },
+        {
+          "kind": "method",
+          "key": "ScoutPulse.update",
+          "before": "    def update(self):\n        pass",
+          "after": "    def update(self):\n        self.rect.y -= self.velocity"
+        },
+        {
+          "kind": "method",
+          "key": "Scout.fire",
+          "before": "    def fire(self):\n        pass",
+          "after": "    def fire(self):\n        self.shoot_sound.play()\n        ScoutPulse(self.rect.centerx, self.rect.top, self.pulses)"
+        },
+        {
+          "kind": "component",
+          "key": "loop",
+          "before": "running = True\nwhile running:\n    for event in pygame.event.get():\n        if event.type == pygame.QUIT:\n            running = False\n\n    if not running:\n        break\n\n    screen.fill((9, 17, 37))\n    scouts.update()\n    raiders.update()\n    scout_pulses.update()\n    raider_pulses.update()\n    mission.update()\n\n    scouts.draw(screen)\n    raiders.draw(screen)\n    scout_pulses.draw(screen)\n    raider_pulses.draw(screen)\n    mission.draw()\n\n    pygame.display.update()\n    clock.tick(FPS)\n\npygame.quit()",
+          "after": "running = True\nwhile running:\n    for event in pygame.event.get():\n        if event.type == pygame.QUIT:\n            running = False\n        if event.type == pygame.KEYDOWN:\n            if event.key == pygame.K_SPACE:\n                scout.fire()\n\n    if not running:\n        break\n\n    screen.fill((9, 17, 37))\n    scouts.update()\n    raiders.update()\n    scout_pulses.update()\n    raider_pulses.update()\n    mission.update()\n\n    scouts.draw(screen)\n    raiders.draw(screen)\n    scout_pulses.draw(screen)\n    raider_pulses.draw(screen)\n    mission.draw()\n\n    pygame.display.update()\n    clock.tick(FPS)\n\npygame.quit()"
+        }
+      ]
+    },
+    {
+      "id": "04-B",
+      "previous": "04-A",
+      "edits": [
+        {
+          "kind": "method",
+          "key": "Scout.fire",
+          "before": "    def fire(self):\n        self.shoot_sound.play()\n        ScoutPulse(self.rect.centerx, self.rect.top, self.pulses)",
+          "after": "    def fire(self):\n        if len(self.pulses) < 2:\n            self.shoot_sound.play()\n            ScoutPulse(self.rect.centerx, self.rect.top, self.pulses)"
+        }
+      ]
+    },
+    {
+      "id": "04-C",
+      "previous": "04-B",
+      "edits": [
+        {
+          "kind": "method",
+          "key": "ScoutPulse.update",
+          "before": "    def update(self):\n        self.rect.y -= self.velocity",
+          "after": "    def update(self):\n        self.rect.y -= self.velocity\n        if self.rect.bottom < 0:\n            self.kill()"
+        }
+      ]
+    },
+    {
+      "id": "05-A",
+      "previous": "04-C",
+      "edits": [
+        {
+          "kind": "method",
+          "key": "Raider.__init__",
+          "before": "    def __init__(self, x, y, velocity, pulse_group):\n        pass",
+          "after": "    def __init__(self, x, y, velocity, pulse_group):\n        super().__init__()\n        if not hasattr(Raider, 'shared_image'):\n            Raider.shared_image = pygame.transform.smoothscale(\n                pygame.image.load('assets/raider.png').convert_alpha(), (56, 48)\n            )\n            Raider.shared_shoot_sound = pygame.mixer.Sound('assets/raider_pulse.ogg')\n        self.image = Raider.shared_image\n        self.rect = self.image.get_rect()\n        self.rect.topleft = (x, y)\n        self.starting_x = x\n        self.starting_y = y\n        self.direction = 1\n        self.velocity = velocity\n        self.pulses = pulse_group\n        self.shoot_sound = Raider.shared_shoot_sound"
+        },
+        {
+          "kind": "method",
+          "key": "Raider.update",
+          "before": "    def update(self):\n        pass",
+          "after": "    def update(self):\n        self.rect.x += self.direction * self.velocity\n        if random.randint(0, 1000) > 999 and len(self.pulses) < 3:\n            self.shoot_sound.play()\n            self.fire()"
+        },
+        {
+          "kind": "method",
+          "key": "Raider.reset",
+          "before": "    def reset(self):\n        pass",
+          "after": "    def reset(self):\n        self.rect.topleft = (self.starting_x, self.starting_y)\n        self.direction = 1"
+        }
+      ]
+    },
+    {
+      "id": "06-A",
+      "previous": "05-A",
+      "edits": [
+        {
+          "kind": "component",
+          "key": "setup",
+          "before": "# --- 스프라이트 그룹 및 객체 생성 ---\nscout_pulses = pygame.sprite.Group()\nraider_pulses = pygame.sprite.Group()\n\nscouts = pygame.sprite.Group()\nscout = Scout(scout_pulses)\nscouts.add(scout)\n\nraiders = pygame.sprite.Group()\n\nmission = Mission(scout, raiders, scout_pulses, raider_pulses)",
+          "after": "# --- 스프라이트 그룹 및 객체 생성 ---\nscout_pulses = pygame.sprite.Group()\nraider_pulses = pygame.sprite.Group()\n\nscouts = pygame.sprite.Group()\nscout = Scout(scout_pulses)\nscouts.add(scout)\n\nraiders = pygame.sprite.Group()\n\nfor i in range(10):\n    raiders.add(Raider(64 + i * 64, 100, 2, raider_pulses))\n\nmission = Mission(scout, raiders, scout_pulses, raider_pulses)"
+        }
+      ]
+    },
+    {
+      "id": "06-B",
+      "previous": "06-A",
+      "edits": [
+        {
+          "kind": "method",
+          "key": "RaiderPulse.__init__",
+          "before": "    def __init__(self, x, y, pulse_group):\n        pass",
+          "after": "    def __init__(self, x, y, pulse_group):\n        super().__init__()\n        self.image = pygame.Surface((4, 16), pygame.SRCALPHA)\n        self.image.fill((255, 92, 124))\n        self.rect = self.image.get_rect()\n        self.rect.centerx = x\n        self.rect.centery = y\n        self.velocity = 10\n        pulse_group.add(self)"
+        },
+        {
+          "kind": "method",
+          "key": "RaiderPulse.update",
+          "before": "    def update(self):\n        pass",
+          "after": "    def update(self):\n        self.rect.y += self.velocity"
+        },
+        {
+          "kind": "method",
+          "key": "Raider.fire",
+          "before": "    def fire(self):\n        pass",
+          "after": "    def fire(self):\n        RaiderPulse(self.rect.centerx, self.rect.bottom, self.pulses)"
+        }
+      ]
+    },
+    {
+      "id": "06-C",
+      "previous": "06-B",
+      "edits": [
+        {
+          "kind": "method",
+          "key": "RaiderPulse.update",
+          "before": "    def update(self):\n        self.rect.y += self.velocity",
+          "after": "    def update(self):\n        self.rect.y += self.velocity\n        if self.rect.top < SCREEN_HEIGHT:\n            self.kill()"
+        }
+      ]
+    },
+    {
+      "id": "06-D",
+      "previous": "06-C",
+      "edits": [
+        {
+          "kind": "method",
+          "key": "RaiderPulse.update",
+          "before": "    def update(self):\n        self.rect.y += self.velocity\n        if self.rect.top < SCREEN_HEIGHT:\n            self.kill()",
+          "after": "    def update(self):\n        self.rect.y += self.velocity\n        if self.rect.top > SCREEN_HEIGHT:\n            self.kill()"
+        }
+      ]
+    },
+    {
+      "id": "07-A",
+      "previous": "06-D",
+      "edits": [
+        {
+          "kind": "method",
+          "key": "Mission.__init__",
+          "before": "    def __init__(self, scout, raiders, scout_pulses, raider_pulses):\n        pass",
+          "after": "    def __init__(self, scout, raiders, scout_pulses, raider_pulses):\n        self.round_number = 1\n        self.score = 0\n        self.scout = scout\n        self.raiders = raiders\n        self.scout_pulses = scout_pulses\n        self.raider_pulses = raider_pulses\n\n        self.new_round_sound = pygame.mixer.Sound('assets/wave_ready.ogg')\n        self.breach_sound = pygame.mixer.Sound('assets/line_alert.ogg')\n        self.raider_break_sound = pygame.mixer.Sound('assets/raider_break.ogg')\n        self.shield_hit_sound = pygame.mixer.Sound('assets/shield_hit.ogg')\n\n        self.font = pygame.font.Font('assets/DoHyeon-Regular.ttf', 28)"
+        },
+        {
+          "kind": "method",
+          "key": "Mission.update",
+          "before": "    def update(self):\n        pass",
+          "after": "    def update(self):\n        self.shift_raiders()\n        self.check_collisions()\n        self.check_round_completion()"
+        }
+      ]
+    },
+    {
+      "id": "07-B",
+      "previous": "07-A",
+      "edits": [
+        {
+          "kind": "method",
+          "key": "Mission.draw",
+          "before": "    def draw(self):\n        pass",
+          "after": "    def draw(self):\n        score_text = self.font.render(f'점수: {self.score}', True, (240, 246, 255))\n        score_rect = score_text.get_rect(centerx=SCREEN_WIDTH // 2, top=10)\n        screen.blit(score_text, score_rect)"
+        }
+      ]
+    },
+    {
+      "id": "07-C",
+      "previous": "07-B",
+      "edits": [
+        {
+          "kind": "method",
+          "key": "Mission.draw",
+          "before": "    def draw(self):\n        score_text = self.font.render(f'점수: {self.score}', True, (240, 246, 255))\n        score_rect = score_text.get_rect(centerx=SCREEN_WIDTH // 2, top=10)\n        screen.blit(score_text, score_rect)",
+          "after": "    def draw(self):\n        score_text = self.font.render(f'점수: {self.score}', True, (240, 246, 255))\n        score_rect = score_text.get_rect(centerx=SCREEN_WIDTH // 2, top=10)\n\n        round_text = self.font.render(f'라운드: {self.round_number}', True, (240, 246, 255))\n        round_rect = round_text.get_rect(topleft=(20, 10))\n\n        lives_text = self.font.render(f'남은 기체: {self.scout.lives}', True, (240, 246, 255))\n        lives_rect = lives_text.get_rect(topright=(SCREEN_WIDTH - 20, 10))\n\n        screen.blit(score_text, score_rect)\n        screen.blit(round_text, round_rect)\n        screen.blit(lives_text, lives_rect)\n\n        pygame.draw.line(screen, (70, 90, 130), (0, 50), (SCREEN_WIDTH, 50), 3)\n        pygame.draw.line(screen, (220, 70, 90), (0, SCREEN_HEIGHT - 100), (SCREEN_WIDTH, SCREEN_HEIGHT - 100), 3)"
+        }
+      ]
+    },
+    {
+      "id": "07-D",
+      "previous": "07-C",
+      "edits": [
+        {
+          "kind": "method",
+          "key": "Mission.start_new_round",
+          "before": "    def start_new_round(self):\n        pass",
+          "after": "    def start_new_round(self):\n        for i in range(11):\n            for j in range(5):\n                raider = Raider(64 + i * 64, 64 + j * 64, self.round_number, self.raider_pulses)\n                self.raiders.add(raider)\n        self.new_round_sound.play()\n        self.pause_game(f'우주 방어대 - 라운드 {self.round_number}', 'Enter 키를 눌러 시작하세요')"
+        }
+      ]
+    },
+    {
+      "id": "07-E",
+      "previous": "07-D",
+      "edits": [
+        {
+          "kind": "component",
+          "key": "setup",
+          "before": "# --- 스프라이트 그룹 및 객체 생성 ---\nscout_pulses = pygame.sprite.Group()\nraider_pulses = pygame.sprite.Group()\n\nscouts = pygame.sprite.Group()\nscout = Scout(scout_pulses)\nscouts.add(scout)\n\nraiders = pygame.sprite.Group()\n\nfor i in range(10):\n    raiders.add(Raider(64 + i * 64, 100, 2, raider_pulses))\n\nmission = Mission(scout, raiders, scout_pulses, raider_pulses)",
+          "after": "# --- 스프라이트 그룹 및 객체 생성 ---\nscout_pulses = pygame.sprite.Group()\nraider_pulses = pygame.sprite.Group()\n\nscouts = pygame.sprite.Group()\nscout = Scout(scout_pulses)\nscouts.add(scout)\n\nraiders = pygame.sprite.Group()\n\nmission = Mission(scout, raiders, scout_pulses, raider_pulses)\nmission.start_new_round()"
+        }
+      ]
+    },
+    {
+      "id": "08-A",
+      "previous": "07-E",
+      "edits": [
+        {
+          "kind": "method",
+          "key": "Mission.shift_raiders",
+          "before": "    def shift_raiders(self):\n        pass",
+          "after": "    def shift_raiders(self):\n        shift = False\n        for raider in self.raiders:\n            if raider.rect.left <= 0 or raider.rect.right >= SCREEN_WIDTH:\n                shift = True\n\n        if shift:\n            for raider in self.raiders:\n                raider.rect.y += 10 * self.round_number\n                raider.direction *= -1\n                raider.rect.x += raider.direction * raider.velocity"
+        }
+      ]
+    },
+    {
+      "id": "08-B",
+      "previous": "08-A",
+      "edits": [
+        {
+          "kind": "method",
+          "key": "Mission.shift_raiders",
+          "before": "    def shift_raiders(self):\n        shift = False\n        for raider in self.raiders:\n            if raider.rect.left <= 0 or raider.rect.right >= SCREEN_WIDTH:\n                shift = True\n\n        if shift:\n            for raider in self.raiders:\n                raider.rect.y += 10 * self.round_number\n                raider.direction *= -1\n                raider.rect.x += raider.direction * raider.velocity",
+          "after": "    def shift_raiders(self):\n        shift = False\n        for raider in self.raiders:\n            if raider.rect.left <= 0 or raider.rect.right >= SCREEN_WIDTH:\n                shift = True\n\n        if shift:\n            breach = False\n            for raider in self.raiders:\n                raider.rect.y += 10 * self.round_number\n                raider.direction *= -1\n                raider.rect.x += raider.direction * raider.velocity\n                if raider.rect.bottom >= SCREEN_HEIGHT - 100:\n                    breach = True\n\n            if breach:\n                self.breach_sound.play()\n                self.scout.lives -= 1\n                self.check_game_status('외계 함선이 방어선을 침범했습니다!', 'Enter 키를 눌러 계속하세요')"
+        }
+      ]
+    },
+    {
+      "id": "09-A",
+      "previous": "08-B",
+      "edits": [
+        {
+          "kind": "method",
+          "key": "Mission.check_game_status",
+          "before": "    def check_game_status(self, main_text, sub_text):\n        pass",
+          "after": "    def check_game_status(self, main_text, sub_text):\n        self.scout_pulses.empty()\n        self.raider_pulses.empty()\n        self.scout.reset()\n        for raider in self.raiders:\n            raider.reset()\n\n        if self.scout.lives <= 0:\n            self.reset_game()\n        else:\n            self.pause_game(main_text, sub_text)"
+        }
+      ]
+    },
+    {
+      "id": "09-B",
+      "previous": "09-A",
+      "edits": [
+        {
+          "kind": "method",
+          "key": "Mission.__init__",
+          "before": "    def __init__(self, scout, raiders, scout_pulses, raider_pulses):\n        self.round_number = 1\n        self.score = 0\n        self.scout = scout\n        self.raiders = raiders\n        self.scout_pulses = scout_pulses\n        self.raider_pulses = raider_pulses\n\n        self.new_round_sound = pygame.mixer.Sound('assets/wave_ready.ogg')\n        self.breach_sound = pygame.mixer.Sound('assets/line_alert.ogg')\n        self.raider_break_sound = pygame.mixer.Sound('assets/raider_break.ogg')\n        self.shield_hit_sound = pygame.mixer.Sound('assets/shield_hit.ogg')\n\n        self.font = pygame.font.Font('assets/DoHyeon-Regular.ttf', 28)",
+          "after": "    def __init__(self, scout, raiders, scout_pulses, raider_pulses):\n        self.round_number = 1\n        self.score = 0\n        self.scout = scout\n        self.raiders = raiders\n        self.scout_pulses = scout_pulses\n        self.raider_pulses = raider_pulses\n\n        self.state = 'playing'\n        self.pause_main_text = ''\n        self.pause_sub_text = ''\n\n        self.new_round_sound = pygame.mixer.Sound('assets/wave_ready.ogg')\n        self.breach_sound = pygame.mixer.Sound('assets/line_alert.ogg')\n        self.raider_break_sound = pygame.mixer.Sound('assets/raider_break.ogg')\n        self.shield_hit_sound = pygame.mixer.Sound('assets/shield_hit.ogg')\n\n        self.font = pygame.font.Font('assets/DoHyeon-Regular.ttf', 28)"
+        },
+        {
+          "kind": "method",
+          "key": "Mission.pause_game",
+          "before": "    def pause_game(self, main_text, sub_text):\n        pass",
+          "after": "    def pause_game(self, main_text, sub_text):\n        self.state = 'paused'\n        self.pause_main_text = main_text\n        self.pause_sub_text = sub_text"
+        },
+        {
+          "kind": "method",
+          "key": "Mission.update",
+          "before": "    def update(self):\n        self.shift_raiders()\n        self.check_collisions()\n        self.check_round_completion()",
+          "after": "    def update(self):\n        if self.state != 'playing':\n            return\n        self.shift_raiders()\n        if self.state != 'playing':\n            return\n        self.check_collisions()\n        if self.state != 'playing':\n            return\n        self.check_round_completion()"
+        },
+        {
+          "kind": "component",
+          "key": "loop",
+          "before": "running = True\nwhile running:\n    for event in pygame.event.get():\n        if event.type == pygame.QUIT:\n            running = False\n        if event.type == pygame.KEYDOWN:\n            if event.key == pygame.K_SPACE:\n                scout.fire()\n\n    if not running:\n        break\n\n    screen.fill((9, 17, 37))\n    scouts.update()\n    raiders.update()\n    scout_pulses.update()\n    raider_pulses.update()\n    mission.update()\n\n    scouts.draw(screen)\n    raiders.draw(screen)\n    scout_pulses.draw(screen)\n    raider_pulses.draw(screen)\n    mission.draw()\n\n    pygame.display.update()\n    clock.tick(FPS)\n\npygame.quit()",
+          "after": "running = True\nwhile running:\n    for event in pygame.event.get():\n        if event.type == pygame.QUIT:\n            running = False\n        if event.type == pygame.KEYDOWN:\n            if event.key == pygame.K_SPACE and mission.state == 'playing':\n                scout.fire()\n            if event.key == pygame.K_RETURN:\n                if mission.state == 'paused':\n                    mission.state = 'playing'\n\n    if not running:\n        break\n\n    screen.fill((9, 17, 37))\n\n    if mission.state == 'playing':\n        scouts.update()\n        raiders.update()\n        scout_pulses.update()\n        raider_pulses.update()\n        mission.update()\n\n    scouts.draw(screen)\n    raiders.draw(screen)\n    scout_pulses.draw(screen)\n    raider_pulses.draw(screen)\n    mission.draw()\n\n    pygame.display.update()\n    clock.tick(FPS)\n\npygame.quit()"
+        }
+      ]
+    },
+    {
+      "id": "09-C",
+      "previous": "09-B",
+      "edits": [
+        {
+          "kind": "method",
+          "key": "Mission.draw",
+          "before": "    def draw(self):\n        score_text = self.font.render(f'점수: {self.score}', True, (240, 246, 255))\n        score_rect = score_text.get_rect(centerx=SCREEN_WIDTH // 2, top=10)\n\n        round_text = self.font.render(f'라운드: {self.round_number}', True, (240, 246, 255))\n        round_rect = round_text.get_rect(topleft=(20, 10))\n\n        lives_text = self.font.render(f'남은 기체: {self.scout.lives}', True, (240, 246, 255))\n        lives_rect = lives_text.get_rect(topright=(SCREEN_WIDTH - 20, 10))\n\n        screen.blit(score_text, score_rect)\n        screen.blit(round_text, round_rect)\n        screen.blit(lives_text, lives_rect)\n\n        pygame.draw.line(screen, (70, 90, 130), (0, 50), (SCREEN_WIDTH, 50), 3)\n        pygame.draw.line(screen, (220, 70, 90), (0, SCREEN_HEIGHT - 100), (SCREEN_WIDTH, SCREEN_HEIGHT - 100), 3)",
+          "after": "    def draw(self):\n        score_text = self.font.render(f'점수: {self.score}', True, (240, 246, 255))\n        score_rect = score_text.get_rect(centerx=SCREEN_WIDTH // 2, top=10)\n\n        round_text = self.font.render(f'라운드: {self.round_number}', True, (240, 246, 255))\n        round_rect = round_text.get_rect(topleft=(20, 10))\n\n        lives_text = self.font.render(f'남은 기체: {self.scout.lives}', True, (240, 246, 255))\n        lives_rect = lives_text.get_rect(topright=(SCREEN_WIDTH - 20, 10))\n\n        screen.blit(score_text, score_rect)\n        screen.blit(round_text, round_rect)\n        screen.blit(lives_text, lives_rect)\n\n        pygame.draw.line(screen, (70, 90, 130), (0, 50), (SCREEN_WIDTH, 50), 3)\n        pygame.draw.line(screen, (220, 70, 90), (0, SCREEN_HEIGHT - 100), (SCREEN_WIDTH, SCREEN_HEIGHT - 100), 3)\n\n        if self.state in ('paused', 'game_over'):\n            overlay = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)\n            overlay.fill((0, 0, 0, 180))\n            screen.blit(overlay, (0, 0))\n\n            title = self.font.render(self.pause_main_text, True, (255, 255, 255))\n            t_rect = title.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2 - 20))\n            sub = self.font.render(self.pause_sub_text, True, (200, 220, 240))\n            s_rect = sub.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2 + 30))\n\n            screen.blit(title, t_rect)\n            screen.blit(sub, s_rect)"
+        }
+      ]
+    },
+    {
+      "id": "09-D",
+      "previous": "09-C",
+      "edits": []
+    },
+    {
+      "id": "10-A",
+      "previous": "09-D",
+      "edits": [
+        {
+          "kind": "method",
+          "key": "Mission.reset_game",
+          "before": "    def reset_game(self):\n        pass",
+          "after": "    def reset_game(self):\n        self.pause_game(f'최종 점수: {self.score}', 'Enter 키를 눌러 다시 도전하세요')\n        self.state = 'game_over'"
+        },
+        {
+          "kind": "method",
+          "key": "Mission.restart_game",
+          "before": "",
+          "after": "    def restart_game(self):\n        self.score = 0\n        self.round_number = 1\n        self.scout.lives = 5\n        self.raiders.empty()\n        self.scout_pulses.empty()\n        self.raider_pulses.empty()\n        self.scout.reset()\n        self.start_new_round()\n        self.state = 'playing'"
+        },
+        {
+          "kind": "component",
+          "key": "loop",
+          "before": "running = True\nwhile running:\n    for event in pygame.event.get():\n        if event.type == pygame.QUIT:\n            running = False\n        if event.type == pygame.KEYDOWN:\n            if event.key == pygame.K_SPACE and mission.state == 'playing':\n                scout.fire()\n            if event.key == pygame.K_RETURN:\n                if mission.state == 'paused':\n                    mission.state = 'playing'\n\n    if not running:\n        break\n\n    screen.fill((9, 17, 37))\n\n    if mission.state == 'playing':\n        scouts.update()\n        raiders.update()\n        scout_pulses.update()\n        raider_pulses.update()\n        mission.update()\n\n    scouts.draw(screen)\n    raiders.draw(screen)\n    scout_pulses.draw(screen)\n    raider_pulses.draw(screen)\n    mission.draw()\n\n    pygame.display.update()\n    clock.tick(FPS)\n\npygame.quit()",
+          "after": "running = True\nwhile running:\n    for event in pygame.event.get():\n        if event.type == pygame.QUIT:\n            running = False\n        if event.type == pygame.KEYDOWN:\n            if event.key == pygame.K_SPACE and mission.state == 'playing':\n                scout.fire()\n            if event.key == pygame.K_RETURN:\n                if mission.state == 'game_over':\n                    mission.restart_game()\n                elif mission.state == 'paused':\n                    mission.state = 'playing'\n\n    if not running:\n        break\n\n    screen.fill((9, 17, 37))\n\n    if mission.state == 'playing':\n        scouts.update()\n        raiders.update()\n        scout_pulses.update()\n        raider_pulses.update()\n        mission.update()\n\n    scouts.draw(screen)\n    raiders.draw(screen)\n    scout_pulses.draw(screen)\n    raider_pulses.draw(screen)\n    mission.draw()\n\n    pygame.display.update()\n    clock.tick(FPS)\n\npygame.quit()"
+        }
+      ]
+    },
+    {
+      "id": "10-B",
+      "previous": "10-A",
+      "edits": [
+        {
+          "kind": "method",
+          "key": "Mission.check_collisions",
+          "before": "    def check_collisions(self):\n        pass",
+          "after": "    def check_collisions(self):\n        hits = pygame.sprite.groupcollide(self.scout_pulses, self.raiders, True, True)\n        if hits:\n            self.raider_break_sound.play()\n            for killed_raiders in hits.values():\n                self.score += 100 * len(killed_raiders)"
+        }
+      ]
+    },
+    {
+      "id": "10-C",
+      "previous": "10-B",
+      "edits": [
+        {
+          "kind": "method",
+          "key": "Mission.check_collisions",
+          "before": "    def check_collisions(self):\n        hits = pygame.sprite.groupcollide(self.scout_pulses, self.raiders, True, True)\n        if hits:\n            self.raider_break_sound.play()\n            for killed_raiders in hits.values():\n                self.score += 100 * len(killed_raiders)",
+          "after": "    def check_collisions(self):\n        hits = pygame.sprite.groupcollide(self.scout_pulses, self.raiders, True, True)\n        if hits:\n            self.raider_break_sound.play()\n            for killed_raiders in hits.values():\n                self.score += 100 * len(killed_raiders)\n\n        if pygame.sprite.spritecollide(self.scout, self.raider_pulses, True):\n            self.shield_hit_sound.play()\n            self.scout.lives -= 1\n            self.check_game_status('기체가 피격되었습니다!', 'Enter 키를 눌러 계속하세요')"
+        }
+      ]
+    },
+    {
+      "id": "10-D",
+      "previous": "10-C",
+      "edits": [
+        {
+          "kind": "method",
+          "key": "Mission.start_new_round",
+          "before": "    def start_new_round(self):\n        for i in range(11):\n            for j in range(5):\n                raider = Raider(64 + i * 64, 64 + j * 64, self.round_number, self.raider_pulses)\n                self.raiders.add(raider)\n        self.new_round_sound.play()\n        self.pause_game(f'우주 방어대 - 라운드 {self.round_number}', 'Enter 키를 눌러 시작하세요')",
+          "after": "    def start_new_round(self):\n        self.scout_pulses.empty()\n        self.raider_pulses.empty()\n        self.scout.reset()\n        for i in range(11):\n            for j in range(5):\n                raider = Raider(64 + i * 64, 64 + j * 64, self.round_number, self.raider_pulses)\n                self.raiders.add(raider)\n        self.new_round_sound.play()\n        self.pause_game(f'우주 방어대 - 라운드 {self.round_number}', 'Enter 키를 눌러 시작하세요')"
+        },
+        {
+          "kind": "method",
+          "key": "Mission.check_round_completion",
+          "before": "    def check_round_completion(self):\n        pass",
+          "after": "    def check_round_completion(self):\n        if not self.raiders:\n            self.score += 1000 * self.round_number\n            self.round_number += 1\n            self.start_new_round()"
+        }
+      ]
+    },
+    {
+      "id": "10-E",
+      "previous": "10-D",
+      "edits": []
+    }
+  ]
+}

@@ -3,9 +3,21 @@ import { parseInlineFormatting, sanitizeLaTeX } from '../../utils/formatUtils';
 import { InlineMath, BlockMath } from 'react-katex';
 import { Check, ExternalLink, X, ZoomIn } from 'lucide-react';
 import 'katex/dist/katex.min.css';
+import SourceCodeModal from './SourceCodeModal';
 
 const MissionMarkdownViewer = ({ text, imageMode = 'default' }) => {
   const [expandedImage, setExpandedImage] = useState(null);
+  const [sourcePath, setSourcePath] = useState(null);
+
+  const openSourceLink = (event) => {
+    const link = event.target.closest('a[href]');
+    if (!link) return;
+    const url = new URL(link.href, window.location.href);
+    if (url.origin !== window.location.origin || !/^\/(?:space-invaders|mars-expedition)\/(?:checkpoints\/|experiments\/)?[\w-]+\.py$/.test(url.pathname)) return;
+    event.preventDefault();
+    event.stopPropagation();
+    setSourcePath(url.pathname);
+  };
 
   if (!text) return null;
   
@@ -200,7 +212,8 @@ const MissionMarkdownViewer = ({ text, imageMode = 'default' }) => {
   };
 
   return (
-    <div className="markdown-body font-tech" style={{ color: 'var(--text-bright)', lineHeight: '1.6' }}>
+    <div className="markdown-body font-tech" onClickCapture={openSourceLink} style={{ color: 'var(--text-bright)', lineHeight: '1.6' }}>
+      {sourcePath && <SourceCodeModal key={sourcePath} path={sourcePath} onClose={() => setSourcePath(null)} />}
       {blocks.map((block, i) => {
         if (block.type === 'code') {
           return (

@@ -1,0 +1,425 @@
+{
+  "checkedAt": "2026-09-10T00:50:52.371Z",
+  "results": [
+    {
+      "path": "catalog.json",
+      "status": 200,
+      "bytes": 3153,
+      "hashMatches": true
+    },
+    {
+      "path": "space-invaders-course.zip",
+      "status": 200,
+      "bytes": 6192545,
+      "hashMatches": true
+    },
+    {
+      "path": "space-invaders-starter.mspygame.json",
+      "status": 200,
+      "bytes": 3319684,
+      "hashMatches": true
+    },
+    {
+      "path": "space-invaders-final.mspygame.json",
+      "status": 200,
+      "bytes": 3332872,
+      "hashMatches": true
+    },
+    {
+      "path": "data-log/01.md",
+      "status": 200,
+      "bytes": 6142,
+      "hashMatches": true
+    },
+    {
+      "path": "data-log/02.md",
+      "status": 200,
+      "bytes": 21711,
+      "hashMatches": true
+    },
+    {
+      "path": "data-log/03.md",
+      "status": 200,
+      "bytes": 18539,
+      "hashMatches": true
+    },
+    {
+      "path": "data-log/04.md",
+      "status": 200,
+      "bytes": 15883,
+      "hashMatches": true
+    },
+    {
+      "path": "data-log/05.md",
+      "status": 200,
+      "bytes": 11002,
+      "hashMatches": true
+    },
+    {
+      "path": "data-log/06.md",
+      "status": 200,
+      "bytes": 17122,
+      "hashMatches": true
+    },
+    {
+      "path": "data-log/07.md",
+      "status": 200,
+      "bytes": 21692,
+      "hashMatches": true
+    },
+    {
+      "path": "data-log/08.md",
+      "status": 200,
+      "bytes": 9840,
+      "hashMatches": true
+    },
+    {
+      "path": "data-log/09.md",
+      "status": 200,
+      "bytes": 23644,
+      "hashMatches": true
+    },
+    {
+      "path": "data-log/10.md",
+      "status": 200,
+      "bytes": 29051,
+      "hashMatches": true
+    },
+    {
+      "path": "checkpoints/01-A.py",
+      "status": 200,
+      "bytes": 262,
+      "hashMatches": true
+    },
+    {
+      "path": "checkpoints/02-A.py",
+      "status": 200,
+      "bytes": 859,
+      "hashMatches": true
+    },
+    {
+      "path": "checkpoints/02-B.py",
+      "status": 200,
+      "bytes": 860,
+      "hashMatches": true
+    },
+    {
+      "path": "checkpoints/02-C.py",
+      "status": 200,
+      "bytes": 4248,
+      "hashMatches": true
+    },
+    {
+      "path": "checkpoints/03-A.py",
+      "status": 200,
+      "bytes": 5449,
+      "hashMatches": true
+    },
+    {
+      "path": "checkpoints/03-B.py",
+      "status": 200,
+      "bytes": 5817,
+      "hashMatches": true
+    },
+    {
+      "path": "checkpoints/03-C.py",
+      "status": 200,
+      "bytes": 5832,
+      "hashMatches": true
+    },
+    {
+      "path": "checkpoints/04-A.py",
+      "status": 200,
+      "bytes": 6292,
+      "hashMatches": true
+    },
+    {
+      "path": "checkpoints/04-B.py",
+      "status": 200,
+      "bytes": 6333,
+      "hashMatches": true
+    },
+    {
+      "path": "checkpoints/04-C.py",
+      "status": 200,
+      "bytes": 6390,
+      "hashMatches": true
+    },
+    {
+      "path": "checkpoints/05-A.py",
+      "status": 200,
+      "bytes": 7227,
+      "hashMatches": true
+    },
+    {
+      "path": "checkpoints/06-A.py",
+      "status": 200,
+      "bytes": 7308,
+      "hashMatches": true
+    },
+    {
+      "path": "checkpoints/06-B.py",
+      "status": 200,
+      "bytes": 7626,
+      "hashMatches": true
+    },
+    {
+      "path": "checkpoints/06-C.py",
+      "status": 200,
+      "bytes": 7692,
+      "hashMatches": true
+    },
+    {
+      "path": "checkpoints/06-D.py",
+      "status": 200,
+      "bytes": 7692,
+      "hashMatches": true
+    },
+    {
+      "path": "checkpoints/07-A.py",
+      "status": 200,
+      "bytes": 8318,
+      "hashMatches": true
+    },
+    {
+      "path": "checkpoints/07-B.py",
+      "status": 200,
+      "bytes": 8486,
+      "hashMatches": true
+    },
+    {
+      "path": "checkpoints/07-C.py",
+      "status": 200,
+      "bytes": 9101,
+      "hashMatches": true
+    },
+    {
+      "path": "checkpoints/07-D.py",
+      "status": 200,
+      "bytes": 9418,
+      "hashMatches": true
+    },
+    {
+      "path": "checkpoints/07-E.py",
+      "status": 200,
+      "bytes": 9363,
+      "hashMatches": true
+    },
+    {
+      "path": "checkpoints/08-A.py",
+      "status": 200,
+      "bytes": 9736,
+      "hashMatches": true
+    },
+    {
+      "path": "checkpoints/08-B.py",
+      "status": 200,
+      "bytes": 10093,
+      "hashMatches": true
+    },
+    {
+      "path": "checkpoints/09-A.py",
+      "status": 200,
+      "bytes": 10365,
+      "hashMatches": true
+    },
+    {
+      "path": "checkpoints/09-B.py",
+      "status": 200,
+      "bytes": 10921,
+      "hashMatches": true
+    },
+    {
+      "path": "checkpoints/09-C.py",
+      "status": 200,
+      "bytes": 11554,
+      "hashMatches": true
+    },
+    {
+      "path": "checkpoints/09-D.py",
+      "status": 200,
+      "bytes": 11554,
+      "hashMatches": true
+    },
+    {
+      "path": "checkpoints/10-A.py",
+      "status": 200,
+      "bytes": 12146,
+      "hashMatches": true
+    },
+    {
+      "path": "checkpoints/10-B.py",
+      "status": 200,
+      "bytes": 12383,
+      "hashMatches": true
+    },
+    {
+      "path": "checkpoints/10-C.py",
+      "status": 200,
+      "bytes": 12647,
+      "hashMatches": true
+    },
+    {
+      "path": "checkpoints/10-D.py",
+      "status": 200,
+      "bytes": 12854,
+      "hashMatches": true
+    },
+    {
+      "path": "checkpoints/10-E.py",
+      "status": 200,
+      "bytes": 12854,
+      "hashMatches": true
+    },
+    {
+      "path": "checkpoints/final-main.py",
+      "status": 200,
+      "bytes": 12854,
+      "hashMatches": true
+    },
+    {
+      "path": "experiments/03-B.py",
+      "status": 200,
+      "bytes": 5837,
+      "hashMatches": true
+    },
+    {
+      "path": "experiments/03-C.py",
+      "status": 200,
+      "bytes": 5910,
+      "hashMatches": true
+    },
+    {
+      "path": "experiments/06-B.py",
+      "status": 200,
+      "bytes": 7655,
+      "hashMatches": true
+    },
+    {
+      "path": "experiments/06-C.py",
+      "status": 200,
+      "bytes": 7721,
+      "hashMatches": true
+    },
+    {
+      "path": "experiments/07-B.py",
+      "status": 200,
+      "bytes": 8508,
+      "hashMatches": true
+    },
+    {
+      "path": "experiments/07-E.py",
+      "status": 200,
+      "bytes": 9399,
+      "hashMatches": true
+    },
+    {
+      "path": "experiments/08-A.py",
+      "status": 200,
+      "bytes": 9785,
+      "hashMatches": true
+    },
+    {
+      "path": "experiments/08-B.py",
+      "status": 200,
+      "bytes": 10168,
+      "hashMatches": true
+    },
+    {
+      "path": "experiments/09-A.py",
+      "status": 200,
+      "bytes": 10500,
+      "hashMatches": true
+    },
+    {
+      "path": "experiments/09-D.py",
+      "status": 200,
+      "bytes": 11628,
+      "hashMatches": true
+    },
+    {
+      "path": "experiments/10-A.py",
+      "status": 200,
+      "bytes": 12228,
+      "hashMatches": true
+    },
+    {
+      "path": "experiments/10-B.py",
+      "status": 200,
+      "bytes": 12561,
+      "hashMatches": true
+    },
+    {
+      "path": "experiments/10-C.py",
+      "status": 200,
+      "bytes": 12742,
+      "hashMatches": true
+    },
+    {
+      "path": "experiments/10-D.py",
+      "status": 200,
+      "bytes": 13154,
+      "hashMatches": true
+    },
+    {
+      "path": "experiments/10-E.py",
+      "status": 200,
+      "bytes": 13146,
+      "hashMatches": true
+    },
+    {
+      "path": "assets/DoHyeon-Regular.ttf",
+      "status": 200,
+      "bytes": 879764,
+      "hashMatches": true
+    },
+    {
+      "path": "assets/line_alert.ogg",
+      "status": 200,
+      "bytes": 6740,
+      "hashMatches": true
+    },
+    {
+      "path": "assets/raider.png",
+      "status": 200,
+      "bytes": 803979,
+      "hashMatches": true
+    },
+    {
+      "path": "assets/raider_break.ogg",
+      "status": 200,
+      "bytes": 6604,
+      "hashMatches": true
+    },
+    {
+      "path": "assets/raider_pulse.ogg",
+      "status": 200,
+      "bytes": 6389,
+      "hashMatches": true
+    },
+    {
+      "path": "assets/scout.png",
+      "status": 200,
+      "bytes": 762590,
+      "hashMatches": true
+    },
+    {
+      "path": "assets/scout_pulse.ogg",
+      "status": 200,
+      "bytes": 4513,
+      "hashMatches": true
+    },
+    {
+      "path": "assets/shield_hit.ogg",
+      "status": 200,
+      "bytes": 8417,
+      "hashMatches": true
+    },
+    {
+      "path": "assets/wave_ready.ogg",
+      "status": 200,
+      "bytes": 6516,
+      "hashMatches": true
+    }
+  ]
+}

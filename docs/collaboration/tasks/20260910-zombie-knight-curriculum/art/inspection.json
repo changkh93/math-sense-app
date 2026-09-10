@@ -1,0 +1,24 @@
+[
+  {
+    "file": "mars-background-master.png",
+    "size": [
+      1536,
+      1024
+    ],
+    "mode": "RGB",
+    "bytes": 1910898
+  },
+  {
+    "file": "explorer-run-atlas-master.png",
+    "size": [
+      1774,
+      887
+    ],
+    "mode": "RGBA",
+    "bytes": 1054191,
+    "alphaExtrema": [
+      0,
+      255
+    ]
+  }
+]
