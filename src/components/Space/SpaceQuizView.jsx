@@ -29,6 +29,7 @@ import {
 } from '../../utils/quizSessionGuards'
 import { writeQuizProgressSnapshot } from '../../utils/quizSessionPersistence'
 import { createSustainedBlurGuard } from '../../utils/quizFocusGuard'
+import { createQuizFocusDiagnostics, isQuizFullscreenAvailable, requestQuizFullscreen } from '../../utils/fieldTestFocus'
 
 // Fisher-Yates 셔플 알고리즘
 const shuffleArray = (array) => {
@@ -280,6 +281,7 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
   const [focusViolationCount, setFocusViolationCount] = useState(0)
   const [focusLockReason, setFocusLockReason] = useState('')
   const [isFocusLocked, setIsFocusLocked] = useState(false)
+  const [isResumingFocus, setIsResumingFocus] = useState(false)
   const [isIntegrityTerminated, setIsIntegrityTerminated] = useState(false)
 
   const initializedRef = useRef(null) // Prevent accidental reshuffling (tracks unitId + uid)
@@ -287,7 +289,12 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
   const initializationAttemptRef = useRef(0)
   const navigationTransitionRef = useRef(false)
   const focusViolationCountRef = useRef(0)
-  const lastFocusViolationAtRef = useRef(0)
+  const focusLockedRef = useRef(false)
+  const focusResumePendingRef = useRef(false)
+  const focusProtectionGenerationRef = useRef(0)
+  const focusDiagnosticsRef = useRef(null)
+  if (!focusDiagnosticsRef.current) focusDiagnosticsRef.current = createQuizFocusDiagnostics()
+  const latestFocusContextRef = useRef(null)
   const integrityTerminatedRef = useRef(false)
   const intentionalFullscreenExitRef = useRef(false)
   const focusProtectionArmedRef = useRef(false)
@@ -299,6 +306,15 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
   const darkMatterSyncedSessionRef = useRef('')
   const sessionOwnershipLostRef = useRef(false)
   const currentQuestion = currentQuestions[currentIdx]
+  latestFocusContextRef.current = {
+    sessionId: quizSessionId,
+    questionId: currentQuestion?.id || '',
+    currentIdx,
+    graded: showFeedback !== null,
+    savingAnswer: isSavingAnswerCheckpoint,
+    savingReaction: isSavingReaction,
+    rebooting: isRebooting,
+  }
   const quizQuestionSignature = quizData?.questions?.map(q => q.id).join('|') || 'no_questions'
 
   // Keep the latest resumable state available to focus-violation callbacks without
@@ -839,7 +855,7 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
           occurredAt: serverTimestamp(),
           ...details,
         }
-      }, { merge: true })
+      }, { mergeFields: ['quizSessionGuardAudit'] })
     } catch (error) {
       console.error('Quiz session guard audit failed', error)
     }
@@ -882,9 +898,38 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
     }
   }, [quizData?.title, quizData?.unitId, user?.uid])
 
+  const recordFocusDiagnostic = useCallback((event, details = {}, persist = false) => {
+    const diagnostics = focusDiagnosticsRef.current
+    diagnostics.record(event, {
+      ...latestFocusContextRef.current,
+      hidden: document.hidden,
+      hasFocus: document.hasFocus(),
+      fullscreen: Boolean(document.fullscreenElement),
+      locked: focusLockedRef.current,
+      online: navigator.onLine,
+      ...details,
+    })
+    if (!persist || !user?.uid || !quizData?.unitId || !diagnostics.shouldPersist()) return
+    // Replace the entire field so stale fields from a previous event cannot mix
+    // with this snapshot. Diagnostics must never block answering or recovery.
+    void setDoc(doc(db, 'users', user.uid, 'learning_progress', quizData.unitId), {
+      quizFocusDiagnostics: {
+        version: 2,
+        sessionId: latestFocusContextRef.current?.sessionId || '',
+        userAgent: navigator.userAgent.slice(0, 200),
+        maxTouchPoints: navigator.maxTouchPoints || 0,
+        events: diagnostics.snapshot(),
+        updatedAt: serverTimestamp(),
+      },
+    }, { mergeFields: ['quizFocusDiagnostics'] }).catch(error => {
+      console.warn('Quiz focus diagnostics save failed:', error)
+    })
+  }, [quizData?.unitId, user?.uid])
+
   const terminateCompromisedFieldTest = useCallback(async (eventType, violationCount) => {
     if (integrityTerminatedRef.current) return
     integrityTerminatedRef.current = true
+    focusLockedRef.current = true
     integritySaveSucceededRef.current = false
     setIsIntegrityTerminated(true)
     setIsFocusLocked(true)
@@ -908,11 +953,12 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
   }, [persistCurrentQuizSession, quizData?.unitId])
 
   const reportFocusViolation = useCallback((eventType, reason) => {
-    if (integrityTerminatedRef.current || document.body.classList.contains('is-capturing')) return
+    if (integrityTerminatedRef.current || focusLockedRef.current || document.body.classList.contains('is-capturing')) return
 
-    const now = Date.now()
-    if (now - lastFocusViolationAtRef.current < 4000) return
-    lastFocusViolationAtRef.current = now
+    // A focus episode is counted once, until an explicit successful resume.
+    // Use a ref because blur/fullscreen/visibility events may share one render.
+    focusLockedRef.current = true
+    recordFocusDiagnostic(eventType, {}, true)
 
     document.body.classList.add('field-test-window-blurred')
     setIsFocusLocked(true)
@@ -928,11 +974,13 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
         quizSessionGuardAudit: {
           event: 'field_test_focus_violation',
           eventType,
+          sessionId: latestFocusContextRef.current?.sessionId || '',
+          focusState: { hidden: document.hidden, hasFocus: document.hasFocus(), fullscreen: Boolean(document.fullscreenElement) },
           violationCount: nextCount,
           unitId: quizData.unitId,
           occurredAt: serverTimestamp(),
         },
-      }, { merge: true }).catch(error => {
+      }, { mergeFields: ['quizSessionGuardAudit'] }).catch(error => {
         console.error('Field test focus audit failed:', error)
       })
     }
@@ -940,15 +988,18 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
     if (nextCount >= FIELD_TEST_MAX_FOCUS_VIOLATIONS) {
       void terminateCompromisedFieldTest(eventType, nextCount)
     }
-  }, [quizData?.unitId, terminateCompromisedFieldTest, user?.uid])
+  }, [quizData?.unitId, recordFocusDiagnostic, terminateCompromisedFieldTest, user?.uid])
 
   useEffect(() => {
     const protectionActive = !isLoadingSession && !isResultMode && currentQuestions.length > 0 && !isIntegrityTerminated
     if (!protectionActive) return undefined
 
+    focusProtectionGenerationRef.current += 1
+    focusResumePendingRef.current = false
+    setIsResumingFocus(false)
     intentionalFullscreenExitRef.current = false
-    const fullscreenSupported = Boolean(document.documentElement.requestFullscreen)
-    focusProtectionArmedRef.current = Boolean(document.fullscreenElement) || !fullscreenSupported
+    const fullscreenRequired = !isDarkMatter && isQuizFullscreenAvailable(document)
+    focusProtectionArmedRef.current = Boolean(document.fullscreenElement) || !fullscreenRequired
     if (document.fullscreenElement) {
       focusTransitionGraceUntilRef.current = Date.now() + 2500
     }
@@ -958,7 +1009,7 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
     )
     const handleVisibility = () => {
       if (document.hidden && !isInternalCapture() && !isEntryTransition()) {
-        reportFocusViolation('visibility_hidden', '탭 전환이 감지되어 문제 화면을 잠갔습니다.')
+        reportFocusViolation('visibility_hidden', '퀴즈 화면이 숨겨져 문제 풀이를 잠시 멈췄습니다.')
       }
     }
     const handleFullscreenChange = () => {
@@ -968,7 +1019,8 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
         return
       }
       if (
-        focusProtectionArmedRef.current
+        fullscreenRequired
+        && focusProtectionArmedRef.current
         && !intentionalFullscreenExitRef.current
         && !isInternalCapture()
         && !isEntryTransition()
@@ -977,16 +1029,29 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
       }
     }
     const blurGuard = createSustainedBlurGuard({
-      canStart: () => !isInternalCapture() && !isEntryTransition(),
-      shouldConfirm: () => !document.hasFocus() && !isInternalCapture() && !isEntryTransition(),
-      onConfirmed: () => {
-        reportFocusViolation('window_blur', '창 포커스 이탈이 지속되어 문제 화면을 잠갔습니다.')
+      canStart: () => !focusLockedRef.current && !isInternalCapture() && !isEntryTransition(),
+      shouldConfirm: () => !focusLockedRef.current && !document.hasFocus() && !isInternalCapture() && !isEntryTransition(),
+      onConfirmed: ({ durationMs }) => {
+        if (document.hidden) {
+          reportFocusViolation('visibility_hidden', '퀴즈 화면이 숨겨져 문제 풀이를 잠시 멈췄습니다.')
+        } else {
+          // Browser/OS focus is not proof of leaving a visible quiz.
+          recordFocusDiagnostic('window_blur_visible', { durationMs }, true)
+        }
       },
       setTimer: (callback, delayMs) => window.setTimeout(callback, delayMs),
       clearTimer: timerId => window.clearTimeout(timerId),
     })
-    const handleBlur = () => blurGuard.start()
-    const handleFocus = () => blurGuard.cancel()
+    const handleBlur = () => {
+      if (!isInternalCapture()) recordFocusDiagnostic('window_blur')
+      blurGuard.start()
+    }
+    const handleFocus = () => {
+      blurGuard.cancel()
+      recordFocusDiagnostic('window_focus')
+    }
+    const handleRuntimeError = () => recordFocusDiagnostic('runtime_error', {}, true)
+    const handleUnhandledRejection = () => recordFocusDiagnostic('unhandled_rejection', {}, true)
     const handleKeyDown = (event) => {
       if (!isCaptureShortcut(event) || isInternalCapture()) return
       event.preventDefault()
@@ -1016,14 +1081,19 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
     window.addEventListener('keydown', handleKeyDown, true)
     window.addEventListener('beforeprint', handleBeforePrint)
     window.addEventListener('beforeunload', handleBeforeUnload)
+    window.addEventListener('error', handleRuntimeError)
+    window.addEventListener('unhandledrejection', handleUnhandledRejection)
 
     const fullscreenCheckTimer = window.setTimeout(() => {
       if (
-        document.documentElement.requestFullscreen
+        fullscreenRequired
+        && !focusLockedRef.current
+        && !focusResumePendingRef.current
         && !document.fullscreenElement
         && !intentionalFullscreenExitRef.current
         && !isInternalCapture()
       ) {
+        focusLockedRef.current = true
         document.body.classList.add('field-test-window-blurred')
         setIsFocusLocked(true)
         setFocusLockReason('전체화면으로 전환해야 Field Test를 계속할 수 있습니다. 이 안내는 이탈 횟수에 포함되지 않습니다.')
@@ -1031,6 +1101,8 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
     }, 3000)
 
     return () => {
+      focusProtectionGenerationRef.current += 1
+      focusResumePendingRef.current = false
       blurGuard.dispose()
       window.clearTimeout(fullscreenCheckTimer)
       document.body.classList.remove('field-test-window-blurred')
@@ -1045,8 +1117,10 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
       window.removeEventListener('keydown', handleKeyDown, true)
       window.removeEventListener('beforeprint', handleBeforePrint)
       window.removeEventListener('beforeunload', handleBeforeUnload)
+      window.removeEventListener('error', handleRuntimeError)
+      window.removeEventListener('unhandledrejection', handleUnhandledRejection)
     }
-  }, [currentQuestions.length, isIntegrityTerminated, isLoadingSession, isResultMode, reportFocusViolation])
+  }, [currentQuestions.length, isDarkMatter, isIntegrityTerminated, isLoadingSession, isResultMode, recordFocusDiagnostic, reportFocusViolation])
 
   useEffect(() => {
     if (!isResultMode || !document.fullscreenElement || !document.exitFullscreen) return
@@ -1074,27 +1148,62 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
   }, [])
 
   const resumeFieldTestFocus = async () => {
-    if (isIntegrityTerminated) return
-    if (!document.hasFocus()) return
-    if (!document.documentElement.requestFullscreen || document.fullscreenElement) {
-      focusProtectionArmedRef.current = true
-      focusTransitionGraceUntilRef.current = Date.now() + 2500
-      document.body.classList.remove('field-test-window-blurred')
-      setIsFocusLocked(false)
-      setFocusLockReason('')
+    if (integrityTerminatedRef.current || focusResumePendingRef.current) return
+    recordFocusDiagnostic('resume_requested')
+    if (document.hidden) {
+      setFocusLockReason('퀴즈 화면으로 돌아온 뒤 다시 눌러 주세요.')
       return
     }
-
+    // A real click/touch on this visible page is enough to attempt recovery.
+    // hasFocus() can remain false on tablets; never silently ignore that touch.
+    const generation = focusProtectionGenerationRef.current
+    focusResumePendingRef.current = true
+    setIsResumingFocus(true)
+    focusTransitionGraceUntilRef.current = Date.now() + 6500
     try {
-      await document.documentElement.requestFullscreen()
+      if (!isDarkMatter && isQuizFullscreenAvailable(document) && !document.fullscreenElement) {
+        await requestQuizFullscreen(document)
+        if (!document.fullscreenElement) throw new Error('FULLSCREEN_NOT_ENTERED')
+      }
+      if (generation !== focusProtectionGenerationRef.current || integrityTerminatedRef.current) return
+      if (document.hidden) throw new Error('PAGE_HIDDEN_DURING_RESUME')
       focusProtectionArmedRef.current = true
       focusTransitionGraceUntilRef.current = Date.now() + 2500
+      focusLockedRef.current = false
       document.body.classList.remove('field-test-window-blurred')
       setIsFocusLocked(false)
       setFocusLockReason('')
-    } catch {
-      setFocusLockReason('전체화면 전환이 차단되었습니다. 브라우저 권한을 허용한 뒤 다시 시도해 주세요.')
+      recordFocusDiagnostic('resume_succeeded')
+    } catch (error) {
+      if (generation !== focusProtectionGenerationRef.current || integrityTerminatedRef.current) return
+      focusTransitionGraceUntilRef.current = 0
+      setFocusLockReason(document.hidden
+        ? '퀴즈 화면으로 돌아온 뒤 다시 눌러 주세요.'
+        : '전체화면으로 돌아가지 못했습니다. 다시 누르거나 진행 상황을 저장하고 나가 주세요.')
+      recordFocusDiagnostic('resume_failed', { timeout: error?.message === 'FULLSCREEN_TIMEOUT' }, true)
+    } finally {
+      if (generation === focusProtectionGenerationRef.current) {
+        focusResumePendingRef.current = false
+        setIsResumingFocus(false)
+      }
     }
+  }
+
+  const handleFocusLockedExit = async () => {
+    if (isSavingExit) return
+    setIsSavingExit(true)
+    const saved = await persistCurrentQuizSession()
+    setIsSavingExit(false)
+    if (!saved) {
+      setFocusLockReason('진행 상황 저장에 실패했습니다. 연결을 확인한 뒤 다시 시도해 주세요.')
+      return
+    }
+    intentionalFullscreenExitRef.current = true
+    document.body.classList.remove('field-test-window-blurred')
+    if (document.fullscreenElement && document.exitFullscreen) {
+      document.exitFullscreen().catch(() => {})
+    }
+    onExit()
   }
 
   const exitTerminatedFieldTest = async () => {
@@ -2227,6 +2336,13 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
   return (
     <div
       className="space-bg field-test-protection-root"
+      onPointerDownCapture={(event) => {
+        const option = event.target.closest?.('.space-option-btn')
+        if (option) recordFocusDiagnostic('option_pointerdown', {
+          pointerType: event.pointerType || 'unknown',
+          disabled: option.disabled,
+        })
+      }}
       style={{
         display: 'flex',
         width: '100%',
@@ -2252,15 +2368,11 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
         ))}
       </div>
 
-      <AnimatePresence>
-        {isFocusLocked && (
-          <motion.div
+      {isFocusLocked && (
+          <div
             className="field-test-focus-lock capture-hide"
             role="dialog"
             aria-modal="true"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
           >
             <div className="glass-card hud-border" style={{ width: 'min(440px, calc(100vw - 2rem))', padding: '2rem', textAlign: 'center' }}>
               <div style={{ fontSize: '3rem', marginBottom: '0.75rem' }}>{isIntegrityTerminated ? '⛔' : '🔒'}</div>
@@ -2276,12 +2388,12 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
               <button
                 className="hud-btn primary glass"
                 onClick={isIntegrityTerminated ? exitTerminatedFieldTest : resumeFieldTestFocus}
-                disabled={isIntegrityTerminated && isSavingExit}
+                disabled={isResumingFocus || isSavingExit}
                 style={{
                   width: '100%',
                   padding: '0.9rem',
-                  cursor: isIntegrityTerminated && isSavingExit ? 'wait' : 'pointer',
-                  opacity: isIntegrityTerminated && isSavingExit ? 0.72 : 1,
+                  cursor: isResumingFocus || isSavingExit ? 'wait' : 'pointer',
+                  opacity: isResumingFocus || isSavingExit ? 0.72 : 1,
                   display: 'flex',
                   flexDirection: 'column',
                   alignItems: 'center',
@@ -2292,18 +2404,39 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
                   isSavingExit ? '진행 상황 저장 중...' : 'MISSION CONTROL로 돌아가기'
                 ) : (
                   <>
-                    <span style={{ fontSize: '1.05rem', fontWeight: 800 }}>퀴즈 계속 풀기</span>
-                    <span style={{ fontSize: '0.78rem', fontWeight: 500, opacity: 0.72 }}>전체화면으로 돌아갑니다</span>
+                    <span style={{ fontSize: '1.05rem', fontWeight: 800 }}>{isResumingFocus ? '화면 복귀 중...' : '퀴즈 계속 풀기'}</span>
+                    <span style={{ fontSize: '0.78rem', fontWeight: 500, opacity: 0.72 }}>{isDarkMatter || !isQuizFullscreenAvailable(document) ? '이 화면에서 이어서 풉니다' : '전체화면으로 돌아갑니다'}</span>
                   </>
                 )}
               </button>
+              {!isIntegrityTerminated && (
+                <button
+                  type="button"
+                  className="hud-btn glass"
+                  style={{
+                    width: '100%',
+                    minHeight: 44,
+                    marginTop: '0.75rem',
+                    padding: '0.7rem 1rem',
+                    borderRadius: '12px',
+                    border: '1px solid rgba(255,255,255,0.25)',
+                    background: 'rgba(255,255,255,0.06)',
+                    color: 'var(--text-bright)',
+                    cursor: isSavingExit || isResumingFocus ? 'wait' : 'pointer',
+                  }}
+                  onClick={handleFocusLockedExit}
+                  disabled={isSavingExit || isResumingFocus}
+                >
+                  {isSavingExit ? '진행 상황 저장 중...' : '진행 저장 후 나가기'}
+                </button>
+              )}
             </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+          </div>
+      )}
       
       <div 
         className={`space-quiz-container scale-in field-test-protected-content ${isAiExplanationOpen ? 'ai-panel-open' : ''}`}
+        inert={isFocusLocked}
         style={{
           transition: 'all 0.4s cubic-bezier(0.16, 1, 0.3, 1)',
           width: '100%',
@@ -2763,6 +2896,7 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
                   key={idx}
                   className={btnClass}
                   onClick={(e) => {
+                    recordFocusDiagnostic('option_click', { optionIndex: idx })
                     if (showFeedback || isRebooting) return
                     if (multiMode) {
                       handleMultiSelect(option)

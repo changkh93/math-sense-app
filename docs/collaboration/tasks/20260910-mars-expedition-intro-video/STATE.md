@@ -1,0 +1,14 @@
+# 화성 탐사대 학생용 소개 영상
+- ID: 20260910-mars-expedition-intro-video
+- Goal: 이전 우주 방어대 영상과 같은 목적·형식의 1분 화성 탐사대 소개 영상.
+- Phase: DONE, 2026-09-10
+- Owner: Codex 직접 제작, 외부 위임 없음.
+- Baseline: b99fe65fc861c655202885339a14ded07351a1d2. 기존 우주 방어대 videos/와 해당 기록 untracked, INDEX 수정 보존.
+- Scope: videos/mars-expedition-intro, 본 기록 및 INDEX. 기존 교육 코드와 이전 영상 보존.
+- Acceptance: 최종 코드 실제 실행, 정확한 한글 애니메이션 설명, 원래 게임 음원, 60초 1080p MP4 및 편집 소스, 시각·메타데이터 검증.
+- Work: 원본 코드 검토, 기존 Remotion 구성 재사용, 키보드 입력만으로 실제 플레이 촬영 준비.
+- Result: videos/mars-expedition-intro/out/mars-expedition-intro.mp4, 60초/1920×1080/30fps/H.264/AAC/약 9.4MB. 편집 소스, 실제 플레이, 썸네일, 촬영 보고서 및 README 포함.
+- Verification: 최종 코드 SHA-256 보존, 자동 키보드 입력으로 65초 연속 촬영, 실제 결정 회수/신호 복구/다음 탐사/게임오버/재시작 기록 확인. ESLint·TypeScript 통과. 한글과 기호 폰트 글리프 검사 통과. 최종 MP4 15시점 시각 검토, ffprobe 형식 확인, 전체 오디오 디코딩 통과(peak -3.3dB).
+- Limitations: 자동 키보드 입력으로 촬영한 실제 코드 실행. 41초 이후 54초로 편집한 부분은 이후 탐사 장면이라고 표기. 음성 해설 없음. 운영 사이트에 게시하지 않음.
+- Next: 완성 영상 전달.
+- User input needed: 없음.

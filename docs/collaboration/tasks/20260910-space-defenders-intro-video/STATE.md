@@ -1,0 +1,14 @@
+# 우주 방어대 게임 소개 영상
+- ID: 20260910-space-defenders-intro-video
+- Goal: 최종 코드를 실제 구동하고 게임의 조작과 규칙을 역동적인 한글 텍스트로 소개하는 학생용 영상 제작.
+- Owner: Codex 직접 작업. 외부 위임 없음.
+- Phase: DONE, 2026-09-10
+- Baseline: b99fe65fc861c655202885339a14ded07351a1d2. 시작 시 videos/만 untracked. 기존 교육 코드 변경 없음.
+- Scope: videos/space-defenders-intro, 본 기록과 INDEX. 운영 배포 범위 아님.
+- Acceptance: 실제 최종 코드 플레이, 정확한 한글 설명, 게임 효과음, MP4 렌더링 및 시각·메타데이터 검증, 편집 가능한 소스.
+- Work: 독립 Remotion 프로젝트 준비. 원본 Python 코드 변경 없이 키보드 입력과 60Hz 시계로 촬영, 실제 Sound.play 호출 기록.
+- Result: videos/space-defenders-intro/out/space-defenders-intro.mp4, 약 60초/1080p/30fps/H.264/AAC/13.7MB. 편집 소스·플레이 원본·촬영 보고서·README 포함.
+- Verification: 최종 코드 해시 보존, 실제 라운드 클리어(6,500점)/2라운드 및 별도 피격/재시작 입력 촬영. ESLint·TypeScript 통과, 완성 영상 12시점 시각 검토, 메타데이터 및 오디오 전체 디코딩 검사 통과.
+- Limitations: 수동 플레이 대신 자동 키보드 입력을 사용한 실제 실행. 음성 해설 없음. 운영에 게시하지 않음.
+- Next: 완성 영상 사용자 전달.
+- User input needed: 없음.

@@ -11,12 +11,6 @@ function getQuestionFallbackTitle(question, fallback) {
   return fallback
 }
 
-const enterDarkMatterFocusMode = () => {
-  if (!document.fullscreenElement && document.documentElement.requestFullscreen) {
-    document.documentElement.requestFullscreen().catch(() => {})
-  }
-}
-
 /**
  * 다크 매터 뷰 — 오답/재검토 문항을 카테고리별로 보여주고 재풀이 진입
  */
@@ -61,7 +55,7 @@ export default function DarkMatterView({
     : 0
 
   const handleStartGroup = (group) => {
-    enterDarkMatterFocusMode()
+    // Learning-mode Dark Matter does not require a fullscreen transition.
     if (onStartQuiz) onStartQuiz(group.questions)
   }
 
