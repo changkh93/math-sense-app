@@ -7,6 +7,8 @@ For an existing task, read its STATE.md and actual artifacts before continuing.
 
 | ID | Goal | Phase | State file | Next action |
 |---|---|---|---|---|
+| 20260910-quiz-progress-wording | 퀴즈 진행 숫자·나중에 풀기 안내 개선 | DONE (local; not deployed) | [STATE](tasks/20260910-quiz-progress-wording/STATE.md) | 전체 기준 답 선택 현황·고정 문제 번호·명확한 보류 안내, 회귀·브라우저·빌드 확인; 웹 배포 전 |
+| 20260910-unified-math-input | 수식 입력 모달 통일 및 + 누락 해결 | ACTIVE | [STATE](tasks/20260910-unified-math-input/STATE.md) | 공통 키패드·같은 모달 내 직접 입력 구현 및 회귀 검증 |
 | 20260910-dark-matter-tablet-focus | 패드 다크매터 퀴즈 잠금·복귀 개선 | DONE (local; not deployed) | [STATE](tasks/20260910-dark-matter-tablet-focus/STATE.md) | visible blur 오탐·잠금 중 중복·복귀 무응답·투명 레이어 수정, 진단 보강. 세션/화면/빌드 검증 완료; 웹 배포 및 실물 패드 확인 남음 |
 | 20260910-smartstore-growth | 둘시네 스마트스토어 세 상품군 점검·검색 및 판매 개선 | PARTIAL / UI_BLOCKED | [STATE](tasks/20260910-smartstore-growth/STATE.md) | 30일 판매전략 작성. 수학12개·전시·오뒷세이아상세 개선 확인. 광고그룹 저장결과 미검증/소재 미등록. 복구문의·상품정합성·대표3개 샘플 우선 |
 | 20260910-game-studio-distribution | 게임 스튜디오 채널 배포·오늘 마케팅 실행 | DONE (distribution) | [STATE](tasks/20260910-game-studio-distribution/STATE.md) | 게임3채널·곱셈 수정YouTube 공개, 접수·교류 기록 완료; 알림 연동 후속 확인 |

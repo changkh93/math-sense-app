@@ -12,6 +12,7 @@ import { useSmartSync } from '../../hooks/useSync'
 import { useAuth } from '../../hooks/useAuth'
 import MissionMarkdownViewer from './MissionMarkdownViewer'
 import QuizScratchPad from './QuizScratchPad'
+import QuizProgressSummary from '../QuizProgressSummary'
 import { db, functions } from '../../firebase'
 import { doc, getDoc, setDoc, deleteField, serverTimestamp, runTransaction, increment } from 'firebase/firestore'
 import { httpsCallable } from 'firebase/functions'
@@ -2292,7 +2293,6 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
   }
 
   // 퀴즈 화면
-  const progress = ((currentIdx + 1) / currentQuestions.length) * 100
 
   // [SAFETY GUARD] Never submit from an invalid index. Recover unanswered
   // questions when possible, or save and exit so the session can be reloaded safely.
@@ -2666,51 +2666,23 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
               fontSize: '0.9rem',
               fontWeight: 700
             }}>
-              {currentQuestion?.unitTitle || quizData?.title} {reSolveMode && '(재도전)'} {isDeferredRound && '(표시 문제)'}
+              {currentQuestion?.unitTitle || quizData?.title} {reSolveMode && '(재도전)'} {isDeferredRound && '(남은 문제 풀기)'}
             </span>
             
-            {/* 진행바 */}
-            <div style={{
-              width: '100%',
-              height: '8px',
-              background: 'rgba(255,255,255,0.1)',
-              borderRadius: '4px',
-              marginTop: '1rem',
-              overflow: 'hidden'
-            }}>
-              <div style={{
-                width: `${progress}%`,
-                height: '100%',
-                background: 'linear-gradient(90deg, var(--crystal-cyan), var(--planet-green))',
-                transition: 'width 0.5s ease',
-                boxShadow: 'var(--glow-cyan)'
-              }}></div>
-            </div>
-            <div style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              marginTop: '0.5rem'
-            }}>
-              <span style={{ 
-                color: 'var(--star-gold)', 
-                fontSize: '0.9rem',
-                fontWeight: 600,
-                display: 'flex',
-                alignItems: 'center',
-                gap: '4px'
-              }}>
-                {hasShield > 0 ? `🛡️ ${Math.max(0, hasShield - shieldsUsed)}` : ''}
-              </span>
-              <span style={{ 
-                color: 'var(--text-muted)', 
-                fontSize: '0.8rem',
-              }}>
-                현재 문항 {currentIdx + 1} / {currentQuestions.length}
-                {` · 전체 답안 ${allSessionQuestions.filter(question => userAnswers[question.id]).length}/${originalTotal}`}
-                {!reSolveMode && !isDeferredRound && deferredQuestionIds.size > 0 ? ` · 표시 ${deferredQuestionIds.size}` : ''}
-              </span>
-            </div>
+            <QuizProgressSummary
+              questions={allSessionQuestions}
+              answers={userAnswers}
+              total={originalTotal}
+              currentQuestionId={currentQuestion?.id}
+              deferredIds={deferredQuestionIds}
+              reSolveMode={reSolveMode}
+              isDeferredRound={isDeferredRound}
+            />
+            {hasShield > 0 && (
+              <div style={{ color: 'var(--star-gold)', fontSize: '0.85rem', marginTop: '0.5rem' }}>
+                🛡️ {Math.max(0, hasShield - shieldsUsed)}
+              </div>
+            )}
           </div>
 
           {sessionGuardMessage && (
@@ -2735,10 +2707,11 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
           {/* Radar HUD */}
           {hasRadar && (
             <div className="radar-hud glass-card" style={{
-              position: 'absolute',
-              top: '4.5rem',
-              left: '50%',
-              transform: 'translateX(-50%)',
+              position: 'relative',
+              width: 'fit-content',
+              maxWidth: '100%',
+              flexWrap: 'wrap',
+              margin: '0 auto 1rem',
               padding: '0.4rem 1rem',
               background: 'rgba(5, 10, 30, 0.8)',
               border: '1px solid var(--crystal-cyan)',
@@ -2856,11 +2829,8 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
               lineHeight: 1.5
             }}>
               답을 고른 뒤 이해 상태를 선택하면 다음 문제로 이동합니다.
-              {!reSolveMode && !isDeferredRound && deferredQuestionIds.size > 0 && (
-                <span> 표시한 문제 {deferredQuestionIds.size}개는 마지막 문제 뒤에 다시 나옵니다.</span>
-              )}
               {isDeferredRound && (
-                <span> 표시하고 넘긴 문제입니다. 답을 골라야 결과를 확인할 수 있어요.</span>
+                <span> 아직 답하지 않은 문제를 풀 차례예요. 답을 골라야 결과를 확인할 수 있어요.</span>
               )}
             </div>
           </div>
@@ -3141,7 +3111,10 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
             <div style={{
               marginTop: '1.25rem',
               display: 'flex',
-              justifyContent: 'center'
+              justifyContent: 'center',
+              alignItems: 'center',
+              flexDirection: 'column',
+              gap: '0.5rem'
             }}>
               <button
                 type="button"
@@ -3161,8 +3134,9 @@ export default function SpaceQuizView({ region, quizData, onExit, onComplete, ha
                   boxShadow: '0 10px 26px rgba(0,0,0,0.24), inset 0 1px 0 rgba(255,255,255,0.12)'
                 }}
               >
-                {isSkippingQuestion ? '저장 중...' : '표시하고 넘기기'}
+                {isSkippingQuestion ? '저장 중...' : '이 문제는 나중에 풀기'}
               </button>
+              <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem', textAlign: 'center', wordBreak: 'keep-all', lineHeight: 1.5 }}>답을 고르지 않고 넘어가요. 다른 문제를 푼 뒤 다시 나와요.</span>
             </div>
           )}
 

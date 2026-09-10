@@ -15,6 +15,10 @@ assert.deepEqual(
   getMathKeypadOperatorKeys('expression').map(key => key.value),
   ['÷', '×', '-', '+', '.', '%', '='],
 );
-assert.deepEqual(getMathKeypadOperatorKeys('integer').map(key => key.value), ['-']);
+assert.deepEqual(
+  getMathKeypadOperatorKeys('integer').map(key => key.value),
+  ['÷', '×', '-', '+', '.', '%', '='],
+);
 
 console.log('Workbook input mode/keypad tests passed.');
+

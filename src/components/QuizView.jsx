@@ -6,6 +6,7 @@ import { createParticleBurst, shakeScreen } from './Space/ParticleEffects'
 import soundManager from '../utils/SoundManager'
 import { parseInlineFormatting } from '../utils/formatUtils'
 import QuestionModal from './QuestionModal'
+import QuizProgressSummary from './QuizProgressSummary'
 
 export default function QuizView({ region, quizData, onExit, onComplete }) {
   const [currentQuestions, setCurrentQuestions] = useState([])
@@ -456,18 +457,17 @@ export default function QuizView({ region, quizData, onExit, onComplete }) {
       
       <div className="quiz-header">
         <span className="region-badge" style={{ backgroundColor: region?.color || '#eee' }}>
-          {quizData?.title} {reSolveMode && ' (오답 재도전)'} {isDeferredRound && ' (표시 문제)'}
+          {quizData?.title} {reSolveMode && ' (오답 재도전)'} {isDeferredRound && ' (남은 문제 풀기)'}
         </span>
-        <div className="progress-bar">
-          <div 
-            className="progress-fill" 
-            style={{ width: `${((currentIdx + 1) / currentQuestions.length) * 100}%` }}
-          ></div>
-        </div>
-        <span className="progress-text">
-          {currentIdx + 1} / {currentQuestions.length}
-          {!reSolveMode && !isDeferredRound && deferredQuestionIds.size > 0 && ` · 표시 ${deferredQuestionIds.size}`}
-        </span>
+        <QuizProgressSummary
+          questions={allSessionQuestions}
+          answers={userAnswers}
+          total={originalTotal}
+          currentQuestionId={currentQuestion?.id}
+          deferredIds={deferredQuestionIds}
+          reSolveMode={reSolveMode}
+          isDeferredRound={isDeferredRound}
+        />
       </div>
 
       <div className="question-card">
@@ -576,20 +576,21 @@ export default function QuizView({ region, quizData, onExit, onComplete }) {
         )}
 
         {!showFeedback && !isRebooting && !reSolveMode && !isDeferredRound && (
-          <div className="quiz-secondary-actions">
+          <div className="quiz-secondary-actions" style={{ flexDirection: 'column', alignItems: 'center', gap: '0.5rem' }}>
             <button
               type="button"
               className="mark-skip-btn"
               onClick={handleMarkAndSkip}
             >
-              표시하고 넘기기
+              이 문제는 나중에 풀기
             </button>
+            <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem', textAlign: 'center', wordBreak: 'keep-all', lineHeight: 1.5 }}>답을 고르지 않고 넘어가요. 다른 문제를 푼 뒤 다시 나와요.</span>
           </div>
         )}
 
         {isDeferredRound && !showFeedback && !isRebooting && (
           <div className="deferred-round-note">
-            표시하고 넘긴 문제입니다. 답을 골라야 결과를 확인할 수 있어요.
+            아직 답하지 않은 문제를 풀 차례예요. 답을 골라야 결과를 확인할 수 있어요.
           </div>
         )}
       </div>

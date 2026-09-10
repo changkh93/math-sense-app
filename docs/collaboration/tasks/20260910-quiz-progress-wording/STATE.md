@@ -1,0 +1,12 @@
+# Quiz progress wording
+- ID: 20260910-quiz-progress-wording
+- Goal: 현재 문항·전체 답안·표시의 의미를 설명하고 학생이 이해할 수 있는 UI로 개선.
+- Phase: DONE (local; not deployed)
+- Updated: 2026-09-10
+- Owner: Codex; bounded local UI work, no external handoff.
+- Baseline: existing checkout; preserved unrelated INDEX.md and workbookInputModeUtils.js changes and unified-math-input task.
+- Scope: QuizProgressSummary.jsx, QuizView.jsx, Space/SpaceQuizView.jsx.
+- Changes: 전체 문제 기준 답 선택 수·진행바, 전체 목록의 고정 문제 번호, 정답 개수가 아니라는 안내, 나중에 풀기 버튼·도움말, 미응답 보류 문제 수, 보류 문제 풀이 중 남은 문제 안내, 레이더 HUD를 문서 흐름에 배치하여 헤더 겹침 방지.
+- Verification: npm run test:quiz-session passed; production build passed; git diff --check passed. Synthetic browser UI confirmed skip keeps answered count at zero, choosing an answer increments it, reaction advances back to deferred question with original number. Desktop and 390px mobile layout inspected; radar desktop layout inspected. No real student data used.
+- Limitations: production deployment and physical device QA not performed; regular QuizView uses same summary but its full interactive flow was not browser-tested. Existing build asset/license/chunk warnings remain.
+- Next: include changes in next authorized web deployment. No user relay required.

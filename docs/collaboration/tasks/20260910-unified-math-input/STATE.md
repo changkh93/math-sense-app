@@ -1,0 +1,15 @@
+# Unified math input
+- ID: 20260910-unified-math-input
+- Original goal: 워크북에서 + 누락을 해결하고 모든 수식 입력 모달을 분석하여 하나로 통일.
+- Phase: ACTIVE
+- Updated: 2026-09-10
+- Coordinator/owner: Codex; local implementation, no external handoff needed (single component and caller).
+- Baseline: 7f5dd708c2e1818a262fd86f6b5372097b7e699e; clean worktree at start (git core.fsmonitor=false).
+- Directory: current math-sense-app checkout. No other code writer assigned.
+- Acceptance: all answer modes offer the same arithmetic keys; fractions, parentheses, symbols and arbitrary text available in one modal; existing answer storage/grading preserved; cursor editing, close/reopen, desktop/tablet/mobile layout checked.
+- Inventory: MathKeypad is the only custom math-entry modal. getMathKeypadOperatorKeys hides operators for integer/decimal/fraction/mixed-number; expression/text share the fuller layout. WorkbookPlayer separately exposes native keyboard editing outside the modal. Student MissionHub and administrator MissionContentEditor preview both use WorkbookPlayer. Multiple-choice modal is a separate selection interaction, not math entry. Other editors use native text/textarea fields, not competing math modals.
+- Root cause: integer keys contain only minus; numeric/decimal native keyboard hints also omit needed symbols.
+- Scope: MathKeypad, workbookInputModeUtils, WorkbookPlayer, related CSS, editor explanation, regression/QA fixtures.
+- Plan: shared unrestricted key palette and in-modal direct keyboard entry; preserve inputMode only for display/grading; run math/input/persistence checks and browser QA.
+- Packets/returned artifacts: none.
+- Next: implement and verify. No user action needed.
