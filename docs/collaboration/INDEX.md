@@ -7,6 +7,7 @@ For an existing task, read its STATE.md and actual artifacts before continuing.
 
 | ID | Goal | Phase | State file | Next action |
 |---|---|---|---|---|
+| 20260910-2010-course-catalog-recovery | 로그인 후 코스 목록 간헐 오류 조사·복구 | DONE (local; not deployed) | [STATE](tasks/20260910-2010-course-catalog-recovery/STATE.md) | 승인된 운영 조회로 계정 admin·활성 및 4코스 확인; 복구 수정·회귀/UI·빌드 완료, 최초 지연 원인 미확정·미배포 |
 | 20260910-studio-completion | 게임 스튜디오 Python 자동완성·인자 안내 | DONE (local) | [STATE](tasks/20260910-studio-completion/STATE.md) | 문맥별 추천·인자 안내·작성 틀·프로젝트 파일, 모델/Chrome/빌드 검증 완료; 배포 전 |
 | 20260910-mid3-sem2-exams5-6 | 중3 삼각비·원·통계 홀짝 분할 5·6회 등록 | DONE | [STATE](tasks/20260910-mid3-sem2-exams5-6/STATE.md) | 원문 검토·작성 |
 | 20260910-quiz-progress-wording | 퀴즈 진행 숫자·나중에 풀기 안내 개선 | DONE (local; not deployed) | [STATE](tasks/20260910-quiz-progress-wording/STATE.md) | 전체 기준 답 선택 현황·고정 문제 번호·명확한 보류 안내, 회귀·브라우저·빌드 확인; 웹 배포 전 |

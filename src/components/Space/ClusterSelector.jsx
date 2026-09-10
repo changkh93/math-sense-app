@@ -9,7 +9,7 @@ const CLUSTER_IMAGES = {
   '초등수학': '/images/clusters/elementary_math.png'
 };
 
-function ClusterSelector({ clusters, loading = false, error = false, onRetry, onSelect, onEnterFrontier }) {
+function ClusterSelector({ clusters, loading = false, error = false, errorCode, retrying = false, onRetry, onSelect, onEnterFrontier }) {
   return (
     <div className="space-bg" style={{ minHeight: '100vh', position: 'relative', padding: '20px' }}>
       <StarField count={200} />
@@ -55,11 +55,16 @@ function ClusterSelector({ clusters, loading = false, error = false, onRetry, on
                 background: 'rgba(5,15,30,.78)'
               }}
             >
-              {error ? '학습 코스 정보를 불러오지 못했습니다.' : '학습 코스를 동기화하는 중입니다…'}
+              {error
+                ? (errorCode === 'content/deadline-exceeded'
+                  ? '학습 코스 연결이 지연되고 있습니다. 연결되면 자동으로 표시됩니다.'
+                  : '학습 코스 정보를 불러오지 못했습니다.')
+                : '학습 코스를 동기화하는 중입니다…'}
               {error && (
                 <button
                   type="button"
                   onClick={onRetry}
+                  disabled={retrying}
                   style={{
                     marginLeft: 12,
                     padding: '.45rem .7rem',
@@ -70,7 +75,7 @@ function ClusterSelector({ clusters, loading = false, error = false, onRetry, on
                     cursor: 'pointer'
                   }}
                 >
-                  다시 시도
+                  {retrying ? '다시 연결 중…' : '다시 시도'}
                 </button>
               )}
             </div>

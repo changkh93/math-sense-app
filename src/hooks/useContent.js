@@ -16,6 +16,7 @@ import { ref, deleteObject } from 'firebase/storage';
 import { httpsCallable } from 'firebase/functions';
 import { db, functions, storage } from '../firebase';
 import { sanitizeCodeTraceExercise } from '../utils/codeTraceSanitizer';
+import { readRecoverableContentQuery } from '../utils/recoverableContentQuery';
 
 const CONTENT_QUERY_TIMEOUT_MS = 10000;
 
@@ -38,18 +39,24 @@ const retryContentQuery = (failureCount, error) => (
 
 // --- Clusters ---
 export function useClusters(options = {}) {
+  const queryClient = useQueryClient();
   return useQuery({
     queryKey: ['clusters'],
-    queryFn: async () => {
-      const q = query(collection(db, 'clusters'), orderBy('order', 'asc'));
-      const snap = await withContentQueryTimeout(getDocs(q), 'clusters');
-      return snap.docs.map(doc => ({ ...doc.data(), docId: doc.id }));
-    },
+    queryFn: () => readRecoverableContentQuery({
+      queryClient,
+      queryKey: ['clusters'],
+      read: async () => {
+        const q = query(collection(db, 'clusters'), orderBy('order', 'asc'));
+        const snap = await getDocs(q);
+        return snap.docs.map(doc => ({ ...doc.data(), docId: doc.id }));
+      },
+    }),
     staleTime: 1000 * 60 * 30, // 30 mins
     gcTime: 1000 * 60 * 60,
     enabled: options.enabled ?? true,
     retry: retryContentQuery,
-    refetchOnWindowFocus: false,
+    // Recover failed catalog reads on return without refreshing healthy data.
+    refetchOnWindowFocus: query => query.state.status === 'error',
   });
 }
 

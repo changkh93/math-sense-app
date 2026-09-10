@@ -1055,6 +1055,8 @@ function SpaceHome() {
     data: clusters,
     isLoading: loadingClusters,
     isError: errorClusters,
+    error: clusterQueryError,
+    isFetching: fetchingClusters,
     refetch: refetchClusters
   } = useClusters({ enabled: canLoadCourseCatalog })
   
@@ -4482,6 +4484,8 @@ function SpaceHome() {
               clusters={activeClusters}
               loading={loadingClusters}
               error={errorClusters}
+              errorCode={clusterQueryError?.code}
+              retrying={fetchingClusters}
               onRetry={() => refetchClusters()}
               onEnterFrontier={requestGalaxyEntry}
               onSelect={(id) => {
