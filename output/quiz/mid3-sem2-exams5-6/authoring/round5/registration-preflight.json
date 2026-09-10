@@ -1,0 +1,13 @@
+{
+  "project": "math-sense-1f6a8",
+  "bucket": "math-sense-1f6a8.firebasestorage.app",
+  "unitId": "reg_1781420075936_chap_1781420292103_unit_1789033557224",
+  "title": "3학년 2학기 중간 5회 (삼각비, 원, 통계)",
+  "parentChapterId": "reg_1781420075936_chap_1781420292103",
+  "existingQuizCount": 0,
+  "plannedQuizCount": 24,
+  "plannedImageCount": 18,
+  "questionsSHA256": "7573f2ee25748809f383c0501a05f88493edc6b341f7c2c06aff7dffc3b6fdaa",
+  "existingQuizIds": [],
+  "writes": 0
+}

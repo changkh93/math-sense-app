@@ -1,0 +1,11 @@
+# 중3 중간 5·6회
+- Phase: DONE
+- Owner: Codex 직접 (이전 요청에 따라 직접 작성·캡처·DB 저장)
+- Goal: 첨부 모든 홀수→5회, 짝수→6회, 5보기·개념4단계·상세풀이·정답검토·그림 및 DB등록/재조회검증.
+- Baseline: 920489927a08e6851d908afcee3d0a99907f0bcd; 시작 시 git clean.
+- Scope: output/quiz/mid3-sem2-exams5-6, 해당 task 및 INDEX, 지정 두 unit. 이전 문제·앱 코드 보존.
+- Source: [중3 모의고사(01)] 삼각비,원,통계.pdf
+- Completed: 총 48문항 / 39그림 DB 저장 및 전 필드·이미지 재조회 검증. 홀수→5회, 짝수→6회 각 24문항.
+- Evidence: output/quiz/mid3-sem2-exams5-6/REPORT.md, acceptance-report.json, registration-summary.json.
+- Preview: http://127.0.0.1:8770/review.html?registered=1
+- Remaining: 없음. 앱 소스 변경 없음; 학생 응시 전체 과정은 별도 실행하지 않음.

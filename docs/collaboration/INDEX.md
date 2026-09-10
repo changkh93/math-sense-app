@@ -7,6 +7,8 @@ For an existing task, read its STATE.md and actual artifacts before continuing.
 
 | ID | Goal | Phase | State file | Next action |
 |---|---|---|---|---|
+| 20260910-studio-completion | 게임 스튜디오 Python 자동완성·인자 안내 | DONE (local) | [STATE](tasks/20260910-studio-completion/STATE.md) | 문맥별 추천·인자 안내·작성 틀·프로젝트 파일, 모델/Chrome/빌드 검증 완료; 배포 전 |
+| 20260910-mid3-sem2-exams5-6 | 중3 삼각비·원·통계 홀짝 분할 5·6회 등록 | DONE | [STATE](tasks/20260910-mid3-sem2-exams5-6/STATE.md) | 원문 검토·작성 |
 | 20260910-quiz-progress-wording | 퀴즈 진행 숫자·나중에 풀기 안내 개선 | DONE (local; not deployed) | [STATE](tasks/20260910-quiz-progress-wording/STATE.md) | 전체 기준 답 선택 현황·고정 문제 번호·명확한 보류 안내, 회귀·브라우저·빌드 확인; 웹 배포 전 |
 | 20260910-unified-math-input | 수식 입력 모달 통일 및 + 누락 해결 | ACTIVE | [STATE](tasks/20260910-unified-math-input/STATE.md) | 공통 키패드·같은 모달 내 직접 입력 구현 및 회귀 검증 |
 | 20260910-dark-matter-tablet-focus | 패드 다크매터 퀴즈 잠금·복귀 개선 | DONE (local; not deployed) | [STATE](tasks/20260910-dark-matter-tablet-focus/STATE.md) | visible blur 오탐·잠금 중 중복·복귀 무응답·투명 레이어 수정, 진단 보강. 세션/화면/빌드 검증 완료; 웹 배포 및 실물 패드 확인 남음 |

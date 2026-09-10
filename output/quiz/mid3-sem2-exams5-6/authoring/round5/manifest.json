@@ -1,0 +1,560 @@
+{
+  "round": 5,
+  "unitId": "reg_1781420075936_chap_1781420292103_unit_1789033557224",
+  "sourceTitle": "중3 모의고사(01) 삼각비,원,통계 - 홀수 문항",
+  "questions": [
+    {
+      "number": 1,
+      "sourceNumber": 1,
+      "topic": "삼각비",
+      "correctOptionNumbers": [
+        5
+      ],
+      "imagePath": "assets/q01.png",
+      "sourceImagePath": "assets/source-q01.png",
+      "replaced": false,
+      "replacementReason": "",
+      "crop": [
+        1,
+        166,
+        254,
+        331,
+        359
+      ],
+      "verification": [
+        "모든 삼각형의 각 $A$가 같으므로 $\\frac{DE}{AD}=\\frac{FG}{AF}=\\sin A$, $\\frac{AC}{AB}=\\frac{AG}{AF}=\\cos A$입니다.",
+        "탄젠트는 높이를 밑변으로 나누므로 $\\tan A=\\frac{FG}{AG}$입니다. 보기 $5$는 분자와 분모가 바뀌었습니다."
+      ],
+      "sourcePage": 1
+    },
+    {
+      "number": 2,
+      "sourceNumber": 3,
+      "topic": "삼각비",
+      "correctOptionNumbers": [
+        4
+      ],
+      "imagePath": "assets/q02.png",
+      "sourceImagePath": "assets/source-q02.png",
+      "replaced": false,
+      "replacementReason": "",
+      "crop": [
+        1,
+        154,
+        909,
+        344,
+        1030
+      ],
+      "verification": [
+        "$AC=\\sqrt{7^2-5^2}=2\\sqrt6$입니다.",
+        "$\\cos A=\\frac{2\\sqrt6}{7}$, $\\tan A=\\frac5{2\\sqrt6}$입니다.",
+        "따라서 $\\frac{\\cos A}{\\tan A}=\\frac{2\\sqrt6}{7}\\times\\frac{2\\sqrt6}{5}=\\frac{24}{35}$입니다."
+      ],
+      "sourcePage": 1
+    },
+    {
+      "number": 3,
+      "sourceNumber": 5,
+      "topic": "삼각비",
+      "correctOptionNumbers": [
+        1
+      ],
+      "imagePath": null,
+      "sourceImagePath": "assets/source-q03.png",
+      "replaced": false,
+      "replacementReason": "",
+      "crop": null,
+      "verification": [
+        "한 단위는 $\\frac{180^\\circ}{9+10+17}=5^\\circ$이므로 $A=45^\\circ$입니다.",
+        "$\\sin A:\\cos A:\\tan A=\\frac{\\sqrt2}{2}:\\frac{\\sqrt2}{2}:1$입니다.",
+        "세 항에 $\\sqrt2$를 곱하면 $1:1:\\sqrt2$입니다."
+      ],
+      "sourcePage": 1
+    },
+    {
+      "number": 4,
+      "sourceNumber": 7,
+      "topic": "삼각비",
+      "correctOptionNumbers": [
+        3
+      ],
+      "imagePath": "assets/q04.png",
+      "sourceImagePath": "assets/source-q04.png",
+      "replaced": false,
+      "replacementReason": "",
+      "crop": [
+        2,
+        167,
+        139,
+        329,
+        286
+      ],
+      "verification": [
+        "$\\sin48^\\circ=0.743$이고 $\\cos42^\\circ=\\sin48^\\circ$입니다.",
+        "합은 $0.743+0.743=1.486$입니다."
+      ],
+      "sourcePage": 2
+    },
+    {
+      "number": 5,
+      "sourceNumber": 9,
+      "topic": "삼각비",
+      "correctOptionNumbers": [
+        5
+      ],
+      "imagePath": "assets/q05.png",
+      "sourceImagePath": "assets/source-q05.png",
+      "replaced": false,
+      "replacementReason": "",
+      "crop": [
+        2,
+        171,
+        879,
+        324,
+        1030
+      ],
+      "verification": [
+        "한 모서리를 $a$라 하면 $FH=\\sqrt2a$, $DH=a$, $DF=\\sqrt3a$입니다.",
+        "$\\cos x^\\circ=\\frac{FH}{DF}=\\frac{\\sqrt2}{\\sqrt3}=\\frac{\\sqrt6}{3}$입니다."
+      ],
+      "sourcePage": 2
+    },
+    {
+      "number": 6,
+      "sourceNumber": 11,
+      "topic": "삼각비",
+      "correctOptionNumbers": [
+        3
+      ],
+      "imagePath": "assets/q06.png",
+      "sourceImagePath": "assets/source-q06.png",
+      "replaced": false,
+      "replacementReason": "",
+      "crop": [
+        2,
+        588,
+        601,
+        703,
+        736
+      ],
+      "verification": [
+        "$\\angle A=45^\\circ$입니다. $B$에서 $AC$에 내린 높이는 $100\\sin60^\\circ=50\\sqrt3$입니다.",
+        "이 높이는 $AB\\sin45^\\circ$이기도 하므로 $AB=\\frac{50\\sqrt3}{\\sqrt2/2}=50\\sqrt6\\,m$입니다."
+      ],
+      "sourcePage": 2
+    },
+    {
+      "number": 7,
+      "sourceNumber": 13,
+      "topic": "삼각비",
+      "correctOptionNumbers": [
+        3
+      ],
+      "imagePath": null,
+      "sourceImagePath": "assets/source-q07.png",
+      "replaced": false,
+      "replacementReason": "",
+      "crop": null,
+      "verification": [
+        "예각을 $\\theta$라 하면 넓이는 $(3\\sqrt2)^2\\sin\\theta=18\\sin\\theta$입니다.",
+        "$\\sin\\theta=\\frac{\\sqrt3}{2}$이므로 예각은 $60^\\circ$입니다. 이웃한 내각의 합이 $180^\\circ$이므로 가장 큰 각은 $120^\\circ$입니다."
+      ],
+      "sourcePage": 3
+    },
+    {
+      "number": 8,
+      "sourceNumber": 15,
+      "topic": "원의 성질",
+      "correctOptionNumbers": [
+        1
+      ],
+      "imagePath": "assets/q08.png",
+      "sourceImagePath": "assets/source-q08.png",
+      "replaced": false,
+      "replacementReason": "",
+      "crop": [
+        3,
+        175,
+        810,
+        322,
+        948
+      ],
+      "verification": [
+        "$AB=CD=6\\,cm$이므로 $AB$의 절반은 $3\\,cm$입니다.",
+        "반지름을 $r$라 하면 $\\cos30^\\circ=\\frac3r$이므로 $r=2\\sqrt3\\,cm$입니다."
+      ],
+      "sourcePage": 3
+    },
+    {
+      "number": 9,
+      "sourceNumber": 17,
+      "topic": "원의 성질",
+      "correctOptionNumbers": [
+        4
+      ],
+      "imagePath": "assets/q09.png",
+      "sourceImagePath": "assets/source-q09.png",
+      "replaced": false,
+      "replacementReason": "",
+      "crop": [
+        3,
+        543,
+        558,
+        743,
+        625
+      ],
+      "verification": [
+        "반지름을 $r$라 하면 현의 절반은 $5$, 중심에서 현까지의 거리는 $r-2$입니다.",
+        "$r^2=5^2+(r-2)^2$에서 $4r=29$이므로 $r=\\frac{29}{4}\\,cm$입니다."
+      ],
+      "sourcePage": 3
+    },
+    {
+      "number": 10,
+      "sourceNumber": 19,
+      "topic": "원의 성질",
+      "correctOptionNumbers": [
+        4
+      ],
+      "imagePath": "assets/q10.png",
+      "sourceImagePath": "assets/source-q10.png",
+      "replaced": false,
+      "replacementReason": "",
+      "crop": [
+        4,
+        171,
+        164,
+        326,
+        298
+      ],
+      "verification": [
+        "$AC=PC$, $BD=PD$이며 직각삼각형의 합동에서 $OC,OD$는 각 $ACP,BDP$를 각각 이등분합니다.",
+        "위아래 접선은 평행하므로 $\\angle ACP+\\angle BDP=180^\\circ$. 삼각형 $COD$의 $C,D$ 각의 합은 $90^\\circ$이므로 $\\angle COD=90^\\circ$입니다.",
+        "두 중심각 $\\angle AOC,\\angle BOD$는 합이 $90^\\circ$이지만 각각 같다는 보장은 없습니다."
+      ],
+      "sourcePage": 4
+    },
+    {
+      "number": 11,
+      "sourceNumber": 21,
+      "topic": "원의 성질",
+      "correctOptionNumbers": [
+        1
+      ],
+      "imagePath": "assets/q11.png",
+      "sourceImagePath": "assets/source-q11.png",
+      "replaced": false,
+      "replacementReason": "",
+      "crop": [
+        4,
+        151,
+        936,
+        349,
+        1059
+      ],
+      "verification": [
+        "반지름을 $r$라 하면 $AB=r+6$, $AC=r+9$, $BC=15$입니다.",
+        "$(r+6)^2+(r+9)^2=15^2$에서 $(r-3)(r+18)=0$, 양의 해는 $r=3$입니다.",
+        "직각삼각형 $BOE$에서 $OB=\\sqrt{6^2+3^2}=3\\sqrt5\\,cm$입니다."
+      ],
+      "sourcePage": 4
+    },
+    {
+      "number": 12,
+      "sourceNumber": 23,
+      "topic": "원의 성질",
+      "correctOptionNumbers": [
+        4
+      ],
+      "imagePath": "assets/q12.png",
+      "sourceImagePath": "assets/source-q12.png",
+      "replaced": false,
+      "replacementReason": "",
+      "crop": [
+        4,
+        570,
+        548,
+        724,
+        671
+      ],
+      "verification": [
+        "$CD=4+7=11\\,cm$입니다. 평행한 수직변의 길이 차는 $3\\,cm$입니다.",
+        "$AB=\\sqrt{11^2-3^2}=4\\sqrt7\\,cm$입니다.",
+        "넓이는 $\\frac{4+7}{2}\\times4\\sqrt7=22\\sqrt7\\,cm^2$입니다."
+      ],
+      "sourcePage": 4
+    },
+    {
+      "number": 13,
+      "sourceNumber": 25,
+      "topic": "원의 성질",
+      "correctOptionNumbers": [
+        2
+      ],
+      "imagePath": "assets/q13.png",
+      "sourceImagePath": "assets/source-q13.png",
+      "replaced": false,
+      "replacementReason": "",
+      "crop": [
+        5,
+        169,
+        139,
+        330,
+        300
+      ],
+      "verification": [
+        "반지름을 $r$라 하면 $OM=r-4$입니다. $r^2=(r-4)^2+8^2$에서 $8r=80$, $r=10$입니다.",
+        "둘레는 $2\\pi r=20\\pi\\,cm$입니다."
+      ],
+      "sourcePage": 5
+    },
+    {
+      "number": 14,
+      "sourceNumber": 27,
+      "topic": "원의 성질",
+      "correctOptionNumbers": [
+        5
+      ],
+      "imagePath": "assets/q14.png",
+      "sourceImagePath": "assets/source-q14.png",
+      "replaced": false,
+      "replacementReason": "",
+      "crop": [
+        5,
+        185,
+        936,
+        315,
+        1066
+      ],
+      "verification": [
+        "큰 원 중심들이 만드는 정사각형의 한 변은 $4\\,cm$입니다. 그 중심에서 한 꼭짓점까지 거리는 $2\\sqrt2\\,cm$입니다.",
+        "작은 반지름을 $r$라 하면 두 원이 외접하므로 $r+2=2\\sqrt2$입니다.",
+        "따라서 $r=2\\sqrt2-2\\,cm$입니다."
+      ],
+      "sourcePage": 5
+    },
+    {
+      "number": 15,
+      "sourceNumber": 29,
+      "topic": "원의 성질",
+      "correctOptionNumbers": [
+        4
+      ],
+      "imagePath": "assets/q15.png",
+      "sourceImagePath": "assets/source-q15.png",
+      "replaced": false,
+      "replacementReason": "",
+      "crop": [
+        5,
+        565,
+        459,
+        721,
+        610
+      ],
+      "verification": [
+        "호 $AB$의 중심각은 $72^\\circ$입니다. 호 $CD$는 그 $\\frac54$배이므로 중심각은 $90^\\circ$입니다.",
+        "$x=\\frac{72^\\circ+90^\\circ}{2}=81^\\circ$입니다."
+      ],
+      "sourcePage": 5
+    },
+    {
+      "number": 16,
+      "sourceNumber": 31,
+      "topic": "원의 성질",
+      "correctOptionNumbers": [
+        4
+      ],
+      "imagePath": "assets/q16.png",
+      "sourceImagePath": "assets/source-q16.png",
+      "replaced": false,
+      "replacementReason": "",
+      "crop": [
+        6,
+        162,
+        184,
+        342,
+        350
+      ],
+      "verification": [
+        "$\\angle DOE=180^\\circ-76^\\circ=104^\\circ$입니다.",
+        "나머지 호 $DF$와 $FE$의 중심각 합은 $360^\\circ-104^\\circ=256^\\circ$입니다.",
+        "$DF=EF$이므로 두 중심각이 같아 각각 $128^\\circ$입니다."
+      ],
+      "sourcePage": 6
+    },
+    {
+      "number": 17,
+      "sourceNumber": 33,
+      "topic": "원의 성질",
+      "correctOptionNumbers": [
+        5
+      ],
+      "imagePath": "assets/q17.png",
+      "sourceImagePath": "assets/source-q17.png",
+      "replaced": false,
+      "replacementReason": "",
+      "crop": [
+        6,
+        550,
+        157,
+        746,
+        334
+      ],
+      "verification": [
+        "각 $A,D$가 보는 호를 합하면 원 한 바퀴에 호 $BC$가 한 번 더 포함됩니다.",
+        "따라서 $\\angle A+\\angle D=\\frac{360^\\circ+50^\\circ}{2}=205^\\circ$입니다.",
+        "$\\angle EAB=205^\\circ-110^\\circ=95^\\circ$입니다."
+      ],
+      "sourcePage": 6
+    },
+    {
+      "number": 18,
+      "sourceNumber": 35,
+      "topic": "원의 성질",
+      "correctOptionNumbers": [
+        3
+      ],
+      "imagePath": "assets/q18.png",
+      "sourceImagePath": "assets/source-q18.png",
+      "replaced": false,
+      "replacementReason": "",
+      "crop": [
+        7,
+        163,
+        156,
+        344,
+        331
+      ],
+      "verification": [
+        "접선과 현의 예각은 $180^\\circ-116^\\circ=64^\\circ$이므로 $\\angle BCD=64^\\circ$입니다.",
+        "$BD=CD$이므로 $\\angle CBD=64^\\circ$, $\\angle BDC=52^\\circ$입니다.",
+        "작은 호 $BC$의 중심각은 $104^\\circ$입니다. 따라서 $\\angle CAB=180^\\circ-104^\\circ=76^\\circ$입니다."
+      ],
+      "sourcePage": 7
+    },
+    {
+      "number": 19,
+      "sourceNumber": 37,
+      "topic": "원의 성질",
+      "correctOptionNumbers": [
+        4
+      ],
+      "imagePath": "assets/q19.png",
+      "sourceImagePath": "assets/source-q19.png",
+      "replaced": true,
+      "replacementReason": "원문 본문의 BCE=27도는 그림에서 E에 표시된 27도 및 정답과 불일치. BEC=27도로 고쳐 그림과 같은 원주각 문제로 정리.",
+      "crop": [
+        7,
+        167,
+        945,
+        338,
+        1100
+      ],
+      "verification": [
+        "주어진 $\\angle BEC=27^\\circ$와 같은 호 $BC$를 보는 $\\angle BAC=27^\\circ$입니다.",
+        "$AB$가 지름이므로 $\\angle ACB=90^\\circ$, $\\angle ABC=63^\\circ$입니다.",
+        "같은 호 $AC$를 보는 $\\angle ADC=\\angle ABC=63^\\circ$입니다."
+      ],
+      "sourcePage": 7
+    },
+    {
+      "number": 20,
+      "sourceNumber": 39,
+      "topic": "통계",
+      "correctOptionNumbers": [
+        4
+      ],
+      "imagePath": null,
+      "sourceImagePath": "assets/source-q20.png",
+      "replaced": true,
+      "replacementReason": "원본 보기3의 하나로 정해진다는 표현이 단일 최빈값 주장인지 모호하여 하나로만으로 명확히 함. 최빈값이 여러 개일 수 있다는 취지 및 원본 정답4 유지.",
+      "crop": null,
+      "verification": [
+        "평균이 언제나 가장 적절하지는 않습니다. 자료가 $1,2$이면 중앙값은 $1.5$여서 실제 변량이 아닐 수 있습니다.",
+        "최빈값은 여러 개일 수 있습니다. 예를 들어 $1,1,2,2$의 최빈값은 $1,2$입니다. 평균과 중앙값은 수치나 순서가 없는 자료에 모두 적용할 수 없습니다.",
+        "극단적인 값을 바꾸면 평균은 크게 변할 수 있지만 중앙값은 순서의 가운데를 사용하여 영향이 상대적으로 작습니다. 따라서 보기 $4$가 참입니다."
+      ],
+      "sourcePage": 7
+    },
+    {
+      "number": 21,
+      "sourceNumber": 41,
+      "topic": "통계",
+      "correctOptionNumbers": [
+        1
+      ],
+      "imagePath": null,
+      "sourceImagePath": "assets/source-q21.png",
+      "replaced": false,
+      "replacementReason": "",
+      "crop": null,
+      "verification": [
+        "현재 $7$과 $9$가 각각 두 번씩 나타나므로 최빈값이 $7$이 되려면 미지 항 중 적어도 하나가 $7$이어야 합니다.",
+        "$a+4=7$이면 $a=3$, $3a+1=7$이면 $a=2$입니다.",
+        "$a=3$일 때 정렬 자료의 가운데는 $7,9$로 중앙값은 $8$입니다. $a=2$일 때 자료는 $5,6,7,7,7,9,9,10$으로 중앙값과 최빈값이 모두 $7$입니다."
+      ],
+      "sourcePage": 8
+    },
+    {
+      "number": 22,
+      "sourceNumber": 43,
+      "topic": "통계",
+      "correctOptionNumbers": [
+        3
+      ],
+      "imagePath": null,
+      "sourceImagePath": "assets/source-q22.png",
+      "replaced": false,
+      "replacementReason": "",
+      "crop": null,
+      "verification": [
+        "편차는 음수일 수 있습니다. 편차가 $-10$인 값은 편차가 $1$인 값보다 편차 자체는 작지만 평균에서 더 멉니다.",
+        "따라서 평균에 가까운지를 판단하려면 편차의 절댓값을 비교해야 합니다. 보기 $3$은 틀리고 나머지는 정의와 성질에 맞습니다."
+      ],
+      "sourcePage": 8
+    },
+    {
+      "number": 23,
+      "sourceNumber": 45,
+      "topic": "통계",
+      "correctOptionNumbers": [
+        2
+      ],
+      "imagePath": "assets/q23.png",
+      "sourceImagePath": "assets/source-q23.png",
+      "replaced": false,
+      "replacementReason": "",
+      "crop": [
+        8,
+        484,
+        646,
+        806,
+        734
+      ],
+      "verification": [
+        "편차는 $5,-2,2,-4,-1$이고 합은 $0$입니다.",
+        "분산은 $\\frac{5^2+(-2)^2+2^2+(-4)^2+(-1)^2}{5}=\\frac{50}{5}=10$입니다.",
+        "표준편차는 $\\sqrt{10}$분입니다."
+      ],
+      "sourcePage": 8
+    },
+    {
+      "number": 24,
+      "sourceNumber": 47,
+      "topic": "통계",
+      "correctOptionNumbers": [
+        2
+      ],
+      "imagePath": null,
+      "sourceImagePath": "assets/source-q24.png",
+      "replaced": false,
+      "replacementReason": "",
+      "crop": null,
+      "verification": [
+        "공통 평균은 전체 평균과 같습니다. 남학생 편차 제곱의 합은 $15\\times20=300$, 여학생은 $10\\times10=100$입니다.",
+        "전체 분산은 $\\frac{300+100}{15+10}=16$입니다."
+      ],
+      "sourcePage": 9
+    }
+  ]
+}

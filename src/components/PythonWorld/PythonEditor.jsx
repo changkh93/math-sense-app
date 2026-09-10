@@ -6,6 +6,7 @@ import { closeBrackets, closeBracketsKeymap } from '@codemirror/autocomplete'
 import { EditorView, Decoration, keymap, lineNumbers, highlightActiveLineGutter } from '@codemirror/view'
 
 import { studioSyntax } from './studioSyntax'
+import { studioCompletion } from './studioCompletion'
 
 const setExecutionLine = StateEffect.define()
 
@@ -27,12 +28,14 @@ const executionLineField = StateField.define({
   provide: (field) => EditorView.decorations.from(field),
 })
 
-const PythonEditor = forwardRef(function PythonEditor({ value, onChange, activeLine, readOnly = false, colorful = false }, ref) {
+const PythonEditor = forwardRef(function PythonEditor({ value, onChange, activeLine, readOnly = false, colorful = false, completionContext = null }, ref) {
   const hostRef = useRef(null)
   const viewRef = useRef(null)
   const onChangeRef = useRef(onChange)
   const syncingValueRef = useRef(false)
   const editableCompartmentRef = useRef(new Compartment())
+  const completionContextRef = useRef(completionContext)
+  useEffect(() => { completionContextRef.current = completionContext }, [completionContext])
 
   useImperativeHandle(ref, () => ({
     insertSnippet: (insertText) => {
@@ -106,6 +109,7 @@ const PythonEditor = forwardRef(function PythonEditor({ value, onChange, activeL
           history(),
           python(),
           ...(initialColorfulRef.current ? studioSyntax : []),
+          ...(completionContextRef.current ? studioCompletion(() => completionContextRef.current) : []),
           closeBrackets(),
           executionLineField,
           editableCompartmentRef.current.of(EditorView.editable.of(!initialReadOnlyRef.current)),

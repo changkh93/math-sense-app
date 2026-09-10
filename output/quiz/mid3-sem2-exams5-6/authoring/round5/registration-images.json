@@ -1,0 +1,146 @@
+[
+  {
+    "number": 1,
+    "localPath": "assets/q01.png",
+    "sha256": "6e736cfd83ca92494a45603a5e3c83f16a9a61adbd8260eb7b4846f049c28747",
+    "storagePath": "quiz_images/reg_1781420075936_chap_1781420292103_unit_1789033557224/mid3-sem2-exam5-20260910-authorized/q01-6e736cfd83ca9249.png",
+    "token": "eb80a746-d053-458f-9b72-0e8e08f437ab",
+    "imageUrl": "https://firebasestorage.googleapis.com/v0/b/math-sense-1f6a8.firebasestorage.app/o/quiz_images%2Freg_1781420075936_chap_1781420292103_unit_1789033557224%2Fmid3-sem2-exam5-20260910-authorized%2Fq01-6e736cfd83ca9249.png?alt=media&token=eb80a746-d053-458f-9b72-0e8e08f437ab"
+  },
+  {
+    "number": 2,
+    "localPath": "assets/q02.png",
+    "sha256": "e38fa4a12e836d906afe0f5c0cb44f915ad868eeda9907522462640c99c343fb",
+    "storagePath": "quiz_images/reg_1781420075936_chap_1781420292103_unit_1789033557224/mid3-sem2-exam5-20260910-authorized/q02-e38fa4a12e836d90.png",
+    "token": "a1f2689e-9b42-4056-92f1-241e4ee477e5",
+    "imageUrl": "https://firebasestorage.googleapis.com/v0/b/math-sense-1f6a8.firebasestorage.app/o/quiz_images%2Freg_1781420075936_chap_1781420292103_unit_1789033557224%2Fmid3-sem2-exam5-20260910-authorized%2Fq02-e38fa4a12e836d90.png?alt=media&token=a1f2689e-9b42-4056-92f1-241e4ee477e5"
+  },
+  {
+    "number": 4,
+    "localPath": "assets/q04.png",
+    "sha256": "0d12be658e8d82d5cfb9684ef095c8f4e8becd2c392ba174e9978758ac5467ec",
+    "storagePath": "quiz_images/reg_1781420075936_chap_1781420292103_unit_1789033557224/mid3-sem2-exam5-20260910-authorized/q04-0d12be658e8d82d5.png",
+    "token": "66b9b2d4-3c43-4f88-ab7f-b4a6f2be0baa",
+    "imageUrl": "https://firebasestorage.googleapis.com/v0/b/math-sense-1f6a8.firebasestorage.app/o/quiz_images%2Freg_1781420075936_chap_1781420292103_unit_1789033557224%2Fmid3-sem2-exam5-20260910-authorized%2Fq04-0d12be658e8d82d5.png?alt=media&token=66b9b2d4-3c43-4f88-ab7f-b4a6f2be0baa"
+  },
+  {
+    "number": 5,
+    "localPath": "assets/q05.png",
+    "sha256": "a28e8a1b6277f1452426ac5b3e057698e7a66019cb18f538b7bdf96bbb0abae5",
+    "storagePath": "quiz_images/reg_1781420075936_chap_1781420292103_unit_1789033557224/mid3-sem2-exam5-20260910-authorized/q05-a28e8a1b6277f145.png",
+    "token": "c21f1f3b-739a-4701-a532-fc1c11cd6bb1",
+    "imageUrl": "https://firebasestorage.googleapis.com/v0/b/math-sense-1f6a8.firebasestorage.app/o/quiz_images%2Freg_1781420075936_chap_1781420292103_unit_1789033557224%2Fmid3-sem2-exam5-20260910-authorized%2Fq05-a28e8a1b6277f145.png?alt=media&token=c21f1f3b-739a-4701-a532-fc1c11cd6bb1"
+  },
+  {
+    "number": 6,
+    "localPath": "assets/q06.png",
+    "sha256": "0e1690d1fe9dc99097cb8b3bc46568ba3f008499501c49388bdd3ee153b98489",
+    "storagePath": "quiz_images/reg_1781420075936_chap_1781420292103_unit_1789033557224/mid3-sem2-exam5-20260910-authorized/q06-0e1690d1fe9dc990.png",
+    "token": "4ab6760a-15b5-42d4-b865-dfc2b29a8d9a",
+    "imageUrl": "https://firebasestorage.googleapis.com/v0/b/math-sense-1f6a8.firebasestorage.app/o/quiz_images%2Freg_1781420075936_chap_1781420292103_unit_1789033557224%2Fmid3-sem2-exam5-20260910-authorized%2Fq06-0e1690d1fe9dc990.png?alt=media&token=4ab6760a-15b5-42d4-b865-dfc2b29a8d9a"
+  },
+  {
+    "number": 8,
+    "localPath": "assets/q08.png",
+    "sha256": "880496e4702f84d7910b7753ec8a6a047c36cef7844b94b1469113d674306b22",
+    "storagePath": "quiz_images/reg_1781420075936_chap_1781420292103_unit_1789033557224/mid3-sem2-exam5-20260910-authorized/q08-880496e4702f84d7.png",
+    "token": "1c923683-8936-439e-b4f1-e56c62f7a39a",
+    "imageUrl": "https://firebasestorage.googleapis.com/v0/b/math-sense-1f6a8.firebasestorage.app/o/quiz_images%2Freg_1781420075936_chap_1781420292103_unit_1789033557224%2Fmid3-sem2-exam5-20260910-authorized%2Fq08-880496e4702f84d7.png?alt=media&token=1c923683-8936-439e-b4f1-e56c62f7a39a"
+  },
+  {
+    "number": 9,
+    "localPath": "assets/q09.png",
+    "sha256": "07676f74bbe46e34f52e0e14b95caef9aa604c6fc3d84cf0b1a936f11f0481a7",
+    "storagePath": "quiz_images/reg_1781420075936_chap_1781420292103_unit_1789033557224/mid3-sem2-exam5-20260910-authorized/q09-07676f74bbe46e34.png",
+    "token": "4d0c9beb-2849-41dc-b640-10d0b75b723d",
+    "imageUrl": "https://firebasestorage.googleapis.com/v0/b/math-sense-1f6a8.firebasestorage.app/o/quiz_images%2Freg_1781420075936_chap_1781420292103_unit_1789033557224%2Fmid3-sem2-exam5-20260910-authorized%2Fq09-07676f74bbe46e34.png?alt=media&token=4d0c9beb-2849-41dc-b640-10d0b75b723d"
+  },
+  {
+    "number": 10,
+    "localPath": "assets/q10.png",
+    "sha256": "86e17c98b5c8ee8f7906405500df5872408a93eebc99d0a057330dcab13b837e",
+    "storagePath": "quiz_images/reg_1781420075936_chap_1781420292103_unit_1789033557224/mid3-sem2-exam5-20260910-authorized/q10-86e17c98b5c8ee8f.png",
+    "token": "504b0803-7783-46ef-bca3-982e91d4d9fa",
+    "imageUrl": "https://firebasestorage.googleapis.com/v0/b/math-sense-1f6a8.firebasestorage.app/o/quiz_images%2Freg_1781420075936_chap_1781420292103_unit_1789033557224%2Fmid3-sem2-exam5-20260910-authorized%2Fq10-86e17c98b5c8ee8f.png?alt=media&token=504b0803-7783-46ef-bca3-982e91d4d9fa"
+  },
+  {
+    "number": 11,
+    "localPath": "assets/q11.png",
+    "sha256": "7a1e8bb4ceb21ee7d61c82ac9d0b83d080c1c4772b227b2fc597ca06460cee27",
+    "storagePath": "quiz_images/reg_1781420075936_chap_1781420292103_unit_1789033557224/mid3-sem2-exam5-20260910-authorized/q11-7a1e8bb4ceb21ee7.png",
+    "token": "ea9f5944-9f47-4a7d-b0a8-a89ad6e6454c",
+    "imageUrl": "https://firebasestorage.googleapis.com/v0/b/math-sense-1f6a8.firebasestorage.app/o/quiz_images%2Freg_1781420075936_chap_1781420292103_unit_1789033557224%2Fmid3-sem2-exam5-20260910-authorized%2Fq11-7a1e8bb4ceb21ee7.png?alt=media&token=ea9f5944-9f47-4a7d-b0a8-a89ad6e6454c"
+  },
+  {
+    "number": 12,
+    "localPath": "assets/q12.png",
+    "sha256": "c2c6113ce7dfd6abe14457aa2b382e8f9e39a440ce8458175bfff74b91ccdd15",
+    "storagePath": "quiz_images/reg_1781420075936_chap_1781420292103_unit_1789033557224/mid3-sem2-exam5-20260910-authorized/q12-c2c6113ce7dfd6ab.png",
+    "token": "979fa6e5-e011-4254-b7f4-e85a3990ac1f",
+    "imageUrl": "https://firebasestorage.googleapis.com/v0/b/math-sense-1f6a8.firebasestorage.app/o/quiz_images%2Freg_1781420075936_chap_1781420292103_unit_1789033557224%2Fmid3-sem2-exam5-20260910-authorized%2Fq12-c2c6113ce7dfd6ab.png?alt=media&token=979fa6e5-e011-4254-b7f4-e85a3990ac1f"
+  },
+  {
+    "number": 13,
+    "localPath": "assets/q13.png",
+    "sha256": "054552abe58475dc25c6ce4ca4c1b9707cfe00745aab86933eac189c7a781e6a",
+    "storagePath": "quiz_images/reg_1781420075936_chap_1781420292103_unit_1789033557224/mid3-sem2-exam5-20260910-authorized/q13-054552abe58475dc.png",
+    "token": "90402c96-9599-4dc9-81ce-dd4a811689b9",
+    "imageUrl": "https://firebasestorage.googleapis.com/v0/b/math-sense-1f6a8.firebasestorage.app/o/quiz_images%2Freg_1781420075936_chap_1781420292103_unit_1789033557224%2Fmid3-sem2-exam5-20260910-authorized%2Fq13-054552abe58475dc.png?alt=media&token=90402c96-9599-4dc9-81ce-dd4a811689b9"
+  },
+  {
+    "number": 14,
+    "localPath": "assets/q14.png",
+    "sha256": "6ac5bb513549b5aff0ccdc46906aa7ce9d4846d8b816e72fb887884d33424718",
+    "storagePath": "quiz_images/reg_1781420075936_chap_1781420292103_unit_1789033557224/mid3-sem2-exam5-20260910-authorized/q14-6ac5bb513549b5af.png",
+    "token": "4872659c-fa0f-4466-a655-a3e9bfcf9bc1",
+    "imageUrl": "https://firebasestorage.googleapis.com/v0/b/math-sense-1f6a8.firebasestorage.app/o/quiz_images%2Freg_1781420075936_chap_1781420292103_unit_1789033557224%2Fmid3-sem2-exam5-20260910-authorized%2Fq14-6ac5bb513549b5af.png?alt=media&token=4872659c-fa0f-4466-a655-a3e9bfcf9bc1"
+  },
+  {
+    "number": 15,
+    "localPath": "assets/q15.png",
+    "sha256": "c7158b6d350f312af7c1c20a817ca77053e4364b57fd04018ca5083c718e3893",
+    "storagePath": "quiz_images/reg_1781420075936_chap_1781420292103_unit_1789033557224/mid3-sem2-exam5-20260910-authorized/q15-c7158b6d350f312a.png",
+    "token": "8519fcbb-7562-4861-a5d8-b0b9422ffa65",
+    "imageUrl": "https://firebasestorage.googleapis.com/v0/b/math-sense-1f6a8.firebasestorage.app/o/quiz_images%2Freg_1781420075936_chap_1781420292103_unit_1789033557224%2Fmid3-sem2-exam5-20260910-authorized%2Fq15-c7158b6d350f312a.png?alt=media&token=8519fcbb-7562-4861-a5d8-b0b9422ffa65"
+  },
+  {
+    "number": 16,
+    "localPath": "assets/q16.png",
+    "sha256": "6fae57ba2f4fe1013066ddd8489f6bbf06dc946afa88a145f67c5f7723624c6b",
+    "storagePath": "quiz_images/reg_1781420075936_chap_1781420292103_unit_1789033557224/mid3-sem2-exam5-20260910-authorized/q16-6fae57ba2f4fe101.png",
+    "token": "992a8ce4-033d-4035-a54f-40310e40bc8a",
+    "imageUrl": "https://firebasestorage.googleapis.com/v0/b/math-sense-1f6a8.firebasestorage.app/o/quiz_images%2Freg_1781420075936_chap_1781420292103_unit_1789033557224%2Fmid3-sem2-exam5-20260910-authorized%2Fq16-6fae57ba2f4fe101.png?alt=media&token=992a8ce4-033d-4035-a54f-40310e40bc8a"
+  },
+  {
+    "number": 17,
+    "localPath": "assets/q17.png",
+    "sha256": "c92ac9e8c5a3a2cc2ff1e7f3bec0d7cb5dcac2560a7d7d87e33843cf05583080",
+    "storagePath": "quiz_images/reg_1781420075936_chap_1781420292103_unit_1789033557224/mid3-sem2-exam5-20260910-authorized/q17-c92ac9e8c5a3a2cc.png",
+    "token": "9040ff22-d7c3-4f48-bfb6-ec798280bdc4",
+    "imageUrl": "https://firebasestorage.googleapis.com/v0/b/math-sense-1f6a8.firebasestorage.app/o/quiz_images%2Freg_1781420075936_chap_1781420292103_unit_1789033557224%2Fmid3-sem2-exam5-20260910-authorized%2Fq17-c92ac9e8c5a3a2cc.png?alt=media&token=9040ff22-d7c3-4f48-bfb6-ec798280bdc4"
+  },
+  {
+    "number": 18,
+    "localPath": "assets/q18.png",
+    "sha256": "68ba939f50044480664399f2b3f8c799418c314e92d60405106e7a98745f62ad",
+    "storagePath": "quiz_images/reg_1781420075936_chap_1781420292103_unit_1789033557224/mid3-sem2-exam5-20260910-authorized/q18-68ba939f50044480.png",
+    "token": "6d2631e4-69ae-46c4-94da-e388c66fd62e",
+    "imageUrl": "https://firebasestorage.googleapis.com/v0/b/math-sense-1f6a8.firebasestorage.app/o/quiz_images%2Freg_1781420075936_chap_1781420292103_unit_1789033557224%2Fmid3-sem2-exam5-20260910-authorized%2Fq18-68ba939f50044480.png?alt=media&token=6d2631e4-69ae-46c4-94da-e388c66fd62e"
+  },
+  {
+    "number": 19,
+    "localPath": "assets/q19.png",
+    "sha256": "75a0d31ec0a9fad7c711071e04751c604b8756e6f00cbd05c3a0709a00293aa0",
+    "storagePath": "quiz_images/reg_1781420075936_chap_1781420292103_unit_1789033557224/mid3-sem2-exam5-20260910-authorized/q19-75a0d31ec0a9fad7.png",
+    "token": "9e5f7a3c-2397-4454-ab7b-95cf93a5cac8",
+    "imageUrl": "https://firebasestorage.googleapis.com/v0/b/math-sense-1f6a8.firebasestorage.app/o/quiz_images%2Freg_1781420075936_chap_1781420292103_unit_1789033557224%2Fmid3-sem2-exam5-20260910-authorized%2Fq19-75a0d31ec0a9fad7.png?alt=media&token=9e5f7a3c-2397-4454-ab7b-95cf93a5cac8"
+  },
+  {
+    "number": 23,
+    "localPath": "assets/q23.png",
+    "sha256": "30e64c85c484a61a79349a84ee80d0a492ac092feb62e34944a4614e555a525b",
+    "storagePath": "quiz_images/reg_1781420075936_chap_1781420292103_unit_1789033557224/mid3-sem2-exam5-20260910-authorized/q23-30e64c85c484a61a.png",
+    "token": "6890ac9d-e164-4d3d-8b0c-729ebf7f481d",
+    "imageUrl": "https://firebasestorage.googleapis.com/v0/b/math-sense-1f6a8.firebasestorage.app/o/quiz_images%2Freg_1781420075936_chap_1781420292103_unit_1789033557224%2Fmid3-sem2-exam5-20260910-authorized%2Fq23-30e64c85c484a61a.png?alt=media&token=6890ac9d-e164-4d3d-8b0c-729ebf7f481d"
+  }
+]

@@ -1,0 +1,228 @@
+{
+  "status": "READY_TO_REGISTER",
+  "rounds": [
+    {
+      "round": 5,
+      "questions": 24,
+      "images": 18,
+      "sha256": "7573f2ee25748809f383c0501a05f88493edc6b341f7c2c06aff7dffc3b6fdaa",
+      "topicCounts": {
+        "삼각비": 7,
+        "원의 성질": 12,
+        "통계": 5
+      }
+    },
+    {
+      "round": 6,
+      "questions": 24,
+      "images": 21,
+      "sha256": "7fdea8821e10c0b1776878b0aec3723ce8e7fef04325ba795fcb9a9f356c5b02",
+      "topicCounts": {
+        "삼각비": 7,
+        "원의 성질": 12,
+        "통계": 5
+      }
+    }
+  ],
+  "sourceKeyMatched": 48,
+  "numericChecks": [
+    {
+      "sourceNumber": 3,
+      "computed": 0.6857142857142856,
+      "expected": 0.6857142857142857
+    },
+    {
+      "sourceNumber": 4,
+      "computed": 1.2071067811865475,
+      "expected": 1.2071067811865475
+    },
+    {
+      "sourceNumber": 5,
+      "computed": 45.0,
+      "expected": 45
+    },
+    {
+      "sourceNumber": 6,
+      "computed": 7.098076211353316,
+      "expected": 7.098076211353316
+    },
+    {
+      "sourceNumber": 8,
+      "computed": 7.794228634059947,
+      "expected": 7.794228634059947
+    },
+    {
+      "sourceNumber": 9,
+      "computed": 0.8164965809277261,
+      "expected": 0.8164965809277259
+    },
+    {
+      "sourceNumber": 11,
+      "computed": 122.47448713915891,
+      "expected": 122.4744871391589
+    },
+    {
+      "sourceNumber": 12,
+      "computed": 54.55960043841963,
+      "expected": 54.55960043841963
+    },
+    {
+      "sourceNumber": 14,
+      "computed": 0.7999999999999998,
+      "expected": 0.8
+    },
+    {
+      "sourceNumber": 15,
+      "computed": 3.4641016151377544,
+      "expected": 3.4641016151377544
+    },
+    {
+      "sourceNumber": 17,
+      "computed": 7.25,
+      "expected": 7.25
+    },
+    {
+      "sourceNumber": 18,
+      "computed": 6.0,
+      "expected": 6
+    },
+    {
+      "sourceNumber": 20,
+      "computed": 8.377580409572781,
+      "expected": 8.377580409572781
+    },
+    {
+      "sourceNumber": 21,
+      "computed": 6.708203932499369,
+      "expected": 6.708203932499369
+    },
+    {
+      "sourceNumber": 22,
+      "computed": 5.196152422706631,
+      "expected": 5.196152422706632
+    },
+    {
+      "sourceNumber": 23,
+      "computed": 58.206528843421,
+      "expected": 58.206528843421
+    },
+    {
+      "sourceNumber": 24,
+      "computed": 20.0,
+      "expected": 20
+    },
+    {
+      "sourceNumber": 25,
+      "computed": 10.0,
+      "expected": 10
+    },
+    {
+      "sourceNumber": 26,
+      "computed": 27,
+      "expected": 27
+    },
+    {
+      "sourceNumber": 27,
+      "computed": 0.8284271247461903,
+      "expected": 0.8284271247461903
+    },
+    {
+      "sourceNumber": 28,
+      "computed": 92,
+      "expected": 92
+    },
+    {
+      "sourceNumber": 29,
+      "computed": 81.0,
+      "expected": 81
+    },
+    {
+      "sourceNumber": 30,
+      "computed": 7.794228634059948,
+      "expected": 7.794228634059947
+    },
+    {
+      "sourceNumber": 31,
+      "computed": 128.0,
+      "expected": 128
+    },
+    {
+      "sourceNumber": 32,
+      "computed": 24.0,
+      "expected": 24
+    },
+    {
+      "sourceNumber": 33,
+      "computed": 95.0,
+      "expected": 95
+    },
+    {
+      "sourceNumber": 34,
+      "computed": 121,
+      "expected": 121
+    },
+    {
+      "sourceNumber": 35,
+      "computed": 76,
+      "expected": 76
+    },
+    {
+      "sourceNumber": 36,
+      "computed": 42.58845726811989,
+      "expected": 42.588457268119896
+    },
+    {
+      "sourceNumber": 37,
+      "computed": 63,
+      "expected": 63
+    },
+    {
+      "sourceNumber": 38,
+      "computed": 25,
+      "expected": 25
+    },
+    {
+      "sourceNumber": 40,
+      "computed": 31.5,
+      "expected": 31.5
+    },
+    {
+      "sourceNumber": 42,
+      "computed": 3,
+      "expected": 3
+    },
+    {
+      "sourceNumber": 45,
+      "computed": 3.1622776601683795,
+      "expected": 3.1622776601683795
+    },
+    {
+      "sourceNumber": 47,
+      "computed": 16.0,
+      "expected": 16
+    },
+    {
+      "sourceNumber": 48,
+      "computed": 8.75,
+      "expected": 8.75
+    },
+    {
+      "sourceNumber": 48,
+      "computed": 5,
+      "expected": 5
+    }
+  ],
+  "visualReview": "All 39 figure crops visually inspected; 9 crops adjusted and visually rechecked; original 46 retains all five graphical options.",
+  "editorialFixes": [
+    {
+      "sourceNumber": 37,
+      "reason": "본문 각 BCE를 그림 및 정답에 맞게 BEC로 수정"
+    },
+    {
+      "sourceNumber": 39,
+      "reason": "보기3의 단일 최빈값 주장을 하나로만으로 명확화"
+    }
+  ],
+  "reviewedBy": "Codex",
+  "reviewedAt": "2026-09-10"
+}

@@ -190,3 +190,14 @@ Pygbag archive `0.9`, CPython 3.12, 관찰된 pygame `2.5.0.dev1` 조합을 사�
 - `done()` / `mainloop()`는 브라우저 창을 막지 않으며 host가 대기·완성 그림 유지를 맡는다. Tk 위젯, 이벤트 콜백(onkey/onclick/ontimer), GIF 사용자 모양, 외부 Colab/IPython 기능 등 전체 turtle/ColabTurtlePlus API는 이번 범위에 포함하지 않는다. trace 제한과 명령 수/좌표 제한으로 잘못된 반복을 종료한다.
 - `document.mjs`에서 Python/JS를 한 srcDoc에 넣으므로 외부 패키지 설치나 새 CDN 의존성은 없다. standalone runner도 같은 문서를 사용한다. 기존 sandbox/프로토콜/기기 저장/과제 첨부를 유지한다.
 - 검증: Python 수업/기하/오류 5개 + pygame 루프 4개, studio 정책/콘솔 12개 통과. 실제 Chrome에서 집 13개 채움 도형, 경주 중 움직임과 최종 승자/한글, 정지·초기화·표준 turtle import·speed(0), turtle→print→pygame→오류 및 동일 인터프리터 유지 확인. house/race 스크린샷 시각 확인. scoped ESLint/production build 통과. Safari/Firefox·운영 배포 미검증.
+
+## Python 자동완성·인자 안내 (2026-09-10)
+
+- Game Studio의 PythonEditor에만 completionContext를 전달해 활성화한다. 일반 PythonWorld 수업 편집기에는 새 자동완성을 적용하지 않는다. 이미 설치된 @codemirror/autocomplete 6.20.3을 직접 의존성에 명시했다.
+- Python 기본 함수/키워드, 구현된 turtle·ColabTurtlePlus 명령, pygame 주요 모듈·Surface/Rect/Event/Clock/Font/Sound/Sprite/Group 및 상수, random/math/asyncio, 문자열·목록·사전·집합의 자주 쓰는 메서드를 제공한다. turtle에서 아직 구현하지 않은 onclick 같은 API를 추천하지 않는다. 목록은 전체 Python/pygame API의 완전한 명세가 아닌 수업 중심 카탈로그다.
+- Lezer Python 구문 트리로 가져오기 별칭/star import, 변수·매개변수·함수·클래스, self 및 클래스/객체 속성, 간단한 상속/반환값/타입 표기, list 항목/append/for/enumerate를 추론한다. pygame.image.load(...).convert_alpha() → image.get_rect() → rect.centerx 같은 경로를 지원한다. 프로젝트의 가져온 Python 파일만 제한적으로 분석하며 수정·삭제 시 캐시를 무효화한다. 다른 함수의 지역 변수는 전역 추천에서 제외한다.
+- 함수·메서드 선택 시 괄호 안에 커서를 두고 이미 있는 괄호는 중복 삽입하지 않는다. 객체 변수와 속성에 불필요한 괄호를 넣지 않는다. 한국어 설명, 호출 형식 및 현재 입력 중인 인자 번호를 표시한다. for/if/while/def/class/try 작성 틀의 빈칸은 Tab으로 이동한다. 스튜디오 들여쓰기는 4칸이다.
+- 업로드한 이미지/폰트/오디오 파일 경로와 turtle 색/모양은 해당 문자열 인자 안에서만 추천한다. 일반 문자열·주석에는 추천하지 않는다. 설명과 사용자 docstring은 텍스트로 표시하며 HTML로 실행하지 않는다.
+- 입력 시 자동 열림, Ctrl+Space 또는 Alt+/ 재호출, ↑↓ 선택, Enter/Tab 적용, Esc 닫기를 지원한다. 기존 일반 Tab 들여쓰기·괄호 닫기·실행 취소·테마/집중 설정은 유지한다.
+- 분석은 브라우저 안에서 이루어지고 학생 코드를 실행하거나 외부 서버로 전송하지 않는다. 파일별 20만 문자/재귀 깊이/캐시 수를 제한한다. 3,000개 변수(약 5.2만 문자) Node 점검에서 분석 약 39ms. 완전한 언어 서버는 아니므로 실행 중 동적 속성 생성·복잡한 타입 흐름·모든 문법/패키지 추론은 보장하지 않는다.
+- 검증: 모델 동작 7개, 기존 studio 정책/콘솔 12개와 turtle/루프 9개 통과. Chrome에서 자동 표시·Tab/Enter/Ctrl+Space·한 번 실행 취소·괄호 중복 방지·인자 안내·사용자 객체·작성 틀·들여쓰기·문자열/주석·프로젝트 import/이미지 경로·좁은 화면/Esc 확인. 추천 UI 스크린샷 시각 검토. 관련 lint 통과(기존 PythonGameStudio deletedIds effect 경고는 별도), production build 통과. 동적 타입의 완전한 의미 분석·Safari/Firefox/IME 조합 중 동작·운영 배포는 검증하지 않았다.
