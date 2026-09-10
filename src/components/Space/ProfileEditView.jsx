@@ -279,6 +279,8 @@ export default function ProfileEditView({ onBack }) {
         profileUpdatedAt: serverTimestamp()
       });
       didUpdateProfileDocument = true;
+      queryClient.invalidateQueries({ queryKey: ['ranking-profile-photo', user.uid, user.uid] });
+      queryClient.invalidateQueries({ queryKey: ['answers'] });
       // Invalidate cached identity/answers after a profile or photo change.
       queryClient.invalidateQueries({
         queryKey: ['public-profile'],

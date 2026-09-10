@@ -8,13 +8,11 @@ import soundManager from '../../utils/SoundManager'
 import { Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer, Tooltip } from 'recharts'
 import CometBadge from './CometBadge'
 import CrewMothership from './CrewMothership'
-import ModularShip from './ModularShip'
-import ProfileAvatar from '../ProfileAvatar'
+import RankingProfileAvatar from './RankingProfileAvatar'
 import { getEffectiveStreak, getTodayKST, getMondayKSTKey } from '../../utils/streakUtils'
 import { calculateSEI, FOCUS_MAX_SCORE, BATTLE_MAX_SCORE } from '../../utils/rankingUtils'
 import { HALL_OF_FAME_LOOKBACK_DAYS, HALL_SHOWCASE_DURATION_DAYS, getFrameSurfaceStyles, getQuestionAnonymousLabel, isHallSpotlightActive, isWithinLastDays } from '../../utils/socialUtils'
 import { getCrewMothershipLevel, getEquippedCrewModules } from '../../utils/crewMothershipCatalog'
-import { resolveProfileImageUrl } from '../../utils/profileImageUtils'
 
 function CrewLeaderboardVessel({ summary, crew, rank }) {
   const resolvedCrew = {
@@ -724,7 +722,6 @@ export default function SpaceRanking({ user, userData }) {
                       : u.selectedProfileFrame === 'solar'
                         ? '☼'
                         : '◇';
-                    const rankingProfileImageUrl = resolveProfileImageUrl(u);
 
                     return (
                       <React.Fragment key={u.id}>
@@ -781,19 +778,12 @@ export default function SpaceRanking({ user, userData }) {
                         </span>
                         <div className={`ranking-pilot-cell ${isPodium ? 'is-podium' : ''}`}>
                           <div className="ranking-pilot-ship" style={{ '--ranking-ship-accent': tier.color || '#35dfff' }}>
-                            <ModularShip
-                              userData={u}
+                            <RankingProfileAvatar
+                              entry={u}
+                              viewerId={user?.uid}
+                              ownProfile={u.id === user?.uid ? userData : null}
                               size={isPodium ? 76 : 68}
-                              animate={false}
-                              title={`${u.publicDisplayName || u.studentName || u.name || '무명 탐험가'}의 탐사선`}
                             />
-                            {rankingProfileImageUrl && (
-                              <ProfileAvatar
-                                src={rankingProfileImageUrl}
-                                displayName={u.publicDisplayName || u.studentName || u.name || '탐험가'}
-                                className="ranking-pilot-avatar"
-                              />
-                            )}
                           </div>
                           <div className="ranking-pilot-copy" style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>

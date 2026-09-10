@@ -1,0 +1,57 @@
+.profile-ship-avatar {
+  display: grid;
+  position: relative;
+  width: 100%;
+  height: 100%;
+  border-radius: inherit;
+  overflow: hidden;
+  isolation: isolate;
+}
+.profile-ship-avatar__ship {
+  grid-area: 1 / 1;
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+}
+.profile-ship-avatar__photo {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0;
+}
+/* Four-second holds, two-second ease-in/out dissolves. No JS timers or reads. */
+.profile-ship-avatar.is-ready .profile-ship-avatar__photo {
+  animation: profile-photo-dissolve 12s ease-in-out infinite;
+}
+.profile-ship-avatar.is-ready .profile-ship-avatar__ship {
+  animation: profile-ship-dissolve 12s ease-in-out infinite;
+}
+@keyframes profile-photo-dissolve {
+  0%, 33.333%, 100% { opacity: 0; }
+  50%, 83.333% { opacity: 1; }
+}
+@keyframes profile-ship-dissolve {
+  0%, 33.333%, 100% { opacity: 1; }
+  50%, 83.333% { opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .profile-ship-avatar.is-ready .profile-ship-avatar__photo {
+    animation: none;
+    opacity: 1;
+  }
+  .profile-ship-avatar.is-ready .profile-ship-avatar__ship {
+    animation: none;
+    opacity: 1;
+    position: absolute;
+    z-index: 1;
+    right: 0;
+    bottom: 0;
+    transform: scale(.42);
+    transform-origin: bottom right;
+    background: #101329;
+    border-radius: 50%;
+  }
+}

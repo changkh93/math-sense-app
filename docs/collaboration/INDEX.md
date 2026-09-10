@@ -7,6 +7,8 @@ For an existing task, read its STATE.md and actual artifacts before continuing.
 
 | ID | Goal | Phase | State file | Next action |
 |---|---|---|---|---|
+| 20260910-profile-ship-crossfade | 랭킹·아고라 사진/탐사선 교차 표시 | DONE (local; not deployed) | [STATE](tasks/20260910-profile-ship-crossfade/STATE.md) | 랭킹 집계 사진 누락 수정·기존 집계 가시행 보완조회; 실제 개발탭 업로드 사진 교차 확인. 웹/함수 배포 전 |
+| 20260910-profile-auth-photo | 직접 등록한 프로필 사진 누락 조사 | ACTIVE (diagnosis corrected) | [STATE](tasks/20260910-profile-auth-photo/STATE.md) | Google 대체 수정 철회; 운영 업로드 폴더 비어 있음·규칙 배포 확인; 저장 성공/오류 여부 확인 필요 |
 | 20260910-2010-course-catalog-recovery | 로그인 후 코스 목록 간헐 오류 조사·복구 | DONE (local; not deployed) | [STATE](tasks/20260910-2010-course-catalog-recovery/STATE.md) | 승인된 운영 조회로 계정 admin·활성 및 4코스 확인; 복구 수정·회귀/UI·빌드 완료, 최초 지연 원인 미확정·미배포 |
 | 20260910-studio-completion | 게임 스튜디오 Python 자동완성·인자 안내 | DONE (local) | [STATE](tasks/20260910-studio-completion/STATE.md) | 문맥별 추천·인자 안내·작성 틀·프로젝트 파일, 모델/Chrome/빌드 검증 완료; 배포 전 |
 | 20260910-mid3-sem2-exams5-6 | 중3 삼각비·원·통계 홀짝 분할 5·6회 등록 | DONE | [STATE](tasks/20260910-mid3-sem2-exams5-6/STATE.md) | 원문 검토·작성 |

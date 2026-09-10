@@ -191,6 +191,8 @@ function cleanUserSummary(u) {
     name: u.publicDisplayName || u.studentName || u.name || '무명 탐험가',
     publicDisplayName: u.publicDisplayName || null,
     studentName: u.studentName || null,
+    profileImageUrl: [u.profileImageUrl, u.avatarUrl, u.photoURL]
+      .find(value => typeof value === 'string' && /^https?:\/\//i.test(value.trim()))?.trim() || '',
     crystals: Number(u.crystals || 0),
     streak: Number(u.streak || 0),
     dailyGain: Number(u.dailyGain || 0),
