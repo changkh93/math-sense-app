@@ -60,6 +60,7 @@
     "test:workbook-math-display": "node scripts/test-workbook-math-display.mjs && node scripts/test-latex-text-repair.mjs",
     "test:elementary-math-answer": "node scripts/test-elementary-math-answer.mjs",
     "test:mission-card-completion": "node scripts/test-mission-card-completion.mjs",
+    "test:code-trace": "node scripts/test-code-trace-progress-utils.mjs && node scripts/test-code-trace-editor-contract.mjs && node --test scripts/test-python-game-completion.mjs",
     "test:galaxy-terrain": "node scripts/test-galaxy-walk-surfaces.mjs",
     "test:galaxy-navigation": "node scripts/test-galaxy-navigation-safety.mjs",
     "test:algorithm-constellation": "node scripts/test-authoring-integrity-contracts.mjs && node scripts/test-gate0-curriculum-contracts.mjs && node scripts/test-semantic-trace-v2.mjs && node scripts/test-12-capability-prototypes.mjs && node scripts/test-algorithm-constellation-contracts.mjs && node scripts/test-bundle-leak-guard.mjs && node scripts/test-server-orchestration-and-judge.mjs && node scripts/test-student-sandbox-resilience.mjs && node scripts/test-phase3-scaffold-and-misconception.mjs && node scripts/test-algorithm-support-accuracy.mjs && node scripts/test-phase4-runtime-v2-and-pat003.mjs && node scripts/test-wave-expansion-contracts.mjs && node scripts/test-client-server-runtime-parity.mjs && node scripts/test-gateway-interface-contract.mjs",

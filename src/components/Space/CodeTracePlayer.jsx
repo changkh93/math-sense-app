@@ -4,6 +4,7 @@ import { Check, ChevronLeft, Eye, Lightbulb, LocateFixed, RotateCcw, Save } from
 import { EditorSelection, EditorState, RangeSetBuilder } from '@codemirror/state';
 import { defaultKeymap, history, historyKeymap, indentLess, indentMore } from '@codemirror/commands';
 import { python } from '@codemirror/lang-python';
+import { acceptCompletion, closeBrackets, closeBracketsKeymap } from '@codemirror/autocomplete';
 import { HighlightStyle, syntaxHighlighting } from '@codemirror/language';
 import { Decoration, EditorView, GutterMarker, ViewPlugin, gutter, keymap } from '@codemirror/view';
 import { tags as syntaxTags } from '@lezer/highlight';
@@ -14,6 +15,7 @@ import { calculateGrowthUpdates } from '../../utils/rankingUtils';
 import { recordCrystalTransaction } from '../../utils/crystalLedger';
 import { applyCrystalRewardMultiplier } from '../../utils/holidayUtils';
 import { getCodeTraceResumeState, isCodeTraceProgressComplete } from '../../utils/codeTraceProgressUtils';
+import { studioCompletion } from '../PythonWorld/studioCompletion';
 import soundManager from '../../utils/SoundManager';
 
 const ANSWER_REVEAL_SECONDS = 30;
@@ -23,6 +25,7 @@ const CODE_PANEL_MAX_HEIGHT = 720;
 const CODE_PANEL_LINE_HEIGHT_PX = 23;
 const CODE_PANEL_VERTICAL_PADDING_PX = 32;
 const STRING_STRUCTURE_TOKEN = '__STRING__';
+const CODE_TRACE_COMPLETION_PROJECT = Object.freeze({ path: 'main.py', files: [] });
 const codeTraceHighlightStyle = HighlightStyle.define([
   { tag: syntaxTags.keyword, color: '#f0abfc', fontWeight: '700' },
   { tag: [syntaxTags.name, syntaxTags.variableName, syntaxTags.propertyName], color: '#f8fafc' },
@@ -1118,6 +1121,8 @@ function CodeTraceEditor({
         extensions: [
           history(),
           python(),
+          ...studioCompletion(() => CODE_TRACE_COMPLETION_PROJECT),
+          closeBrackets(),
           syntaxHighlighting(codeTraceHighlightStyle, { fallback: true }),
           codeTracePlugin,
           codeTraceGutter,
@@ -1126,7 +1131,7 @@ function CodeTraceEditor({
             {
               key: 'Tab',
               preventDefault: true,
-              run: view => insertStringSuggestion(view) || indentMore(view),
+              run: view => acceptCompletion(view) || insertStringSuggestion(view) || indentMore(view),
             },
             {
               key: 'Shift-Tab',
@@ -1138,6 +1143,7 @@ function CodeTraceEditor({
               preventDefault: true,
               run: handleEnter,
             },
+            ...closeBracketsKeymap,
             ...historyKeymap,
             ...defaultKeymap,
           ]),
@@ -2413,6 +2419,9 @@ export default function CodeTracePlayer({
 
           <section className={`glass-card code-trace-student-panel ${currentPassed ? 'is-complete' : ''}`} style={{ padding: '1rem', minWidth: 0, position: 'relative' }}>
             <h3 className="font-title" style={{ margin: '0 0 0.75rem', color: 'var(--crystal-cyan)' }}>학생 입력</h3>
+            <p className="font-tech" style={{ margin: '-0.35rem 0 0.75rem', color: 'var(--text-muted)', fontSize: '0.72rem' }}>
+              자동 추천은 Tab으로 선택 · Ctrl+Space로 다시 열기 · 괄호와 따옴표는 자동으로 닫힙니다.
+            </p>
             {linePulse && (
               <div
                 key={linePulse.id}
