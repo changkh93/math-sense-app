@@ -311,6 +311,23 @@ export function createStudioAnalyzer(getProject = () => ({})) {
     }
     const importMatch = line.match(/^\s*(?:from\s+([\w.]+)\s+import\s+|import\s+|from\s+)([\w.]*)$/)
     if (importMatch) {
+      // In a dotted import path, complete only the segment after the final dot.
+      // Functions/classes belong after `import`, not inside a module path.
+      if (!importMatch[1] && importMatch[2].includes('.')) {
+        const typed = importMatch[2], dot = typed.lastIndexOf('.')
+        const parent = typed.slice(0, dot), prefix = typed.slice(dot + 1)
+        const options = new Map([...members(imported(parent, model))]
+          .filter(([, binding]) => resolve(binding)?.kind === 'module')
+          .map(([label, binding]) => [label, { ...entry(binding), label }]))
+        for (const file of getProject().files || []) {
+          if (file.kind !== 'python' || file.path === path) continue
+          const name = moduleName(file.path)
+          if (!parent || !name.startsWith(parent + '.')) continue
+          const label = name.slice(parent.length + 1).split('.')[0]
+          if (label && !options.has(label)) options.set(label, { label, type: 'namespace', detail: '내 프로젝트 모듈', info: `${parent}.${label}` })
+        }
+        return { from: pos - prefix.length, options: [...options.values()], importing: true }
+      }
       const options = importMatch[1] ? [...members(imported(importMatch[1], model)).values()].map(b => entry(b)) : [...modules, ...(getProject().files || []).filter(f => f.kind === 'python' && f.path !== path).map(f => ({ label: moduleName(f.path), type: 'namespace', info: '내 프로젝트의 Python 파일' }))]
       return { from: pos - importMatch[2].length, options, importing: true }
     }

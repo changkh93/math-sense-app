@@ -7,6 +7,9 @@ For an existing task, read its STATE.md and actual artifacts before continuing.
 
 | ID | Goal | Phase | State file | Next action |
 |---|---|---|---|---|
+| 20260911-studio-input | 코드 스튜디오 input 대화형 입력 | DONE (local) | [STATE](tasks/20260911-studio-input/STATE.md) | 한글·연속 입력·int·정지/재실행·모바일·turtle/pygame 검증 완료, 배포 전 |
+| 20260911-studio-method-loops | pygame 클래스 메서드 일시정지 멈춤 | DONE (local) | [STATE](tasks/20260911-studio-method-loops/STATE.md) | 원본 몬스터 게임 충돌·Enter 재시작·정지 검증, 웹 배포 전 |
+| 20260911-manual-assignment-feedback-38 | 대기중 과제 38건 상세 수동 피드백 | DONE (drafts saved) | [STATE](tasks/20260911-manual-assignment-feedback-38/STATE.md) | 운영툴 AI 초안 38건 확인 후 초안 적용·승인/보완 결정; student-visible 상태 미변경 |
 | 20260911-python-showcase | 파이썬 전용 소개·체험 신청·과정 영상 5편 | DONE (local) | [STATE](tasks/20260911-python-showcase/STATE.md) | 영상 6편 썸네일·현재 위치·다음 영상 탐색 개선; 모바일·재생 검증, 배포 전 |
 | 20260911-code-studio-rename | 코드 스튜디오 이름·화면 안내 통일 | DONE (local; not deployed) | [STATE](tasks/20260911-code-studio-rename/STATE.md) | 화면·자료·ZIP 이름 통일, Chrome/과제 첨부·20검사·빌드 통과 |
 | 20260910-studio-math-libraries | 파이썬 수학 NumPy·그래프·확률 수업 | DONE (local; not deployed) | [STATE](tasks/20260910-studio-math-libraries/STATE.md) | 실제 WASM 수학 예제·한글 그래프·패키지 재사용·Tk/turtle/pygame 회귀·57검사·빌드 통과 |
@@ -15,7 +18,7 @@ For an existing task, read its STATE.md and actual artifacts before continuing.
 | 20260910-profile-ship-crossfade | 랭킹·아고라 사진/탐사선 교차 표시 | DONE (local; not deployed) | [STATE](tasks/20260910-profile-ship-crossfade/STATE.md) | 랭킹 집계 사진 누락 수정·기존 집계 가시행 보완조회; 실제 개발탭 업로드 사진 교차 확인. 웹/함수 배포 전 |
 | 20260910-profile-auth-photo | 직접 등록한 프로필 사진 누락 조사 | ACTIVE (diagnosis corrected) | [STATE](tasks/20260910-profile-auth-photo/STATE.md) | Google 대체 수정 철회; 운영 업로드 폴더 비어 있음·규칙 배포 확인; 저장 성공/오류 여부 확인 필요 |
 | 20260910-2010-course-catalog-recovery | 로그인 후 코스 목록 간헐 오류 조사·복구 | DONE (local; not deployed) | [STATE](tasks/20260910-2010-course-catalog-recovery/STATE.md) | 승인된 운영 조회로 계정 admin·활성 및 4코스 확인; 복구 수정·회귀/UI·빌드 완료, 최초 지연 원인 미확정·미배포 |
-| 20260910-studio-completion | 게임 스튜디오 Python 자동완성·인자 안내 | DONE (local) | [STATE](tasks/20260910-studio-completion/STATE.md) | 문맥별 추천·인자 안내·작성 틀·프로젝트 파일, 모델/Chrome/빌드 검증 완료; 배포 전 |
+| 20260910-studio-completion | 게임 스튜디오 Python 자동완성·인자 안내 | DONE (local) | [STATE](tasks/20260910-studio-completion/STATE.md) | 점 뒤 하위 모듈 추천 누락 수정; ColabTurtlePlus→Turtle 선택·실행 및 11검사·Chrome·빌드 통과, 배포 전 |
 | 20260910-mid3-sem2-exams5-6 | 중3 삼각비·원·통계 홀짝 분할 5·6회 등록 | DONE | [STATE](tasks/20260910-mid3-sem2-exams5-6/STATE.md) | 원문 검토·작성 |
 | 20260910-quiz-progress-wording | 퀴즈 진행 숫자·나중에 풀기 안내 개선 | DONE (local; not deployed) | [STATE](tasks/20260910-quiz-progress-wording/STATE.md) | 전체 기준 답 선택 현황·고정 문제 번호·명확한 보류 안내, 회귀·브라우저·빌드 확인; 웹 배포 전 |
 | 20260910-unified-math-input | 수식 입력 모달 통일 및 + 누락 해결 | ACTIVE | [STATE](tasks/20260910-unified-math-input/STATE.md) | 공통 키패드·같은 모달 내 직접 입력 구현 및 회귀 검증 |

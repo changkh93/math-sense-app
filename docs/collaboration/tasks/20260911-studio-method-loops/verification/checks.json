@@ -1,0 +1,9 @@
+{
+  "startPauseBeyondWatchdog": true,
+  "collisionPauseBeyondWatchdog": true,
+  "enterResumes": true,
+  "quitDuringPause": true,
+  "stopAndWarmRerun": true,
+  "sourceUnchanged": true,
+  "spriteUpdateRemainsSync": true
+}

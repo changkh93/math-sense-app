@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { ArrowLeft, Play, Square, Upload, FileCode2, FolderPlus, Plus, Download, FolderOpen, Maximize2, Trash2, Code2, X } from 'lucide-react'
 import PythonEditor from '../PythonWorld/PythonEditor'
 import GamePreview from './GamePreview'
+import StudioInput from './StudioInput'
 import StudioPlayTools, { RunFeedback } from './StudioPlayTools'
 import { createProject } from './templates'
 import ProjectFileTree from './ProjectFileTree'
@@ -15,7 +16,7 @@ import SpaceInvadersMaterials from './SpaceInvadersMaterials'
 import MarsExpeditionMaterials from './MarsExpeditionMaterials'
 import './PythonGameStudio.css'
 
-const statusNames = { loading: '엔진 준비 중', ready: '실행 준비 완료', running: '실행 중', stopped: '정지됨', error: '오류 확인', exited: '실행 완료' }
+const statusNames = { loading: '엔진 준비 중', ready: '실행 준비 완료', waiting: '입력 대기', running: '실행 중', stopped: '정지됨', error: '오류 확인', exited: '실행 완료' }
 function readPlayPreferences(uid) {
   try {
     const saved = JSON.parse(localStorage.getItem(`metasense-studio-play:${uid}`))
@@ -67,6 +68,8 @@ export default function PythonGameStudio({ uid = 'local-preview', onBack }) {
   const [saved, setSaved] = useState('불러오는 중')
   const [notice, setNotice] = useState('')
   const [run, setRun] = useState(null)
+  const [inputRequest, setInputRequest] = useState(null)
+  const consoleOutput = useRef(null)
   const [status, setStatus] = useState('stopped')
   const [logs, setLogs] = useState([])
   const [drawer, setDrawer] = useState(false)
@@ -93,7 +96,7 @@ export default function PythonGameStudio({ uid = 'local-preview', onBack }) {
       catch (error) { setNotice(`가져온 프로젝트를 이 기기에 저장하지 못했습니다. ${error.message}`); return false }
     }
     latest.current = next
-    runGeneration.current++; setRun(null); setStatus('stopped'); setLogs([]); setProject(next); setSelected(next.entrypoint); setSelectedFolder(''); setErrorLine(null); setDrawer(false); return true }, [uid])
+    runGeneration.current++; setRun(null); setInputRequest(null); setStatus('stopped'); setLogs([]); setProject(next); setSelected(next.entrypoint); setSelectedFolder(''); setErrorLine(null); setDrawer(false); return true }, [uid])
   useEffect(() => {
     mounted.current = true
     listDrafts(uid).then(rows => { if (mounted.current) { setDrafts(rows); setProject(rows[0]?.project || createProject()); setSelected(rows[0]?.project.entrypoint || 'main.py') } }).catch(() => { if (mounted.current) { setProject(createProject()); setNotice('브라우저 초안을 읽지 못했습니다. 프로젝트 다운로드로 작업을 보관해 주세요.') } })
@@ -121,11 +124,15 @@ export default function PythonGameStudio({ uid = 'local-preview', onBack }) {
   }, [saved])
   const activeFile = project?.files.find(f => f.path === selected)
   const editCode = useCallback(text => { setErrorLine(null); setProject(prev => ({ ...prev, files: prev.files.map(f => f.path === selected ? { ...f, text } : f) })) }, [selected])
-  const stop = () => { runGeneration.current++; setRun(null); setStatus('stopped') }
+  useEffect(() => {
+    const output = consoleOutput.current
+    if (output) output.scrollTop = output.scrollHeight
+  }, [logs, inputRequest])
+  const stop = () => { runGeneration.current++; setRun(null); setInputRequest(null); setStatus('stopped') }
   const runPath = activeFile?.kind === 'python' ? activeFile.path : project?.entrypoint
   const execute = async () => {
     const generation = ++runGeneration.current
-    setBusy(true); setRun(null)
+    setBusy(true); setRun(null); setInputRequest(null)
     try {
       // Use a run snapshot so opening a script does not change the saved project default.
       const checked = validateProject({ ...project, entrypoint: runPath })
@@ -136,7 +143,7 @@ export default function PythonGameStudio({ uid = 'local-preview', onBack }) {
     finally { if (mounted.current) setBusy(false) }
   }
   useEffect(() => {
-    const hide = () => { if (document.hidden) { runGeneration.current++; setRun(null); setStatus('stopped') } }
+    const hide = () => { if (document.hidden) { runGeneration.current++; setRun(null); setInputRequest(null); setStatus('stopped') } }
     document.addEventListener('visibilitychange', hide)
     return () => document.removeEventListener('visibilitychange', hide)
   }, [])
@@ -155,6 +162,11 @@ export default function PythonGameStudio({ uid = 'local-preview', onBack }) {
       }
     }
     if (event.type === 'READY') setStatus('ready')
+    if (event.type === 'INPUT_REQUEST') { setInputRequest(event); setStatus('waiting'); return }
+    if (['INPUT_CANCEL', 'ERROR', 'EXIT'].includes(event.type)) {
+      setInputRequest(null)
+      if (event.type === 'INPUT_CANCEL') setStatus(previous => previous === 'waiting' ? 'running' : previous)
+    }
     if (event.type === 'RUNNING') setStatus('running')
     if (event.type === 'EXIT') setStatus(previous => previous === 'error' ? previous : 'exited')
     if (event.type === 'ERROR') setStatus('error')
@@ -321,7 +333,7 @@ export default function PythonGameStudio({ uid = 'local-preview', onBack }) {
       } catch (error) { setNotice(error.message) } finally { setBusy(false) }
     }} />}</section>
     <div {...layout.separator('editor')} />
-    <section className="pgs-preview-pane" ref={preview}><div className="pgs-panel-title">실행 화면<button aria-label="실행 화면 크게 보기" onClick={() => preview.current.requestFullscreen?.().catch(() => setNotice('전체 화면을 지원하지 않는 브라우저입니다.'))}><Maximize2 size={16} /></button></div><div className="pgs-game-frame"><GamePreview run={run} onEvent={handleEvent} /></div><div {...layout.separator('console')} /><div className="pgs-console"><div className="pgs-panel-title">출력 · 오류<button onClick={() => setLogs([])}>지우기</button></div><>{preferences.playful && <RunFeedback status={status} />}</><pre aria-live="polite">{!logs.length && <span className="pgs-console-hint">print() 출력과 오류가 여기에 표시됩니다.</span>}{logs.map(log => <span key={log.id} className={log.type === 'ERROR' || log.type === 'STDERR' ? 'pgs-error' : ''}>{log.text}{log.type === 'ERROR' && <button onClick={() => jumpToError(log.text)}>오류 줄로 이동</button>}</span>)}</pre></div></section></div>
+    <section className="pgs-preview-pane" ref={preview}><div className="pgs-panel-title">실행 화면<button aria-label="실행 화면 크게 보기" onClick={() => preview.current.requestFullscreen?.().catch(() => setNotice('전체 화면을 지원하지 않는 브라우저입니다.'))}><Maximize2 size={16} /></button></div><div className="pgs-game-frame"><GamePreview run={run} onEvent={handleEvent} /></div><div {...layout.separator('console')} /><div className="pgs-console"><div className="pgs-panel-title">출력 · 오류<button onClick={() => setLogs([])}>지우기</button></div><>{preferences.playful && <RunFeedback status={status} />}</><pre ref={consoleOutput} aria-live="polite">{!logs.length && <span className="pgs-console-hint">print() 출력과 오류가 여기에 표시됩니다.</span>}{logs.map(log => <span key={log.id} className={log.type === 'ERROR' || log.type === 'STDERR' ? 'pgs-error' : ''}>{log.text}{log.type === 'ERROR' && <button onClick={() => jumpToError(log.text)}>오류 줄로 이동</button>}</span>)}</pre>{inputRequest && run && <StudioInput key={`${run.id}:${inputRequest.requestId}`} request={inputRequest} onSubmitted={() => { setInputRequest(null); setStatus('running') }} />}</div></section></div>
     {drawer && <div className="pgs-modal-backdrop"><section className="pgs-library" role="dialog" aria-modal="true" aria-label="내 프로젝트" aria-busy={importing}><div className="pgs-panel-title">내 프로젝트<button aria-label="프로젝트 목록 닫기" disabled={importing} onClick={() => setDrawer(false)}><X size={18} /></button></div>{notice && <p role="alert">{notice}</p>}<div className="pgs-library-actions"><button disabled={busy} onClick={() => { setDialogValue('나의 프로젝트'); setDialog('new') }}><Plus size={16} /> 새 프로젝트</button><button disabled={busy} onClick={() => folderInput.current.click()}><FolderOpen size={16} /> {importing ? '가져오는 중…' : '프로젝트 가져오기'}</button><button disabled={busy} onClick={() => importInput.current.click()}><Upload size={16} /> 백업 파일 복원</button><button disabled={busy} onClick={async () => { try { const { createMonsterProject } = await import('./monsterTemplate'); switchProject(await createMonsterProject()) } catch (error) { setNotice(error.message) } }}>몬스터 잡기 예제</button><button disabled={busy} onClick={async () => {
       setBusy(true)
       try {

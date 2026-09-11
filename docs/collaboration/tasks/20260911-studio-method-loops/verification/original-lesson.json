@@ -1,0 +1,9 @@
+{
+  "source": "user original pasted monster game",
+  "codeChanges": "audio filename extensions only: mp3 to bundled ogg",
+  "fontFixture": "bundled OFL DoHyeon under expected filename",
+  "initialPauseBeyondWatchdog": true,
+  "collisionGameOverBeyondWatchdog": true,
+  "enterRestoresFiveLives": true,
+  "editorUnchanged": true
+}

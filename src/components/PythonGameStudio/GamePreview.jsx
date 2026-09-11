@@ -30,6 +30,7 @@ export default function GamePreview({ run, onEvent }) {
     let waitingId = null, waitingForStop = false
     let csvBaseline = new Map()
     const recover = () => {
+      if (!disposed) callbackRef.current({ type: 'INPUT_CANCEL' })
       if (!disposed) setEngineEpoch(value => value + 1)
     }
     const bootTimeout = setTimeout(() => {
@@ -63,6 +64,20 @@ export default function GamePreview({ run, onEvent }) {
       if (data.runId === waitingId && ['READY','RUNNING','STOPPED','ERROR'].includes(data.type)) clearTimeout(watchdog)
       if (data.type === 'STOPPED' && data.runId === waitingId) waitingForStop = false
       if (data.type === 'STOPPED' || data.runId !== runRef.current?.id) return
+      if (data.type === 'INPUT_REQUEST') {
+        try {
+          const request = JSON.parse(data.text)
+          if (typeof request.requestId !== 'string' || typeof request.prompt !== 'string') return
+          let submitted = false
+          callbackRef.current({ type: 'INPUT_REQUEST', requestId: request.requestId, prompt: request.prompt,
+            submit: value => {
+              if (submitted || disposed || data.runId !== runRef.current?.id || typeof value !== 'string' || value.length > 8192) return
+              submitted = true
+              channel.port1.postMessage({ type: 'INPUT_RESPONSE', protocolVersion: 2, sessionId, runId: data.runId, requestId: request.requestId, value })
+            } })
+        } catch { /* Ignore malformed messages from the isolated runtime. */ }
+        return
+      }
       if (data.type === 'FILE_WRITE') {
         try {
           if (typeof data.text !== 'string' || data.text.length > 280000) throw new Error('CSV 저장 데이터가 너무 큽니다.')
@@ -74,7 +89,7 @@ export default function GamePreview({ run, onEvent }) {
         }
         return
       }
-      if (!['READY','RUNNING','STDOUT','STDERR','ERROR','EXIT'].includes(data.type)) return
+      if (!['READY','RUNNING','STDOUT','STDERR','ERROR','EXIT','INPUT_CANCEL'].includes(data.type)) return
       callbackRef.current({ type: data.type, text: String(data.text || '').slice(0,8192) })
     }
     const hello = event => { if (event.source === frame.contentWindow && event.data?.type === 'RUNNER_HELLO' && event.data.protocolVersion === 2) connect() }

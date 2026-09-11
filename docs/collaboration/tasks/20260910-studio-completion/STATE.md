@@ -14,3 +14,9 @@
 - Checks: completion model 7 cases; existing studio 12 and turtle/loop 9 pass. Chrome complete editing QA passed, desktop/narrow screenshots in verification visually inspected. Scoped lint passes; existing unrelated deletedIds cleanup warning remains. Production build passed (existing chunk warning).
 - Coverage: common teaching APIs and lightweight inference, not full Pyright/VS Code semantic analysis or all pygame APIs. No unsupported turtle callbacks suggested. No deployment or server writes, no external agents/relay, no user project migration.
 - Next: use locally; deployment has not been requested for this change.
+
+## 2026-09-11 — Dotted import completion (DONE, local; not deployed)
+
+- User reported no Turtle recommendation after `from ColabTurtlePlus.`. Import completion was treating the whole dotted path as a top-level module prefix.
+- Complete only the segment after the final dot, using known submodules and project package paths. Preserve the parent path and suppress function-call parentheses in import statements. Also covers `import ColabTurtlePlus.`, partial `.Tu`, `matplotlib.pyplot`, NumPy submodules, and nested project files.
+- Verification: 11 model tests pass, including replacement offsets, namespace/class distinction, unknown/comment/string exclusions and file-list freshness. Full Chrome completion QA passes: typed the dot, selected Turtle with Tab, selected the imported Turtle class, executed forward(100), stdout confirms (100.0, 0.0); existing keyboard, objects, signatures, snippets and path cases pass. Focused ESLint and production build pass (existing chunk warning). No production deploy, user project edits, or server writes. Existing unrelated INDEX/manual-feedback edits preserved.

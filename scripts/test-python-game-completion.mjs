@@ -110,3 +110,29 @@ test('math lesson modules, arrays and Matplotlib axes offer appropriate suggesti
     ['import pandas as pd\nh=pd.DataFrame({"x":[1]})\nh.', 'loc'],
   ]) assert.ok(labels(code).includes(expected), code)
 })
+
+
+test('dotted import paths complete module segments without replacing their parent', () => {
+  for (const head of ['from ColabTurtlePlus.', 'from ColabTurtlePlus.Tu', 'import ColabTurtlePlus.']) {
+    const result = suggest(head)
+    const turtle = result.options.find(o => o.label === 'Turtle')
+    assert.ok(turtle, head)
+    assert.equal(turtle.type, 'namespace')
+    assert.equal(turtle.signature, undefined)
+    assert.equal(head.slice(0, result.from) + turtle.label, head.startsWith('from') ? 'from ColabTurtlePlus.Turtle' : 'import ColabTurtlePlus.Turtle')
+    assert.equal(result.importing, true)
+  }
+  assert.ok(labels('from ColabTurtlePlus.Turtle import ').includes('Turtle'))
+  assert.ok(labels('from matplotlib.').includes('pyplot'))
+  assert.ok(labels('import numpy.').includes('random'))
+  assert.ok(!labels('from turtle.').includes('forward'))
+  assert.deepEqual(labels('from unknown.'), [])
+  assert.equal(suggest('# from ColabTurtlePlus.'), null)
+  assert.equal(suggest('text="from ColabTurtlePlus.'), null)
+  let files = [{path:'lessons/drawing/shapes.py',kind:'python',text:''}]
+  const analyzer = createStudioAnalyzer(() => ({files}))
+  assert.deepEqual(labels('from lessons.', analyzer), ['drawing'])
+  assert.deepEqual(labels('import lessons.drawing.sh', analyzer), ['shapes'])
+  files = []
+  assert.deepEqual(labels('from lessons.', analyzer), [])
+})

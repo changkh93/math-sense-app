@@ -1,0 +1,16 @@
+{
+  "numeric": true,
+  "korean": true,
+  "empty": true,
+  "whitespace": true,
+  "sequential": true,
+  "functionsAndMethods": true,
+  "turtleAfterInput": true,
+  "invalidIntValueError": true,
+  "stopAndReplace": true,
+  "warmInterpreter": true,
+  "imeEnterGuard": true,
+  "mobileInput": true,
+  "emoji": true,
+  "sourceUnchanged": true
+}

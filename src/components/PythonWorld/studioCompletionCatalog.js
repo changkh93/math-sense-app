@@ -20,7 +20,7 @@ define('builtins', [
   ['enumerate', 'iterable, start=0', '번호와 값을 함께 반복합니다.'], ['zip', '*iterables', '여러 목록의 같은 위치 항목을 묶습니다.'],
   ['type', 'obj', '값의 자료형을 확인합니다.'], ['isinstance', 'obj, classinfo', '특정 자료형의 값인지 확인합니다.', 'bool'],
   ['open', "file, mode='r', encoding=None", '프로젝트의 파일을 엽니다. 예: open("data.txt", encoding="utf-8")'],
-  ['input', "prompt=''", '입력 요청. 현재 게임 실행기에는 대화형 입력창이 없으므로 수업에서는 변수에 값을 지정해 주세요.', 'str'],
+  ['input', "prompt=''", '출력 영역에서 값을 입력하고 Enter를 누르면 문자열로 돌려줍니다. 숫자는 int(input()) 또는 float(input())으로 바꿔 주세요.', 'str'],
   ['help', 'object', '객체의 도움말을 확인합니다.'], ['dir', 'object', '객체에 있는 이름을 확인합니다.', 'list[str]'],
   ['super', '', '부모 클래스의 메서드에 접근합니다.'], ['any', 'iterable', '하나라도 참인지 확인합니다.', 'bool'], ['all', 'iterable', '모두 참인지 확인합니다.', 'bool'],
 ])

@@ -60,6 +60,22 @@ html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#080f20;col
 <script>
 window.config={cdn:'https://pygame-web.github.io/archives/0.9/',executable:'https://pygame-web.github.io/archives/0.9/cpython312/main.js',user_canvas:1,user_canvas_managed:1,gui_divider:1,ume_block:0,can_close:0,autorun:1,quiet:true};
 window.studioCommand='';window.studioEngineReady=false;window.studioActiveRun=null;
+window.studioPendingInput=null;
+window.studioBeginInput=(runId,requestId,encodedPrompt)=>{
+ const prompt=new TextDecoder().decode(Uint8Array.from(atob(encodedPrompt),c=>c.charCodeAt(0)));
+ window.studioPendingInput={runId,requestId,response:''};
+ window.studioEmit('INPUT_REQUEST',JSON.stringify({requestId,prompt:String(prompt).slice(0,8192)}),runId);
+};
+window.studioTakeInput=(runId,requestId)=>{
+ const pending=window.studioPendingInput;
+ return pending?.runId===runId&&pending.requestId===requestId ? pending.response : '';
+};
+window.studioEndInput=(runId,requestId)=>{
+ const pending=window.studioPendingInput;
+ if(pending?.runId===runId&&pending.requestId===requestId){
+  window.studioPendingInput=null;window.studioEmit('INPUT_CANCEL','',runId);
+ }
+};
 window.studioTakeCommand=()=>{const command=window.studioCommand;window.studioCommand='';return command;};
 window.studioEmitEncoded=(type,data,runId)=>window.studioEmit(type,new TextDecoder().decode(Uint8Array.from(atob(data),c=>c.charCodeAt(0))),runId);
 window.custom_onload=function(){window.python=window.Module;window.Module.vt.xterm={write:()=>{}};};
@@ -70,7 +86,7 @@ window.studioEmit=(type,text='',runId=window.studioActiveRun)=>{
  if(!port)return;
  if(performance.now()-windowStart>1000){sent=0;windowStart=performance.now();}
  if((type==='STDOUT'||type==='STDERR')&&++sent>100)return;
- port.postMessage({protocolVersion:2,sessionId,runId,type,text:String(text).slice(0,type==='FILE_WRITE'?280000:8192)});
+ port.postMessage({protocolVersion:2,sessionId,runId,type,text:String(text).slice(0,type==='FILE_WRITE'?280000:type==='INPUT_REQUEST'?60000:8192)});
  if(type==='READY'||type==='ENGINE_READY')document.getElementById('start').hidden=true;
  if(type==='ERROR'||type==='EXIT'||type==='STOPPED'){document.getElementById('start').hidden=true;document.getElementById('audio-note').hidden=true;}
 };
@@ -79,7 +95,15 @@ window.addEventListener('message',function connect(event){
  if(event.source!==parent||event.data?.type!=='CONNECT'||event.data.protocolVersion!==2||port||!event.ports[0])return;
  clearInterval(hello);port=event.ports[0];sessionId=event.data.sessionId;
  port.onmessage=({data})=>{
- if(data.sessionId!==sessionId||data.protocolVersion!==2||!['RUN','STOP'].includes(data.type))return;
+ if(data.sessionId!==sessionId||data.protocolVersion!==2)return;
+ if(data.type==='INPUT_RESPONSE'){
+  const pending=window.studioPendingInput;
+  if(pending&&data.runId===window.studioActiveRun&&data.runId===pending.runId&&data.requestId===pending.requestId&&!pending.response&&typeof data.value==='string'&&data.value.length<=8192){
+   pending.response=JSON.stringify({value:data.value}).replace(/[\u007f-\uffff]/g,c=>'\\u'+c.charCodeAt(0).toString(16).padStart(4,'0'));
+  }
+  return;
+ }
+ if(!['RUN','STOP'].includes(data.type))return;
  window.studioCommand=JSON.stringify(data).replace(/[\u007f-\uffff]/g,c=>'\\u'+c.charCodeAt(0).toString(16).padStart(4,'0'));
  };
  port.start();window.studioEmit('CONNECTED');if(window.studioEngineReady)window.studioEmit('ENGINE_READY');
@@ -88,6 +112,7 @@ window.addEventListener('message',function connect(event){
 const audioContexts=new Set();
 window.studioResetPresentation=(preserveTurtle=false)=>{
  window.studioActiveRun=null;
+ window.studioPendingInput=null;
  window.studioTurtleReset(preserveTurtle);
  window.studioTkReset();
  window.studioPlotReset(preserveTurtle);
@@ -143,8 +168,10 @@ import importlib
 import types
 import gc
 import warnings
+import builtins
 
 ROOT = '/tmp/studio'
+ORIGINAL_INPUT = builtins.input
 ORIGINAL_RUN = asyncio.run
 ORIGINAL_STDOUT, ORIGINAL_STDERR = sys.stdout, sys.stderr
 ORIGINAL_PATH = list(sys.path)
@@ -199,6 +226,31 @@ class StudioOutput:
     def flush(self): pass
     def isatty(self): return False
 
+def unsupported_input(prompt='', /):
+    # Pygbag's default input returns a coroutine to synchronous Python callers.
+    # Keep unsupported callback/dynamic contexts explicit instead of leaking it.
+    raise RuntimeError('이 위치의 input()은 아직 지원하지 않습니다. 입력을 파일의 본문이나 직접 호출하는 함수로 옮겨 주세요.')
+
+async def studio_input(prompt='', /):
+    context = active
+    async with context['input_lock']:
+        context['input_number'] += 1
+        request_id = str(context['input_number'])
+        run_id = context['id']
+        prompt = str(prompt)
+        emit('STDOUT', prompt, run_id)
+        platform.window.studioBeginInput(run_id, request_id, base64.b64encode(prompt.encode('utf-8')).decode('ascii'))
+        try:
+            while True:
+                response = str(platform.window.studioTakeInput(run_id, request_id))
+                if response:
+                    value = json.loads(response)['value']
+                    emit('STDOUT', value + '\n', run_id)
+                    return value
+                await asyncio.sleep(.01)
+        finally:
+            platform.window.studioEndInput(run_id, request_id)
+
 def project_packages(project):
     packages = set()
     supported = {'pygame', 'numpy', 'matplotlib'}
@@ -235,22 +287,163 @@ class FrameCallFinder(ast.NodeVisitor):
             if tuple(parts) in self.call_paths: self.found = True
         self.generic_visit(node)
 
+class GameCallGraph:
+    """Resolve direct calls within this file; never infer a method by name alone."""
+    def __init__(self, tree, call_paths):
+        self.functions, self.targets, self.lifted = {}, {}, set()
+        self.input_calls = set()
+        input_scopes = {}
+        classes = {n.name: n for n in tree.body if isinstance(n, ast.ClassDef)}
+        for node in tree.body:
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                self.functions[('', node.name)] = node
+            elif isinstance(node, ast.ClassDef):
+                for method in node.body:
+                    if isinstance(method, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                        self.functions[(node.name, method.name)] = method
+        self.keys = {id(node): key for key, node in self.functions.items()}
+        roots = {name: ('class', name) for name in classes}
+        roots.update({key[1]: ('function', key) for key in self.functions if not key[0]})
+        scopes = [(None, tree)] + list(self.functions.items())
+        blocked, calls, seeds = set(), {}, set()
+        def nodes(body):
+            for node in body:
+                yield node
+                if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef, ast.Lambda, ast.ListComp, ast.SetComp, ast.DictComp, ast.GeneratorExp)):
+                    yield from nodes(ast.iter_child_nodes(node))
+        def bindings(body, base):
+            env, writes = dict(base), {}
+            for n in nodes(body):
+                if isinstance(n, ast.Name) and isinstance(n.ctx, ast.Store): writes.setdefault(n.id, []).append(None)
+                if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)): env[n.name] = None
+                if isinstance(n, (ast.Import, ast.ImportFrom)):
+                    for alias in n.names:
+                        if alias.name != '*': env[alias.asname or alias.name.split('.')[0]] = None
+            for n in nodes(body):
+                if isinstance(n, ast.Assign) and isinstance(n.value, ast.Call) and isinstance(n.value.func, ast.Name) and n.value.func.id in classes:
+                    for target in n.targets:
+                        if isinstance(target, ast.Name):
+                            # Only one unambiguous assignment; reassigned receivers are not guessed.
+                            if len(writes.get(target.id, [])) == 1: writes[target.id] = [('instance', n.value.func.id)]
+            env.update({name: values[0] if len(values) == 1 else None for name, values in writes.items()})
+            return env
+        globals_ = bindings(tree.body, roots)
+        # Definitions are bindings at module scope, too.
+        globals_.update(roots)
+        def target(n, env):
+            if isinstance(n, ast.Name):
+                value = env.get(n.id)
+                return value[1] if value and value[0] == 'function' else None
+            if isinstance(n, ast.Attribute) and isinstance(n.value, ast.Name):
+                value = env.get(n.value.id)
+                key = (value[1], n.attr) if value and value[0] in ('class', 'instance') else None
+                return key if key in self.functions else None
+            return None
+        for key, scope in scopes:
+            env = dict(globals_)
+            if key:
+                for arg in scope.args.posonlyargs + scope.args.args + scope.args.kwonlyargs: env[arg.arg] = None
+                for arg in (scope.args.vararg, scope.args.kwarg):
+                    if arg: env[arg.arg] = None
+                if key[0] and scope.args.args: env[scope.args.args[0].arg] = ('instance', key[0])
+                env = bindings(scope.body, env)
+                if scope.decorator_list or scope.name.startswith('__') or (key[0] and classes[key[0]].bases): blocked.add(key)
+            calls[key] = set()
+            for n in nodes(scope.body):
+                if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef, ast.Lambda, ast.ListComp, ast.SetComp, ast.DictComp, ast.GeneratorExp)):
+                    if id(n) in self.keys or (key is None and isinstance(n, ast.ClassDef)):
+                        continue  # Collected definitions are analyzed in their own scope.
+                    # Callbacks, nested scopes and comprehension awaits need richer analysis.
+                    for inner in ast.walk(n):
+                        found = target(inner, env)
+                        if found: blocked.add(found)
+                    continue
+                if isinstance(n, (ast.Yield, ast.YieldFrom)) and key: blocked.add(key)
+                if isinstance(n, ast.Call):
+                    if isinstance(n.func, ast.Name) and n.func.id == 'input' and 'input' not in env:
+                        input_scopes[id(n)] = key
+                        if key: seeds.add(key)
+                    found = target(n.func, env)
+                    if found:
+                        self.targets[id(n)] = found
+                        calls[key].add(found)
+                # A function/method used as a value may be invoked by synchronous library code.
+                for child in ast.iter_child_nodes(n):
+                    if isinstance(n, ast.Call) and child is n.func: continue
+                    found = target(child, env)
+                    if found: blocked.add(found)
+                if key and isinstance(n, (ast.While, ast.For)):
+                    finder = FrameCallFinder(call_paths); finder.visit(n)
+                    if finder.found: seeds.add(key)
+        # If a caller cannot be lifted, preserve its synchronous callees as well.
+        pending = list(blocked)
+        while pending:
+            for callee in calls.get(pending.pop(), ()):
+                if callee not in blocked: blocked.add(callee); pending.append(callee)
+        reachable, pending = set(), list(calls[None])
+        while pending:
+            key = pending.pop()
+            if key in reachable: continue
+            reachable.add(key); pending.extend(calls.get(key, ()))
+        eligible = {key for key, node in self.functions.items() if isinstance(node, ast.FunctionDef)} & reachable - blocked
+        self.lifted = seeds & eligible
+        while True:
+            extra = {key for key in eligible if calls[key] & self.lifted} - self.lifted
+            if not extra: break
+            self.lifted.update(extra)
+        self.await_calls = {identity for identity, key in self.targets.items() if key in self.lifted}
+        self.input_calls = {identity for identity, key in input_scopes.items()
+                            if key is None or key in self.lifted or isinstance(self.functions[key], ast.AsyncFunctionDef)}
+
 class BrowserGameLoops(ast.NodeTransformer):
-    def __init__(self, call_paths, yield_name):
+    def __init__(self, call_paths, yield_name, graph=None, input_name=None):
+        self.input_name = input_name
         self.call_paths, self.yield_name, self.changed = call_paths, yield_name, False
-    # Existing async code and synchronous helper definitions retain their own semantics.
-    def visit_FunctionDef(self, node): return node
-    def visit_AsyncFunctionDef(self, node): return node
-    def visit_ClassDef(self, node): return node
+        self.graph, self.adapt_loops, self.in_loop = graph, True, False
+    def visit_FunctionDef(self, node):
+        if not self.graph or self.graph.keys.get(id(node)) not in self.graph.lifted: return node
+        self.changed = True
+        result = ast.AsyncFunctionDef(**{field: getattr(node, field) for field in node._fields})
+        ast.copy_location(result, node)
+        return self.function_body(result, True)
+    def function_body(self, node, adapt):
+        previous = self.adapt_loops, self.in_loop
+        self.adapt_loops, self.in_loop = adapt, False
+        node.body = [self.visit(statement) for statement in node.body]
+        self.adapt_loops, self.in_loop = previous
+        return node
+    def visit_AsyncFunctionDef(self, node): return self.function_body(node, False)
+    def visit_ClassDef(self, node):
+        node.body = [self.visit(n) if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef)) else n for n in node.body]
+        return node
     def visit_Lambda(self, node): return node
+    def visit_Call(self, node):
+        is_input = self.graph and id(node) in self.graph.input_calls
+        needs_await = self.graph and (id(node) in self.graph.await_calls or is_input)
+        if is_input: node.func = ast.copy_location(ast.Name(id=self.input_name, ctx=ast.Load()), node.func)
+        self.generic_visit(node)
+        if needs_await:
+            self.changed = True
+            return ast.copy_location(ast.Await(value=node), node)
+        return node
+    def visit_Await(self, node):
+        value = self.visit(node.value)
+        node.value = value.value if isinstance(value, ast.Await) else value
+        return node
     def visit_While(self, node):
         finder = FrameCallFinder(self.call_paths)
         finder.visit(node)
-        if not finder.found: return self.generic_visit(node)
-        pause = ast.Expr(value=ast.Await(value=ast.Call(func=ast.Name(id=self.yield_name, ctx=ast.Load()), args=[], keywords=[])))
-        node.body.insert(0, ast.copy_location(pause, node))
-        self.changed = True
-        # One yield per outer game iteration; do not slow each event in nested loops.
+        indirect = self.graph and any(id(n) in self.graph.await_calls for n in ast.walk(node))
+        adapt = self.adapt_loops and (finder.found or indirect)
+        insert = adapt and (isinstance(node, ast.While) or not self.in_loop)
+        previous = self.in_loop
+        self.in_loop = previous or adapt
+        self.generic_visit(node)
+        self.in_loop = previous
+        if insert:
+            pause = ast.Expr(value=ast.Await(value=ast.Call(func=ast.Name(id=self.yield_name, ctx=ast.Load()), args=[], keywords=[])))
+            node.body.insert(0, ast.copy_location(pause, node))
+            self.changed = True
         return node
     visit_For = visit_While
 
@@ -281,8 +474,11 @@ def compile_project(source, filename, namespace):
                 if alias.name != '*': aliases[alias.asname or alias.name] = tuple(node.module.split('.')) + (alias.name,)
     frame_paths = [('pygame','display','update'), ('pygame','display','flip'), ('pygame','event','get'), ('pygame','event','poll')]
     call_paths = { (name,) + path[len(prefix):] for name, prefix in aliases.items() for path in frame_paths if path[:len(prefix)] == prefix }
-    yield_name = '__metasense_frame_yield_' + str(id(namespace))
-    transformer = BrowserGameLoops(call_paths, yield_name)
+    yield_name = '_metasense_frame_yield_' + str(id(namespace))
+    graph = GameCallGraph(tree, call_paths)
+    input_name = '_metasense_input_' + str(id(namespace))
+    if graph.input_calls: namespace[input_name] = studio_input
+    transformer = BrowserGameLoops(call_paths, yield_name, graph, input_name)
     tree = transformer.visit(tree)
     if transformer.changed:
         namespace[yield_name] = lambda: asyncio.sleep(0)
@@ -331,6 +527,7 @@ async def stop_current(preserve_turtle=False):
         numpy.set_printoptions(**numpy_defaults[1])
     warnings.filters[:] = ORIGINAL_WARNING_FILTERS
     asyncio.run = ORIGINAL_RUN
+    builtins.input = ORIGINAL_INPUT
     sys.stdout, sys.stderr = ORIGINAL_STDOUT, ORIGINAL_STDERR
     sys.path[:] = ORIGINAL_PATH
     sys.argv[:] = ORIGINAL_ARGV
@@ -389,8 +586,9 @@ async def start_project(command):
     namespace = module.__dict__
     install_studio_turtle()
     install_studio_tk()
-    context = {'id': run_id, 'namespace': namespace, 'baseline_tasks': set(asyncio.all_tasks()), 'tasks': [], 'deadline': time.monotonic() + 2, 'failed': False}
+    context = {'id': run_id, 'namespace': namespace, 'baseline_tasks': set(asyncio.all_tasks()), 'tasks': [], 'deadline': time.monotonic() + 2, 'failed': False, 'input_lock': asyncio.Lock(), 'input_number': 0}
     active = context
+    builtins.input = unsupported_input
     platform.window.studioActiveRun = run_id
     sys.stdout, sys.stderr = StudioOutput('STDOUT', run_id), StudioOutput('STDERR', run_id)
     def trace(frame, event, arg):
