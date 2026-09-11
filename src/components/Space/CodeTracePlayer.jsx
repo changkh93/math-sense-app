@@ -13,7 +13,7 @@ import { buildStreakWriteAudit, calculateStreakUpdate, getTodayKST } from '../..
 import { calculateGrowthUpdates } from '../../utils/rankingUtils';
 import { recordCrystalTransaction } from '../../utils/crystalLedger';
 import { applyCrystalRewardMultiplier } from '../../utils/holidayUtils';
-import { isCodeTraceProgressComplete } from '../../utils/codeTraceProgressUtils';
+import { getCodeTraceResumeState, isCodeTraceProgressComplete } from '../../utils/codeTraceProgressUtils';
 import soundManager from '../../utils/SoundManager';
 
 const ANSWER_REVEAL_SECONDS = 30;
@@ -935,6 +935,7 @@ function CodeTraceEditor({
   const hostRef = useRef(null);
   const localViewRef = useRef(null);
   const initialValueRef = useRef(value);
+  const isApplyingExternalValueRef = useRef(false);
   const latestRef = useRef({
     answerCode,
     activeStringSuggestion,
@@ -1141,7 +1142,7 @@ function CodeTraceEditor({
             ...defaultKeymap,
           ]),
           EditorView.updateListener.of((update) => {
-            if (update.docChanged) {
+            if (update.docChanged && !isApplyingExternalValueRef.current) {
               latestRef.current.onChange?.(update.state.doc.toString());
             }
             if (update.selectionSet || update.docChanged) {
@@ -1174,10 +1175,15 @@ function CodeTraceEditor({
     if (!view) return;
     const currentValue = view.state.doc.toString();
     if (currentValue === value) return;
-    view.dispatch({
-      changes: { from: 0, to: view.state.doc.length, insert: value },
-      selection: EditorSelection.cursor(Math.min(value.length, view.state.selection.main.head)),
-    });
+    isApplyingExternalValueRef.current = true;
+    try {
+      view.dispatch({
+        changes: { from: 0, to: view.state.doc.length, insert: value },
+        selection: EditorSelection.cursor(Math.min(value.length, view.state.selection.main.head)),
+      });
+    } finally {
+      isApplyingExternalValueRef.current = false;
+    }
   }, [value]);
 
   return (
@@ -1203,12 +1209,13 @@ export default function CodeTracePlayer({
   onClose
 }) {
   const { user } = useAuth();
-  const [exerciseIndex, setExerciseIndex] = useState(0);
-  const [mode, setMode] = useState('recall');
+  const initialResumeRef = useRef(getCodeTraceResumeState(exercises, learningProgress?.codeTrace));
+  const [exerciseIndex, setExerciseIndex] = useState(() => initialResumeRef.current.exerciseIndex);
+  const [mode, setMode] = useState(() => initialResumeRef.current.mode);
   const [visibleLines, setVisibleLines] = useState(1);
   const [answerVisible, setAnswerVisible] = useState(true);
   const [revealSeconds, setRevealSeconds] = useState(ANSWER_REVEAL_SECONDS);
-  const [studentCode, setStudentCode] = useState('');
+  const [studentCode, setStudentCode] = useState(() => initialResumeRef.current.studentCode);
   const [hintIndex, setHintIndex] = useState(0);
   const [completedIds, setCompletedIds] = useState(() => new Set(learningProgress?.codeTrace?.completedExerciseIds || []));
   // 세트별 작성 초안 보존. { [exerciseId]: studentCode }. 세트를 옮겨도 돌아오면 복원됨.
@@ -1234,6 +1241,7 @@ export default function CodeTracePlayer({
   const [studentSelection, setStudentSelection] = useState({ start: 0, end: 0 });
   const previousLineComboRef = useRef(0);
   const studentEditorViewRef = useRef(null);
+  const hasLocalSessionInteractionRef = useRef(false);
 
   useEffect(() => {
     const savedIds = learningProgress?.codeTrace?.completedExerciseIds;
@@ -1292,6 +1300,13 @@ export default function CodeTracePlayer({
   const allCompleted = currentExerciseIds.length > 0 && currentCompletedCount >= currentExerciseIds.length;
   const hint = exercise?.hints?.[Math.min(hintIndex, Math.max(0, (exercise?.hints?.length || 1) - 1))] || '';
   const currentExerciseId = getExerciseId(exercise);
+  const handleStudentCodeChange = (nextCode) => {
+    hasLocalSessionInteractionRef.current = true;
+    setStudentCode(nextCode);
+    if (currentExerciseId) {
+      setDrafts(prev => ({ ...prev, [currentExerciseId]: nextCode }));
+    }
+  };
   const currentAttemptCount = Number(exerciseAttempts[currentExerciseId] || 0);
   const exerciseBaseReward = getExerciseBaseReward(requiredAnswerCode);
   const nextAttemptNumber = currentAttemptCount + 1;
@@ -1343,6 +1358,7 @@ export default function CodeTracePlayer({
   }, [studentCode, studentSelection.start]);
   // 현재 세트의 입력을 빈 상태로 되돌림 (초기화 버튼). 초안도 함께 비움.
   const resetExercise = () => {
+    hasLocalSessionInteractionRef.current = true;
     if (currentExerciseId) {
       setDrafts(prev => ({ ...prev, [currentExerciseId]: '' }));
     }
@@ -1360,6 +1376,7 @@ export default function CodeTracePlayer({
   // 들어가는 세트의 저장된 초안을 복원한다. 통과한 세트는 초안을 비워 깔끔하게 시작.
   const goToExercise = (nextIndex) => {
     if (nextIndex < 0 || nextIndex >= exercises.length || nextIndex === exerciseIndex) return;
+    hasLocalSessionInteractionRef.current = true;
     const leavingId = currentExerciseId;
     const nextDrafts = { ...drafts };
     if (leavingId) {
@@ -1397,27 +1414,33 @@ export default function CodeTracePlayer({
     return () => clearTimeout(timer);
   }, [rewardBurst]);
 
-  const hasAutoJumpedRef = useRef(false);
-
   useEffect(() => {
-    if (hasAutoJumpedRef.current) return;
-    if (!exercises.length || unitAlreadyCompleted || firstIncompleteIndex < 0) return;
+    // Firestore can publish a fresher snapshot after this screen has mounted.
+    // Keep accepting that saved state until the student starts interacting;
+    // never replace code typed during the current visit.
+    if (hasLocalSessionInteractionRef.current || !exercises.length) return;
+    const savedCodeTrace = learningProgress?.codeTrace;
+    if (!savedCodeTrace) return;
 
-    hasAutoJumpedRef.current = true;
-    const currentId = getExerciseId(exercises[exerciseIndex]);
-    if (!currentId || completedIds.has(currentId)) {
-      const targetId = getExerciseId(exercises[firstIncompleteIndex]);
-      setExerciseIndex(firstIncompleteIndex);
-      setStudentCode(drafts[targetId] || '');
-      setVisibleLines(1);
-      setHintIndex(0);
-      setAnswerVisible(true);
-      setRevealSeconds(ANSWER_REVEAL_SECONDS);
-      setLinePulse(null);
-      previousLineComboRef.current = 0;
-      setStudentSelection({ start: 0, end: 0 });
-    }
-  }, [completedIds, exerciseIndex, exercises, firstIncompleteIndex, unitAlreadyCompleted, drafts]);
+    const resumeState = getCodeTraceResumeState(exercises, savedCodeTrace);
+    const currentExerciseIdSet = new Set(exercises.map(getExerciseId).filter(Boolean));
+    const restoredDrafts = Object.fromEntries(
+      Object.entries(savedCodeTrace.drafts || {})
+        .filter(([id, code]) => currentExerciseIdSet.has(id) && typeof code === 'string')
+    );
+
+    setDrafts(restoredDrafts);
+    setExerciseIndex(resumeState.exerciseIndex);
+    setMode(resumeState.mode);
+    setStudentCode(resumeState.studentCode);
+    setVisibleLines(1);
+    setHintIndex(0);
+    setAnswerVisible(true);
+    setRevealSeconds(ANSWER_REVEAL_SECONDS);
+    setLinePulse(null);
+    previousLineComboRef.current = 0;
+    setStudentSelection({ start: 0, end: 0 });
+  }, [exercises, learningProgress?.codeTrace]);
 
   useEffect(() => {
     if (!answerVisible) return undefined;
@@ -1447,14 +1470,11 @@ export default function CodeTracePlayer({
   }
 
   const changeMode = (nextMode) => {
-    if (currentExerciseId) {
-      setDrafts(prev => ({ ...prev, [currentExerciseId]: '' }));
-    }
+    hasLocalSessionInteractionRef.current = true;
     setMode(nextMode);
     setVisibleLines(1);
     setAnswerVisible(true);
     setRevealSeconds(ANSWER_REVEAL_SECONDS);
-    setStudentCode('');
     setHintIndex(0);
     setStudentSelection({ start: 0, end: 0 });
   };
@@ -2424,7 +2444,7 @@ export default function CodeTracePlayer({
               lineCombo={lineCombo}
               indentUnit={indentUnit}
               editorViewRef={studentEditorViewRef}
-              onChange={setStudentCode}
+              onChange={handleStudentCodeChange}
               onSelectionChange={setStudentSelection}
               onLinePulse={pulseEditorLine}
             />

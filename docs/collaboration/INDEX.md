@@ -7,6 +7,7 @@ For an existing task, read its STATE.md and actual artifacts before continuing.
 
 | ID | Goal | Phase | State file | Next action |
 |---|---|---|---|---|
+| 20260911-code-trace-draft-restore | CODE TRACE `오늘은 여기까지` 초안 재진입 복원 | DONE (local; not deployed) | [STATE](tasks/20260911-code-trace-draft-restore/STATE.md) | 두 실제 초안 복원·지연 스냅샷 보호·모드 전환 보존·빌드 통과; Hosting 배포 후 로그인 재진입 확인 |
 | 20260911-studio-input | 코드 스튜디오 input 대화형 입력 | DONE (local) | [STATE](tasks/20260911-studio-input/STATE.md) | 한글·연속 입력·int·정지/재실행·모바일·turtle/pygame 검증 완료, 배포 전 |
 | 20260911-studio-method-loops | pygame 클래스 메서드 일시정지 멈춤 | DONE (local) | [STATE](tasks/20260911-studio-method-loops/STATE.md) | 원본 몬스터 게임 충돌·Enter 재시작·정지 검증, 웹 배포 전 |
 | 20260911-manual-assignment-feedback-38 | 대기중 과제 38건 상세 수동 피드백 | DONE (drafts saved) | [STATE](tasks/20260911-manual-assignment-feedback-38/STATE.md) | 운영툴 AI 초안 38건 확인 후 초안 적용·승인/보완 결정; student-visible 상태 미변경 |

@@ -4236,7 +4236,7 @@ export default function MissionHub({
   }
 
   if (currentMode === 'code') {
-    if (loadingCodeExercises) {
+    if (loadingCodeExercises || loadingProgress) {
       return (
         <div className="space-bg" style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <div style={{ textAlign: 'center', color: 'var(--crystal-cyan)' }}>

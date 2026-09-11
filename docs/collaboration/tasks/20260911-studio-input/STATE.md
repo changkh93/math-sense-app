@@ -26,3 +26,9 @@
 ## Next
 
 Implementation and local verification complete. No user input required. Production msense.me remains undeployed; no server/student data writes performed.
+
+## Follow-up: user screenshot after release
+
+- Read-only live check on 2026-09-11: msense.me/python-game-studio references index-GxeVL_EC.js and PythonGameStudioPage-DwCwsldI.js. The live studio bundle is byte-for-byte identical to the locally tested dist bundle and includes studioBeginInput, INPUT_REQUEST, input_calls, and pgs-input-form. Deployment occurred outside this turn; Codex did not deploy it. Earlier "not deployed" status is superseded for this studio bundle.
+- Screenshot's exact `!pip install ColabTurtlePlus` directive + Colab import + int(input()) + five sequential inputs also passed executable-copy compiler behavior check.
+- Likely stale already-open browser tab/iframe, since it still shows the pre-fix coroutine TypeError. This is an inference; user's tab version was not directly inspected. Recommended reload and rerun without clearing browser site data or changing student code.
