@@ -1,0 +1,10 @@
+import {createRequire} from 'node:module'
+const {chromium}=createRequire(import.meta.url)('/Users/selah/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright')
+const browser=await chromium.launch({headless:true,executablePath:'/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'})
+const page=await browser.newPage({viewport:{width:1600,height:1000}})
+page.on('pageerror',e=>console.log('ERROR',e.message))
+await page.goto('http://127.0.0.1:5180/'+(process.argv[2]||'dev/python-game-studio'))
+await page.waitForTimeout(5000)
+console.log((await page.locator('body').innerText()).slice(0,9000))
+await page.screenshot({path:'/tmp/python-showcase-probe.png'})
+await browser.close()

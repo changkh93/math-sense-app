@@ -1,0 +1,87 @@
+[
+  {
+    "id": "foundation",
+    "music": "Carefree",
+    "audioSHA256": "d7b1dfe05b6cb2defb41093e319ad9ea7639604eae8cb3f9d26f876154553085",
+    "duration": 57.045333,
+    "resolution": [
+      1920,
+      1080
+    ],
+    "fps": 30,
+    "video": "H.264",
+    "audio": "AAC stereo 48 kHz",
+    "sizeMB": 4.52,
+    "integratedLUFS": -20.03,
+    "truePeakDBFS": -5.48,
+    "decode": "pass"
+  },
+  {
+    "id": "lumi",
+    "music": "Cipher",
+    "audioSHA256": "f009e5cf18da3cd807be3433728bc9394b3286c8dc836bcf3d0696e1bdb6be7f",
+    "duration": 57.045333,
+    "resolution": [
+      1920,
+      1080
+    ],
+    "fps": 30,
+    "video": "H.264",
+    "audio": "AAC stereo 48 kHz",
+    "sizeMB": 5.0,
+    "integratedLUFS": -22.5,
+    "truePeakDBFS": -8.43,
+    "decode": "pass"
+  },
+  {
+    "id": "advanced",
+    "music": "Local Forecast",
+    "audioSHA256": "9de04e7d94ca7ae93a55219b739a778b0dd66155c7733ba974c84908b4d2fe3a",
+    "duration": 57.045333,
+    "resolution": [
+      1920,
+      1080
+    ],
+    "fps": 30,
+    "video": "H.264",
+    "audio": "AAC stereo 48 kHz",
+    "sizeMB": 4.47,
+    "integratedLUFS": -20.09,
+    "truePeakDBFS": -10.35,
+    "decode": "pass"
+  },
+  {
+    "id": "math",
+    "music": "Prelude in C (BWV 846)",
+    "audioSHA256": "123949070c2851ac297a44264b20708ef3635ef99939ed9418a1d428326cc041",
+    "duration": 57.045333,
+    "resolution": [
+      1920,
+      1080
+    ],
+    "fps": 30,
+    "video": "H.264",
+    "audio": "AAC stereo 48 kHz",
+    "sizeMB": 4.41,
+    "integratedLUFS": -20.07,
+    "truePeakDBFS": -6.27,
+    "decode": "pass"
+  },
+  {
+    "id": "algorithm",
+    "music": "Thinking Music",
+    "audioSHA256": "7f48bdfc57dd29670c9c05ef7914e761dfd58d51f51adc3a44d003e4526f0d69",
+    "duration": 57.045333,
+    "resolution": [
+      1920,
+      1080
+    ],
+    "fps": 30,
+    "video": "H.264",
+    "audio": "AAC stereo 48 kHz",
+    "sizeMB": 4.53,
+    "integratedLUFS": -20.2,
+    "truePeakDBFS": -3.9,
+    "decode": "pass"
+  }
+]

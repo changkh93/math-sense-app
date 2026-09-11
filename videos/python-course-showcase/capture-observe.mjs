@@ -1,0 +1,7 @@
+import {createRequire} from 'node:module';import {mkdir,writeFile} from 'node:fs/promises';import path from 'node:path';
+const {chromium}=createRequire(import.meta.url)('/Users/selah/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright');
+const dir=path.resolve('videos/python-course-showcase/out/observe');await mkdir(dir,{recursive:true});
+const b=await chromium.launch({headless:true,executablePath:'/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'});const c=await b.newContext({viewport:{width:1600,height:900},recordVideo:{dir,size:{width:1600,height:900}}});const t=Date.now();const p=await c.newPage();
+await p.goto('http://127.0.0.1:5180/videos/python-course-showcase/capture.html?algorithm');await p.getByText('예측 제출 및 확인',{exact:true}).waitFor();await p.waitForTimeout(800);
+const start=(Date.now()-t)/1000;await p.waitForTimeout(2000);await p.getByRole('button',{name:'열림 (True)',exact:true}).nth(0).click();await p.waitForTimeout(2000);await p.getByRole('button',{name:'얼어붙음 (False)',exact:true}).nth(1).click();await p.waitForTimeout(2000);await p.getByRole('button',{name:'열림 (True)',exact:true}).nth(2).click();await p.waitForTimeout(3000);
+await p.screenshot({path:path.join(dir,'screen.png')});const video=await p.video().path();await c.close();await b.close();await writeFile(path.join(dir,'report.json'),JSON.stringify({start,video,description:'Actual public observation UI; predictions selected locally. No graded submission or server evaluation.'}));

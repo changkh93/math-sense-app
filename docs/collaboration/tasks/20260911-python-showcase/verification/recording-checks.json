@@ -1,0 +1,42 @@
+[
+  {
+    "id": "foundation",
+    "recording": "videos/python-course-showcase/out/captures-3",
+    "start": 8.23,
+    "end": 38.231,
+    "result": "18번의 반복으로 나만의 꽃 완성!\n",
+    "browserErrors": []
+  },
+  {
+    "id": "lumi",
+    "recording": "videos/python-course-showcase/out/captures-2",
+    "start": 65.129,
+    "end": 94.015,
+    "result": "←\nLUMI PROTOCOL\n/\nLUMI Protocol Vertical Slice (6 Missions)\n🔊\nPYTHON READY\n1\n어둠 속 신호\n🔒\n첫걸음\n🔒\n에너지 셀까지\n✓\n꺾인 항로\n🔒\n첫 교신\n🔒\nField Test: 자유 항로\nACT 0 · AWAKENING\n꺾인 항로\n지금 어떤 상황인가요?\n\n항로가 직진 후 아래쪽으로 꺾여 있습니다. 명령이 위에서 아래로 차례대로 실행됨을 관찰하세요.\n\n코드로 무엇을 해야 하나요?\n\n위에서 아래로 순차 실행되는 명령을 조합하여 비콘에 도달하세요.\n\n스스로 다시 만들기\n\n배운 원리를 떠올리되, 막히면 단계별 힌트나 완성 코드 보기를 사용할 수 있습니다.\n\n코드 작성 순서\n위에서 아래로 순차 실행되는 명령을 조합하여 비콘에 도달하세요.\n🎯 실행 후 이렇게 되면 성공입니다\n✓목표 좌표 (3, 2) 도달\n순차 실행\n회전 명령\n이번에 사용하는 도구\nlumi.move(distance)\n\nLUMI를 앞으로 distance칸 이동합니다.\n\n예: lumi.move(2)를 작성하면 앞으로 2칸 이동합니다.\nlumi.turn(degrees)\n\nLUMI의 방향을 degrees도만큼 회전합니다.\n\n90은 오른쪽(시계 방향), -90은 왼쪽(반시계 방향)으로 회전합니다.\n단계별 도움말 보기 (0/3)\nTARGET\nLUMI\n💬 \"방향 전환 성공! 꺾인 항로 돌파.\"\n‹\n›\n↻\n▶\n0.5×\n1×\n2×\nSTEP 3/3\n★★☆ SIGNAL UNDERSTOOD\n\n💬 LUMI: \"방향 전환 성공! 꺾인 항로 돌파.\"\n\n⚡ CORE RESTORATION: 60%\n\n축하합니다! 미션의 모든 조건을 성공적으로 달성했습니다.\n\n다음 미션 →\n🎮\nPYGAME로 이어지는 게임 제작 원리\n\nLUMI의 game은 학습용 도구입니다. 실제 pygame과 이름이나 좌표 단위는 다르지만, 아래의 문제 해결 순서가 이어집니다.\n\nLUMI에서 익힌 코드\nlumi.move(2) lumi.turn(90) lumi.move(1)\n나중에 PYGAME에서 만날 코드\nplayer.forward(2) player.angle += 90 player.forward(1)\n💡 공통 생각: 회전과 이동을 결합하여 2차원 공간을 자유롭게 항법한다.\nmain.py\n완성 코드 보기\nRESET\n▶ RUN\n1\n2\n3\nlumi.move(2)\nlumi.turn(90)\nlumi.move(1)\n변수 기록 (MEMORY)\n🛰️ 시스템 객체 (1)\n💻 출력 (OUTPUT)\n\nLINE 3\n\n변수 상태: [EMPTY]",
+    "browserErrors": []
+  },
+  {
+    "id": "advanced",
+    "recording": "videos/python-course-showcase/out/captures-4",
+    "start": 10.812,
+    "end": 40.815,
+    "result": "Tk callbacks verified: imagine → 상상하다 → create → 만들다 → imagine",
+    "browserErrors": []
+  },
+  {
+    "id": "math",
+    "recording": "videos/python-course-showcase/out/captures-3",
+    "start": 38.914,
+    "end": 68.916,
+    "result": "모든 직선은 (0, 1)을 지나갑니다.\n",
+    "browserErrors": []
+  },
+  {
+    "id": "algorithm",
+    "recording": "videos/python-course-showcase/out/captures-2",
+    "start": 11.128,
+    "end": 41.129,
+    "result": "0 열림\n1 닫힘\n2 닫힘\n3 열림\n4 닫힘\n5 닫힘\n6 열림\n7 닫힘\n8 닫힘\n9 열림\n10 닫힘\n11 닫힘\n12초는? True\n",
+    "browserErrors": []
+  }
+]

@@ -1,0 +1,117 @@
+[
+  {
+    "file": "MUSIC-CREDITS.md",
+    "sha256": "8344680194a41d78d2fbb349e4b67c58fba7256f9ce711b0694fcbd541d4f94e",
+    "distMatches": true
+  },
+  {
+    "file": "README.md",
+    "sha256": "ab7d1eedf1b1b3fecf6ae202e35470700de5df0fa5b75b63e066517191400089",
+    "distMatches": true
+  },
+  {
+    "file": "advanced-poster.webp",
+    "sha256": "1153e1328ce88664dd0ceae3ea5487c54b9c0f08a9146bbf1be75a3645425ae4",
+    "distMatches": true
+  },
+  {
+    "file": "advanced-screen.webp",
+    "sha256": "f6f8b6d4d17082c307e0e73b16569bf52dd45b1f8f1b4f9f04d31dca3facec61",
+    "distMatches": true
+  },
+  {
+    "file": "advanced.mp4",
+    "sha256": "cc80a68fd2901b882a89bc2be1f7cb8c68b32ff391bffba52f6931ae628abd81",
+    "distMatches": true
+  },
+  {
+    "file": "advanced.vtt",
+    "sha256": "c6d45850b752febf6b879dfc4b319e6aa8dd806d8272a947359befdff4caacd8",
+    "distMatches": true
+  },
+  {
+    "file": "algorithm-poster.webp",
+    "sha256": "8dcbea4b775c70b9bc4dc2f6547eaabce310c5eebb39a4494867ec4a76e07b83",
+    "distMatches": true
+  },
+  {
+    "file": "algorithm-screen.webp",
+    "sha256": "40ee78c470160fbd160ade08ad6153d950e86c6cae21ad971f51b3f982854a60",
+    "distMatches": true
+  },
+  {
+    "file": "algorithm.mp4",
+    "sha256": "3b44fb02f1fea3a61adbe7dbfb84cf371467de8c7a2ef984b16cc8f2c4f8f392",
+    "distMatches": true
+  },
+  {
+    "file": "algorithm.vtt",
+    "sha256": "a20885329033801e6964b02f9d47193414a794ab00d87b11b3ca53f676134223",
+    "distMatches": true
+  },
+  {
+    "file": "foundation-poster.webp",
+    "sha256": "c15e08a83bf297a65ae7d00b8367717d6e3e13d71bf2fe36b9956de5bdf114cb",
+    "distMatches": true
+  },
+  {
+    "file": "foundation-screen.webp",
+    "sha256": "63cf28676d9e8176943d758b4f31324c3eab7a82da49b5fed1bb48c12f9e8731",
+    "distMatches": true
+  },
+  {
+    "file": "foundation.mp4",
+    "sha256": "f38762dd3a223e0861332fb38357470d03fc062cdf31fb11c84e33f791b05187",
+    "distMatches": true
+  },
+  {
+    "file": "foundation.vtt",
+    "sha256": "acfbae35f0785ebe8ee3d1ad4b1e98f21602bb3c5c69dbfcec5e9f03b0426838",
+    "distMatches": true
+  },
+  {
+    "file": "game-poster.webp",
+    "sha256": "7776da9174c48594bd7689663b32b3dfe5579cfe9bf6d311c036949ea4b568fc",
+    "distMatches": true
+  },
+  {
+    "file": "lumi-poster.webp",
+    "sha256": "77264c1f063e88a706db872e1734dda742361236dba4597c2fa32c2c1ada9d68",
+    "distMatches": true
+  },
+  {
+    "file": "lumi-screen.webp",
+    "sha256": "dbdb7784585cef106bbdacabae2ee38c72aff1c5f62b5de705d19f8472d7832f",
+    "distMatches": true
+  },
+  {
+    "file": "lumi.mp4",
+    "sha256": "8076d3da045141fa373d499e2603b683108c15bef8b77f01701aabeac771c971",
+    "distMatches": true
+  },
+  {
+    "file": "lumi.vtt",
+    "sha256": "88e948b9de42c0699ad1ec8f38e4b28dd144120e59acbd99bc397f16478a6c34",
+    "distMatches": true
+  },
+  {
+    "file": "math-poster.webp",
+    "sha256": "74a7924871e395720f4511fa6268890b6a58609cd8427abbaf83756a28947642",
+    "distMatches": true
+  },
+  {
+    "file": "math-screen.webp",
+    "sha256": "888de4ec426e62b67189030e408bced52160765655d51d109ca5f2b7696df53f",
+    "distMatches": true
+  },
+  {
+    "file": "math.mp4",
+    "sha256": "79df44a62a12105fefa6b15ce917d1249c3bca359f95d8fb682394dd6ff0cea5",
+    "distMatches": true
+  },
+  {
+    "file": "math.vtt",
+    "sha256": "06b4324c420a154598db13d1d790aac816af3b9c27160208aae5d4f08046c556",
+    "distMatches": true
+  }
+]

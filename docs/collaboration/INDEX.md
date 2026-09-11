@@ -7,6 +7,7 @@ For an existing task, read its STATE.md and actual artifacts before continuing.
 
 | ID | Goal | Phase | State file | Next action |
 |---|---|---|---|---|
+| 20260911-python-showcase | 파이썬 전용 소개·체험 신청·과정 영상 5편 | DONE (local) | [STATE](tasks/20260911-python-showcase/STATE.md) | 영상 6편 썸네일·현재 위치·다음 영상 탐색 개선; 모바일·재생 검증, 배포 전 |
 | 20260911-code-studio-rename | 코드 스튜디오 이름·화면 안내 통일 | DONE (local; not deployed) | [STATE](tasks/20260911-code-studio-rename/STATE.md) | 화면·자료·ZIP 이름 통일, Chrome/과제 첨부·20검사·빌드 통과 |
 | 20260910-studio-math-libraries | 파이썬 수학 NumPy·그래프·확률 수업 | DONE (local; not deployed) | [STATE](tasks/20260910-studio-math-libraries/STATE.md) | 실제 WASM 수학 예제·한글 그래프·패키지 재사용·Tk/turtle/pygame 회귀·57검사·빌드 통과 |
 | 20260910-studio-pandas-lessons | 날씨 CSV·pandas 수업 및 퀴즈 1~5 | DONE (local; not deployed) | [STATE](tasks/20260910-studio-pandas-lessons/STATE.md) | 수업/퀴즈·CSV 저장복원·한글 열 자동완성, 정식 pandas 결과 대조·Chrome/Tk 회귀·빌드 확인 |

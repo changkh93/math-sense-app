@@ -1,0 +1,67 @@
+[
+  {
+    "course": "처음 파이썬",
+    "title": "Carefree",
+    "artist": "Kevin MacLeod",
+    "isrc": "USUAN1400037",
+    "filename": "Carefree.mp3",
+    "start": 0,
+    "style": "밝은 우쿨렐레·마림바",
+    "page": "https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1400037",
+    "license": "https://creativecommons.org/licenses/by/4.0/",
+    "sourceSHA256": "8433b770a630d9b1594fd484442c677907ece899a4d149954cd2e74fd733e311",
+    "preparedSHA256": "3fc2855820bcfddce484bea701e928f22ddb2a3ae4d16dd76f862d525f7d2e53"
+  },
+  {
+    "course": "루미 프로토콜",
+    "title": "Cipher",
+    "artist": "Kevin MacLeod",
+    "isrc": "USUAN1100844",
+    "filename": "Cipher2.mp3",
+    "start": 24,
+    "style": "리듬감 있는 신시사이저",
+    "page": "https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1100844",
+    "license": "https://creativecommons.org/licenses/by/4.0/",
+    "sourceSHA256": "d3d0614535a61d748e2fd8d5117fc4d781022a7624794802a2462d8af3fdd522",
+    "preparedSHA256": "501978fc37217eb20d3ed72f5af465118b589efa02aeef5ae354904e332087eb"
+  },
+  {
+    "course": "파이썬 심화",
+    "title": "Local Forecast",
+    "artist": "Kevin MacLeod",
+    "isrc": "USUAN1300010",
+    "filename": "Local Forecast.mp3",
+    "start": 0,
+    "style": "경쾌한 재즈",
+    "page": "https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1300010",
+    "license": "https://creativecommons.org/licenses/by/4.0/",
+    "sourceSHA256": "c0b120cb91a62468f5024162c8942dd2310696c076b6a1df2b88892350575b87",
+    "preparedSHA256": "7f20549f51518795c59b43ac8a19c9c6ebcaec6adde54af76b720572255c34f5"
+  },
+  {
+    "course": "파이썬 수학",
+    "title": "Prelude in C (BWV 846)",
+    "artist": "Kevin MacLeod",
+    "isrc": "USUAN1100689",
+    "filename": "Prelude in C - BWV 846.mp3",
+    "start": 0,
+    "style": "차분한 클래식 피아노",
+    "page": "https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1100689",
+    "license": "https://creativecommons.org/licenses/by/4.0/",
+    "sourceSHA256": "84a391d63e505f5c9b2e75e7bf99e9a773aed2b6c2891030394b9c8e5c1cc01a",
+    "preparedSHA256": "cd51afdd9c7d8b07b44e4876beb280b4457c0e65fb3d24e08c076c82f6d0c9d6"
+  },
+  {
+    "course": "생각의 항로",
+    "title": "Thinking Music",
+    "artist": "Kevin MacLeod",
+    "isrc": "USUAN1600060",
+    "filename": "Thinking Music.mp3",
+    "start": 0,
+    "style": "호기심을 살리는 현악·하프",
+    "page": "https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1600060",
+    "license": "https://creativecommons.org/licenses/by/4.0/",
+    "sourceSHA256": "891d3ea47e443e590a6562a1e2bff37c8830817b3cdf604091f92bfe87e5cc4f",
+    "preparedSHA256": "32b68029986f8b161dbadcc34ebf74075e5ae30bb819c6ad4f899b6e75ee0424"
+  }
+]

@@ -1,0 +1,15 @@
+{
+  "cards": 6,
+  "widths": [
+    1440,
+    1024,
+    768,
+    390,
+    360
+  ],
+  "noOverflow": true,
+  "nextPreviousAndWrap": "pass",
+  "keyboardSelection": "pass",
+  "gameClickGate": "preserved",
+  "autoplay": false
+}

@@ -1,0 +1,11 @@
+import {Audio} from '@remotion/media';
+import {staticFile,interpolate} from 'remotion';
+import {TransitionSeries,linearTiming} from '@remotion/transitions';
+import {fade} from '@remotion/transitions/fade';
+import {chapters,CourseId} from './data';
+import {Intro} from './scenes/Intro';
+import {Demo} from './scenes/Demo';
+import {Insight} from './scenes/Insight';
+import {Flow} from './scenes/Flow';
+import {Outro} from './scenes/Outro';
+export const CourseFilm=({id}:{id:CourseId})=>{const c=chapters[id];return <><Audio src={staticFile(`music/${id}.wav`)} volume={f=>interpolate(f,[0,15,1650,1710],[0,0.8,0.8,0],{extrapolateLeft:'clamp',extrapolateRight:'clamp'})}/><TransitionSeries><TransitionSeries.Sequence durationInFrames={180}><Intro id={id} c={c}/></TransitionSeries.Sequence><TransitionSeries.Transition presentation={fade()} timing={linearTiming({durationInFrames:15})}/><TransitionSeries.Sequence durationInFrames={960}><Demo id={id} c={c}/></TransitionSeries.Sequence><TransitionSeries.Transition presentation={fade()} timing={linearTiming({durationInFrames:15})}/><TransitionSeries.Sequence durationInFrames={210}><Insight c={c}/></TransitionSeries.Sequence><TransitionSeries.Transition presentation={fade()} timing={linearTiming({durationInFrames:15})}/><TransitionSeries.Sequence durationInFrames={210}><Flow/></TransitionSeries.Sequence><TransitionSeries.Transition presentation={fade()} timing={linearTiming({durationInFrames:15})}/><TransitionSeries.Sequence durationInFrames={210}><Outro id={id} c={c}/></TransitionSeries.Sequence></TransitionSeries></>};

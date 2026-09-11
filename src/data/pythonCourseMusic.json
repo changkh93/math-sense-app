@@ -1,0 +1,57 @@
+{
+  "foundation": {
+    "course": "처음 파이썬",
+    "title": "Carefree",
+    "artist": "Kevin MacLeod",
+    "isrc": "USUAN1400037",
+    "filename": "Carefree.mp3",
+    "start": 0,
+    "style": "밝은 우쿨렐레·마림바",
+    "page": "https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1400037",
+    "license": "https://creativecommons.org/licenses/by/4.0/"
+  },
+  "lumi": {
+    "course": "루미 프로토콜",
+    "title": "Cipher",
+    "artist": "Kevin MacLeod",
+    "isrc": "USUAN1100844",
+    "filename": "Cipher2.mp3",
+    "start": 24,
+    "style": "리듬감 있는 신시사이저",
+    "page": "https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1100844",
+    "license": "https://creativecommons.org/licenses/by/4.0/"
+  },
+  "advanced": {
+    "course": "파이썬 심화",
+    "title": "Local Forecast",
+    "artist": "Kevin MacLeod",
+    "isrc": "USUAN1300010",
+    "filename": "Local Forecast.mp3",
+    "start": 0,
+    "style": "경쾌한 재즈",
+    "page": "https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1300010",
+    "license": "https://creativecommons.org/licenses/by/4.0/"
+  },
+  "math": {
+    "course": "파이썬 수학",
+    "title": "Prelude in C (BWV 846)",
+    "artist": "Kevin MacLeod",
+    "isrc": "USUAN1100689",
+    "filename": "Prelude in C - BWV 846.mp3",
+    "start": 0,
+    "style": "차분한 클래식 피아노",
+    "page": "https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1100689",
+    "license": "https://creativecommons.org/licenses/by/4.0/"
+  },
+  "algorithm": {
+    "course": "생각의 항로",
+    "title": "Thinking Music",
+    "artist": "Kevin MacLeod",
+    "isrc": "USUAN1600060",
+    "filename": "Thinking Music.mp3",
+    "start": 0,
+    "style": "호기심을 살리는 현악·하프",
+    "page": "https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1600060",
+    "license": "https://creativecommons.org/licenses/by/4.0/"
+  }
+}

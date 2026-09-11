@@ -43,6 +43,7 @@ const QuestionDetail = lazy(() => import('./pages/Community/QuestionDetail'))
 const PublicProfile = lazy(() => import('./pages/Community/PublicProfile'))
 const PrivacyPolicy = lazy(() => import('./pages/PrivacyPolicy'))
 const InviteHandler = lazy(() => import('./pages/InviteHandler'))
+const PythonEducation = lazy(() => import('./pages/PythonEducation'))
 const PublicApplication = lazy(() => import('./pages/PublicApplication'))
 const VacationCamp = lazy(() => import('./pages/VacationCamp'))
 const Signup = lazy(() => import('./pages/Signup'))
@@ -101,6 +102,8 @@ function App() {
       <Route path="/agora-connect/:uid" element={<Navigate to="/?view=journey" replace />} />
       <Route path="/invite/:inviteCode" element={<InviteHandler />} />
       <Route path="/crew-invite/:crewId" element={<CrewGuestInvite />} />
+      <Route path="/python" element={<PythonEducation />} />
+      <Route path="/trial/python" element={<PythonEducation />} />
       <Route path="/trial" element={<PublicApplication fixedType="trial" />} />
       <Route path="/consultation" element={<PublicApplication fixedType="consultation" />} />
       <Route path="/vacation" element={<VacationCamp />} />

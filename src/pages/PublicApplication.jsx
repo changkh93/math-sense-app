@@ -415,7 +415,7 @@ export default function PublicApplication({ fixedType }) {
             </div>
             {courseCatalog.map(course => (
               <div key={course.id} className="course-comparison__row" role="row">
-                <strong role="cell">{course.name}</strong>
+                <strong role="cell">{course.name}{course.id === 'python-coding' && <Link to={`/python${window.location.search}`} style={{ display: 'block', fontSize: 13, marginTop: 6 }}>파이썬 과정 자세히 보기 ↗</Link>}</strong>
                 <span role="cell">{course.target}</span>
                 <span role="cell">{course.schedule}</span>
                 <b role="cell">{course.price}</b>
