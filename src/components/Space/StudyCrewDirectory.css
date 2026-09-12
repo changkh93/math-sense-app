@@ -44,6 +44,34 @@
   transition: transform .35s ease, filter .35s ease;
 }
 
+.crew-directory-hangar__profile {
+  position: absolute;
+  z-index: 2;
+  inset: 0 0 43px;
+  width: 100%;
+  height: calc(100% - 43px);
+  object-fit: cover;
+  opacity: 0;
+  filter: saturate(.92) contrast(1.04);
+}
+
+.crew-directory-hangar.has-profile-image .crew-directory-hangar__profile {
+  animation: crew-profile-dissolve 12s ease-in-out infinite;
+}
+
+.crew-directory-hangar.has-profile-image .crew-directory-hangar__ship {
+  animation: crew-ship-dissolve 12s ease-in-out infinite;
+}
+
+.crew-directory-hangar.has-profile-image::after {
+  content: '';
+  position: absolute;
+  z-index: 3;
+  inset: 0 0 43px;
+  pointer-events: none;
+  background: linear-gradient(180deg, rgba(2, 7, 21, .08), rgba(2, 7, 21, .22));
+}
+
 .crew-directory-card:hover .crew-directory-hangar__ship {
   transform: translateY(-2px) scale(1.04);
   filter: brightness(1.12) saturate(1.12);
@@ -179,6 +207,16 @@
   50% { transform: rotate(12deg); }
 }
 
+@keyframes crew-profile-dissolve {
+  0%, 33.333%, 100% { opacity: 0; }
+  50%, 83.333% { opacity: 1; }
+}
+
+@keyframes crew-ship-dissolve {
+  0%, 33.333%, 100% { opacity: 1; }
+  50%, 83.333% { opacity: 0; }
+}
+
 @media (max-width: 768px) {
   .crew-directory-guide { grid-template-columns: 1fr; }
   .crew-directory-hangar { height: 146px; }
@@ -187,4 +225,16 @@
 @media (prefers-reduced-motion: reduce) {
   .crew-directory-card:hover .crew-directory-hangar__ship { transform: none; }
   .crew-directory-hangar.is-building .crew-directory-hangar__dock > svg { animation: none; }
+  .crew-directory-hangar.has-profile-image .crew-directory-hangar__profile { animation: none; opacity: 1; }
+  .crew-directory-hangar.has-profile-image .crew-directory-hangar__ship {
+    animation: none;
+    z-index: 4;
+    inset: auto 8px 48px auto;
+    width: 62px;
+    height: 48px;
+    padding: 2px;
+    border: 1px solid rgba(103, 232, 249, .35);
+    border-radius: 10px;
+    background: rgba(2, 10, 28, .82);
+  }
 }

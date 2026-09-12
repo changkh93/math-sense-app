@@ -1,0 +1,34 @@
+# 20260912-study-crew-profile-image
+
+- Original goal: 스터디 크루 운영자, 즉 크루 창설자(리더)가 크루 프로필 이미지를 등록·수정·삭제하고, 목록에서 탐사선과 부드럽게 교차 표시하며, 상세에서는 탐사선/크루 메모 전환과 충돌하지 않게 배치한다.
+- Coordinator: Codex (local implementation; no external relay)
+- Phase: DONE (local; not deployed)
+- Last updated: 2026-09-12 KST
+- Baseline: current working tree; pre-existing unrelated changes in collaboration/marketing and Study Stream planning files are preserved.
+- Acceptance criteria:
+  - Crew founder can select JPG/PNG/WebP, preview, upload/replace, and remove one crew profile image in the existing Crew Settings modal.
+  - Storage and callable authorization restrict writes to that crew's founder or a site admin; metadata is validated server-side.
+  - Crew directory cards crossfade between mothership and crew image with reduced-motion behavior and graceful image failure fallback.
+  - Crew detail shows a stable crew identity visual outside the ship/notes auto-switching canvas.
+  - Crew snapshots propagate image metadata to members.
+  - Focused automated checks and production build pass; responsive/browser behavior is inspected where available.
+- Ownership: Codex owns all task changes and this record. No external writer/worktree.
+- Expected paths: `src/components/Space/StudyCrewView.jsx`, `src/components/Space/StudyCrewDirectory.css`, `src/components/Space/CrewDetailView.jsx`, `src/components/Space/CrewDetailView.css`, `src/pages/Admin/CrewApproval.jsx`, `src/utils/crewProfileImageUtils.js`, `functions/index.js`, `storage.rules`, tests/scripts, this task record and collaboration index.
+- Local changes:
+  - Added the image picker directly to the existing Crew Settings modal for the founder, with 16:9 preview, client compression, upload/replace, old-file cleanup, and metadata-first safe deletion. The site-admin management page retains the same controls.
+  - Added `crew-profile-images/{crewId}` Storage policy (authenticated reads; matching crew `leaderId` or site-admin writes; 2MB stored limit).
+  - Added server validation for paired HTTPS URL/owned path and propagated both fields through member crew snapshots.
+  - Added directory 12-second mothership/photo dissolve with image-load fallback and reduced-motion static photo + ship badge.
+  - Added a stable `CREW IDENTITY` patch above the detail Focus Channel so it never joins the ship/notes auto-switch.
+  - Added focused utility/contract tests and package script.
+  - Follow-up correction: the user's term `운영자` means the Study Crew founder, not only the site administrator. Extended `updateStudyCrew`, Storage rules, detail settings visibility, and tests accordingly.
+- Verification:
+  - `npm run test:crew-profile-image`: PASS, 3/3, including founder-or-site-admin authorization and modal wiring.
+  - Focused ESLint on changed JS/JSX: PASS.
+  - `node --check functions/index.js`: PASS.
+  - `npm run build`: PASS (4,305 modules; existing large-chunk and provisional audio-license notices only).
+  - `git diff --check`: PASS; fsmonitor daemon emitted its pre-existing warning.
+  - Local app booted successfully, but authenticated crew/admin screens could not be visually exercised because localhost had no signed-in session. Layout was checked against the supplied screenshots and responsive CSS; real upload/crossfade still needs post-deploy authenticated smoke testing.
+  - Storage emulator rule compilation was not run because installed Firebase CLI now requires JDK 21 while the workstation has JDK 17. The rule follows Firebase's supported `firestore.get(...)` admin lookup form.
+- Final limitations: not deployed; Cloud Functions, Storage rules, and web must be released together before the feature can work in production.
+- Next action: deploy Functions + Storage rules + web when authorized, then upload a test crew image and verify desktop/mobile crossfade and detail placement with an authenticated admin.

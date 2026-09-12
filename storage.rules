@@ -16,6 +16,18 @@ service firebase.storage {
         request.auth.token.email == 'paul@dulcine.net';
     }
 
+    function isAdmin() {
+      return isMemberAuth() &&
+        firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+
+    function canManageCrewImage(crewId) {
+      return isMemberAuth() && (
+        isAdmin() ||
+        firestore.get(/databases/(default)/documents/crews/$(crewId)).data.leaderId == request.auth.uid
+      );
+    }
+
     // Quiz images are readable by everyone, but writable only by admins
     match /quiz_images/{allPaths=**} {
       allow read: if true;
@@ -71,6 +83,15 @@ service firebase.storage {
         request.resource.size <= 2 * 1024 * 1024 &&
         request.resource.contentType.matches('image/(jpeg|png|webp)');
       allow delete: if isMemberAuth() && request.auth.uid == userId;
+    }
+
+    // Public-facing Study Crew identity art. Only admins can curate it.
+    match /crew-profile-images/{crewId}/{fileName} {
+      allow read: if isMemberAuth();
+      allow create, update: if canManageCrewImage(crewId) &&
+        request.resource.size <= 2 * 1024 * 1024 &&
+        request.resource.contentType.matches('image/(jpeg|png|webp)');
+      allow delete: if canManageCrewImage(crewId);
     }
 
     // Owner-managed reference images for objects placed in a Galaxy world.

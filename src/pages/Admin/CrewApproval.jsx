@@ -1,9 +1,18 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { collection, documentId, getDocs, query, where } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
-import { AlertTriangle, CalendarDays, CheckCircle2, Crown, Edit3, ExternalLink, Link2, RefreshCw, RotateCcw, Save, Sparkles, Trash2, UserMinus, Users, X, XCircle } from 'lucide-react';
-import { db, functions } from '../../firebase';
+import { deleteObject, getDownloadURL, ref, uploadBytes } from 'firebase/storage';
+import { AlertTriangle, CalendarDays, CheckCircle2, Crown, Edit3, ExternalLink, ImagePlus, Link2, RefreshCw, RotateCcw, Save, Sparkles, Trash2, UserMinus, Users, X, XCircle } from 'lucide-react';
+import { db, functions, storage } from '../../firebase';
 import { STUDY_CREW_DAILY_MISSIONS, STUDY_CREW_MISSION_MAX_LENGTH, getStudyCrewMissionForDate, getTodayStudyCrewMissionKey } from '../../components/Space/studyCrewMissionDefaults';
+import { compressImage } from '../../utils/storageUtils';
+import {
+  CREW_PROFILE_IMAGE_ACCEPT,
+  CREW_PROFILE_IMAGE_MAX_STORED_BYTES,
+  buildCrewProfileImageStoragePath,
+  isOwnedCrewProfileImagePath,
+  validateCrewProfileImageFile,
+} from '../../utils/crewProfileImageUtils';
 
 function statusLabel(status) {
   if (status === 'approved') return '승인 완료';
@@ -497,6 +506,117 @@ const fieldStyle = {
   outline: 'none',
 };
 
+function CrewProfileImageManager({ crew, busyId, setBusyId, onSaved }) {
+  const inputRef = useRef(null);
+  const [file, setFile] = useState(null);
+  const [previewUrl, setPreviewUrl] = useState('');
+  const [error, setError] = useState('');
+  const busy = Boolean(busyId);
+  const visibleUrl = previewUrl || crew.profileImageUrl || '';
+
+  useEffect(() => () => {
+    if (previewUrl.startsWith('blob:')) URL.revokeObjectURL(previewUrl);
+  }, [previewUrl]);
+
+  const selectFile = (event) => {
+    const selected = event.target.files?.[0];
+    const validationError = validateCrewProfileImageFile(selected);
+    if (validationError) {
+      setError(validationError);
+      setFile(null);
+      setPreviewUrl('');
+      event.target.value = '';
+      return;
+    }
+    setError('');
+    setFile(selected);
+    setPreviewUrl(URL.createObjectURL(selected));
+  };
+
+  const uploadImage = async () => {
+    if (!file || busy) return;
+    setBusyId(`image:${crew.id}`);
+    setError('');
+    let uploadedPath = '';
+    try {
+      const optimized = await compressImage(file, { maxWidth: 1280, maxHeight: 720, quality: 0.84 });
+      if (optimized.size > CREW_PROFILE_IMAGE_MAX_STORED_BYTES) {
+        throw new Error('압축한 이미지가 2MB를 넘습니다. 더 작은 이미지를 선택해주세요.');
+      }
+      uploadedPath = buildCrewProfileImageStoragePath(crew.id);
+      const uploadedRef = ref(storage, uploadedPath);
+      await uploadBytes(uploadedRef, optimized, {
+        contentType: 'image/jpeg',
+        cacheControl: 'public,max-age=31536000,immutable',
+      });
+      const profileImageUrl = await getDownloadURL(uploadedRef);
+      await httpsCallable(functions, 'adminUpdateStudyCrewDetails')({
+        crewId: crew.id,
+        profileImageUrl,
+        profileImagePath: uploadedPath,
+      });
+      if (isOwnedCrewProfileImagePath(crew.profileImagePath, crew.id) && crew.profileImagePath !== uploadedPath) {
+        deleteObject(ref(storage, crew.profileImagePath)).catch((cleanupError) => console.warn('이전 크루 이미지 정리 실패:', cleanupError));
+      }
+      setFile(null);
+      setPreviewUrl('');
+      if (inputRef.current) inputRef.current.value = '';
+      await onSaved('크루 프로필 이미지를 저장했습니다.');
+    } catch (uploadError) {
+      console.error('Failed to upload crew profile image:', uploadError);
+      if (uploadedPath) deleteObject(ref(storage, uploadedPath)).catch(() => {});
+      setError(uploadError?.message || '크루 이미지를 저장하지 못했습니다.');
+    } finally {
+      setBusyId('');
+    }
+  };
+
+  const removeImage = async () => {
+    if (!crew.profileImageUrl || busy || !window.confirm(`"${crew.name}" 크루 프로필 이미지를 삭제할까요?`)) return;
+    setBusyId(`image-remove:${crew.id}`);
+    setError('');
+    try {
+      await httpsCallable(functions, 'adminUpdateStudyCrewDetails')({
+        crewId: crew.id,
+        profileImageUrl: '',
+        profileImagePath: '',
+      });
+      if (isOwnedCrewProfileImagePath(crew.profileImagePath, crew.id)) {
+        await deleteObject(ref(storage, crew.profileImagePath)).catch((cleanupError) => console.warn('크루 이미지 파일 정리 실패:', cleanupError));
+      }
+      setFile(null);
+      setPreviewUrl('');
+      if (inputRef.current) inputRef.current.value = '';
+      await onSaved('크루 프로필 이미지를 삭제했습니다.');
+    } catch (removeError) {
+      console.error('Failed to remove crew profile image:', removeError);
+      setError(removeError?.message || '크루 이미지를 삭제하지 못했습니다.');
+    } finally {
+      setBusyId('');
+    }
+  };
+
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(240px, 100%), 1fr))', gap: '1rem', marginTop: '1rem', padding: '1rem', borderRadius: 10, border: '1px solid rgba(56,189,248,.2)', background: 'rgba(2,132,199,.055)' }}>
+      <div style={{ aspectRatio: '16 / 9', borderRadius: 10, overflow: 'hidden', display: 'grid', placeItems: 'center', background: '#07101f', border: '1px dashed rgba(125,211,252,.3)' }}>
+        {visibleUrl
+          ? <img src={visibleUrl} alt={`${crew.name || '스터디'} 크루 프로필 미리보기`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+          : <div style={{ color: '#64748b', textAlign: 'center', fontSize: '.82rem' }}><ImagePlus size={28} /><div>등록된 이미지 없음</div></div>}
+      </div>
+      <div style={{ display: 'grid', alignContent: 'center', gap: '.6rem' }}>
+        <div><strong style={{ color: '#e0f2fe' }}>크루 프로필 이미지</strong><div style={{ color: '#94a3b8', fontSize: '.78rem', lineHeight: 1.5, marginTop: '.25rem' }}>가로형 16:9 권장 · JPG/PNG/WebP · 원본 5MB 이하</div></div>
+        <input ref={inputRef} type="file" accept={CREW_PROFILE_IMAGE_ACCEPT} onChange={selectFile} disabled={busy} style={{ display: 'none' }} />
+        <div style={{ display: 'flex', gap: '.5rem', flexWrap: 'wrap' }}>
+          <button type="button" className="admin-btn secondary" onClick={() => inputRef.current?.click()} disabled={busy}><ImagePlus size={15} /> {crew.profileImageUrl ? '이미지 교체' : '이미지 선택'}</button>
+          {file && <button type="button" className="admin-btn primary" onClick={uploadImage} disabled={busy}><Save size={15} /> 업로드 확정</button>}
+          {crew.profileImageUrl && <button type="button" className="admin-btn danger" onClick={removeImage} disabled={busy}><Trash2 size={15} /> 이미지 삭제</button>}
+        </div>
+        {error && <div role="alert" style={{ color: '#fca5a5', fontSize: '.8rem', lineHeight: 1.45 }}>{error}</div>}
+      </div>
+    </div>
+  );
+}
+
 export default function CrewApproval() {
   const [crews, setCrews] = useState([]);
   const [openPools, setOpenPools] = useState([]);
@@ -548,6 +668,11 @@ export default function CrewApproval() {
 
   const setCrewDraft = (crewId, patch) => {
     setEditDrafts(prev => ({ ...prev, [crewId]: { ...(prev[crewId] || {}), ...patch } }));
+  };
+
+  const handleProfileImageSaved = async (nextMessage) => {
+    await refreshData();
+    setMessage(nextMessage);
   };
 
   const approveCrew = async (crew) => {
@@ -796,6 +921,13 @@ export default function CrewApproval() {
                       {' · '}이벤트 참여 완료 회원 {members.filter((member) => member.crewGrowthEvent2026RewardedAtMs > 0).length}명
                     </div>
                   )}
+
+                  <CrewProfileImageManager
+                    crew={crew}
+                    busyId={busyId}
+                    setBusyId={setBusyId}
+                    onSaved={handleProfileImageSaved}
+                  />
 
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(230px, 100%), 1fr))', gap: '0.8rem', marginTop: '1rem' }}>
                     <label style={{ display: 'grid', gap: '0.35rem' }}>

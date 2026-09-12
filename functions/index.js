@@ -6387,6 +6387,8 @@ function buildCrewSnapshot(crewId, crewData, memberSummaries = [], greetings = [
     groupName: crewData.groupName || '자유 스터디',
     clusterId: crewData.clusterId || '',
     clusterName: crewData.clusterName || '',
+    profileImageUrl: crewData.profileImageUrl || '',
+    profileImagePath: crewData.profileImagePath || '',
     scheduleDays: Array.isArray(crewData.scheduleDays) ? crewData.scheduleDays : [],
     scheduleTimes: crewData.scheduleTimes || {},
     status: crewData.status || 'pending',
@@ -6519,6 +6521,22 @@ function normalizeCrewSchedule(scheduleDays, scheduleTimes) {
     times[day] = /^\d{2}:\d{2}$/.test(rawTime) ? rawTime : "20:00";
   });
   return { scheduleDays: days, scheduleTimes: times };
+}
+
+function normalizeCrewProfileImageUpdate(data, crewId, crewData = {}) {
+  const hasUpdate = Object.prototype.hasOwnProperty.call(data || {}, "profileImageUrl")
+    || Object.prototype.hasOwnProperty.call(data || {}, "profileImagePath");
+  const profileImageUrl = String(data?.profileImageUrl ?? crewData.profileImageUrl ?? "").trim();
+  const profileImagePath = String(data?.profileImagePath ?? crewData.profileImagePath ?? "").trim();
+  if (hasUpdate) {
+    const validPath = !profileImagePath || profileImagePath.startsWith(`crew-profile-images/${crewId}/`);
+    const validUrl = !profileImageUrl || /^https:\/\//i.test(profileImageUrl);
+    const hasCompletePair = Boolean(profileImageUrl) === Boolean(profileImagePath);
+    if (!validPath || !validUrl || !hasCompletePair || profileImageUrl.length > 2048 || profileImagePath.length > 320) {
+      throw new functions.https.HttpsError("invalid-argument", "크루 프로필 이미지 정보가 올바르지 않습니다.");
+    }
+  }
+  return { hasUpdate, profileImageUrl, profileImagePath };
 }
 
 function uniqueIds(ids = []) {
@@ -8327,6 +8345,7 @@ exports.updateStudyCrew = regionalFunctions.https.onCall(async (data, context) =
     data?.scheduleDays ?? crewData.scheduleDays,
     data?.scheduleTimes ?? crewData.scheduleTimes,
   );
+  const profileImageUpdate = normalizeCrewProfileImageUpdate(data, crewId, crewData);
 
   let updatedCrew;
   let nameChangeResult = null;
@@ -8410,6 +8429,12 @@ exports.updateStudyCrew = regionalFunctions.https.onCall(async (data, context) =
       groupName: nextGroupName,
       clusterId: nextClusterId,
       clusterName: nextClusterName,
+      ...(profileImageUpdate.hasUpdate ? {
+        profileImageUrl: profileImageUpdate.profileImageUrl,
+        profileImagePath: profileImageUpdate.profileImagePath,
+        profileImageUpdatedAt: now,
+        profileImageUpdatedBy: uid,
+      } : {}),
       ...nextSchedule,
       updatedAt: now,
     };
@@ -9515,6 +9540,8 @@ exports.adminUpdateStudyCrewDetails = regionalFunctions.https.onCall(async (data
     await assertCrewNameAvailable(db, initialNamePolicy.canonical, crewId);
   }
 
+  const profileImageUpdate = normalizeCrewProfileImageUpdate(data, crewId, crewData);
+
   let updatedCrew;
   await db.runTransaction(async (tx) => {
     const freshCrewSnap = await tx.get(crewRef);
@@ -9575,6 +9602,12 @@ exports.adminUpdateStudyCrewDetails = regionalFunctions.https.onCall(async (data
       groupName: String(data?.groupName ?? freshCrew.groupName ?? "자유 스터디").trim().slice(0, 80) || "자유 스터디",
       clusterId: String(data?.clusterId ?? freshCrew.clusterId ?? "").trim().slice(0, 120),
       clusterName: String(data?.clusterName ?? freshCrew.clusterName ?? "").trim().slice(0, 120),
+      ...(profileImageUpdate.hasUpdate ? {
+        profileImageUrl: profileImageUpdate.profileImageUrl,
+        profileImagePath: profileImageUpdate.profileImagePath,
+        profileImageUpdatedAt: now,
+        profileImageUpdatedBy: adminUid,
+      } : {}),
       ...normalizedSchedule,
       updatedAt: now,
     };

@@ -1,11 +1,20 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { motion as Motion, AnimatePresence } from 'framer-motion';
-import { Crown, Edit3, LockKeyhole, ShieldCheck, X } from 'lucide-react';
+import { Crown, Edit3, ImagePlus, LockKeyhole, Save, ShieldCheck, Trash2, X } from 'lucide-react';
 import { httpsCallable } from 'firebase/functions';
-import { functions } from '../../firebase';
+import { deleteObject, getDownloadURL, ref, uploadBytes } from 'firebase/storage';
+import { functions, storage } from '../../firebase';
 import { useAuth } from '../../hooks/useAuth';
 import { useClusters } from '../../hooks/useContent';
 import soundManager from '../../utils/SoundManager';
+import { compressImage } from '../../utils/storageUtils';
+import {
+  CREW_PROFILE_IMAGE_ACCEPT,
+  CREW_PROFILE_IMAGE_MAX_STORED_BYTES,
+  buildCrewProfileImageStoragePath,
+  isOwnedCrewProfileImagePath,
+  validateCrewProfileImageFile,
+} from '../../utils/crewProfileImageUtils';
 import { CREW_SCHEDULE_DAYS, getDefaultScheduleTimes, normalizeScheduleDays } from './crewSchedule';
 
 const CREW_GROUP_PRESETS = [
@@ -26,6 +35,117 @@ const inputStyle = {
   outline: 'none',
   fontFamily: 'var(--font-tech)',
 };
+
+function CrewLeaderProfileImageEditor({ crew, busy, setBusy, setMessage }) {
+  const inputRef = useRef(null);
+  const [file, setFile] = useState(null);
+  const [previewUrl, setPreviewUrl] = useState('');
+  const [error, setError] = useState('');
+  const visibleUrl = previewUrl || crew?.profileImageUrl || '';
+
+  useEffect(() => () => {
+    if (previewUrl.startsWith('blob:')) URL.revokeObjectURL(previewUrl);
+  }, [previewUrl]);
+
+  const selectImage = (event) => {
+    const selected = event.target.files?.[0];
+    const validationError = validateCrewProfileImageFile(selected);
+    if (validationError) {
+      setFile(null);
+      setPreviewUrl('');
+      setError(validationError);
+      event.target.value = '';
+      return;
+    }
+    setFile(selected);
+    setPreviewUrl(URL.createObjectURL(selected));
+    setError('');
+    setMessage('');
+    soundManager.playClick();
+  };
+
+  const uploadImage = async () => {
+    if (!crew?.id || !file || busy) return;
+    setBusy(true);
+    setError('');
+    setMessage('');
+    let uploadedPath = '';
+    try {
+      const optimized = await compressImage(file, { maxWidth: 1280, maxHeight: 720, quality: 0.84 });
+      if (optimized.size > CREW_PROFILE_IMAGE_MAX_STORED_BYTES) {
+        throw new Error('압축한 이미지가 2MB를 넘습니다. 더 작은 이미지를 선택해주세요.');
+      }
+      uploadedPath = buildCrewProfileImageStoragePath(crew.id);
+      const uploadedRef = ref(storage, uploadedPath);
+      await uploadBytes(uploadedRef, optimized, {
+        contentType: 'image/jpeg',
+        cacheControl: 'public,max-age=31536000,immutable',
+      });
+      const profileImageUrl = await getDownloadURL(uploadedRef);
+      await httpsCallable(functions, 'updateStudyCrew')({
+        crewId: crew.id,
+        profileImageUrl,
+        profileImagePath: uploadedPath,
+      });
+      if (isOwnedCrewProfileImagePath(crew.profileImagePath, crew.id) && crew.profileImagePath !== uploadedPath) {
+        deleteObject(ref(storage, crew.profileImagePath)).catch((cleanupError) => console.warn('이전 크루 이미지 정리 실패:', cleanupError));
+      }
+      setFile(null);
+      setPreviewUrl('');
+      if (inputRef.current) inputRef.current.value = '';
+      setMessage('크루 프로필 이미지를 저장했습니다. 목록과 크루 화면에 바로 반영됩니다.');
+    } catch (uploadError) {
+      console.error('Failed to upload crew profile image:', uploadError);
+      if (uploadedPath) deleteObject(ref(storage, uploadedPath)).catch(() => {});
+      setError(String(uploadError?.message || '크루 이미지를 저장하지 못했습니다.').replace(/^FirebaseError:\s*/i, ''));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const removeImage = async () => {
+    if (!crew?.id || !crew.profileImageUrl || busy || !window.confirm('크루 프로필 이미지를 삭제할까요?')) return;
+    setBusy(true);
+    setError('');
+    setMessage('');
+    try {
+      await httpsCallable(functions, 'updateStudyCrew')({ crewId: crew.id, profileImageUrl: '', profileImagePath: '' });
+      if (isOwnedCrewProfileImagePath(crew.profileImagePath, crew.id)) {
+        await deleteObject(ref(storage, crew.profileImagePath)).catch((cleanupError) => console.warn('크루 이미지 파일 정리 실패:', cleanupError));
+      }
+      setFile(null);
+      setPreviewUrl('');
+      if (inputRef.current) inputRef.current.value = '';
+      setMessage('크루 프로필 이미지를 삭제했습니다.');
+    } catch (removeError) {
+      console.error('Failed to remove crew profile image:', removeError);
+      setError(String(removeError?.message || '크루 이미지를 삭제하지 못했습니다.').replace(/^FirebaseError:\s*/i, ''));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <section style={{ display: 'grid', gap: '0.7rem', padding: '0.9rem', border: '1px solid rgba(0,243,255,.2)', borderRadius: 12, background: 'rgba(0,243,255,.045)' }}>
+      <div>
+        <div className="font-tech" style={{ color: 'var(--crystal-cyan)', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '.4rem' }}><ImagePlus size={16} /> 크루 프로필 이미지</div>
+        <div className="font-tech" style={{ color: 'var(--text-muted)', fontSize: '.76rem', marginTop: '.3rem', lineHeight: 1.5 }}>크루 창설자가 등록·교체·삭제합니다. 가로형 16:9 권장 · JPG/PNG/WebP · 5MB 이하</div>
+      </div>
+      <div style={{ aspectRatio: '16 / 7', borderRadius: 10, overflow: 'hidden', display: 'grid', placeItems: 'center', background: 'rgba(2,6,23,.75)', border: '1px dashed rgba(103,232,249,.3)' }}>
+        {visibleUrl
+          ? <img src={visibleUrl} alt={`${crew.name || '스터디'} 크루 프로필 미리보기`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+          : <div className="font-tech" style={{ color: 'rgba(255,255,255,.38)', textAlign: 'center', fontSize: '.78rem' }}><ImagePlus size={28} /><div>등록된 이미지가 없습니다</div></div>}
+      </div>
+      <input ref={inputRef} type="file" accept={CREW_PROFILE_IMAGE_ACCEPT} onChange={selectImage} disabled={busy} style={{ display: 'none' }} />
+      <div style={{ display: 'flex', gap: '.5rem', flexWrap: 'wrap' }}>
+        <button type="button" className="space-nav-link font-tech" onClick={() => inputRef.current?.click()} disabled={busy} style={{ borderRadius: 8, display: 'inline-flex', alignItems: 'center', gap: '.4rem' }}><ImagePlus size={15} /> {crew.profileImageUrl ? '이미지 교체' : '이미지 선택'}</button>
+        {file && <button type="button" className="space-btn cosmic-btn font-tech" onClick={uploadImage} disabled={busy} style={{ borderRadius: 8, display: 'inline-flex', alignItems: 'center', gap: '.4rem', padding: '.55rem .8rem' }}><Save size={15} /> 업로드 확정</button>}
+        {crew.profileImageUrl && <button type="button" className="space-nav-link font-tech" onClick={removeImage} disabled={busy} style={{ borderRadius: 8, display: 'inline-flex', alignItems: 'center', gap: '.4rem', color: '#fca5a5' }}><Trash2 size={15} /> 이미지 삭제</button>}
+      </div>
+      {error && <div role="alert" className="font-tech" style={{ color: '#fca5a5', fontSize: '.78rem', lineHeight: 1.45 }}>{error}</div>}
+    </section>
+  );
+}
 
 export default function CrewSettingsModal({ isOpen, onClose, crew }) {
   const { user, userData } = useAuth();
@@ -235,6 +355,8 @@ export default function CrewSettingsModal({ isOpen, onClose, crew }) {
           </div>
 
           <div style={{ display: 'grid', gap: '0.9rem', marginBottom: '1rem' }}>
+            <CrewLeaderProfileImageEditor crew={crew} busy={busy} setBusy={setBusy} setMessage={setMessage} />
+
             <label style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
               <span className="font-tech" style={{ color: 'var(--crystal-cyan)', fontWeight: 700 }}>크루 이름</span>
               <input

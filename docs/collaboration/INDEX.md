@@ -7,6 +7,8 @@ For an existing task, read its STATE.md and actual artifacts before continuing.
 
 | ID | Goal | Phase | State file | Next action |
 |---|---|---|---|---|
+| 20260912-study-crew-profile-image | 스터디 크루 프로필 이미지 관리·목록 교차·상세 배치 | DONE (local; not deployed) | [STATE](tasks/20260912-study-crew-profile-image/STATE.md) | 함수·Storage 규칙·웹 함께 배포 후 운영자 업로드/모바일 실기 확인 |
+| 20260911-study-stream-30-sfu-plan | 크루 Google Meet를 최대 30명 앱 내부 Study Stream으로 전환 | DONE (design only; not implemented) | [STATE](tasks/20260911-study-stream-30-sfu-plan/STATE.md) | Cloudflare Realtime SFU 권장안·비용·대안·파일럿 계획 완성; 구현 시 Phase 0 안전 상한부터 |
 | 20260911-code-trace-draft-restore | CODE TRACE 초안 복원·Python 자동 추천·괄호 자동 닫기 | DONE (local; not deployed) | [STATE](tasks/20260911-code-trace-draft-restore/STATE.md) | 실제 초안 복원·자동완성 11군·괄호 통합·빌드 통과; Hosting 배포 후 로그인 실기 확인 |
 | 20260911-studio-input | 코드 스튜디오 input 대화형 입력 | DONE (local) | [STATE](tasks/20260911-studio-input/STATE.md) | 한글·연속 입력·int·정지/재실행·모바일·turtle/pygame 검증 완료, 배포 전 |
 | 20260911-studio-method-loops | pygame 클래스 메서드 일시정지 멈춤 | DONE (local) | [STATE](tasks/20260911-studio-method-loops/STATE.md) | 원본 몬스터 게임 충돌·Enter 재시작·정지 검증, 웹 배포 전 |
@@ -24,7 +26,7 @@ For an existing task, read its STATE.md and actual artifacts before continuing.
 | 20260910-quiz-progress-wording | 퀴즈 진행 숫자·나중에 풀기 안내 개선 | DONE (local; not deployed) | [STATE](tasks/20260910-quiz-progress-wording/STATE.md) | 전체 기준 답 선택 현황·고정 문제 번호·명확한 보류 안내, 회귀·브라우저·빌드 확인; 웹 배포 전 |
 | 20260910-unified-math-input | 수식 입력 모달 통일 및 + 누락 해결 | ACTIVE | [STATE](tasks/20260910-unified-math-input/STATE.md) | 공통 키패드·같은 모달 내 직접 입력 구현 및 회귀 검증 |
 | 20260910-dark-matter-tablet-focus | 패드 다크매터 퀴즈 잠금·복귀 개선 | DONE (local; not deployed) | [STATE](tasks/20260910-dark-matter-tablet-focus/STATE.md) | visible blur 오탐·잠금 중 중복·복귀 무응답·투명 레이어 수정, 진단 보강. 세션/화면/빌드 검증 완료; 웹 배포 및 실물 패드 확인 남음 |
-| 20260910-smartstore-growth | 둘시네 스마트스토어 세 상품군 점검·검색 및 판매 개선 | PARTIAL / UI_BLOCKED | [STATE](tasks/20260910-smartstore-growth/STATE.md) | 30일 판매전략 작성. 수학12개·전시·오뒷세이아상세 개선 확인. 광고그룹 저장결과 미검증/소재 미등록. 복구문의·상품정합성·대표3개 샘플 우선 |
+| 20260910-smartstore-growth | 둘시네 스마트스토어 세 상품군 점검·검색 및 판매 개선 | PARTIAL / REVIEW_PENDING | [STATE](tasks/20260910-smartstore-growth/STATE.md) | 9/12 분수 상세 개편 완료. 리뷰 AI Basic 월19,900원 네이버 신청 저장·자동충전 등록 완료. 공급사 가입 기본정보 입력 완료, 사용자 비밀번호 설정·휴대폰 인증 대기. 오뒷세이아 리뷰0으로 덧뺄셈 대체 예정. 기존 복구/광고·메시지 성과 후속 남음 |
 | 20260910-game-studio-distribution | 게임 스튜디오 채널 배포·오늘 마케팅 실행 | DONE (distribution) | [STATE](tasks/20260910-game-studio-distribution/STATE.md) | 게임3채널·곱셈 수정YouTube 공개, 접수·교류 기록 완료; 알림 연동 후속 확인 |
 | 20260910-game-projects-parent-reel | 학부모 대상 게임 프로젝트 쇼츠·릴스 홍보 영상 | DONE | [STATE](tasks/20260910-game-projects-parent-reel/STATE.md) | 36초 세로 MP4 v2·표지·게시 문구 완성. 전환음 제거, Pixelland 음악/출처 적용·음량 검증 |
 | 20260910-mars-expedition-intro-video | 화성 탐사대 1분 실제 플레이·한글 설명 영상 | DONE | [STATE](tasks/20260910-mars-expedition-intro-video/STATE.md) | 1분 1080p MP4, 한글 애니메이션·게임 음악/효과음, 15시점 시각 검증 완료 |

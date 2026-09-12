@@ -275,6 +275,8 @@ function FounderLetterPanel({ crew, founderId, founderName, currentUid }) {
 }
 
 function CrewDirectoryHangar({ crew, isMyCrew, isApproved }) {
+  const [imageReady, setImageReady] = useState(false);
+  const [imageFailed, setImageFailed] = useState(false);
   const level = getCrewMothershipLevel(crew);
   const equippedModules = getEquippedCrewModules(crew);
   const project = crew?.currentMothershipProject?.status === 'funding' ? crew.currentMothershipProject : null;
@@ -291,11 +293,22 @@ function CrewDirectoryHangar({ crew, isMyCrew, isApproved }) {
         : { label: '공동 건설소', detail: '첫 모함 시설을 함께 건설해 보세요.' };
 
   return (
-    <div className={`crew-directory-hangar ${project ? 'is-building' : ''}`} style={{ '--crew-directory-accent': crew.color || '#00d4ff' }}>
+    <div className={`crew-directory-hangar ${project ? 'is-building' : ''} ${imageReady && !imageFailed ? 'has-profile-image' : ''}`} style={{ '--crew-directory-accent': crew.color || '#00d4ff' }}>
       <div className="crew-directory-hangar__space" aria-hidden="true" />
       <div className="crew-directory-hangar__ship">
         <CrewMothership crew={crew} variant="directory" />
       </div>
+      {crew.profileImageUrl && !imageFailed && (
+        <img
+          className="crew-directory-hangar__profile"
+          src={crew.profileImageUrl}
+          alt={`${crew.name || '스터디'} 크루 프로필`}
+          loading="lazy"
+          decoding="async"
+          onLoad={(event) => setImageReady(event.currentTarget.naturalWidth > 0)}
+          onError={() => setImageFailed(true)}
+        />
+      )}
       <div className="crew-directory-hangar__level font-tech">
         <span>LV.{level.level}</span>
         <strong>{level.name}</strong>
@@ -354,7 +367,7 @@ function CrewCard({ crew, userUid, userCrewId, onClick, onlineCount = 0, presenc
         boxShadow: isMyCrew ? '0 0 20px rgba(0,243,255,0.08)' : 'none'
       }}
     >
-      <CrewDirectoryHangar crew={crew} isMyCrew={isMyCrew} isApproved={isApproved} />
+      <CrewDirectoryHangar key={crew.profileImageUrl || 'no-profile-image'} crew={crew} isMyCrew={isMyCrew} isApproved={isApproved} />
       <div style={{ display: 'flex', alignItems: 'start', gap: '0.85rem' }}>
         <div style={{
           width: 44, height: 44, borderRadius: 10, flexShrink: 0,

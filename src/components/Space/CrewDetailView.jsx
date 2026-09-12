@@ -64,6 +64,21 @@ function getMemberClusterDays(participation, clusterNameMap) {
 function getCrewStatusLabel(s) { return s === 'approved' ? '인증 완료' : s === 'rejected' ? '반려됨' : '운영자 승인 대기'; }
 function getCrewStatusColor(s) { return s === 'approved' ? 'var(--planet-green)' : s === 'rejected' ? '#f87171' : 'var(--planet-orange)'; }
 function getMemberLabel(m, f = '크루 멤버') { return m?.publicDisplayName || m?.studentName || m?.name || m?.displayName || f; }
+
+function CrewIdentityPatch({ crew }) {
+  const [failed, setFailed] = useState(false);
+  if (!crew?.profileImageUrl || failed) return null;
+  return (
+    <figure className="crew-identity-patch">
+      <img src={crew.profileImageUrl} alt={`${crew.name || '스터디'} 크루 프로필`} onError={() => setFailed(true)} />
+      <figcaption className="font-tech">
+        <span>CREW IDENTITY</span>
+        <strong>{crew.name || '스터디 크루'}</strong>
+      </figcaption>
+    </figure>
+  );
+}
+
 function getTodayKey() { return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Seoul' }).format(new Date()); }
 function getPresenceInfo(profile) {
   const liveStatus = profile?.liveStatus;
@@ -1291,6 +1306,7 @@ export default function CrewDetailView({ onBack }) {
           </div>
 
           <aside className="crew-launch-console">
+            <CrewIdentityPatch key={crew.profileImageUrl || 'no-profile-image'} crew={crew} />
             <div className="crew-launch-label font-tech"><Radio size={14} /> FOCUS CHANNEL</div>
             <strong className="font-title">집중 모드 준비 완료</strong>
             <span className="font-tech">Google Meet에서 크루원과 바로 연결됩니다.</span>
@@ -1607,11 +1623,11 @@ export default function CrewDetailView({ onBack }) {
         )}
       </AnimatePresence>
 
-      {userData?.crewRole === 'leader' && (
+      {(isLeader || userData?.role === 'admin') && (
         <section className="glass-card hud-border" style={{ padding: '1.2rem', borderRadius: 12 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
             <h3 className="font-tech" style={{ color: 'var(--crystal-cyan)', margin: 0, display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
-              <Crown size={16} /> 리더 설정
+              <Crown size={16} /> {isLeader ? '크루 창설자 설정' : '운영자 크루 설정'}
             </h3>
             <button
               type="button"
@@ -1623,7 +1639,7 @@ export default function CrewDetailView({ onBack }) {
             </button>
           </div>
           <div className="font-tech" style={{ color: 'var(--text-muted)', lineHeight: 1.55, marginTop: '0.8rem' }}>
-            크루 이름, 모토, 군집, 엠블럼은 거의 수정하지 않는 값입니다. 버튼을 눌러 모달에서만 변경하세요.
+            크루 프로필 이미지와 이름, 모토, 군집, 엠블럼을 이 설정 모달에서 관리합니다.
           </div>
         </section>
       )}

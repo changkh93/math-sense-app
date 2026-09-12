@@ -51,6 +51,7 @@
     "test:frontier-story": "node scripts/test-frontier-story-utils.mjs",
     "test:guest-galaxy": "node scripts/test-guest-galaxy-data.mjs",
     "test:profile-image": "node scripts/test-profile-image-utils.mjs",
+    "test:crew-profile-image": "node --test scripts/test-crew-profile-image.mjs",
     "test:profile-performance": "node scripts/test-profile-performance.mjs",
     "test:lumi-rover": "node functions/galaxyGame.rover.test.cjs && node functions/galaxyGame.story.test.cjs && node scripts/test-guest-galaxy-data.mjs && node scripts/test-lumi-rover-contract.mjs",
     "test:workbook-persistence": "node scripts/test-workbook-loss-reproduction.mjs && node scripts/test-workbook-persistence.mjs",
