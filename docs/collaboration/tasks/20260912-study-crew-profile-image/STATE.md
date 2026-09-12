@@ -2,7 +2,7 @@
 
 - Original goal: 스터디 크루 운영자, 즉 크루 창설자(리더)가 크루 프로필 이미지를 등록·수정·삭제하고, 목록에서 탐사선과 부드럽게 교차 표시하며, 상세에서는 탐사선/크루 메모 전환과 충돌하지 않게 배치한다.
 - Coordinator: Codex (local implementation; no external relay)
-- Phase: DONE (local; not deployed)
+- Phase: DEPLOYED (Firebase Hosting, Functions, Firestore, Storage)
 - Last updated: 2026-09-12 KST
 - Baseline: current working tree; pre-existing unrelated changes in collaboration/marketing and Study Stream planning files are preserved.
 - Acceptance criteria:
