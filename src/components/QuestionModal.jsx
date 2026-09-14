@@ -13,6 +13,24 @@ import { useSpeechToText } from '../hooks/useSpeechToText';
 import { AGORA_BOUNTY_OPTIONS, getAnonymousLabel } from '../utils/socialUtils';
 import './QuestionModal.css';
 
+const PDFJS_VERSION = '4.4.168';
+const PDFJS_MODULE_URL = `https://cdn.jsdelivr.net/npm/pdfjs-dist@${PDFJS_VERSION}/build/pdf.min.mjs`;
+const PDFJS_WORKER_URL = `https://cdn.jsdelivr.net/npm/pdfjs-dist@${PDFJS_VERSION}/build/pdf.worker.min.mjs`;
+let pdfJsModulePromise = null;
+
+const loadPdfJs = async () => {
+  if (!pdfJsModulePromise) {
+    pdfJsModulePromise = import(/* @vite-ignore */ PDFJS_MODULE_URL).catch((error) => {
+      pdfJsModulePromise = null;
+      throw error;
+    });
+  }
+
+  const pdfjsLib = await pdfJsModulePromise;
+  pdfjsLib.GlobalWorkerOptions.workerSrc = PDFJS_WORKER_URL;
+  return pdfjsLib;
+};
+
 export default function QuestionModal({ isOpen, onClose, quizContext, contextData }) {
   const activeContext = quizContext || contextData;
   const queryClient = useQueryClient();
@@ -239,37 +257,6 @@ export default function QuestionModal({ isOpen, onClose, quizContext, contextDat
     return htmlToImage.toPng(element, captureOptions);
   };
 
-  const capturePdfFallbackToDataUrl = async (element) => {
-    if (!element) return null;
-
-    const iframes = element.querySelectorAll('iframe');
-    const placeholders = [];
-
-    try {
-      iframes.forEach(iframe => {
-        const placeholder = document.createElement('div');
-        placeholder.style.cssText = `
-          width: 100%; height: ${iframe.clientHeight || 360}px;
-          display: flex; flex-direction: column; align-items: center; justify-content: center;
-          background: linear-gradient(135deg, #1a1a2e, #16213e);
-          border: 2px dashed rgba(0, 243, 255, 0.4); border-radius: 12px;
-          color: rgba(0, 243, 255, 0.8); font-size: 1.5rem; font-family: monospace;
-        `;
-        placeholder.innerHTML = '<div style="font-size:3rem;margin-bottom:1rem">📄</div><div>PDF 문서 영역</div><div style="font-size:0.8rem;margin-top:0.5rem;color:rgba(255,255,255,0.4)">그림 위에 질문 내용을 그려주세요</div>';
-        iframe.parentNode?.insertBefore(placeholder, iframe);
-        iframe.style.display = 'none';
-        placeholders.push({ iframe, placeholder });
-      });
-
-      return await captureElementToDataUrl(element);
-    } finally {
-      placeholders.forEach(({ iframe, placeholder }) => {
-        iframe.style.display = '';
-        placeholder.remove();
-      });
-    }
-  };
-
   const questionTypes = [
     { id: 'quiz', label: '이 문제 질문', icon: '📝' },
     { id: 'concept', label: '개념 이해 안 됨', icon: '💡' },
@@ -287,30 +274,7 @@ export default function QuestionModal({ isOpen, onClose, quizContext, contextDat
       fetchUrl = `https://drive.google.com/uc?export=download&id=${driveMatch[1]}`;
     }
 
-    // Dynamically load pdf.js from CDN (only when needed)
-    if (!window.pdfjsLib) {
-      await new Promise((resolve, reject) => {
-        const script = document.createElement('script');
-        script.src = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.4.168/build/pdf.min.mjs';
-        script.type = 'module';
-        script.onload = resolve;
-        script.onerror = reject;
-
-        // Fallback: use legacy build for broader compatibility
-        const legacyScript = document.createElement('script');
-        legacyScript.src = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.4.168/build/pdf.min.js';
-        legacyScript.onload = resolve;
-        legacyScript.onerror = reject;
-
-        // Try legacy (non-module) first for wider browser support
-        document.head.appendChild(legacyScript);
-      });
-    }
-
-    const pdfjsLib = window.pdfjsLib;
-    if (!pdfjsLib) throw new Error('pdf.js failed to load');
-    
-    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.4.168/build/pdf.worker.min.js';
+    const pdfjsLib = await loadPdfJs();
 
     const loadingTask = pdfjsLib.getDocument({
       url: fetchUrl,
@@ -345,6 +309,7 @@ export default function QuestionModal({ isOpen, onClose, quizContext, contextDat
   // screenshot down to just the on-screen rect of the learning content.
   const getCropTargetRect = () => {
     const candidates = [
+      activeContext?.type === 'datalog' ? '.mission-content-view iframe[title="PDF Document"]' : null,
       activeContext?.captureSelector,
       activeContext?.type === 'video' ? '.theater-aspect-box' : null,
       activeContext?.type === 'video' ? '#mission-video-capture-area' : null,
@@ -422,7 +387,7 @@ export default function QuestionModal({ isOpen, onClose, quizContext, contextDat
   // Browser-native capture for live YouTube frames. The web platform cannot
   // read pixels from a cross-origin YouTube iframe directly, so we capture the
   // current tab with user permission and crop it to the player area.
-  const attemptNativeVideoCapture = async () => {
+  const attemptNativeTabCapture = async () => {
     if (!navigator.mediaDevices?.getDisplayMedia) {
       throw new Error('DISPLAY_MEDIA_UNSUPPORTED');
     }
@@ -588,7 +553,7 @@ export default function QuestionModal({ isOpen, onClose, quizContext, contextDat
           }
 
           try {
-            shouldEnterDrawMode = await attemptNativeVideoCapture();
+            shouldEnterDrawMode = await attemptNativeTabCapture();
           } catch (videoCaptureErr) {
             console.error('Native video capture failed:', videoCaptureErr);
             setError(
@@ -628,17 +593,18 @@ export default function QuestionModal({ isOpen, onClose, quizContext, contextDat
           } catch (pdfErr) {
             console.warn('📄 PDF direct capture failed (CORS or network):', pdfErr.message);
             
-            // ── 3. Fallback: Capture non-iframe content with a styled PDF placeholder ──
+            // Cross-origin PDF viewers cannot be read from the DOM. In that
+            // case, ask the browser for the current tab and crop to the visible
+            // PDF viewport instead of attaching a misleading placeholder.
             try {
-              await new Promise(resolve => setTimeout(resolve, 200));
-              const element = resolveCaptureElement();
-              const fallbackDataUrl = await capturePdfFallbackToDataUrl(element);
-              if (!isValidImageDataUrl(fallbackDataUrl)) throw new Error('PDF fallback returned empty image');
-              setBackgroundImage(fallbackDataUrl);
-              shouldEnterDrawMode = true;
-            } catch (fallbackErr) {
-              console.error('Fallback capture also failed:', fallbackErr);
-              setError('PDF 화면을 캡처할 수 없습니다. 대신 📎 이미지 첨부 기능을 사용해주세요.');
+              shouldEnterDrawMode = await attemptNativeTabCapture();
+            } catch (tabCaptureErr) {
+              console.error('PDF tab capture also failed:', tabCaptureErr);
+              setError(
+                tabCaptureErr?.name === 'NotAllowedError'
+                  ? 'PDF 현재 화면을 캡처하려면 화면 공유 요청에서 현재 탭을 허용해야 합니다. 원하지 않으면 📎 이미지 첨부를 사용해주세요.'
+                  : 'PDF 화면을 캡처할 수 없습니다. 다시 시도하거나 📎 이미지 첨부를 사용해주세요.'
+              );
             }
           }
           // Continue to finally block → enter draw mode
@@ -754,6 +720,7 @@ export default function QuestionModal({ isOpen, onClose, quizContext, contextDat
           drawingUrl = await ImageService.uploadImage(imageToUpload, path);
         } catch (imgErr) {
           console.error('Failed to upload image:', imgErr);
+          throw new Error('IMAGE_UPLOAD_FAILED');
         }
       }
 
@@ -804,6 +771,10 @@ export default function QuestionModal({ isOpen, onClose, quizContext, contextDat
       setError(
         err.message === 'AGORA_BANNED' || errorCode.includes('permission-denied')
           ? '현재 아고라 게시글 작성이 제한되어 있습니다.'
+          : err.message === 'IMAGE_UPLOAD_FAILED'
+          ? '이미지 업로드에 실패했습니다. 질문은 등록되지 않았습니다. 이미지를 다시 첨부해주세요.'
+          : errorCode.includes('invalid-argument') || errorMessage.includes('질문 내용을 입력')
+          ? '질문 내용을 한 글자 이상 입력해주세요.'
           : err.message === 'INSUFFICIENT_BOUNTY' || errorMessage.includes('광석이 부족')
           ? `현상금 ${selectedBounty}광석을 걸기에는 보유 광석이 부족합니다.`
           : '질문 등록에 실패했습니다. 다시 시도해주세요.'
@@ -1003,7 +974,7 @@ export default function QuestionModal({ isOpen, onClose, quizContext, contextDat
                 <button 
                   type="submit" 
                   className="submit-btn"
-                  disabled={isSubmitting || (!content.trim() && !tempDrawing && !attachedImage)}
+                  disabled={isSubmitting || !content.trim()}
                 >
                   {isSubmitting ? '보내는 중...' : '질문 보내기'}
                 </button>
