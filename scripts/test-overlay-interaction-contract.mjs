@@ -19,7 +19,15 @@ assert.match(navbarCss, /\.mobile-more-sheet\s*\{[\s\S]*?z-index:\s*40001/);
 assert.match(spaceHome, /import \{ createPortal \} from 'react-dom'/);
 assert.match(spaceHome, /createPortal\([\s\S]*?data-overlay="completion-result"[\s\S]*?document\.body/);
 assert.match(spaceHome, /data-overlay="completion-result"[\s\S]*?zIndex:\s*50000/);
-assert.match(spaceHome, /data-overlay="completion-result"[\s\S]*?exit=\{\{ opacity: 0, pointerEvents: 'none' \}\}/);
+assert.match(spaceHome, /function CompletionResultModal\(/);
+assert.match(spaceHome, /event\.key !== 'Escape'/);
+assert.match(spaceHome, /event\.pointerType !== 'touch'/);
+assert.match(spaceHome, /onPointerUp=\{\(event\) => handleTouchActivation\(event, onClose\)\}/);
+assert.match(spaceHome, /onPointerUp=\{\(event\) => handleTouchActivation\(event, onDashboard\)\}/);
+assert.match(spaceHome, /onPointerUp=\{\(event\) => handleTouchActivation\(event, onContinue\)\}/);
+assert.match(spaceHome, /if \(clearedFinalDarkMatter\) stopDarkMatterMode\(\)/);
+assert.match(spaceHome, /setCompletionResult\(!isDarkMatterCompletion \|\| clearedFinalDarkMatter \? nextCompletionResult : null\)/);
+assert.match(spaceHome, /<CompletionResultModal[\s\S]*?onClose=\{closeCompletionResult\}[\s\S]*?onDashboard=\{openCompletionDashboard\}[\s\S]*?onContinue=\{continueAfterCompletion\}/);
 
 for (const [name, source] of [
   ['SpaceHome', spaceHome],

@@ -116,6 +116,183 @@ function SpaceViewFallback() {
   )
 }
 
+function CompletionResultModal({ result, onClose, onDashboard, onContinue }) {
+  useEffect(() => {
+    if (!result) return undefined
+
+    const previousOverflow = document.body.style.overflow
+    const handleKeyDown = (event) => {
+      if (event.key !== 'Escape') return
+      event.preventDefault()
+      onClose()
+    }
+
+    document.body.style.overflow = 'hidden'
+    window.addEventListener('keydown', handleKeyDown)
+    return () => {
+      document.body.style.overflow = previousOverflow
+      window.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [onClose, result])
+
+  if (!result || typeof document === 'undefined') return null
+
+  // Windows touch Chrome can occasionally lose the synthetic click while the
+  // quiz view is being replaced. Activate touch controls on pointer-up as a
+  // direct path, while retaining click for mouse, pen, and keyboard input.
+  const handleTouchActivation = (event, action) => {
+    if (event.pointerType !== 'touch') return
+    event.preventDefault()
+    action()
+  }
+
+  return createPortal(
+    <div
+      className="modal-overlay space-hud"
+      data-overlay="completion-result"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="completion-result-title"
+      onClick={(event) => {
+        if (event.target === event.currentTarget) onClose()
+      }}
+      style={{
+        position: 'fixed',
+        inset: 0,
+        width: '100vw',
+        height: '100dvh',
+        zIndex: 50000,
+        padding: '1rem',
+        background: 'rgba(0, 0, 0, 0.76)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        isolation: 'isolate',
+        pointerEvents: 'auto',
+        touchAction: 'manipulation'
+      }}
+    >
+      <div
+        className="hud-border completion-modal-space"
+        onClick={(event) => event.stopPropagation()}
+        style={{
+          position: 'relative',
+          width: 'min(500px, calc(100vw - 2rem))',
+          maxHeight: 'calc(100dvh - 2rem)',
+          overflowY: 'auto',
+          padding: '3rem',
+          textAlign: 'center',
+          borderRadius: '20px',
+          background: 'rgba(0, 15, 30, 0.98)',
+          boxShadow: result.isPerfect ? 'var(--glow-gold)' : 'var(--glow-cyan)',
+          pointerEvents: 'auto',
+          touchAction: 'pan-y'
+        }}
+      >
+        <button
+          type="button"
+          aria-label="완료 화면 닫기"
+          title="닫기"
+          onClick={onClose}
+          onPointerUp={(event) => handleTouchActivation(event, onClose)}
+          style={{
+            position: 'absolute',
+            top: '0.85rem',
+            right: '0.85rem',
+            zIndex: 2,
+            width: '44px',
+            height: '44px',
+            minWidth: '44px',
+            minHeight: '44px',
+            padding: 0,
+            display: 'grid',
+            placeItems: 'center',
+            border: '1px solid rgba(255,255,255,0.22)',
+            borderRadius: '50%',
+            background: 'rgba(3, 12, 24, 0.82)',
+            color: 'var(--text-bright)',
+            cursor: 'pointer',
+            touchAction: 'manipulation'
+          }}
+        >
+          <X size={22} aria-hidden="true" />
+        </button>
+        <div className="hud-line mb-4"></div>
+        <h2
+          className="font-title gradient-text-space"
+          id="completion-result-title"
+          style={{
+            fontSize: '2.5rem',
+            marginBottom: '1.5rem',
+            background: 'linear-gradient(to right, #00f3ff, #00ff88)',
+            WebkitBackgroundClip: 'text',
+            WebkitTextFillColor: 'transparent'
+          }}
+        >
+          {result.isPerfect ? '🌟 MISSION PERFECT' : '🚀 MISSION COMPLETE'}
+        </h2>
+
+        <div style={{ margin: '2rem 0' }}>
+          <div className="crystal-icon large" style={{ width: '60px', height: '60px', margin: '0 auto 1.5rem' }}></div>
+          <p className="font-tech" style={{ fontSize: '1.2rem', color: 'var(--text-bright)' }}>
+            획득한 메타 광석: <span style={{ color: 'var(--crystal-cyan)', fontWeight: 900 }}>{result.crystalsEarned}개</span>
+          </p>
+          {result.rewardMessage && (
+            <p className="font-tech" style={{ fontSize: '0.9rem', color: 'var(--text-muted)', marginTop: '0.8rem' }}>
+              {result.rewardMessage}
+            </p>
+          )}
+        </div>
+
+        <p className="font-tech" style={{ color: 'var(--text-muted)', marginBottom: '2.5rem' }}>
+          행성 탐사가 성공적으로 종료되었습니다.<br />다음 경로를 선택하십시오.
+        </p>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          <button
+            type="button"
+            className="hud-btn primary glass"
+            onClick={onDashboard}
+            onPointerUp={(event) => handleTouchActivation(event, onDashboard)}
+            style={{
+              padding: '1rem',
+              background: 'rgba(0, 243, 255, 0.2)',
+              border: '1px solid var(--neon-blue)',
+              color: 'var(--text-bright)',
+              borderRadius: '10px',
+              cursor: 'pointer',
+              fontWeight: 700,
+              touchAction: 'manipulation'
+            }}
+          >
+            📊 성장 기록 분석 (DASHBOARD)
+          </button>
+          <button
+            type="button"
+            className="hud-btn secondary glass"
+            onClick={onContinue}
+            onPointerUp={(event) => handleTouchActivation(event, onContinue)}
+            style={{
+              padding: '1rem',
+              background: 'rgba(255, 255, 255, 0.05)',
+              border: '1px solid rgba(255,255,255,0.2)',
+              color: 'var(--text-muted)',
+              borderRadius: '10px',
+              cursor: 'pointer',
+              fontWeight: 700,
+              touchAction: 'manipulation'
+            }}
+          >
+            🛰️ 연속 탐사 진행 (CONTINUE)
+          </button>
+        </div>
+        <div className="hud-line mt-4"></div>
+      </div>
+    </div>,
+    document.body
+  )
+}
+
 function GalaxyModuleFallback() {
   return (
     <div
@@ -1474,7 +1651,7 @@ function SpaceHome() {
     }
   }, [chapters, activeUnit, activeChapter, singleRegion, selectedChapterDocId, selectedRegionId, selectedClusterId])
 
-  const fetchDarkMatterQuestions = async () => {
+  const fetchDarkMatterQuestions = async ({ throwOnError = false } = {}) => {
     if (!user) return []
     try {
       // 1. Fetch metadata IDs from incorrect_questions & review_marks
@@ -1545,6 +1722,7 @@ function SpaceHome() {
       return freshQuestions.sort((a, b) => (a.unitTitle || '').localeCompare(b.unitTitle || ''))
     } catch (err) {
       console.error('Error fetching dark matter questions:', err)
+      if (throwOnError) throw err
       return []
     }
   }
@@ -1783,6 +1961,25 @@ function SpaceHome() {
 
   const [completionResult, setCompletionResult] = useState(null)
   const [streakCelebration, setStreakCelebration] = useState(null)
+
+  const closeCompletionResult = useCallback(() => {
+    setCompletionResult(null)
+    if (isDarkMatterMode) stopDarkMatterMode()
+    soundManager.playClick()
+  }, [isDarkMatterMode, stopDarkMatterMode])
+
+  const openCompletionDashboard = useCallback(() => {
+    setCompletionResult(null)
+    switchRootView('dashboard')
+    soundManager.playClick()
+  }, [switchRootView])
+
+  const continueAfterCompletion = useCallback(() => {
+    setCompletionResult(null)
+    if (isDarkMatterMode) stopDarkMatterMode()
+    clearMissionSelection()
+    soundManager.playClick()
+  }, [clearMissionSelection, isDarkMatterMode, stopDarkMatterMode])
 
   useEffect(() => {
     if (!user?.uid) return undefined
@@ -2117,6 +2314,7 @@ function SpaceHome() {
       const currentChapterId = result.chapterId || selectedChapterDocId || ''
       const isWorkbookResult = result.type === 'workbook'
       const isDarkMatterQuizResult = currentUnitId === 'dark_matter_zone'
+      let refreshedDarkMatterList = null
       const scoreKey = isWorkbookResult ? `${currentUnitId}_workbook` : currentUnitId
       const previousBest = bestScores[scoreKey] || 0
       let actualCrystalsEarned = 0
@@ -2553,7 +2751,8 @@ function SpaceHome() {
 
       // --- Update dark matter count & list ---
       try {
-        const updatedList = await fetchDarkMatterQuestions()
+        const updatedList = await fetchDarkMatterQuestions({ throwOnError: true })
+        refreshedDarkMatterList = updatedList
         setDarkMatterQuestions(updatedList)
         setDarkMatterCount(updatedList.length)
       } catch { /* non-critical */ }
@@ -2572,14 +2771,23 @@ function SpaceHome() {
         })
       }
 
-      setCompletionResult({
+      const isDarkMatterCompletion = isDarkMatterMode || isDarkMatterQuizResult
+      const clearedFinalDarkMatter = isDarkMatterCompletion && refreshedDarkMatterList?.length === 0
+
+      // Do not leave SpaceHome in the contradictory state where Dark Matter is
+      // still active but its final question list is empty. That transition used
+      // to remount the whole planet screen underneath a new portal modal and
+      // could leave Windows touch Chrome with a stale hit-test layer.
+      if (clearedFinalDarkMatter) stopDarkMatterMode()
+
+      const nextCompletionResult = {
         crystalsEarned: finalCrystals,
         isPerfect: isPerfect && previousBest < 100, // Only show perfect effect for first time
         rewardMessage: finalCrystals > 0 
-          ? ((isDarkMatterMode || isDarkMatterQuizResult) 
+          ? (isDarkMatterCompletion
               ? `🌌 다크 매터 정화 성공! (+${finalCrystals} 광석)` 
               : `${score}점으로 최고 기록을 경신했습니다! (+${finalCrystals} 광석)`) + getRewardMultiplierSuffix(rewardMultiplierMeta)
-          : ((isDarkMatterMode || isDarkMatterQuizResult)
+          : (isDarkMatterCompletion
               ? "문제를 맞혔으나 '재검토' 마크를 유지하여 보상이 지급되지 않았습니다. (학습 지속)"
               : (score === 100 ? "이미 100점을 달성한 마스터 레벨입니다! (추가 광석 없음)" : `최고 점수를 넘지 못해 추가 광석을 획득할 수 없습니다.`)),
         streakInfo: {
@@ -2589,7 +2797,11 @@ function SpaceHome() {
           alreadyDoneToday: streakResultsFinal?.meta?.alreadyDoneToday,
           justReachedMilestone: streakResultsFinal?.meta?.justReachedMilestone
         }
-      })
+      }
+
+      // Intermediate Dark Matter batches return to the Dark Matter dashboard;
+      // only the batch that actually clears the final item shows this modal.
+      setCompletionResult(!isDarkMatterCompletion || clearedFinalDarkMatter ? nextCompletionResult : null)
       clearMissionSelection()
       return { ok: true }
     } catch (error) {
@@ -5532,155 +5744,12 @@ function SpaceHome() {
         </div>
       </main>
 
-      {/* 우주 테마 학습 완료 모달 */}
-      {typeof document !== 'undefined' && createPortal(
-        <AnimatePresence>
-          {completionResult && (
-          <Motion.div 
-            className="modal-overlay space-hud"
-            data-overlay="completion-result"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1, pointerEvents: 'auto' }}
-            exit={{ opacity: 0, pointerEvents: 'none' }}
-            transition={{ duration: 0.16 }}
-            style={{ 
-              position: 'fixed',
-              top: 0,
-              left: 0,
-              width: '100vw',
-              height: '100vh',
-              zIndex: 50000,
-              background: 'rgba(0, 0, 0, 0.7)',
-              backdropFilter: 'blur(5px)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              isolation: 'isolate',
-              pointerEvents: 'auto'
-            }}
-          >
-            <Motion.div 
-              className="glass-card hud-border completion-modal-space"
-              initial={{ scale: 0.8, y: 50, rotateX: 20 }}
-              animate={{ scale: 1, y: 0, rotateX: 0 }}
-              exit={{ scale: 0.8, y: 50, opacity: 0 }}
-              style={{
-                position: 'relative',
-                padding: '3rem',
-                textAlign: 'center',
-                maxWidth: '500px',
-                background: 'rgba(0, 15, 30, 0.95)',
-                boxShadow: completionResult.isPerfect ? 'var(--glow-gold)' : 'var(--glow-cyan)'
-              }}
-            >
-              <button
-                type="button"
-                aria-label="완료 화면 닫기"
-                title="닫기"
-                onClick={() => {
-                  setCompletionResult(null)
-                  soundManager.playClick()
-                }}
-                style={{
-                  position: 'absolute',
-                  top: '0.85rem',
-                  right: '0.85rem',
-                  zIndex: 2,
-                  width: '44px',
-                  height: '44px',
-                  minWidth: '44px',
-                  minHeight: '44px',
-                  padding: 0,
-                  display: 'grid',
-                  placeItems: 'center',
-                  border: '1px solid rgba(255,255,255,0.22)',
-                  borderRadius: '50%',
-                  background: 'rgba(3, 12, 24, 0.82)',
-                  color: 'var(--text-bright)',
-                  cursor: 'pointer',
-                  touchAction: 'manipulation'
-                }}
-              >
-                <X size={22} aria-hidden="true" />
-              </button>
-              <div className="hud-line mb-4"></div>
-              <h2 className="font-title gradient-text-space" style={{ 
-                fontSize: '2.5rem', 
-                marginBottom: '1.5rem',
-                background: 'linear-gradient(to right, #00f3ff, #00ff88)',
-                WebkitBackgroundClip: 'text',
-                WebkitTextFillColor: 'transparent'
-              }}>
-                {completionResult.isPerfect ? '🌟 MISSION PERFECT' : '🚀 MISSION COMPLETE'}
-              </h2>
-              
-              <div style={{ margin: '2rem 0' }}>
-                <div className="crystal-icon large" style={{ width: '60px', height: '60px', margin: '0 auto 1.5rem' }}></div>
-                <p className="font-tech" style={{ fontSize: '1.2rem', color: 'var(--text-bright)' }}>
-                  획득한 메타 광석: <span style={{ color: 'var(--crystal-cyan)', fontWeight: 900 }}>{completionResult.crystalsEarned}개</span>
-                </p>
-                {completionResult.rewardMessage && (
-                  <p className="font-tech" style={{ fontSize: '0.9rem', color: 'var(--text-muted)', marginTop: '0.8rem' }}>
-                    {completionResult.rewardMessage}
-                  </p>
-                )}
-              </div>
-
-              <p className="font-tech" style={{ color: 'var(--text-muted)', marginBottom: '2.5rem' }}>
-                행성 탐사가 성공적으로 종료되었습니다.<br/>다음 경로를 선택하십시오.
-              </p>
-
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                <button
-                  type="button"
-                  className="hud-btn primary glass"
-                  style={{
-                    padding: '1rem',
-                    background: 'rgba(0, 243, 255, 0.2)',
-                    border: '1px solid var(--neon-blue)',
-                    color: 'var(--text-bright)',
-                    borderRadius: '10px',
-                    cursor: 'pointer',
-                    fontWeight: 700,
-                    touchAction: 'manipulation'
-                  }}
-                          onClick={() => {
-                            setCompletionResult(null)
-                            switchRootView('dashboard')
-                            soundManager.playClick()
-                          }}
-                >
-                  📊 성장 기록 분석 (DASHBOARD)
-                </button>
-                <button
-                  type="button"
-                  className="hud-btn secondary glass"
-                  style={{
-                    padding: '1rem',
-                    background: 'rgba(255, 255, 255, 0.05)',
-                    border: '1px solid rgba(255,255,255,0.2)',
-                    color: 'var(--text-muted)',
-                    borderRadius: '10px',
-                    cursor: 'pointer',
-                    fontWeight: 700,
-                    touchAction: 'manipulation'
-                  }}
-                          onClick={() => {
-                            setCompletionResult(null)
-                            clearMissionSelection()
-                            soundManager.playClick()
-                          }}
-                >
-                  🛰️ 연속 탐사 진행 (CONTINUE)
-                </button>
-              </div>
-              <div className="hud-line mt-4"></div>
-            </Motion.div>
-          </Motion.div>
-          )}
-        </AnimatePresence>,
-        document.body
-      )}
+      <CompletionResultModal
+        result={completionResult}
+        onClose={closeCompletionResult}
+        onDashboard={openCompletionDashboard}
+        onContinue={continueAfterCompletion}
+      />
 
       {/* RewardPotentialModal moved to MissionHub - shown only before Field Test */}
 
