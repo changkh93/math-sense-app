@@ -1,6 +1,13 @@
-export const PROJECT_LIMITS = Object.freeze({ files: 100, codeBytes: 200 * 1024, assetBytes: 5 * 1024 * 1024, totalBytes: 6 * 1024 * 1024 })
+export const PROJECT_LIMITS = Object.freeze({ files: 100, codeBytes: 200 * 1024, assetBytes: 5 * 1024 * 1024, fontBytes: 20 * 1024 * 1024, totalBytes: 30 * 1024 * 1024 })
 export const RUNTIME_VERSION = 'pygame-web-0.9-cp312-v1'
 const types = { py: 'python', csv: 'csv', png: 'image', jpg: 'image', jpeg: 'image', webp: 'image', ogg: 'audio', wav: 'audio', mp3: 'audio', ttf: 'font', otf: 'font' }
+export function fileByteLimit(kind) {
+  return ['python', 'csv'].includes(kind) ? PROJECT_LIMITS.codeBytes : kind === 'font' ? PROJECT_LIMITS.fontBytes : PROJECT_LIMITS.assetBytes
+}
+export function assertFileSize(path, size) {
+  const limit = fileByteLimit(fileKind(path))
+  if (size > limit) throw new Error(`${path}: 파일 크기 ${(size / 1024 / 1024).toFixed(1)} MB — 최대 ${limit < 1024 * 1024 ? `${limit / 1024} KB` : `${limit / 1024 / 1024} MB`}까지 추가할 수 있습니다.`)
+}
 export function normalizeFolderPath(input) {
   if (typeof input !== 'string') throw new Error('파일 이름을 확인해 주세요.')
   const path = input.normalize('NFC')
@@ -19,8 +26,10 @@ export function bytesToBase64(bytes) {
   return btoa(result)
 }
 export function base64ToBytes(data) {
-  if (typeof data !== 'string' || data.length > 8 * 1024 * 1024 || (data.length % 4 !== 0 || !/^[A-Za-z0-9+/]*={0,2}$/.test(data))) throw new Error('파일 데이터가 올바르지 않습니다.')
-  return Uint8Array.from(atob(data), c => c.charCodeAt(0))
+  if (typeof data !== 'string' || data.length > 4 * Math.ceil(PROJECT_LIMITS.fontBytes / 3) || (data.length % 4 !== 0 || !/^[A-Za-z0-9+/]*={0,2}$/.test(data))) throw new Error('파일 데이터가 올바르지 않습니다.')
+  const decoded = atob(data), bytes = new Uint8Array(decoded.length)
+  for (let i = 0; i < decoded.length; i++) bytes[i] = decoded.charCodeAt(i)
+  return bytes
 }
 export function validateAsset(path, bytes) {
   const ext = path.split('.').pop().toLowerCase()
@@ -65,7 +74,7 @@ export function validateProject(input) {
     seen.add(key)
     if (kind === 'python' && typeof file.text !== 'string') throw new Error(`${path}: 코드가 올바르지 않습니다.`)
     const bytes = kind === 'python' ? new TextEncoder().encode(file.text) : base64ToBytes(file.data)
-    if (bytes.length > (kind === 'python' ? PROJECT_LIMITS.codeBytes : PROJECT_LIMITS.assetBytes)) throw new Error(`${path}: 파일 크기 제한을 초과했습니다.`)
+    assertFileSize(path, bytes.length)
     if (kind !== 'python') validateAsset(path, bytes)
     totalBytes += bytes.length
     return kind === 'python' ? { path, kind, text: file.text } : { path, kind, data: file.data }
@@ -89,7 +98,7 @@ export function validateProject(input) {
   for (const file of files) { const parent = file.path.split('/').slice(0, -1).join('/'); if (parent) addFolder(parent) }
   if (folderMap.size > 100) throw new Error('폴더는 100개까지 만들 수 있습니다.')
   const folders = [...folderMap.values()].sort()
-  if (totalBytes > PROJECT_LIMITS.totalBytes) throw new Error('프로젝트는 총 6 MB까지 저장할 수 있습니다.')
+  if (totalBytes > PROJECT_LIMITS.totalBytes) throw new Error(`프로젝트 전체 용량 ${(totalBytes / 1024 / 1024).toFixed(1)} MB — 최대 ${PROJECT_LIMITS.totalBytes / 1024 / 1024} MB까지 저장할 수 있습니다.`)
   const entrypoint = normalizePath(input.entrypoint)
   if (!files.some(f => f.path === entrypoint && f.kind === 'python')) throw new Error('실행할 Python 파일이 없습니다.')
   const revision = input.revision ?? 0

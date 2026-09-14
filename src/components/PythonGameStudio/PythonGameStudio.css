@@ -60,3 +60,30 @@
 .pgs-console:has(.pgs-input-form){min-height:160px}.pgs-console:has(.pgs-input-form) .pgs-run-feedback{display:none}
 .pgs-preview-pane:fullscreen .pgs-console:has(.pgs-input-form){display:flex}
 .pgs-run-status.waiting{color:#ffdc89}
+
+.pgs-upload-error{margin:0 12px 8px;padding:10px;background:#402331;border:1px solid #8f5062;border-radius:7px;color:#ffc2cd;font-size:12px;overflow-wrap:anywhere;flex-shrink:0}
+
+/* Results stay mounted across compact view switches and enlargement. */
+.pgs-panel-switch{display:none}.pgs-fit-label{font-size:10px;color:#8ba6ba;white-space:nowrap}
+.pgs-preview-pane.pgs-preview-expanded{display:flex!important;position:fixed;inset:0;z-index:1200;background:#080f20;width:100%;height:100dvh;padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)}
+.pgs-preview-expanded>.pgs-splitter{display:none}.pgs-preview-expanded>.pgs-console{height:160px;max-height:35dvh}
+.pgs-preview-expanded>.pgs-panel-title{height:48px}.pgs-preview-pane>.pgs-panel-title button{min-width:32px;min-height:30px}
+@media(max-width:1100px){
+ .pgs-shell{height:100dvh;min-height:0;overflow:hidden}
+ .pgs-header{padding:8px 12px}.pgs-brand input{max-width:160px}
+ .pgs-toolbar{padding:8px 12px}.pgs-toolbar>div:first-child{display:none}.pgs-run-actions{margin-left:auto}
+ .pgs-play-bar>small{display:none}
+ .pgs-panel-switch{display:flex;gap:6px;flex-shrink:0;padding:6px 12px;background:#101a2b;border-top:1px solid var(--pgs-line)}
+ .pgs-panel-switch button{flex:1;min-height:36px}.pgs-panel-switch button[aria-pressed="true"]{background:#214939;border-color:#83f3cd;color:#abffe3}
+ .pgs-workspace{flex:1;min-height:0;grid-template-columns:var(--pgs-files-width,150px) 6px minmax(0,1fr);grid-template-rows:minmax(0,1fr)}
+ .pgs-workspace[data-panel="code"]>.pgs-preview-pane,.pgs-workspace>.pgs-splitter-editor{display:none}
+ .pgs-workspace[data-panel="preview"]{display:flex}
+ .pgs-workspace[data-panel="preview"]>.pgs-files,.pgs-workspace[data-panel="preview"]>.pgs-editor-pane,.pgs-workspace[data-panel="preview"]>.pgs-splitter-files{display:none}
+ .pgs-workspace[data-panel="preview"]>.pgs-preview-pane{display:flex;flex:1}
+ .pgs-editor-pane>.pgs-panel-title{overflow-x:auto;justify-content:flex-start}
+ .pgs-files .pgs-upload{flex-shrink:0}.pgs-file-tip{max-height:22dvh;overflow:auto;flex-shrink:0}
+}
+@media(max-height:600px) and (max-width:1100px){
+ .pgs-play-tools{display:none}.pgs-header{padding:5px 10px}.pgs-brand>span{display:none}
+ .pgs-console{height:100px}.pgs-game-frame{min-height:80px}.pgs-console:has(.pgs-input-form){min-height:130px}
+}

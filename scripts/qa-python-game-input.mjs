@@ -25,6 +25,8 @@ const logs = () => page.locator('.pgs-console pre').innerText()
 const input = () => page.locator('.pgs-input-form input')
 const frame = async () => (await page.locator('iframe[title="Python 코드 실행 화면"]').elementHandle()).contentFrame()
 async function run(code) {
+  const codeTab = page.getByRole('button', { name: '코드 · 파일', exact: true })
+  if (await codeTab.isVisible()) await codeTab.click()
   await page.locator('.cm-content').click()
   await page.keyboard.press('Meta+a')
   await page.keyboard.insertText(code)

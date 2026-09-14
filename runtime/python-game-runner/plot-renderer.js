@@ -14,7 +14,7 @@
     if (!image) {
       if (images.size >= 20) throw new Error('한 번에 그래프 20개까지 표시할 수 있습니다.');
       image = document.createElement('img'); image.alt = `그래프 ${number}`;
-      Object.assign(image.style, { display: 'block', maxWidth: '100%', height: 'auto', margin: '0 auto 16px', background: 'white' });
+      Object.assign(image.style, { display: 'block', maxWidth: '100%', maxHeight: 'calc(100vh - 40px)', width: 'auto', height: 'auto', objectFit: 'contain', margin: '0 auto 16px', background: 'white' });
       root.append(image); images.set(number, image);
     }
     image.src = `data:image/png;base64,${data}`;

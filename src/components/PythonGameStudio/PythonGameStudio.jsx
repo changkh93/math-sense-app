@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { ArrowLeft, Play, Square, Upload, FileCode2, FolderPlus, Plus, Download, FolderOpen, Maximize2, Trash2, Code2, X } from 'lucide-react'
+import { ArrowLeft, Play, Square, Upload, FileCode2, FolderPlus, Plus, Download, FolderOpen, Maximize2, Minimize2, Trash2, Code2, X } from 'lucide-react'
 import PythonEditor from '../PythonWorld/PythonEditor'
 import GamePreview from './GamePreview'
 import StudioInput from './StudioInput'
@@ -8,7 +8,7 @@ import { createProject } from './templates'
 import ProjectFileTree from './ProjectFileTree'
 import { folderPaths, moveProjectFile } from './projectFolders'
 import { listDrafts, saveDraft, selectDraft, deleteDraft } from './projectStore'
-import { base64ToBytes, bytesToBase64, fileKind, normalizePath, normalizeFolderPath, validateProject, applyRuntimeCsv } from './projectPolicy.mjs'
+import { PROJECT_LIMITS, assertFileSize, base64ToBytes, bytesToBase64, fileKind, normalizePath, normalizeFolderPath, validateProject, applyRuntimeCsv } from './projectPolicy.mjs'
 import { prepareRunnerProject, convertAudioToOgg, clearAudioConversionCache } from './audioConversion'
 import useStudioLayout from './useStudioLayout'
 import { importProjectFile, importProjectFolder } from './importProjectFile'
@@ -67,7 +67,10 @@ export default function PythonGameStudio({ uid = 'local-preview', onBack }) {
   const [drafts, setDrafts] = useState([])
   const [saved, setSaved] = useState('불러오는 중')
   const [notice, setNotice] = useState('')
+  const [uploadError, setUploadError] = useState('')
   const [run, setRun] = useState(null)
+  const [compactPanel, setCompactPanel] = useState('code')
+  const [previewExpanded, setPreviewExpanded] = useState(false)
   const [inputRequest, setInputRequest] = useState(null)
   const consoleOutput = useRef(null)
   const [status, setStatus] = useState('stopped')
@@ -96,7 +99,7 @@ export default function PythonGameStudio({ uid = 'local-preview', onBack }) {
       catch (error) { setNotice(`가져온 프로젝트를 이 기기에 저장하지 못했습니다. ${error.message}`); return false }
     }
     latest.current = next
-    runGeneration.current++; setRun(null); setInputRequest(null); setStatus('stopped'); setLogs([]); setProject(next); setSelected(next.entrypoint); setSelectedFolder(''); setErrorLine(null); setDrawer(false); return true }, [uid])
+    runGeneration.current++; setRun(null); setInputRequest(null); setStatus('stopped'); setLogs([]); setUploadError(''); setCompactPanel('code'); setPreviewExpanded(false); setProject(next); setSelected(next.entrypoint); setSelectedFolder(''); setErrorLine(null); setDrawer(false); return true }, [uid])
   useEffect(() => {
     mounted.current = true
     listDrafts(uid).then(rows => { if (mounted.current) { setDrafts(rows); setProject(rows[0]?.project || createProject()); setSelected(rows[0]?.project.entrypoint || 'main.py') } }).catch(() => { if (mounted.current) { setProject(createProject()); setNotice('브라우저 초안을 읽지 못했습니다. 프로젝트 다운로드로 작업을 보관해 주세요.') } })
@@ -122,6 +125,12 @@ export default function PythonGameStudio({ uid = 'local-preview', onBack }) {
     window.addEventListener('beforeunload', beforeUnload)
     return () => window.removeEventListener('beforeunload', beforeUnload)
   }, [saved])
+  useEffect(() => {
+    if (!previewExpanded) return undefined
+    const escape = event => { if (event.key === 'Escape') setPreviewExpanded(false) }
+    window.addEventListener('keydown', escape)
+    return () => window.removeEventListener('keydown', escape)
+  }, [previewExpanded])
   const activeFile = project?.files.find(f => f.path === selected)
   const editCode = useCallback(text => { setErrorLine(null); setProject(prev => ({ ...prev, files: prev.files.map(f => f.path === selected ? { ...f, text } : f) })) }, [selected])
   useEffect(() => {
@@ -131,6 +140,7 @@ export default function PythonGameStudio({ uid = 'local-preview', onBack }) {
   const stop = () => { runGeneration.current++; setRun(null); setInputRequest(null); setStatus('stopped') }
   const runPath = activeFile?.kind === 'python' ? activeFile.path : project?.entrypoint
   const execute = async () => {
+    setCompactPanel('preview')
     const generation = ++runGeneration.current
     setBusy(true); setRun(null); setInputRequest(null)
     try {
@@ -162,7 +172,7 @@ export default function PythonGameStudio({ uid = 'local-preview', onBack }) {
       }
     }
     if (event.type === 'READY') setStatus('ready')
-    if (event.type === 'INPUT_REQUEST') { setInputRequest(event); setStatus('waiting'); return }
+    if (event.type === 'INPUT_REQUEST') { setCompactPanel('preview'); setInputRequest(event); setStatus('waiting'); return }
     if (['INPUT_CANCEL', 'ERROR', 'EXIT'].includes(event.type)) {
       setInputRequest(null)
       if (event.type === 'INPUT_CANCEL') setStatus(previous => previous === 'waiting' ? 'running' : previous)
@@ -174,14 +184,15 @@ export default function PythonGameStudio({ uid = 'local-preview', onBack }) {
   }, [])
   const upload = async (files, destination = selectedFolder) => {
     if (!files?.length) return
+    setUploadError('')
     setBusy(true)
     const baseline = project
     try {
       const incoming = Array.from(files)
       if (baseline.files.length + incoming.length > 100) throw new Error('파일은 총 100개까지 올릴 수 있습니다.')
-      if (validateProject(baseline).totalBytes + incoming.reduce((n, file) => n + file.size, 0) > 6 * 1024 * 1024) throw new Error('프로젝트 전체 용량은 6 MB까지 사용할 수 있습니다.')
+      for (const file of incoming) assertFileSize(file.name, file.size)
+      if (validateProject(baseline).totalBytes + incoming.reduce((n, file) => n + file.size, 0) > PROJECT_LIMITS.totalBytes) throw new Error(`프로젝트 전체 용량은 ${PROJECT_LIMITS.totalBytes / 1024 / 1024} MB까지 사용할 수 있습니다.`)
       const additions = await Promise.all(Array.from(files).map(async file => {
-        if (file.size > 5 * 1024 * 1024) throw new Error(`${file.name}: 파일은 5 MB까지 업로드할 수 있습니다.`)
         const path = normalizePath([destination, file.webkitRelativePath || file.name].filter(Boolean).join('/')), kind = fileKind(path)
         return kind === 'python' ? { path, kind, text: await file.text() } : { path, kind, data: bytesToBase64(new Uint8Array(await file.arrayBuffer())) }
       }))
@@ -189,7 +200,7 @@ export default function PythonGameStudio({ uid = 'local-preview', onBack }) {
       const next = validateProject({ ...baseline, files: [...baseline.files, ...additions] })
       if (latest.current !== baseline) throw new Error('업로드 중 프로젝트가 변경되었습니다. 파일을 다시 올려 주세요.')
       setProject(next); setSelected(additions[0].path); setSelectedFolder(destination); setNotice(`${additions.length}개 파일을 프로젝트에 넣었습니다.`)
-    } catch (error) { setNotice(error.message) } finally { setBusy(false); if (fileInput.current) fileInput.current.value = '' }
+    } catch (error) { setUploadError(error.message); setNotice(error.message) } finally { setBusy(false); if (fileInput.current) fileInput.current.value = '' }
   }
   const moveFile = (sourcePath, destination) => {
     if (busy) return false
@@ -206,7 +217,7 @@ export default function PythonGameStudio({ uid = 'local-preview', onBack }) {
     const baseline = project, target = activeFile
     setBusy(true)
     try {
-      if (file.size > 5 * 1024 * 1024) throw new Error('파일은 5 MB까지 교체할 수 있습니다.')
+      assertFileSize(target.path, file.size)
       const replacement = target.kind === 'python' ? { ...target, text: await file.text() } : { ...target, data: bytesToBase64(new Uint8Array(await file.arrayBuffer())) }
       if (latest.current !== baseline) throw new Error('프로젝트가 변경되었습니다. 다시 시도해 주세요.')
       setProject(validateProject({ ...baseline, files: baseline.files.map(item => item.path === target.path ? replacement : item) }))
@@ -311,7 +322,7 @@ export default function PythonGameStudio({ uid = 'local-preview', onBack }) {
   const jumpToError = text => {
     const matches = [...text.matchAll(/File "\/tmp\/studio\/([^"]+)", line (\d+)/g)]
     const match = matches.at(-1)
-    if (match && project.files.some(f => f.path === match[1])) { setSelected(match[1]); setSelectedFolder(match[1].split('/').slice(0, -1).join('/')); setErrorLine(Number(match[2])); requestAnimationFrame(() => editor.current?.revealLine(Number(match[2]))) }
+    if (match && project.files.some(f => f.path === match[1])) { setCompactPanel('code'); setPreviewExpanded(false); setSelected(match[1]); setSelectedFolder(match[1].split('/').slice(0, -1).join('/')); setErrorLine(Number(match[2])); requestAnimationFrame(() => editor.current?.revealLine(Number(match[2]))) }
   }
   if (!project) return <div className="pgs-shell pgs-loading">내 프로젝트를 불러오고 있습니다…</div>
   return <main className="pgs-shell" data-code-theme={preferences.theme} onDragOver={e => { if (Array.from(e.dataTransfer.types).includes('Files')) e.preventDefault() }} onDrop={e => { if (!e.dataTransfer.files.length) return; e.preventDefault(); e.stopPropagation(); if (!busy) upload(e.dataTransfer.files) }}>
@@ -319,7 +330,8 @@ export default function PythonGameStudio({ uid = 'local-preview', onBack }) {
     {notice && <div className="pgs-notice" role="status">{notice}<button aria-label="안내 닫기" onClick={() => setNotice('')}><X size={15} /></button></div>}
     <div className="pgs-toolbar"><div><span className="pgs-dot" /> 그림부터 게임, 수학까지 파이썬으로 직접 만들어 보세요.</div><div className="pgs-run-actions"><span className={`pgs-run-status ${status}`}>{statusNames[status]}</span><span className="pgs-run-target" title={`실행 대상: ${runPath}`}>{runPath}</span><button className="pgs-run" title={`${runPath} 실행`} disabled={busy} onClick={execute}><Play size={16} fill="currentColor" /> 실행</button><button disabled={!run} onClick={stop}><Square size={15} /> 정지</button></div></div>
     <StudioPlayTools preferences={preferences} onPreferences={changePreferences} />
-    <div ref={layout.workspaceRef} className={`pgs-workspace${layout.dragging ? ' pgs-is-resizing' : ''}`} style={layout.style}><aside className="pgs-files"><div className="pgs-panel-title">프로젝트 파일<span><button title="Python 파일 추가" aria-label="Python 파일 추가" onClick={() => { setDialogValue('helper.py'); setDialog('file') }}><Plus size={15} /></button><button title="폴더 만들기" aria-label="폴더 만들기" onClick={() => { setDialogValue('새 폴더'); setDialog('folder'); setNotice('') }}><FolderPlus size={15} /></button><button title="파일 업로드" aria-label="파일 업로드" onClick={() => fileInput.current.click()}><Upload size={15} /></button></span></div><ProjectFileTree key={project.id} project={project} selected={selected} selectedFolder={selectedFolder} onSelectFolder={setSelectedFolder} busy={busy} onMoveFile={moveFile} onUpload={upload} onError={setNotice} onSelectFile={path => { setSelected(path); setSelectedFolder(path.split('/').slice(0, -1).join('/')); setErrorLine(null) }} /><button className="pgs-upload" disabled={busy} onClick={() => fileInput.current.click()}><Upload size={18} /> 파일 올리기<small>이미지 · 사운드 · 폰트 · Python · CSV</small></button><div className="pgs-file-tip">업로드 위치: {selectedFolder || '프로젝트 루트'}<br />파일을 폴더 위에 끌어다 놓으세요. 기존 파일은 ‘이동’ 버튼으로도 옮길 수 있습니다.<br />PNG, JPG, WebP · OGG, WAV, MP3 · TTF, OTF · CSV (UTF-8, 200 KB)<br />파일 5 MB / 프로젝트 6 MB</div><input ref={fileInput} type="file" multiple accept=".py,.csv,.png,.jpg,.jpeg,.webp,.ogg,.wav,.mp3,.ttf,.otf" hidden onChange={e => upload(e.target.files)} /></aside>
+    <div className="pgs-panel-switch" role="group" aria-label="작업 화면 선택"><button aria-pressed={compactPanel === 'code'} onClick={() => setCompactPanel('code')}>코드 · 파일</button><button aria-pressed={compactPanel === 'preview'} onClick={() => setCompactPanel('preview')}>실행 화면 · 출력</button></div>
+    <div data-panel={compactPanel} ref={layout.workspaceRef} className={`pgs-workspace${layout.dragging ? ' pgs-is-resizing' : ''}`} style={layout.style}><aside className="pgs-files"><div className="pgs-panel-title">프로젝트 파일<span><button title="Python 파일 추가" aria-label="Python 파일 추가" onClick={() => { setDialogValue('helper.py'); setDialog('file') }}><Plus size={15} /></button><button title="폴더 만들기" aria-label="폴더 만들기" onClick={() => { setDialogValue('새 폴더'); setDialog('folder'); setNotice('') }}><FolderPlus size={15} /></button><button title="파일 업로드" aria-label="파일 업로드" onClick={() => fileInput.current.click()}><Upload size={15} /></button></span></div><ProjectFileTree key={project.id} project={project} selected={selected} selectedFolder={selectedFolder} onSelectFolder={setSelectedFolder} busy={busy} onMoveFile={moveFile} onUpload={upload} onError={setNotice} onSelectFile={path => { setSelected(path); setSelectedFolder(path.split('/').slice(0, -1).join('/')); setErrorLine(null) }} /><button className="pgs-upload" disabled={busy} onClick={() => fileInput.current.click()}><Upload size={18} /> {busy ? '파일 처리 중…' : '파일 올리기'}<small>이미지 · 사운드 · 폰트 · Python · CSV</small></button>{uploadError && <div className="pgs-upload-error" role="alert">{uploadError}</div>}<div className="pgs-file-tip">업로드 위치: {selectedFolder || '프로젝트 루트'}<br />파일을 폴더 위에 끌어다 놓으세요. 기존 파일은 ‘이동’ 버튼으로도 옮길 수 있습니다.<br />PNG, JPG, WebP · OGG, WAV, MP3 · TTF, OTF · CSV (UTF-8, 200 KB)<br />글꼴 {PROJECT_LIMITS.fontBytes / 1024 / 1024} MB · 이미지/소리 {PROJECT_LIMITS.assetBytes / 1024 / 1024} MB<br />프로젝트 전체 {PROJECT_LIMITS.totalBytes / 1024 / 1024} MB</div><input ref={fileInput} type="file" multiple accept=".py,.csv,.png,.jpg,.jpeg,.webp,.ogg,.wav,.mp3,.ttf,.otf" hidden onChange={e => upload(e.target.files)} /></aside>
     <div {...layout.separator('files')} />
     <section className="pgs-editor-pane"><input ref={replaceInput} type="file" hidden accept={`.${selected.split('.').at(-1)}`} onChange={replaceFile} /><div className="pgs-panel-title"><span>{selected}</span><div><button disabled={busy} onClick={() => replaceInput.current.click()}>파일 교체</button><button onClick={() => { setDialogValue(selected); setDialog('rename') }}>이름 변경</button><button disabled={busy} onClick={() => { setDialogValue(selected.split('/').slice(0, -1).join('/')); setNotice(''); setDialog('move') }}>이동</button>{activeFile?.kind === 'python' && selected !== project.entrypoint && <button onClick={() => setProject({ ...project, entrypoint: selected })}>기본 실행 파일로</button>}<button aria-label="선택한 파일 다운로드" onClick={() => download(activeFile.path.split('/').at(-1), activeFile.kind === 'python' ? activeFile.text : base64ToBytes(activeFile.data), 'application/octet-stream')}><Download size={14} /></button><button aria-label="선택한 파일 삭제" disabled={selected === project.entrypoint} onClick={() => { setDialog('delete') }}><Trash2 size={14} /></button></div></div>{activeFile?.kind === 'python' ? <PythonEditor colorful completionContext={{ path: selected, files: project.files }} key={selected} ref={editor} value={activeFile.text} onChange={editCode} activeLine={errorLine} /> : activeFile && <AssetPreview key={selected} file={activeFile} busy={busy} onInsert={() => snippet(activeFile)} onConvert={async () => {
       setBusy(true)
@@ -333,7 +345,7 @@ export default function PythonGameStudio({ uid = 'local-preview', onBack }) {
       } catch (error) { setNotice(error.message) } finally { setBusy(false) }
     }} />}</section>
     <div {...layout.separator('editor')} />
-    <section className="pgs-preview-pane" ref={preview}><div className="pgs-panel-title">실행 화면<button aria-label="실행 화면 크게 보기" onClick={() => preview.current.requestFullscreen?.().catch(() => setNotice('전체 화면을 지원하지 않는 브라우저입니다.'))}><Maximize2 size={16} /></button></div><div className="pgs-game-frame"><GamePreview run={run} onEvent={handleEvent} /></div><div {...layout.separator('console')} /><div className="pgs-console"><div className="pgs-panel-title">출력 · 오류<button onClick={() => setLogs([])}>지우기</button></div><>{preferences.playful && <RunFeedback status={status} />}</><pre ref={consoleOutput} aria-live="polite">{!logs.length && <span className="pgs-console-hint">print() 출력과 오류가 여기에 표시됩니다.</span>}{logs.map(log => <span key={log.id} className={log.type === 'ERROR' || log.type === 'STDERR' ? 'pgs-error' : ''}>{log.text}{log.type === 'ERROR' && <button onClick={() => jumpToError(log.text)}>오류 줄로 이동</button>}</span>)}</pre>{inputRequest && run && <StudioInput key={`${run.id}:${inputRequest.requestId}`} request={inputRequest} onSubmitted={() => { setInputRequest(null); setStatus('running') }} />}</div></section></div>
+    <section className={`pgs-preview-pane${previewExpanded ? ' pgs-preview-expanded' : ''}`} ref={preview}><div className="pgs-panel-title"><span>실행 화면</span><div>{previewExpanded && <><button disabled={busy} onClick={execute}><Play size={14} /> 다시 실행</button><button disabled={!run} onClick={stop}><Square size={14} /> 정지</button></>}<span className="pgs-fit-label">화면에 맞춤</span><button aria-label={previewExpanded ? '실행 화면 원래 크기로' : '실행 화면 크게 보기'} aria-pressed={previewExpanded} onClick={() => setPreviewExpanded(value => !value)}>{previewExpanded ? <Minimize2 size={16} /> : <Maximize2 size={16} />}</button></div></div><div className="pgs-game-frame"><GamePreview run={run} onEvent={handleEvent} /></div><div {...layout.separator('console')} /><div className="pgs-console"><div className="pgs-panel-title">출력 · 오류<button onClick={() => setLogs([])}>지우기</button></div><>{preferences.playful && <RunFeedback status={status} />}</><pre ref={consoleOutput} aria-live="polite">{!logs.length && <span className="pgs-console-hint">print() 출력과 오류가 여기에 표시됩니다.</span>}{logs.map(log => <span key={log.id} className={log.type === 'ERROR' || log.type === 'STDERR' ? 'pgs-error' : ''}>{log.text}{log.type === 'ERROR' && <button onClick={() => jumpToError(log.text)}>오류 줄로 이동</button>}</span>)}</pre>{inputRequest && run && <StudioInput key={`${run.id}:${inputRequest.requestId}`} request={inputRequest} onSubmitted={() => { setInputRequest(null); setStatus('running') }} />}</div></section></div>
     {drawer && <div className="pgs-modal-backdrop"><section className="pgs-library" role="dialog" aria-modal="true" aria-label="내 프로젝트" aria-busy={importing}><div className="pgs-panel-title">내 프로젝트<button aria-label="프로젝트 목록 닫기" disabled={importing} onClick={() => setDrawer(false)}><X size={18} /></button></div>{notice && <p role="alert">{notice}</p>}<div className="pgs-library-actions"><button disabled={busy} onClick={() => { setDialogValue('나의 프로젝트'); setDialog('new') }}><Plus size={16} /> 새 프로젝트</button><button disabled={busy} onClick={() => folderInput.current.click()}><FolderOpen size={16} /> {importing ? '가져오는 중…' : '프로젝트 가져오기'}</button><button disabled={busy} onClick={() => importInput.current.click()}><Upload size={16} /> 백업 파일 복원</button><button disabled={busy} onClick={async () => { try { const { createMonsterProject } = await import('./monsterTemplate'); switchProject(await createMonsterProject()) } catch (error) { setNotice(error.message) } }}>몬스터 잡기 예제</button><button disabled={busy} onClick={async () => {
       setBusy(true)
       try {

@@ -10,7 +10,7 @@ self.onmessage = async ({ data: request }) => {
     const file = request.file
     const python = /\.py$/i.test(file.name)
     if (!python && !/\.json$/i.test(file.name)) throw new Error('프로젝트 다운로드로 받은 .mspygame.json 파일 또는 .py 파일을 선택해 주세요. ZIP 파일은 지원하지 않습니다.')
-    if (file.size > (python ? PROJECT_LIMITS.codeBytes : 9 * 1024 * 1024)) throw new Error(python ? 'Python 파일은 200 KB까지 가져올 수 있습니다.' : '프로젝트 파일은 9 MB까지 가져올 수 있습니다.')
+    if (file.size > (python ? PROJECT_LIMITS.codeBytes : (Math.ceil(PROJECT_LIMITS.totalBytes * 4 / 3) + 1024 * 1024))) throw new Error(python ? 'Python 파일은 200 KB까지 가져올 수 있습니다.' : `프로젝트 백업 파일은 ${Math.ceil(PROJECT_LIMITS.totalBytes * 4 / 3 / 1024 / 1024) + 1} MB까지 가져올 수 있습니다.`)
     const text = await file.text()
     let input
     if (python) {

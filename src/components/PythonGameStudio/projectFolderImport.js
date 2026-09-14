@@ -1,4 +1,4 @@
-import { PROJECT_LIMITS, RUNTIME_VERSION, bytesToBase64, fileKind, normalizePath, validateProject } from './projectPolicy.mjs'
+import { PROJECT_LIMITS, assertFileSize, RUNTIME_VERSION, bytesToBase64, fileKind, normalizePath, validateProject } from './projectPolicy.mjs'
 
 const supported = /\.(py|csv|png|jpe?g|webp|ogg|wav|mp3|ttf|otf)$/i
 const ignoredDirectories = new Set(['__pycache__', 'node_modules', 'venv', 'env'])
@@ -16,9 +16,9 @@ export async function readProjectFolder(entries) {
       skipped.push(path); continue
     }
     const normalized = normalizePath(path), kind = fileKind(normalized)
-    if (file.size > (kind === 'python' ? PROJECT_LIMITS.codeBytes : PROJECT_LIMITS.assetBytes)) throw new Error(`${path}: 파일 크기 제한을 초과했습니다.`)
+    assertFileSize(normalized, file.size)
     totalBytes += file.size
-    if (totalBytes > PROJECT_LIMITS.totalBytes) throw new Error('가져올 파일의 합계가 6 MB를 넘습니다. 필요한 파일만 모은 폴더를 선택해 주세요.')
+    if (totalBytes > PROJECT_LIMITS.totalBytes) throw new Error(`가져올 파일의 합계가 ${PROJECT_LIMITS.totalBytes / 1024 / 1024} MB를 넘습니다. 필요한 파일만 모은 폴더를 선택해 주세요.`)
     selected.push({ file, path: normalized, kind })
     if (selected.length > PROJECT_LIMITS.files) throw new Error('프로젝트는 파일 100개까지 가져올 수 있습니다.')
   }

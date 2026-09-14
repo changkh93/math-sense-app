@@ -11,7 +11,7 @@
   }
   function surface() {
     if (!svg) {
-      svg = element('svg', { id: 'turtle-canvas', role: 'img', 'aria-label': '거북이 그림', viewBox: '-400 -300 800 600', width: 800, height: 600 })
+      svg = element('svg', { id: 'turtle-canvas', role: 'img', 'aria-label': '거북이 그림', viewBox: '-400 -300 800 600', preserveAspectRatio: 'xMidYMid meet', width: 800, height: 600 })
       Object.assign(svg.style, { maxWidth: '100%', maxHeight: '100%', background: 'white', display: 'block', overflow: 'hidden' })
       title = element('title'); title.textContent = '거북이 그림'
       drawings = element('g', { 'data-layer': 'drawing' })
