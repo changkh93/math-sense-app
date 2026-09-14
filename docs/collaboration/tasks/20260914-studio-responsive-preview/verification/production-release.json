@@ -1,0 +1,40 @@
+{
+  "verifiedAt": "2026-09-14T10:42:22.267Z",
+  "commit": "842fe2c6",
+  "url": "https://msense.me/python-game-studio",
+  "mainAsset": "/assets/index-C1gSFMHy.js",
+  "checks": [
+    {
+      "asset": "PythonGameStudioPage-C0fTuXGx.js",
+      "sha256": "5945cd2b9f3dc851365f30ead87345eed3b8244e2d031d00919b0321262a07d2",
+      "bytes": 1323283
+    },
+    {
+      "asset": "PythonGameStudioPage-DTbNdb6x.css",
+      "sha256": "2f5c7b5e27770edc094e2fb33bd0b4d72e772790481d00a6bcac17c528883b6d",
+      "bytes": 16695
+    }
+  ],
+  "publicPages": [
+    {
+      "path": "/",
+      "status": 200,
+      "title": "메타센스 | 수학·파이썬·고전읽기 · 스스로 배우는 힘"
+    },
+    {
+      "path": "/python",
+      "status": 200,
+      "title": "초등·중학생 파이썬 코딩 | 프로젝트로 배우는 Python · 메타센스"
+    },
+    {
+      "path": "/trial",
+      "status": 200,
+      "title": "메타센스 무료체험 | 수학·파이썬·고전읽기 과정 안내"
+    },
+    {
+      "path": "/python/guides/",
+      "status": 200,
+      "title": "파이썬 학습 노트 | 메타센스"
+    }
+  ]
+}
