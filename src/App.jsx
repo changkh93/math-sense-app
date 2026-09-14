@@ -1,3 +1,4 @@
+import PublicSeo from './components/PublicSeo'
 import { lazy, Suspense, useEffect } from 'react'
 import { Navigate, Routes, Route } from 'react-router-dom'
 import './App.css'
@@ -93,6 +94,7 @@ function App() {
   return (
     <DirectMemoRealtimeProvider>
       <DirectMemoArrivalAlert />
+      <PublicSeo />
       <Suspense fallback={<RouteFallback />}>
       <QuizBattleChallengeReceiver />
       <Routes>
@@ -186,7 +188,7 @@ function App() {
       <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
       </Suspense>
-      <Footer />
+      <Routes><Route path="/" element={null} /><Route path="*" element={<Footer />} /></Routes>
     </DirectMemoRealtimeProvider>
   )
 }

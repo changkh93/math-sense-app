@@ -89,6 +89,8 @@ const AlgorithmConstellationHub = lazy(() => import('../AlgorithmConstellation/c
 const ReadingLibraryView = lazy(() => import('./ReadingLibrary/ReadingLibraryView'))
 import { isWesternClassicCluster, filterWesternClassicRegions } from '../../constants/westernClassicNavigation'
 import { isCourseExplorerCluster } from './coursePlanetCatalog'
+import PublicHomeIntro from '../PublicHomeIntro'
+import Footer from '../common/Footer'
 
 function SpaceViewFallback() {
   return (
@@ -3261,6 +3263,7 @@ function SpaceHome() {
     const titleText = "META SENSE"
     
     return (
+      <>
       <div className="space-bg logged-out-home" style={{ display: 'flex', flexDirection: 'column', minHeight: 0 }}>
         <StarField count={200} />
         <div className="nebula-bg" />
@@ -3849,6 +3852,9 @@ function SpaceHome() {
           </div>
         </div>
       </div>
+      <PublicHomeIntro />
+      <Footer />
+      </>
     )
   }
 
