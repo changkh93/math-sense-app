@@ -7,6 +7,7 @@ For an existing task, read its STATE.md and actual artifacts before continuing.
 
 | ID | Goal | Phase | State file | Next action |
 |---|---|---|---|---|
+| 20260915-studio-project-import | 정시원 코드 스튜디오 프로젝트 가져오기 실패·용량 상향 | DONE (Hosting deployed) | [STATE](tasks/20260915-studio-project-import/STATE.md) | `1f0883e3` 배포·운영 해시 일치; 학생 강력 새로고침 후 재시도 |
 | 20260914-studio-responsive-preview | 패드 실행 화면 잘림·결과 가시성 | DONE (Hosting deployed) | [STATE](tasks/20260914-studio-responsive-preview/STATE.md) | 842fe2c6 푸시·운영 JS/CSS 해시 일치, 패드 실물 확인 후속 |
 | 20260914-studio-font-upload | 큰 한글 TTF 업로드 실패 | DONE (Hosting deployed) | [STATE](tasks/20260914-studio-font-upload/STATE.md) | 공식 TTF 실기·842fe2c6 배포 검증 완료, 학생 새로고침 후 업로드 |
 | 20260912-study-crew-profile-image | 스터디 크루 프로필 이미지 관리·목록 교차·상세 배치 | DONE (local; not deployed) | [STATE](tasks/20260912-study-crew-profile-image/STATE.md) | 함수·Storage 규칙·웹 함께 배포 후 운영자 업로드/모바일 실기 확인 |
