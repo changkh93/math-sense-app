@@ -1,8 +1,8 @@
 # Code Studio project import resilience
 
 - ID: `20260915-studio-project-import`
-- Phase: DONE (local; not deployed)
-- Last updated: 2026-09-15 19:29 KST
+- Phase: DONE (Hosting deployed)
+- Last updated: 2026-09-15 19:26 KST
 - Coordinator: Codex (local)
 - Baseline: `e6dec935`; shared checkout has unrelated user changes in marketing, SEO, crew, Functions, rules, and other task records. Preserve them.
 - Original goal: investigate why student 정시원 (`cPW3EkkiW5Me2pLQDgAbixuRDLa2`) cannot import a Code Studio folder at `amer_monster.png`, and make project capacity more generous because size failures are frequent.
@@ -30,9 +30,16 @@
 - Actual Chrome folder chooser: a real WebP file copied as `images/amer_monster.png` imports, persists to IndexedDB, and `pygame.image.load()` executes successfully alongside nested Python, PNG, OGG, and TTF assets. Re-import, entrypoint choice/cancel, and no-Python errors pass.
 - Actual Chrome backup flow: exported mixed-asset project restores and survives reload; a valid PNG payload above the old 5 MiB limit restores without data loss; malformed JSON, unsupported ZIP, and simulated IndexedDB quota failure preserve the active project and controls.
 - Targeted ESLint: pass. `npm run build`: pass (74/74 Frontier audio asset validity; pre-existing license/provisional notices and chunk-size warning remain). `git diff --check`: pass; git fsmonitor emits its existing IPC warning.
-- Not verified: the student's original binary/device was unavailable, so its exact byte signature was not inspected. No authenticated production learner session, deployment, Firestore/Storage read, or student-data write was performed.
+- Not verified: the student's original binary/device was unavailable, so its exact byte signature was not inspected. No authenticated production learner session, Firestore/Storage read, or student-data write was performed.
+
+## Release
+
+- Source commit `1f0883e3` (`fix: make studio project imports resilient`) pushed to GitHub `origin/main`.
+- Built and deployed from a detached clean worktree at exactly `1f0883e3`; unrelated working-tree changes were excluded.
+- Firebase Hosting deployment to `math-sense-1f6a8` completed. Hosting only: no Functions, Firestore/Storage rules, or production data changes.
+- Production `https://msense.me/python-game-studio` returns HTTP 200 and entry `/assets/index-Co5Z3-3s.js`. Its entry SHA-256 and `/assets/PythonGameStudioPage-BfA8Ry_X.js` SHA-256 exactly match the clean local release build; the studio chunk returns HTTP 200.
 
 ## Ownership and next action
 
 - Codex owns `projectPolicy.mjs`, import timeout, targeted tests, this state, and the index entry. No external relay.
-- Next: deploy the frontend when authorized, then have the student hard-refresh and import the same folder again. If it still fails, collect the original `amer_monster.png` binary (not a screenshot) for exact format/damage analysis.
+- Next: have the student hard-refresh and import the same folder again. If it still fails, collect the original `amer_monster.png` binary (not a screenshot) for exact format/damage analysis.
