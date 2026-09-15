@@ -1,4 +1,4 @@
-export const PROJECT_LIMITS = Object.freeze({ files: 100, codeBytes: 200 * 1024, assetBytes: 5 * 1024 * 1024, fontBytes: 20 * 1024 * 1024, totalBytes: 30 * 1024 * 1024 })
+export const PROJECT_LIMITS = Object.freeze({ files: 100, codeBytes: 200 * 1024, assetBytes: 20 * 1024 * 1024, fontBytes: 30 * 1024 * 1024, totalBytes: 100 * 1024 * 1024 })
 export const RUNTIME_VERSION = 'pygame-web-0.9-cp312-v1'
 const types = { py: 'python', csv: 'csv', png: 'image', jpg: 'image', jpeg: 'image', webp: 'image', ogg: 'audio', wav: 'audio', mp3: 'audio', ttf: 'font', otf: 'font' }
 export function fileByteLimit(kind) {
@@ -26,7 +26,8 @@ export function bytesToBase64(bytes) {
   return btoa(result)
 }
 export function base64ToBytes(data) {
-  if (typeof data !== 'string' || data.length > 4 * Math.ceil(PROJECT_LIMITS.fontBytes / 3) || (data.length % 4 !== 0 || !/^[A-Za-z0-9+/]*={0,2}$/.test(data))) throw new Error('파일 데이터가 올바르지 않습니다.')
+  const largestFileBytes = Math.max(PROJECT_LIMITS.assetBytes, PROJECT_LIMITS.fontBytes)
+  if (typeof data !== 'string' || data.length > 4 * Math.ceil(largestFileBytes / 3) || (data.length % 4 !== 0 || !/^[A-Za-z0-9+/]*={0,2}$/.test(data))) throw new Error('파일 데이터가 올바르지 않습니다.')
   const decoded = atob(data), bytes = new Uint8Array(decoded.length)
   for (let i = 0; i < decoded.length; i++) bytes[i] = decoded.charCodeAt(i)
   return bytes
@@ -40,15 +41,23 @@ export function validateAsset(path, bytes) {
     return
   }
   const head = String.fromCharCode(...bytes.subarray(0, 12))
-  const valid = ext === 'png' ? head.startsWith('\x89PNG\r\n\x1a\n')
-    : ['jpg', 'jpeg'].includes(ext) ? bytes[0] === 255 && bytes[1] === 216 && bytes[2] === 255
-    : ext === 'webp' ? head.startsWith('RIFF') && head.slice(8) === 'WEBP'
-    : ext === 'ogg' ? head.startsWith('OggS')
-    : ext === 'wav' ? head.startsWith('RIFF') && head.slice(8) === 'WAVE'
-    : ext === 'mp3' ? head.startsWith('ID3') || (bytes[0] === 255 && (bytes[1] & 224) === 224)
-    : ['ttf','otf'].includes(ext) ? head.startsWith('\x00\x01\x00\x00') || head.startsWith('OTTO') || head.startsWith('true')
-    : false
-  if (!valid) throw new Error(`${path}: 파일 내용과 확장자가 일치하지 않습니다.`)
+  const detected = head.startsWith('\x89PNG\r\n\x1a\n') ? 'image'
+    : bytes[0] === 255 && bytes[1] === 216 && bytes[2] === 255 ? 'image'
+    : head.startsWith('RIFF') && head.slice(8) === 'WEBP' ? 'image'
+    : head.startsWith('OggS') ? 'audio'
+    : head.startsWith('RIFF') && head.slice(8) === 'WAVE' ? 'audio'
+    : head.startsWith('ID3') || (bytes[0] === 255 && (bytes[1] & 224) === 224) ? 'audio'
+    : head.startsWith('\x00\x01\x00\x00') || head.startsWith('OTTO') || head.startsWith('true') ? 'font'
+    : null
+  const expected = ['png', 'jpg', 'jpeg', 'webp'].includes(ext) ? 'image'
+    : ['ogg', 'wav', 'mp3'].includes(ext) ? 'audio'
+    : ['ttf', 'otf'].includes(ext) ? 'font'
+    : null
+  // Browsers and pygame identify supported media from its signature. Downloads
+  // are often saved with a .png name even when the server supplied WebP/JPEG.
+  // Accept that harmless mismatch within the same media family, while still
+  // rejecting HTML/scripts, damaged files and cross-family disguises.
+  if (!detected || detected !== expected) throw new Error(`${path}: 파일 내용과 확장자가 일치하지 않거나 지원하지 않는 형식입니다.`)
 }
 
 // Runtime output may only update CSV in the same project and only if its prior

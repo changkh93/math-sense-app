@@ -51,11 +51,13 @@ try {
   console.log('PASS Python-file import and execution')
   const large = structuredClone(original)
   const image = large.files.find(file => file.kind === 'image')
-  image.data = Buffer.concat([Buffer.from(image.data, 'base64'), Buffer.alloc(3 * 1024 * 1024)]).toString('base64')
+  // Exercise the raised media limit with an otherwise valid PNG above the old
+  // 5 MiB ceiling. PNG decoders safely ignore bytes after the IEND chunk.
+  image.data = Buffer.concat([Buffer.from(image.data, 'base64'), Buffer.alloc(12 * 1024 * 1024)]).toString('base64')
   large.title = '큰 프로젝트'
   await choose({ name: 'large.mspygame.json', buffer: Buffer.from(JSON.stringify(large)) }); await success()
   assert.equal((await rows())[0].project.files.find(file => file.path === image.path).data, image.data)
-  console.log('PASS large embedded asset import without data loss')
+  console.log('PASS >5 MiB embedded asset import without data loss')
   await page.evaluate(() => {
     const put = IDBObjectStore.prototype.put
     IDBObjectStore.prototype.put = function (record, ...args) {

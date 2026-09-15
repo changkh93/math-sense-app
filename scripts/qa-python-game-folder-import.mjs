@@ -6,12 +6,14 @@ import { createRequire } from 'node:module'
 const { chromium } = createRequire(import.meta.url)(process.env.PLAYWRIGHT_MODULE || 'playwright')
 const root = await mkdtemp(join(tmpdir(), 'metasense-folder-qa-'))
 const game = join(root, '게임 왕국')
-const main = 'import pygame\nfrom helpers.score import value\npygame.init()\nscreen=pygame.display.set_mode((320,240))\nimage=pygame.image.load("images/hero.png")\nfont=pygame.font.Font("fonts/myfont.ttf",20)\nsound=pygame.mixer.Sound("sounds/success.ogg")\nprint("FOLDER_OK",value,image.get_size(),font.get_height(),sound.get_length())\n'
+const main = 'import pygame\nfrom helpers.score import value\npygame.init()\nscreen=pygame.display.set_mode((320,240))\nimage=pygame.image.load("images/hero.png")\ndownloaded=pygame.image.load("images/amer_monster.png")\nfont=pygame.font.Font("fonts/myfont.ttf",20)\nsound=pygame.mixer.Sound("sounds/success.ogg")\nprint("FOLDER_OK",value,image.get_size(),downloaded.get_size(),font.get_height(),sound.get_length())\n'
 await mkdir(join(game, 'helpers'), { recursive: true }); await mkdir(join(game, 'images'))
 await mkdir(join(game, 'fonts')); await mkdir(join(game, 'sounds')); await mkdir(join(game, '.venv'))
 await writeFile(join(game, 'main.py'), main); await writeFile(join(game, 'helpers', 'score.py'), 'value=42\n')
 await writeFile(join(game, 'README.md'), 'Folder fixture'); await writeFile(join(game, '.venv', 'ignored.py'), 'skip me')
 await copyFile(new URL('../public/python-game-examples/knight.png', import.meta.url), join(game, 'images', 'hero.png'))
+// Reproduce a common Windows download: valid WebP bytes kept under a .png name.
+await copyFile(new URL('../public/assets/planets/elementary/dark.webp', import.meta.url), join(game, 'images', 'amer_monster.png'))
 await copyFile(new URL('../public/python-game-examples/success.ogg', import.meta.url), join(game, 'sounds', 'success.ogg'))
 await copyFile('/System/Library/Fonts/Supplemental/Arial.ttf', join(game, 'fonts', 'myfont.ttf'))
 const multi = join(root, '여러 실행 파일'); await mkdir(multi)
@@ -30,7 +32,7 @@ try {
   await choose(game)
   await page.waitForFunction(() => document.querySelector('input[aria-label="프로젝트 이름"]')?.value === '게임 왕국')
   let project = (await rows())[0].project
-  assert.deepEqual(project.files.map(file => file.path).sort(), ['fonts/myfont.ttf','helpers/score.py','images/hero.png','main.py','sounds/success.ogg'])
+  assert.deepEqual(project.files.map(file => file.path).sort(), ['fonts/myfont.ttf','helpers/score.py','images/amer_monster.png','images/hero.png','main.py','sounds/success.ogg'])
   assert.equal(project.entrypoint, 'main.py'); assert.match(await page.locator('.pgs-notice').innerText(), /2개는 제외/)
   await page.getByRole('button', { name: '실행', exact: true }).click()
   await page.waitForFunction(() => document.querySelector('.pgs-console pre')?.textContent.includes('FOLDER_OK 42'), null, { timeout: 90000 })

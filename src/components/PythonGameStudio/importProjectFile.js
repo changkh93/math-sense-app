@@ -7,7 +7,7 @@ function importRequest(request) {
       if (error) reject(error)
       else resolve(project)
     }
-    const timeout = setTimeout(() => finish(new Error('파일을 읽는 시간이 너무 오래 걸립니다. 파일을 다시 선택해 주세요.')), 20000)
+    const timeout = setTimeout(() => finish(new Error('파일을 읽는 시간이 너무 오래 걸립니다. 파일을 다시 선택해 주세요.')), 60000)
     worker.onmessage = ({ data }) => finish(data.ok ? null : new Error(data.message), data)
     worker.onerror = () => finish(new Error('프로젝트 파일을 처리하지 못했습니다. 새로고침 후 다시 시도해 주세요.'))
     worker.postMessage(request)

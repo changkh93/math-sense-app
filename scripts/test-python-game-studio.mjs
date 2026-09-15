@@ -17,7 +17,11 @@ test('reject conflicting normalized names, missing entry and file/folder overlap
 })
 test('validate genuine assets and reject disguised content', async () => {
   for (const name of ['knight.png','success.ogg']) { const p=basic();p.files.push({path:name,data:bytesToBase64(await readFile(new URL(`../public/python-game-examples/${name}`,import.meta.url)))});assert.equal(validateProject(p).files.length,2) }
+  for (const bytes of [new Uint8Array([0xff, 0xd8, 0xff, 0, 0]), new TextEncoder().encode('RIFF\0\0\0\0WEBP')]) {
+    const p=basic();p.files.push({path:'downloaded-as.png',data:bytesToBase64(bytes)});assert.equal(validateProject(p).files[1].kind,'image')
+  }
   const p=basic();p.files.push({path:'fake.png',data:bytesToBase64(new TextEncoder().encode('<script>bad</script>'))});assert.throws(()=>validateProject(p),/확장자/)
+  const audio=basic();audio.files.push({path:'audio.png',data:bytesToBase64(new TextEncoder().encode('OggS\0\0\0\0'))});assert.throws(()=>validateProject(audio),/확장자/)
 })
 test('large payload limits and malformed revisions are rejected', () => {
   const p=basic();p.files[0].text='x'.repeat(201*1024);assert.throws(()=>validateProject(p),/크기/)
@@ -60,7 +64,7 @@ test('CSV validates UTF-8 and supports guarded local runtime saves only', async 
   for (const data of [bytesToBase64(new Uint8Array([0xff])), bytes('a\0b'), bytes('a'.repeat(201*1024))]) assert.throws(() => applyRuntimeCsv(initial, initial.id, { ...csv, data }, undefined))
 })
 
-test('large Korean fonts round-trip while image/code/project limits remain enforced', async () => {
+test('larger media and Korean fonts round-trip while code/project limits remain enforced', async () => {
   const { PROJECT_LIMITS, assertFileSize } = await import('../src/components/PythonGameStudio/projectPolicy.mjs')
   const font = new Uint8Array(10 * 1024 * 1024); font.set([0,1,0,0])
   const data = bytesToBase64(font)
@@ -69,9 +73,10 @@ test('large Korean fonts round-trip while image/code/project limits remain enfor
   assert.equal(base64ToBytes(toRunnerProject(valid).files[1].data).length, font.length)
   assert.equal(valid.files[1].kind, 'font')
   assert.doesNotThrow(() => assertFileSize('font.OTF', PROJECT_LIMITS.fontBytes))
-  assert.throws(() => assertFileSize('font.ttf', PROJECT_LIMITS.fontBytes + 1), /20 MB/)
-  assert.throws(() => assertFileSize('image.png', 6 * 1024 * 1024), /5 MB/)
+  assert.throws(() => assertFileSize('font.ttf', PROJECT_LIMITS.fontBytes + 1), /30 MB/)
+  assert.doesNotThrow(() => assertFileSize('image.png', 20 * 1024 * 1024))
+  assert.throws(() => assertFileSize('image.png', PROJECT_LIMITS.assetBytes + 1), /20 MB/)
   assert.throws(() => assertFileSize('data.csv', 201 * 1024), /200 KB/)
-  const excessive = basic(); excessive.files.push(...Array.from({length:3}, (_, i) => ({path:`${i}.ttf`,data})))
+  const excessive = basic(); excessive.files.push(...Array.from({length:11}, (_, i) => ({path:`${i}.ttf`,data})))
   assert.throws(() => validateProject(excessive), /프로젝트 전체 용량/)
 })

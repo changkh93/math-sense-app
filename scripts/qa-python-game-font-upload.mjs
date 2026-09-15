@@ -34,8 +34,8 @@ try{
  const choosing=page.waitForEvent('filechooser');await page.getByRole('button',{name:'백업 파일 복원',exact:true}).click();await(await choosing).setFiles('/tmp/studio-font-backup.mspygame.json')
  await page.getByRole('dialog',{name:'내 프로젝트'}).waitFor({state:'detached'});await row().waitFor()
  // A rejected selection must leave the existing project intact and show a local error.
- await picker().setInputFiles({name:'too-large.ttf',mimeType:'font/ttf',buffer:Buffer.alloc(21*1024*1024)})
- await page.locator('.pgs-upload-error').waitFor();assert.match(await page.locator('.pgs-upload-error').innerText(),/20 MB/);assert.equal(await row().count(),1)
+ await picker().setInputFiles({name:'too-large.ttf',mimeType:'font/ttf',buffer:Buffer.alloc(31*1024*1024)})
+ await page.locator('.pgs-upload-error').waitFor();assert.match(await page.locator('.pgs-upload-error').innerText(),/30 MB/);assert.equal(await row().count(),1)
  await page.screenshot({path:`${out}/upload-error.png`})
  // Folder import uses the same large-font limits.
  const folderResult=await page.evaluate(async ({data})=>{
