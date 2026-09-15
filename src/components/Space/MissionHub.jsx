@@ -1,6 +1,6 @@
 import React, { lazy, Suspense, useState, useEffect, useRef, useCallback, useImperativeHandle } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { RotateCcw, Volume2, VolumeX, X } from 'lucide-react'
+import { GripVertical, RotateCcw, Volume2, VolumeX, X } from 'lucide-react'
 
 import soundManager from '../../utils/SoundManager'
 import UnitLeaderboard from './UnitLeaderboard'
@@ -24,6 +24,11 @@ import {
 } from '../../utils/videoPlaybackUtils'
 import { getMissionSetCompletion } from '../../utils/pythonMissionProgressUtils'
 import { usePythonMissionSet } from '../../hooks/usePythonMissionSet'
+import {
+  clampFloatingControlCenter,
+  normalizeFloatingControlPosition,
+  parseFloatingControlPosition,
+} from '../../utils/floatingControlPosition'
 
 const SpaceQuizView = lazy(() => import('./SpaceQuizView'))
 const QuizBattleView = lazy(() => import('./QuizBattleView'))
@@ -33,6 +38,8 @@ const PythonMissionLab = lazy(() => import('../PythonWorld/PythonMissionLab'))
 const QuestionModal = lazy(() => import('../QuestionModal'))
 const MissionMarkdownViewer = lazy(() => import('./MissionMarkdownViewer'))
 const TimeAttackOverlay = lazy(() => import('./TimeAttackOverlay'))
+const VIDEO_MENU_POSITION_STORAGE_KEY = 'metasense_video_menu_position_v1'
+const VIDEO_MENU_DRAG_THRESHOLD_PX = 5
 
 function MissionModeFallback({ label = '학습 모듈을 불러오고 있습니다...' }) {
   return (
@@ -1161,6 +1168,10 @@ export default function MissionHub({
   const [isVideoMuted, setIsVideoMuted] = useState(() => localStorage.getItem('metasense_video_muted') === '1');
   const [isMediaControlsOpen, setIsMediaControlsOpen] = useState(false);
   const [isBottomActionsOpen, setIsBottomActionsOpen] = useState(() => window.innerWidth >= 768);
+  const [videoMenuPosition, setVideoMenuPosition] = useState(() => (
+    parseFloatingControlPosition(localStorage.getItem(VIDEO_MENU_POSITION_STORAGE_KEY))
+  ));
+  const [isVideoMenuDragging, setIsVideoMenuDragging] = useState(false)
   
   useEffect(() => {
     if (completionBonusTimeLeft === null || completionBonusTimeLeft <= 0) return;
@@ -1180,6 +1191,10 @@ export default function MissionHub({
   const [isUiVisible, setIsUiVisible] = useState(true);
   const [isBottomHudInteracting, setIsBottomHudInteracting] = useState(false);
   const idleTimerRef = useRef(null);
+  const theaterWrapperRef = useRef(null)
+  const videoMenuButtonRef = useRef(null)
+  const videoMenuDragRef = useRef(null)
+  const suppressVideoMenuClickRef = useRef(false)
 
   useEffect(() => {
     if (currentMode !== 'video' || !selectedTx) return
@@ -1188,6 +1203,111 @@ export default function MissionHub({
     setIsBottomActionsOpen(!isMobile)
     setIsBottomHudInteracting(false)
   }, [currentMode, selectedTx?.id, isMobile])
+
+  const finishVideoMenuDrag = useCallback((event) => {
+    const drag = videoMenuDragRef.current
+    if (!drag || drag.pointerId !== event.pointerId) return
+    videoMenuDragRef.current = null
+    setIsVideoMenuDragging(false)
+    if (event.currentTarget.hasPointerCapture?.(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId)
+    }
+    if (!drag.moved) return
+    suppressVideoMenuClickRef.current = true
+    setTimeout(() => { suppressVideoMenuClickRef.current = false }, 0)
+  }, [])
+
+  const handleVideoMenuPointerDown = useCallback((event) => {
+    if (event.button !== 0 && event.pointerType !== 'touch') return
+    const containerRect = theaterWrapperRef.current?.getBoundingClientRect()
+    const controlRect = videoMenuButtonRef.current?.getBoundingClientRect()
+    if (!containerRect || !controlRect) return
+    event.currentTarget.setPointerCapture?.(event.pointerId)
+    videoMenuDragRef.current = {
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      originX: controlRect.left - containerRect.left + controlRect.width / 2,
+      originY: controlRect.top - containerRect.top + controlRect.height / 2,
+      containerRect,
+      controlWidth: controlRect.width,
+      controlHeight: controlRect.height,
+      moved: false,
+    }
+    setIsVideoMenuDragging(false)
+  }, [])
+
+  const handleVideoMenuPointerMove = useCallback((event) => {
+    const drag = videoMenuDragRef.current
+    if (!drag || drag.pointerId !== event.pointerId) return
+    const deltaX = event.clientX - drag.startX
+    const deltaY = event.clientY - drag.startY
+    if (!drag.moved && Math.hypot(deltaX, deltaY) < VIDEO_MENU_DRAG_THRESHOLD_PX) return
+    if (!drag.moved) {
+      drag.moved = true
+      setIsVideoMenuDragging(true)
+    }
+    event.preventDefault()
+    const bounded = clampFloatingControlCenter({
+      x: drag.originX + deltaX,
+      y: drag.originY + deltaY,
+      containerWidth: drag.containerRect.width,
+      containerHeight: drag.containerRect.height,
+      controlWidth: drag.controlWidth,
+      controlHeight: drag.controlHeight,
+      padding: 8,
+    })
+    setVideoMenuPosition(normalizeFloatingControlPosition({
+      ...bounded,
+      containerWidth: drag.containerRect.width,
+      containerHeight: drag.containerRect.height,
+    }))
+  }, [])
+
+  useEffect(() => {
+    if (!videoMenuPosition) return
+    localStorage.setItem(VIDEO_MENU_POSITION_STORAGE_KEY, JSON.stringify(videoMenuPosition))
+  }, [videoMenuPosition])
+
+  useEffect(() => {
+    if (!videoMenuPosition || currentMode !== 'video') return
+    let animationFrame = null
+    let resizeObserver = null
+    const keepVideoMenuInBounds = () => {
+      const containerRect = theaterWrapperRef.current?.getBoundingClientRect()
+      const controlRect = videoMenuButtonRef.current?.getBoundingClientRect()
+      if (!containerRect || !controlRect) return
+      const bounded = clampFloatingControlCenter({
+        x: videoMenuPosition.x * containerRect.width,
+        y: videoMenuPosition.y * containerRect.height,
+        containerWidth: containerRect.width,
+        containerHeight: containerRect.height,
+        controlWidth: controlRect.width,
+        controlHeight: controlRect.height,
+        padding: 8,
+      })
+      const next = normalizeFloatingControlPosition({
+        ...bounded,
+        containerWidth: containerRect.width,
+        containerHeight: containerRect.height,
+      })
+      if (Math.abs(next.x - videoMenuPosition.x) < 0.0001 && Math.abs(next.y - videoMenuPosition.y) < 0.0001) return
+      setVideoMenuPosition(next)
+      localStorage.setItem(VIDEO_MENU_POSITION_STORAGE_KEY, JSON.stringify(next))
+    }
+    animationFrame = requestAnimationFrame(keepVideoMenuInBounds)
+    window.addEventListener('resize', keepVideoMenuInBounds)
+    if (typeof ResizeObserver !== 'undefined') {
+      resizeObserver = new ResizeObserver(keepVideoMenuInBounds)
+      if (theaterWrapperRef.current) resizeObserver.observe(theaterWrapperRef.current)
+      if (videoMenuButtonRef.current) resizeObserver.observe(videoMenuButtonRef.current)
+    }
+    return () => {
+      if (animationFrame !== null) cancelAnimationFrame(animationFrame)
+      window.removeEventListener('resize', keepVideoMenuInBounds)
+      resizeObserver?.disconnect()
+    }
+  }, [currentMode, isMobile, videoMenuPosition])
 
   const handlePlaybackRateChange = useCallback((rate) => {
     setPlaybackRate(rate)
@@ -3583,7 +3703,7 @@ export default function MissionHub({
       const shouldShowBottomHud = isBottomActionsOpen && (isUiVisible || isBottomHudInteracting || videoCompleted || isAtEnd || videoTrackingWarning)
 
       return (
-          <div className="theater-wrapper">
+          <div ref={theaterWrapperRef} className="theater-wrapper">
              <div
                id="mission-video-capture-area"
                className="theater-aspect-box"
@@ -4046,8 +4166,14 @@ export default function MissionHub({
 
              {!isBottomActionsOpen && (
                <button
+                 ref={videoMenuButtonRef}
                  type="button"
+                 onPointerDown={handleVideoMenuPointerDown}
+                 onPointerMove={handleVideoMenuPointerMove}
+                 onPointerUp={finishVideoMenuDrag}
+                 onPointerCancel={finishVideoMenuDrag}
                  onClick={() => {
+                   if (suppressVideoMenuClickRef.current) return
                    if (hasUnsavedVideoCompletion) {
                      handleSaveVideoPosition()
                      return
@@ -4056,13 +4182,14 @@ export default function MissionHub({
                    setIsUiVisible(true)
                  }}
                  className="font-tech"
-                 title={hasUnsavedVideoCompletion ? '완료 보너스 받기' : '학습 메뉴 열기'}
-                 aria-label={hasUnsavedVideoCompletion ? '완료 보너스 받기' : '학습 메뉴 열기'}
+                 title={hasUnsavedVideoCompletion ? '완료 보너스 받기 · 끌어서 이동' : '학습 메뉴 열기 · 끌어서 이동'}
+                 aria-label={hasUnsavedVideoCompletion ? '완료 보너스 받기, 끌어서 이동 가능' : '학습 메뉴 열기, 끌어서 이동 가능'}
                  style={{
                    position: 'absolute',
-                   left: '50%',
-                   bottom: isMobile ? 'calc(0.75rem + env(safe-area-inset-bottom, 0px))' : '1.1rem',
-                   transform: 'translateX(-50%)',
+                   left: videoMenuPosition ? `${videoMenuPosition.x * 100}%` : '50%',
+                   top: videoMenuPosition ? `${videoMenuPosition.y * 100}%` : undefined,
+                   bottom: videoMenuPosition ? undefined : (isMobile ? 'calc(0.75rem + env(safe-area-inset-bottom, 0px))' : '1.1rem'),
+                   transform: videoMenuPosition ? 'translate(-50%, -50%)' : 'translateX(-50%)',
                    zIndex: 5100,
                    display: 'inline-flex',
                    alignItems: 'center',
@@ -4081,7 +4208,7 @@ export default function MissionHub({
                    backdropFilter: 'blur(12px)',
                    WebkitBackdropFilter: 'blur(12px)',
                    color: '#ffffff',
-                   cursor: 'pointer',
+                   cursor: isVideoMenuDragging ? 'grabbing' : 'grab',
                    fontSize: isMobile ? '0.92rem' : '0.96rem',
                    fontWeight: 800,
                    letterSpacing: '0.02em',
@@ -4090,9 +4217,13 @@ export default function MissionHub({
                      : '0 10px 30px rgba(0, 0, 0, 0.7), 0 0 20px rgba(0, 243, 255, 0.35)',
                    textShadow: '0 1px 3px rgba(0, 0, 0, 0.9), 0 0 8px rgba(0, 243, 255, 0.4)',
                    transition: 'all 0.2s ease-in-out',
-                   pointerEvents: 'auto'
+                   pointerEvents: 'auto',
+                   touchAction: 'none',
+                   userSelect: 'none',
+                   WebkitUserSelect: 'none'
                  }}
                >
+                 <GripVertical size={18} aria-hidden="true" style={{ flexShrink: 0, opacity: 0.72 }} />
                  {hasUnsavedVideoCompletion ? (
                    hasActiveCompletionBonus ? (
                      <>✨ 완료 보너스 받기 · {completionBonusTimeLeft}초</>
