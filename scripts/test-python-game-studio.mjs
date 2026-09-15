@@ -8,6 +8,18 @@ test('Unicode source and asset paths survive serialization', () => {
   assert.equal(new TextDecoder().decode(base64ToBytes(toRunnerProject(p).files[0].data)), 'print("안녕")')
   assert.equal(validateProject(p).files[1].path, '도움.py')
 })
+test('monster starter provides assets with an empty main.py', async () => {
+  const originalFetch = globalThis.fetch, requested = []
+  globalThis.fetch = async path => { requested.push(path); return { ok: true, arrayBuffer: async () => new ArrayBuffer(0) } }
+  try {
+    const { createMonsterProject } = await import('../src/components/PythonGameStudio/monsterTemplate.js')
+    const project = await createMonsterProject()
+    assert.equal(project.files.find(file => file.path === 'main.py').text, '')
+    assert.equal(project.files.length, 10)
+    assert.equal(requested.length, 9)
+    assert.ok(!requested.some(path => path.includes('monster-main.py')))
+  } finally { globalThis.fetch = originalFetch }
+})
 test('reject traversal, reserved and unsupported files', () => {
   for (const path of ['../main.py','/main.py','C:/main.py','a\\b.py','a//b.py','./main.py','.hidden/main.py','index.html','code.js','image.svg','a\u0000.py']) assert.throws(() => normalizePath(path), path)
 })

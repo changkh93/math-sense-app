@@ -20,6 +20,10 @@ try {
   await page.goto(process.env.GAME_STUDIO_QA_URL || 'http://127.0.0.1:5179/dev/python-game-studio'); await page.locator('.cm-content').waitFor()
   await library(); await page.getByRole('button', { name: '몬스터 잡기 예제' }).click()
   await page.waitForFunction(() => document.querySelector('input[aria-label="프로젝트 이름"]')?.value === '몬스터 잡기')
+  await page.waitForFunction(() => document.querySelector('.pgs-save-state')?.textContent === '이 기기에 저장됨')
+  let monster = (await rows())[0].project
+  assert.equal(monster.files.find(file => file.path === 'main.py').text, '')
+  assert.equal(monster.files.length, 10)
   const font = await readFile('/System/Library/Fonts/Supplemental/Arial.ttf')
   await page.locator('input[type=file][multiple]:not([webkitdirectory])').setInputFiles({ name: 'myfont.ttf', mimeType: 'font/ttf', buffer: font })
   await page.waitForFunction(() => document.querySelector('.pgs-file-list')?.textContent.includes('myfont.ttf'))
