@@ -34,7 +34,13 @@ export default function PythonWorldCanvas({
 
   const instances = useMemo(() => Object.values(execTraceState.instances || {}), [execTraceState])
 
-  const isObjectMission = Boolean(mission?.isPilot || mission?.isSpike || mission?.isObjectMission || mission?.actId === 'object-learning-pilot')
+  const isObjectMission = Boolean(
+    mission?.isPilot ||
+    mission?.isSpike ||
+    mission?.isObjectMission ||
+    mission?.actId === 'object-learning-pilot' ||
+    mission?.id?.startsWith('lumi-object-')
+  )
   const width = Math.max(1, Number(worldState.width) || 8)
   const height = Math.max(1, Number(worldState.height) || 5)
   const rover = worldState.rover || { x: 0, y: 0, direction: 0, energy: 100, awake: true }

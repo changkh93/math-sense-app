@@ -19,12 +19,19 @@ assert.equal(OBJECT_CORE_MISSIONS.length, 8, 'Object Core must contain exactly 8
 for (const m of OBJECT_CORE_MISSIONS) {
   assert.equal(m.persistencePolicy, 'official')
   assert.equal(m.rewardPolicy, 'standard-crystals')
+  assert.match(m.id, /^lumi-object-/, 'Object Core missions must use the canvas object-mission namespace')
 }
 console.log('  -> 8 official missions verified with official policies')
 
 // 2. Real CPython Execution Setup
 const workerFilePath = path.resolve('src/components/PythonWorld/runtime/pythonWorld.worker.js')
 const workerContent = fs.readFileSync(workerFilePath, 'utf8')
+const worldCanvasContent = fs.readFileSync(path.resolve('src/components/PythonWorld/PythonWorldCanvas.jsx'), 'utf8')
+assert.match(
+  worldCanvasContent,
+  /mission\?\.id\?\.startsWith\('lumi-object-'\)/,
+  'Official Object Core missions must render the drone assembly world instead of a navigation target'
+)
 const matchRunner = workerContent.match(/const PYTHON_RUNNER = String\.raw`([\s\S]*?)`\s*async function loadRuntime/)
 assert.ok(matchRunner, 'Must extract PYTHON_RUNNER from worker file')
 const pythonRunnerCode = matchRunner[1]
