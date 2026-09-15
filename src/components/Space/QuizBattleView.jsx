@@ -33,6 +33,26 @@ const BATTLE_SCOPE_LABELS = {
 const BATTLE_FEEDBACK_VOLUME_MULTIPLIER = 1.75
 const BATTLE_MAX_FOCUS_VIOLATIONS = 3
 
+const getBattleRewardPolicyMessage = (rewardPolicy) => {
+  if (!rewardPolicy?.reason) return ''
+  if (rewardPolicy.reason === 'scope_reward_reduced') {
+    const attempt = Number(rewardPolicy.scopeRewardAttempt || 0)
+    const percent = Number(rewardPolicy.scopeRewardPercent || 0)
+    const nextPercent = Number(rewardPolicy.nextScopeRewardPercent || 0)
+    const nextMessage = nextPercent > 0
+      ? `같은 범위를 한 번 더 플레이하면 ${nextPercent}%가 지급됩니다.`
+      : '같은 범위의 오늘 추가 배틀은 연습 경기로 진행되며 광석은 지급되지 않습니다.'
+    return `오늘 같은 범위 ${attempt}회차라 기본 보상의 ${percent}%만 지급되었습니다. ${nextMessage} 새로운 유닛에 도전해 보세요.`
+  }
+  return {
+    battle_access_inactive: '현재 접근 허용된 과정 또는 리전이 아니라 광석과 공식 전적에서 제외되었습니다.',
+    scope_repeat_limit: '오늘 같은 범위의 보상·공식 전적 반영 횟수를 모두 사용했습니다. 새로운 유닛에 도전해 보세요.',
+    opponent_repeat_limit: '오늘 같은 상대와의 보상·공식 전적 반영 횟수를 모두 사용했습니다.',
+    daily_ore_cap: '오늘의 퀴즈 배틀 광석 상한에 도달했습니다.',
+    daily_ore_cap_partial: '오늘의 남은 배틀 광석 한도까지만 지급되었습니다.',
+  }[rewardPolicy.reason] || '공정 플레이 정책에 따라 연습 경기로 기록되었습니다.'
+}
+
 const isBattleCaptureShortcut = (event) => {
   if (event.key === 'PrintScreen') return true
   const key = String(event.key || '').toLowerCase()
@@ -1628,13 +1648,7 @@ export default function QuizBattleView({
           )}
           {resultSummary?.rewardPolicy?.reason && (
             <div className="font-tech" style={{ color: 'var(--star-gold)', margin: '-0.8rem 0 1.5rem', lineHeight: 1.6 }}>
-              {{
-                battle_access_inactive: '현재 접근 허용된 과정 또는 리전이 아니라 광석과 공식 전적에서 제외되었습니다.',
-                scope_repeat_limit: '오늘 같은 범위의 보상·공식 전적 반영 횟수를 모두 사용했습니다.',
-                opponent_repeat_limit: '오늘 같은 상대와의 보상·공식 전적 반영 횟수를 모두 사용했습니다.',
-                daily_ore_cap: '오늘의 퀴즈 배틀 광석 상한에 도달했습니다.',
-                daily_ore_cap_partial: '오늘의 남은 배틀 광석 한도까지만 지급되었습니다.',
-              }[resultSummary.rewardPolicy.reason] || '공정 플레이 정책에 따라 연습 경기로 기록되었습니다.'}
+              {getBattleRewardPolicyMessage(resultSummary.rewardPolicy)}
             </div>
           )}
           <div style={{ display: 'flex', gap: '0.8rem', justifyContent: 'center', flexWrap: 'wrap' }}>

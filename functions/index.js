@@ -31,6 +31,9 @@ const {
 } = require("./directMemoPolicy");
 const crewGrowthPolicy = require("./crewGrowthEventPolicy.cjs");
 const crewGrowthService = require("./crewGrowthEventService.cjs");
+const {
+  calculateQuizBattleRewardPolicy,
+} = require("./quizBattleRewardPolicy.cjs");
 const FUNCTIONS_REGION = "asia-northeast3";
 const regionalFunctions = functions.region(FUNCTIONS_REGION);
 const accountDeletionFunctions = regionalFunctions.runWith({ timeoutSeconds: 540, memory: "1GB" });
@@ -518,9 +521,6 @@ const QUIZ_BATTLE_AI_FAVORED_PROFILE_RATE = 0.3;
 const QUIZ_BATTLE_AI_DEFAULT_USER_ACCURACY = 0.75;
 const QUIZ_BATTLE_AI_MIN_USER_ACCURACY = 0.5;
 const QUIZ_BATTLE_AI_MAX_USER_ACCURACY = 0.93;
-const QUIZ_BATTLE_DAILY_ORE_CAP = 500;
-const QUIZ_BATTLE_DAILY_SCOPE_REWARD_LIMIT = 3;
-const QUIZ_BATTLE_DAILY_OPPONENT_LIMIT = 3;
 const QUIZ_BATTLE_CHALLENGE_TTL_MS = 75 * 1000;
 const QUIZ_BATTLE_ONLINE_WINDOW_MS = 2 * 60 * 1000;
 const QUIZ_BATTLE_DIRECT_CONFIRM_TIMEOUT_MS = 45 * 1000;
@@ -1443,30 +1443,19 @@ async function finalizeQuizBattleInternal(battleId, finalizeReason = "completed"
         battleData.clusterId || "",
         battleData.regionId || ""
       );
-      const repeatEligible = scopeCount < QUIZ_BATTLE_DAILY_SCOPE_REWARD_LIMIT
-        && opponentCount < QUIZ_BATTLE_DAILY_OPPONENT_LIMIT;
-      const rewardEligible = accessEligible && repeatEligible;
-      const competitiveEligible = rewardEligible && battleData.isAI !== true;
-      const aiTrainingEligible = rewardEligible && battleData.isAI === true;
       const requestedReward = Number(rewardResult.rewards[uid] || 0);
-      const remainingDailyOre = Math.max(0, QUIZ_BATTLE_DAILY_ORE_CAP - Number(limitData.totalOre || 0));
-      const reward = rewardEligible ? Math.min(requestedReward, remainingDailyOre) : 0;
-      let reason = "";
-      if (!accessEligible) reason = "battle_access_inactive";
-      else if (scopeCount >= QUIZ_BATTLE_DAILY_SCOPE_REWARD_LIMIT) reason = "scope_repeat_limit";
-      else if (opponentCount >= QUIZ_BATTLE_DAILY_OPPONENT_LIMIT) reason = "opponent_repeat_limit";
-      else if (remainingDailyOre <= 0) reason = "daily_ore_cap";
-      else if (reward < requestedReward) reason = "daily_ore_cap_partial";
-
-      rewardResult.rewards[uid] = reward;
-      rewardPolicies[uid] = {
-        reward,
+      const rewardPolicy = calculateQuizBattleRewardPolicy({
         requestedReward,
-        reason,
+        scopeCount,
+        opponentCount,
+        totalOre: limitData.totalOre,
         accessEligible,
-        rewardEligible,
-        competitiveEligible,
-        aiTrainingEligible,
+        isAI: battleData.isAI === true,
+      });
+
+      rewardResult.rewards[uid] = rewardPolicy.reward;
+      rewardPolicies[uid] = {
+        ...rewardPolicy,
         scopeKey,
         opponentKey,
       };
@@ -1541,6 +1530,8 @@ async function finalizeQuizBattleInternal(battleId, finalizeReason = "completed"
             score: Number(participant.score || 0),
             correctCount: Number(participant.correctCount || 0),
             winnerUid: rewardResult.winnerUid || "",
+            scopeRewardAttempt: Number(rewardPolicy.scopeRewardAttempt || 0),
+            scopeRewardPercent: Number(rewardPolicy.scopeRewardPercent || 0),
           },
         });
       }
@@ -1565,6 +1556,8 @@ async function finalizeQuizBattleInternal(battleId, finalizeReason = "completed"
         forfeited: participant.forfeited === true,
         crystalsEarned: reward,
         rewardLimitReason: rewardPolicy.reason || "",
+        scopeRewardAttempt: Number(rewardPolicy.scopeRewardAttempt || 0),
+        scopeRewardPercent: Number(rewardPolicy.scopeRewardPercent || 0),
         competitiveEligible,
         aiTrainingEligible,
         battleResult: didWin ? "win" : didDraw ? "draw" : "loss",

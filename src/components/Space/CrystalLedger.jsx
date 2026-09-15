@@ -867,7 +867,8 @@ export default function CrystalLedger({ userData }) {
                 <li>NOVA-7은 공식 승률·연승·아레나 순위에서 제외되며, 정답률·완주에 따라 전체 SEI에 <span style={{color: 'var(--text-bright)'}}>최대 60점</span> 반영</li>
                 <li>현재 학습 중인 <span style={{color: 'var(--text-bright)'}}>과정과 리전</span>에서만 참여 가능</li>
                 <li>배틀 광석은 하루 최대 <span style={{color: 'var(--text-bright)'}}>500개</span></li>
-                <li>같은 범위 또는 같은 상대는 하루 <span style={{color: 'var(--text-bright)'}}>3회</span>까지만 보상·공식 전적 반영</li>
+                <li>같은 유닛·누적 범위는 하루 <span style={{color: 'var(--text-bright)'}}>100% → 50% → 20%</span>로 보상 감소, 이후 연습 경기</li>
+                <li>같은 상대는 하루 <span style={{color: 'var(--text-bright)'}}>3회</span>까지만 보상·공식 전적 반영</li>
                 <li>중도 포기 시 <span style={{color: '#f87171'}}>보상 없음</span></li>
                 <li><span style={{color: '#f87171'}}>AI 사용 및 부정행위 적발 시 퀴즈 배틀에서 영구 퇴출될 수 있습니다.</span></li>
               </ul>
