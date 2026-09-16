@@ -30,7 +30,6 @@ export default function ErrorCoach({ uid, source, currentSource, text, mode = 'f
   const prepared = useMemo(() => payload ? renderStructure(payload) : null, [payload])
   const [step, setStep] = useState(0), [preview, setPreview] = useState(false), [reviewed, setReviewed] = useState(false)
   const [pending, setPending] = useState(false), [answer, setAnswer] = useState(null), [failure, setFailure] = useState(''), [aiStep, setAiStep] = useState(0)
-  const [reported, setReported] = useState(false)
   const alive = useRef(true), lock = useRef(false)
   const stale = currentSource !== source
   useEffect(() => { alive.current = true; return () => { alive.current = false } }, [])
@@ -69,7 +68,7 @@ export default function ErrorCoach({ uid, source, currentSource, text, mode = 'f
         <div className="pgs-coach-actions"><button disabled={!reviewed || pending || lock.current} onClick={ask}>{pending ? '힌트를 생각하고 있어요…' : '확인한 내용으로 AI 힌트 받기'}</button>{!pending && !lock.current && <button onClick={() => { setPreview(false); setReviewed(false) }}>돌아가기</button>}</div>
       </div>}
       {failure && <p role="status">{failure}</p>}
-      {answer && <div className="pgs-coach-answer" aria-live="polite"><strong>변환된 코드를 살펴본 AI 힌트</strong><p>{answer.explanation}</p><p>{answer.hint}</p>{aiStep >= 1 && <p>{answer.question}</p>}{aiStep >= 2 && <p>{answer.check}</p>}{aiStep < 2 && <button onClick={() => setAiStep(aiStep + 1)}>{aiStep === 0 ? '생각해 볼 질문' : '확인 방법 보기'}</button>}<small>전송용 별명은 이 화면에서 내 변수 이름으로 다시 표시해요. 줄 번호로 내 코드와 비교하세요. AI는 원래 값과 철자를 모르며 설명이 틀릴 수 있어요. 한 곳씩 바꾸고 실행 결과로 확인해 보세요.</small><button onClick={() => setReported(true)}>선생님과 확인하기</button>{reported && <p role="status">이 설명을 따라 고치기 전에 선생님께 오류 줄과 AI 설명을 보여주세요.</p>}</div>}
+      {answer && <div className="pgs-coach-answer" aria-live="polite"><strong>AI 힌트</strong><p>{answer.explanation}</p><p>{answer.hint}</p>{aiStep >= 1 && <p>{answer.question}</p>}{aiStep >= 2 && <p>{answer.check}</p>}{aiStep < 2 && <button onClick={() => setAiStep(aiStep + 1)}>{aiStep === 0 ? '생각해 볼 질문' : '확인 방법 보기'}</button>}<small>AI 설명은 틀릴 수 있어요. 코드를 한 곳씩 고친 뒤 다시 실행해 보세요.</small></div>}
     </>}
   </section>
 }
