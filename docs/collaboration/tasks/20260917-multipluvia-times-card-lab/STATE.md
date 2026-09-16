@@ -2,7 +2,7 @@
 
 - Original goal: 멀티플루비아 섹터의 체험 학습을 일반 학습 아래와 RETURN TO GALAXY 사이로 옮기고, 큰곱셈 조립소 왼쪽에 2단~12단 복수 선택·전체 무작위 출제·앞뒷면 카드·불빛 수열·정답/오답 데크·오답 반복·다음날 취약 카드 집중 기능을 갖춘 구구단 체험 학습을 추가한다.
 - Coordinator: Codex (local implementation and verification)
-- Phase: IMPLEMENTED_AND_VERIFIED
+- Phase: DEPLOYED_AND_VERIFIED
 - Last updated: 2026-09-17 KST
 - Baseline: current shared checkout with existing unrelated modified/untracked files. Preserve all existing user work; this task owns only the paths listed below and narrow integration edits.
 - Worktree/branch: shared checkout; no external writer or parallel handoff.
@@ -35,7 +35,13 @@
 
 ## Next action
 
-- No required implementation work remains. If classroom listening reveals a specific pronunciation or pacing issue, regenerate only the affected hashed phrase and bump the versioned audio directory before deployment so immutable caches remain correct.
+- No required implementation work remains. If classroom listening reveals a specific pronunciation or pacing issue, regenerate only the affected hashed phrase and bump the versioned audio directory before the next deployment.
+
+## Release
+
+- Implementation commit `18078758` was pushed to GitHub `main` on 2026-09-17 KST.
+- Firebase Hosting deployment to `math-sense-1f6a8` completed successfully from a clean detached worktree at that commit; functions and rules were not deployed.
+- Production `MultiplicationCardLab-CPPVEj2O.js`, the versioned audio manifest, and `table-2.mp3` returned HTTP 200 from `https://msense.me`; all three SHA-256 values exactly matched the clean release artifacts.
 
 ## Work completed
 

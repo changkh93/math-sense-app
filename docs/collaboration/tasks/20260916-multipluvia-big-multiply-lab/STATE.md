@@ -2,7 +2,7 @@
 
 - Original goal: 멀티플루비아 섹터에 기존 과정과 구별되는 체험형 큰 수 세로셈 활동을 추가하고, 학생이 교사의 단계별 안내를 따라 약 10개의 세 자리 수 × 세 자리 수 문제에서 자리 올림을 포함한 전 절차를 익히게 한다.
 - Coordinator: Codex (local implementation and verification)
-- Phase: DONE (local; operand/answer visual distinction verified; not deployed)
+- Phase: DEPLOYED_AND_VERIFIED
 - Last updated: 2026-09-17 KST
 - Baseline: current shared checkout; repository already contains numerous unrelated modified/untracked user files. This task only owns the files listed below and narrow integration edits in `SpaceHome.jsx`/`package.json`/this index.
 - Worktree/branch: shared checkout; no external writer or parallel code handoff.
@@ -49,4 +49,10 @@
 
 ## Next action
 
-- Optional: deploy the current web build when the user wants this released; physical phone/tablet confirmation can follow deployment.
+- No required work remains. Physical phone/tablet classroom confirmation may be performed as a follow-up.
+
+## Release
+
+- Implementation commit `18078758` was pushed to GitHub `main` on 2026-09-17 KST.
+- Firebase Hosting deployment to `math-sense-1f6a8` completed successfully from a clean detached worktree at that commit; functions and rules were not deployed.
+- Production `VerticalMultiplicationLab-Dp-5ynoh.js` returned HTTP 200 from `https://msense.me` and its SHA-256 exactly matched the clean build artifact (`99b6c585241dfd0d9cddaed52b677257575b3205a0c01857bf8e94bbfb7b51f7`).
