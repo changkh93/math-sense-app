@@ -1,3 +1,4 @@
+import { diagnoseNames } from './studioErrorCoachNames.mjs'
 // Local-only diagnosis: no network, execution, or persistent student-code storage.
 // This small lexer is deliberately conservative; it is not a Python parser.
 function tokens(source) {
@@ -33,6 +34,35 @@ function tokens(source) {
 const feedback = (title, action, check, example = '') => ({ guide: [title, action, check], example, specific: true })
 const shortName = value => value?.length <= 40 ? value : '해당 이름'
 
+// Match the entire tokenized statement, not text inside a comment/string.
+// Rules carry stable evidence IDs so the server can repeat the same check on
+// the already-minimized excerpt without accepting a client diagnosis as fact.
+function importDiagnosis(row) {
+  if (row.some(t => t.kind === 'string')) return null
+  const statement = row.map(t => t.value).join(' ')
+  const module = '[\\p{L}_][\\p{L}\\p{N}_]*(?: \\. [\\p{L}_][\\p{L}\\p{N}_]*)*'
+  const empty = statement.match(new RegExp(`^from (${module}) import$`, 'u'))
+  if (empty) {
+    const turtle = empty[1] === 'ColabTurtlePlus . Turtle'
+    return { ...feedback('import 뒤에 가져올 이름이 빠졌어요.', turtle
+      ? '이 거북이 수업에서는 import 뒤에 *를 붙여 Turtle과 Screen 등의 이름을 불러올 수 있어요.'
+      : 'import 뒤에 그 모듈에서 사용할 함수나 클래스 이름을 적어 주세요.',
+    turtle ? '*는 이 모듈이 공개한 이름들을 함께 불러온다는 뜻이에요. 첫 줄을 고친 뒤 다시 실행해 보세요.' : 'from은 어디에서, import는 무엇을 가져오는지 정해요. 뒤에 콜론을 붙이는 문장은 아니에요.',
+    turtle ? 'from ColabTurtlePlus.Turtle import *' : 'from math import sqrt'), ruleId: 'import-missing-target', confidence: 'high' }
+  }
+  const cases = [
+    [/^import$/, 'import 뒤에 모듈 이름이 빠졌어요.', '사용할 모듈 이름을 import 다음에 적어 주세요.', 'import random', 'import-missing-module'],
+    [/^from import(?: |$)/, 'from과 import 사이에 모듈 이름이 빠졌어요.', '어디에서 가져올지 모듈 이름을 from 뒤에 적어 주세요.', 'from math import sqrt', 'from-missing-module'],
+    [new RegExp(`^from ${module}$`, 'u'), 'from 뒤에 모듈만 있고, 가져올 이름이 아직 없어요.', '모듈 이름 다음에 import와 가져올 이름을 적어 주세요.', 'from math import sqrt', 'from-missing-import'],
+    [/^(?:from |import ).*\bas$/, 'as 뒤에 사용할 별명이 빠졌어요.', 'as 다음에 코드에서 쓸 짧은 별명을 적거나, 별명이 필요 없으면 as를 지워 주세요.', 'import pandas as pd', 'import-missing-alias'],
+    [/^import \*$/, 'import *만으로는 어디에서 가져올지 알 수 없어요.', '모듈을 통째로 쓰려면 import 모듈, 그 안의 이름을 가져오려면 from 모듈 import 이름 형태로 써 주세요.', 'import math\nfrom math import sqrt', 'import-star-without-from'],
+  ]
+  for (const [pattern, title, action, example, ruleId] of cases) {
+    if (pattern.test(statement)) return { ...feedback(title, action, '예시의 모듈은 설명용이에요. 수업에서 사용하는 모듈과 가져올 이름으로 확인해 주세요.', example), ruleId, confidence: 'high' }
+  }
+  return null
+}
+
 export function diagnoseLocalError(error, source = '', mode = 'file') {
   if (!source || source.length > 250000) return null
   const lines = source.split('\n'), message = error.message || ''
@@ -56,6 +86,14 @@ export function diagnoseLocalError(error, source = '', mode = 'file') {
     if (/does not match opening parenthesis|unmatched/.test(message)) return feedback('여는 괄호와 닫는 괄호의 짝이 맞지 않아요.', '소괄호 (), 대괄호 [], 중괄호 {}가 같은 종류끼리 짝을 이루는지 확인해 주세요. 닫는 괄호가 하나 더 있을 수도 있어요.', again)
     if (/expected ':'/.test(message)) return feedback('이 문장 끝에 콜론(:)이 필요해요.', 'if, elif, else, for, while, def, class 같은 문장은 조건이나 이름 뒤에 :을 붙여 주세요.', '다음 줄의 실행할 코드는 공백 4칸 들여써 주세요.', 'if score > 0:\n    print(score)')
     const ts = tokens(source), row = ts.filter(t => t.line === error.line)
+    // A token on this row may be inside an expression continued from above.
+    // Only diagnose a complete standalone import statement.
+    const previous = ts.filter(t => t.line < error.line)
+    const depth = previous.reduce((n, t) => n + (t.kind === 'symbol' && '([{'.includes(t.value) ? 1 : t.kind === 'symbol' && ')]}'.includes(t.value) ? -1 : 0), 0)
+    if (depth === 0 && !lines[error.line - 2]?.trimEnd().endsWith('\\')) {
+      const imported = importDiagnosis(row)
+      if (imported) return imported
+    }
     for (let n = 0; n < row.length - 1; n++) {
       const left = row[n], right = row[n + 1]
       // A closed string followed by a name is not an implicit string join.
@@ -75,8 +113,19 @@ export function diagnoseLocalError(error, source = '', mode = 'file') {
     const missing = message.match(/name ['"]([^'"]+)['"] is not defined/)?.[1]
     if (!missing) return null
     const name = shortName(missing)
+    // Evidence is local-only. Do not forward original comments or values.
+    const ts = tokens(source)
+    const commented = lines.slice(0, error.line - 1).findIndex((text, index) => {
+      if (ts.some(t => t.kind === 'string' && t.line <= index + 1 && source.slice(t.start, t.end).split('\n').length + t.line - 1 >= index + 1)) return false
+      return text.match(/^\s*#\s*([\p{L}_][\p{L}\p{N}_]*)\s*=(?!=)/u)?.[1] === missing
+    })
+    if (commented >= 0) return { ...feedback(`${name}에 값을 넣는 줄이 ${commented + 1}번째 줄에서 #으로 주석 처리되어 있어요.`, `# 뒤의 글은 설명으로 취급되어 실행되지 않아요. ${name}에 값을 넣으려던 줄이라면 앞의 #을 지우고 다시 실행해 보세요.`, mode === 'notebook' ? '변수를 만드는 셀을 먼저 실행한 다음, 그 값을 사용하는 셀을 실행해요.' : '변수에 값을 넣는 줄이 사용하는 줄보다 앞에 있어야 해요.'), ruleId: 'name-commented-assignment', confidence: 'high' }
+    const spelling = diagnoseNames(error, source, ts)
+    if (spelling) return spelling
     return feedback(`${name}라는 이름에 담긴 값을 찾지 못했어요.`, `${name}에 값을 넣는 줄이 먼저 실행됐는지, 이름의 철자와 대소문자가 같은지 확인해 주세요.`, mode === 'notebook' ? '다른 셀에서 만든 변수라면 그 셀부터 실행하세요. 글자 자체를 출력하려면 따옴표로 감싸 주세요.' : '글자 자체를 출력하려면 따옴표로 감싸 주세요. 변수라면 사용하기 전에 값을 넣어 주세요.')
   }
+  const named = diagnoseNames(error, source, tokens(source))
+  if (named) return named
   if (error.type === 'TypeError' && (/can only concatenate str/.test(message) || (/unsupported operand type.*for \+/.test(message) && /'str'/.test(message)))) return feedback('글자와 숫자를 그대로 더하려고 했어요.', '계산하려면 숫자 모양의 글자를 int() 또는 float()로 바꾸세요. 함께 보여주려면 print() 안에서 쉼표로 나눠 주세요.', '더하려는 것인지, 이어서 보여주려는 것인지 먼저 정해요.', 'print("점수", 10)\nprint(int("10") + 2)')
   if (error.type === 'TypeError' && /'module' object is not callable/.test(message)) return feedback('함수나 클래스 대신 모듈에 괄호()를 붙였어요.', 'import한 문장과 괄호 앞의 이름을 확인해 주세요. 모듈은 기능을 담은 상자이고, 그 안의 함수나 클래스를 호출해야 해요.', /ColabTurtlePlus/.test(source) ? 'Turtle()을 만들려면 from ColabTurtlePlus.Turtle import *로 Turtle 클래스를 불러오세요.' : '자동 추천에서 모듈 안의 함수나 클래스 이름을 찾아보세요.')
   if (error.type === 'ValueError' && /invalid literal for int/.test(message)) return feedback('int()에 정수로 바꿀 수 없는 글자가 들어왔어요.', '입력에 글자나 소수점이 섞였거나, 아무것도 입력하지 않았는지 확인해 주세요. 정수를 원하면 10처럼 숫자만 입력해요.', '소수를 받으려는 코드라면 float()를 사용해요.', 'age = int(input("나이: "))')

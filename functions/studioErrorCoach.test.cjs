@@ -41,7 +41,7 @@ test('fixed model, bounded Responses request, no identity and ephemeral cache', 
   assert.equal(url, 'https://api.openai.com/v1/responses'); assert.equal(body.model, 'gpt-5.6-luna'); assert.equal(body.store, false);
   assert.equal(body.max_output_tokens, 700); assert.equal(body.reasoning.effort, 'none'); assert.equal(body.text.format.strict, true);
   assert.equal(request.headers['OpenAI-Project'], 'proj_msense_test'); assert.ok(request.signal);
-  assert.ok(!request.body.includes(context.auth.uid)); assert.ok(!body.input.includes("'score'")); assert.equal(body.tools, undefined);
+  assert.ok(!request.body.includes(context.auth.uid)); assert.ok(body.input.includes("'score'")); assert.equal(body.tools, undefined);
   assert.equal((await f.handler(payload, context)).cached, true); assert.equal(f.calls.length, 1);
   const ledger = JSON.stringify([...f.docs.entries()].filter(([key]) => key.startsWith('studioCoachUsage')));
   for (const secret of ['print(score)', 'NameError', 'synthetic-student', advice.hint]) assert.ok(!ledger.includes(secret));
@@ -84,4 +84,17 @@ test('ambiguous earlier-cell frames never send the current cell as the failing f
   const { parseError, makeCoachPayload } = await import('./studioErrorCoachPolicy.mjs');
   const error = parseError('  File "/tmp/studio/notebook.ipynb", line 1, in <module>\n  File "/tmp/studio/notebook.ipynb", line 2, in helper\nNameError: missing');
   assert.equal(makeCoachPayload('helper()', error, 'notebook'), null);
+});
+
+test('server adds its own syntax diagnosis to AI input without expanding the private excerpt', async () => {
+  const { makeCoachPayload, parseError } = await import('./studioErrorCoachPolicy.mjs');
+  const error = parseError('  File "/tmp/studio/notebook.ipynb", line 1\nSyntaxError: invalid syntax');
+  const input = makeCoachPayload('from ColabTurtlePlus.Turtle import # private@example.com', error, 'notebook');
+  const f = fixture(); await f.handler(input, context);
+  const body = JSON.parse(f.calls[0].request.body), supplied = JSON.parse(body.input);
+  assert.equal(supplied.localDiagnosis.ruleId, 'import-missing-target');
+  assert.match(supplied.localDiagnosis.nextStep, /import 뒤에 \*/);
+  assert.ok(!body.input.includes('private@example.com'));
+  assert.match(body.instructions, /do not replace it with a generic checklist/);
+  assert.equal(f.calls.length, 1);
 });

@@ -33,6 +33,21 @@ export function redactIdentifiers(text) {
     .replace(/\b\d[\d ()+-]{8,}\d\b/g, '<번호>')
     .replace(/[\w-]{40,}/g, '<긴 값>')
 }
+// Keep only identifier-shaped names from diagnostic slots. Arbitrary quoted
+// values (KeyError keys, input strings, paths) still go through minimization.
+// These names are visible in the privacy preview, just like code identifiers.
+export function minimizeError(message) {
+  const text = String(message)
+  // Only structurally known Python diagnostics, not arbitrary ValueError text.
+  if (!/^(NameError: name |AttributeError: |ImportError: cannot import name |ModuleNotFoundError: No module named |TypeError: .*missing \d+ required positional argument)/.test(text)) return minimizeCode(text)
+  const matches = [...text.matchAll(/(name |No module named |has no attribute |positional argument: )(['"])([\p{L}_][\p{L}\p{N}_]{0,39})\2/gu)]
+  let result = '', end = 0
+  for (const match of matches) {
+    result += minimizeCode(text.slice(end, match.index)) + match[1] + match[2] + redactIdentifiers(match[3]) + match[2]
+    end = match.index + match[0].length
+  }
+  return result + minimizeCode(text.slice(end))
+}
 export function parseError(text) {
   const lines = String(text || '').split('\n')
   const last = [...lines].reverse().find(line => /^(?:\w*(?:Error|Exception)|pygame\.error)(?::|$)/.test(line.trim()))?.trim() || ''
@@ -51,16 +66,16 @@ export function makeCoachPayload(source, error, mode = 'file') {
   const lines = minimizeCode(source).split('\n'), line = Math.max(1, Math.min(error.line, lines.length))
   const start = Math.max(0, line - 9), end = Math.min(lines.length, line + 4)
   const snippet = lines.slice(start, end).map((text, i) => `${start + i + 1}: ${text.slice(0, 220)}`).join('\n').slice(0, 3200)
-  return { version: COACH_VERSION, mode, errorType: error.type, error: minimizeCode(error.type === 'Error' ? `Error: ${error.message}` : error.message).slice(0, 500), line, snippet }
+  return { version: COACH_VERSION, mode, errorType: error.type, error: minimizeError(error.type === 'Error' ? `Error: ${error.message}` : error.message).slice(0, 500), line, snippet }
 }
 export function validateCoachPayload(data) {
   if (!data || Object.keys(data).sort().join(',') !== 'error,errorType,line,mode,snippet,version' || data.version !== COACH_VERSION || !['file', 'notebook'].includes(data.mode) || !ERROR_TYPES.includes(data.errorType) || !Number.isInteger(data.line) || data.line < 1 || data.line > 100000 || typeof data.snippet !== 'string' || !data.snippet.trim() || data.snippet.length > 3200 || data.snippet.split('\n').length > 13 || typeof data.error !== 'string' || data.error.length > 500 || !data.error.startsWith(data.errorType)) throw new Error('invalid-payload')
   // Defense in depth for clients bypassing the preview UI.
-  return { ...data, snippet: minimizeCode(data.snippet), error: minimizeCode(data.error) }
+  return { ...data, snippet: minimizeCode(data.snippet), error: minimizeError(data.error) }
 }
 
 const guides = {
-  SyntaxError: ['파이썬 문법에 맞지 않는 부분이 있어요.', '표시된 줄과 바로 윗줄의 따옴표, 괄호, 콜론(:)을 확인해 주세요. 어떤 글자가 빠졌거나 더 들어갔을 수 있어요.', 'if, for, def 뒤에는 콜론이 필요한지 확인하고, 한 곳만 고쳐 다시 실행해 보세요.'],
+  SyntaxError: ['이 줄의 문법을 아직 정확히 구분하지 못했어요.', '자세한 오류 보기에서 ^ 표시가 가리키는 부분을 찾아, 수업 예시의 같은 문장과 비교해 주세요.', '오류 표시 바로 앞이나 윗줄에서 시작한 문장이 끝났는지도 살펴보세요. 원인을 단정하기 어려우면 해당 줄을 선생님과 함께 확인해요.'],
   IndentationError: ['들여쓰기의 위치를 확인해 볼까요?', 'if, for, def 안에서 실행할 줄이 같은 깊이로 들어가 있는지 살펴보세요.', '같은 묶음의 줄을 맞추고 다시 실행해 보세요. 보통 공백 4칸을 사용해요.'],
   NameError: ['파이썬이 이 이름을 아직 찾지 못했어요.', '오류에 나온 이름과 변수를 만든 곳의 철자·대소문자를 비교해 보세요.', '값을 먼저 만들었는지도 확인해 보세요. 노트북이라면 변수를 만든 셀부터 실행해야 해요.'],
   UnboundLocalError: ['함수 안에서 아직 값이 정해지지 않은 이름을 사용했어요.', '이 함수에서 그 이름에 처음 값을 넣는 줄을 찾아보세요.', '조건문을 건너뛰어도 값이 준비되는지 확인해 보세요. 함수 밖 변수와 이름이 같은지도 살펴보세요.'],
@@ -79,4 +94,14 @@ const guides = {
 export function localGuide(error) { return guides[error.type === 'TabError' ? 'IndentationError' : error.type] || guides.Error }
 export function localFeedback(error, source, mode) {
   return diagnoseLocalError(error, source, mode) || { guide: localGuide(error), example: '', specific: false }
+}
+
+// Repeat supported diagnoses only on a complete, contiguous excerpt.
+// No original comments, runtime values, or extra client-supplied facts enter AI.
+export function groundedSyntaxContext(payload) {
+  const rows = payload.snippet.split('\n').map(text => text.match(/^(\d+): (.*)$/))
+  if (rows.some(row => !row) || Number(rows[0][1]) !== 1 || rows.some((row, index) => Number(row[1]) !== index + 1)) return null
+  const diagnosis = diagnoseLocalError({ type: payload.errorType, message: payload.error, line: payload.line }, rows.map(row => row[2]).join('\n'), payload.mode)
+  if (!diagnosis?.ruleId || diagnosis.ruleId === 'name-commented-assignment') return null
+  return { ruleId: diagnosis.ruleId, confidence: diagnosis.confidence, explanation: diagnosis.guide[0], nextStep: diagnosis.guide[1] }
 }
