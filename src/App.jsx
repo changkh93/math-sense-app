@@ -60,6 +60,9 @@ const VerticalMultiplicationLabDev = import.meta.env.DEV
 const MultiplicationCardLabDev = import.meta.env.DEV
   ? lazy(() => import('./components/Space/MultiplicationCardLab'))
   : null
+const VerticalDivisionLabDev = import.meta.env.DEV
+  ? lazy(() => import('./components/Space/VerticalDivisionLab'))
+  : null
 
 const AlgorithmConstellationHub = lazy(() => import('./components/AlgorithmConstellation/client/hub/AlgorithmConstellationHub'))
 
@@ -145,6 +148,12 @@ function App() {
         <Route
           path="/dev/multiplication-card-lab"
           element={<MultiplicationCardLabDev userId="local-qa" onExit={() => window.history.back()} />}
+        />
+      )}
+      {VerticalDivisionLabDev && (
+        <Route
+          path="/dev/vertical-division-lab"
+          element={<VerticalDivisionLabDev userId="local-qa" onExit={() => window.history.back()} />}
         />
       )}
       <Route path="/algorithm-constellation" element={

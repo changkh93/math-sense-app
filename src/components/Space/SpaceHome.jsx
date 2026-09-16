@@ -89,6 +89,7 @@ const AlgorithmConstellationHub = lazy(() => import('../AlgorithmConstellation/c
 const ReadingLibraryView = lazy(() => import('./ReadingLibrary/ReadingLibraryView'))
 const MultiplicationCardLab = lazy(() => import('./MultiplicationCardLab'))
 const VerticalMultiplicationLab = lazy(() => import('./VerticalMultiplicationLab'))
+const VerticalDivisionLab = lazy(() => import('./VerticalDivisionLab'))
 import { isWesternClassicCluster, filterWesternClassicRegions } from '../../constants/westernClassicNavigation'
 import { isCourseExplorerCluster } from './coursePlanetCatalog'
 import PublicHomeIntro from '../PublicHomeIntro'
@@ -920,6 +921,7 @@ function SpaceHome() {
   const [quizBattleReturnView, setQuizBattleReturnView] = useState('planet')
   const [multiplicationCardLabOpen, setMultiplicationCardLabOpen] = useState(false)
   const [verticalMultiplicationLabOpen, setVerticalMultiplicationLabOpen] = useState(false)
+  const [verticalDivisionLabOpen, setVerticalDivisionLabOpen] = useState(false)
   const galaxyPlay = useGalaxyPlaySession({ uid: user?.uid, active: currentView === 'galaxy', isGuest: userData?.isGuest === true })
 
   useEffect(() => {
@@ -4553,6 +4555,20 @@ function SpaceHome() {
     )
   }
 
+  if (verticalDivisionLabOpen) {
+    return (
+      <Suspense fallback={<SpaceViewFallback />}>
+        <VerticalDivisionLab
+          userId={user?.uid}
+          onExit={() => {
+            setVerticalDivisionLabOpen(false)
+            soundManager.playClick?.()
+          }}
+        />
+      </Suspense>
+    )
+  }
+
   // Main App
   return (
     <div className={`space-bg ${isMobile ? 'mobile-space-home' : ''}`} style={{ 
@@ -5698,6 +5714,52 @@ function SpaceHome() {
                   }}>
                     MISSION SELECT: {chapters?.length === 1 ? activeRegion?.title : activeChapter?.title}
                   </h2>
+                  {selectedRegionId === 'division' && (
+                    <section
+                      aria-labelledby="division-experience-title"
+                      style={{
+                        marginBottom: isMobile ? '1rem' : '1.35rem',
+                        padding: isMobile ? '0.85rem' : '1rem',
+                        border: '1px solid rgba(255, 176, 102, 0.3)',
+                        borderRadius: isMobile ? 16 : 20,
+                        background: 'linear-gradient(115deg, rgba(87, 46, 34, 0.46), rgba(22, 64, 79, 0.68))',
+                        boxShadow: '0 18px 48px rgba(255, 151, 91, 0.08)',
+                      }}
+                    >
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'end', gap: '1rem', marginBottom: '0.7rem' }}>
+                        <div>
+                          <strong id="division-experience-title" className="font-title" style={{ display: 'block', color: '#ffd19b', fontSize: isMobile ? '0.88rem' : '1rem' }}>
+                            NEW · 원리 실험실
+                          </strong>
+                          <span style={{ display: 'block', color: '#8eacb8', fontSize: isMobile ? '0.68rem' : '0.76rem', marginTop: '0.2rem' }}>
+                            15개 일반 미션과 별도로, 세로셈을 손으로 움직이며 배워요.
+                          </span>
+                        </div>
+                        <span style={{ color: '#ffbd78', fontSize: '0.7rem', whiteSpace: 'nowrap' }}>20개 미션</span>
+                      </div>
+                      <ExperienceLearningCard
+                        testId="vertical-division-lab-entry"
+                        eyebrow="작은 수부터 천의 자리까지"
+                        badge="몫 → 곱하기 → 빼기 → 내려오기"
+                        title="나눗셈 내려오기 연구소"
+                        description="왕새우쌤과 네 동작을 정확한 자리에 한 칸씩 써요. 다음 숫자가 화살표를 타고 제자리로 내려와요."
+                        icon="↘"
+                        isMobile
+                        accent={{
+                          border: 'rgba(255, 184, 104, 0.48)',
+                          background: 'linear-gradient(115deg, rgba(76, 45, 30, 0.78), rgba(13, 70, 79, 0.84))',
+                          shadow: '0 12px 34px rgba(255, 159, 91, 0.1)',
+                          icon: 'linear-gradient(135deg, #ffc576, #55dfd2)',
+                          iconShadow: '0 0 26px rgba(255, 180, 100, 0.24)',
+                          label: '#ffd093',
+                        }}
+                        onClick={() => {
+                          setVerticalDivisionLabOpen(true)
+                          soundManager.playWarp?.()
+                        }}
+                      />
+                    </section>
+                  )}
                   <MissionLeaderboard user={user} chapterId={selectedChapterDocId} chapterTitle={chapters?.length === 1 ? activeRegion?.title : activeChapter?.title} />
                   <div style={{
                     display: 'flex',
