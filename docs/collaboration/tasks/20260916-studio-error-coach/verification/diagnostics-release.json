@@ -1,0 +1,73 @@
+{
+  "at": "2026-09-16T11:35:06.380Z",
+  "commit": "d0dbcabf",
+  "pageStatus": 200,
+  "entryAssetsMatch": true,
+  "assets": [
+    {
+      "file": "/assets/index-BcPIp-Ix.js",
+      "status": 200,
+      "sha256": "38e834a5c6f3cba02ecb0c68298ae4f6ae3a1d3b1000d728db2d20bf15ddf9db",
+      "matches": true
+    },
+    {
+      "file": "/assets/vendor-motion-DYtcP7i3.js",
+      "status": 200,
+      "sha256": "29fa04d45f606d44bd10fd459555be0b12639152c20e0c571ac79229eb2c9805",
+      "matches": true
+    },
+    {
+      "file": "/assets/vendor-three-CYREyV_u.js",
+      "status": 200,
+      "sha256": "8da6dae61731ed14292a57ab597e5029126193093a8da946b6b6a8b575d6cc22",
+      "matches": true
+    },
+    {
+      "file": "/assets/vendor-charts-JyJp7xMO.js",
+      "status": 200,
+      "sha256": "088b691876818acb4e981e70b195c63169069c83c8fcf2aadc52206b66202fb0",
+      "matches": true
+    },
+    {
+      "file": "/assets/vendor-react-three-Caen7N4X.js",
+      "status": 200,
+      "sha256": "a004a46fd9d3852d56820a83da3a9d32c5783c7a0d0df6d8e2b77cb267ccddeb",
+      "matches": true
+    },
+    {
+      "file": "/assets/vendor-firebase-CRhvhPXE.js",
+      "status": 200,
+      "sha256": "313494e1e239d25566e52e0229da15a11e78170654142b675efaf12166898aed",
+      "matches": true
+    },
+    {
+      "file": "/assets/vendor-firebase-firestore-BraIygi-.js",
+      "status": 200,
+      "sha256": "4a0b7a14c53f31b7880e55c49196fea6c3870cad4c90143635a970e805b8cfe8",
+      "matches": true
+    },
+    {
+      "file": "/assets/index-DYs-KNB8.css",
+      "status": 200,
+      "sha256": "eb4fb52de80afa5422240a290e28c55738c69c0ac1d751e0552bfee7737fbbae",
+      "matches": true
+    },
+    {
+      "file": "/assets/PythonGameStudioPage-D24Ip3yS.css",
+      "status": 200,
+      "sha256": "72737fa2531333133e8a7bde7edf5b68c27ffae7d9cc94109d2e4998c118756d",
+      "matches": true
+    },
+    {
+      "file": "/assets/PythonGameStudioPage-DYfoo5u7.js",
+      "status": 200,
+      "sha256": "918d562deecce4fda4a181898d0e9818cc9fe23790f3f945175123129aef6e75",
+      "matches": true
+    }
+  ],
+  "callable": {
+    "httpStatus": 401,
+    "status": "UNAUTHENTICATED"
+  },
+  "passed": true
+}
