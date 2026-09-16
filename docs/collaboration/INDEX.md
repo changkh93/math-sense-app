@@ -7,7 +7,7 @@ For an existing task, read its STATE.md and actual artifacts before continuing.
 
 | ID | Goal | Phase | State file | Next action |
 |---|---|---|---|---|
-| 20260916-studio-remove-comparison | 두 단계 비교 메뉴·관련 안내 제거, 자료 유지 | ACTIVE | [STATE](tasks/20260916-studio-remove-comparison/STATE.md) | UI·준비 버튼 검증, 운영 문구 39개 수정; Hosting 배포 대기 |
+| 20260916-studio-remove-comparison | 두 단계 비교 메뉴·관련 안내 제거, 자료 유지 | DONE | [STATE](tasks/20260916-studio-remove-comparison/STATE.md) | e8126074 배포·운영 문구/자료 검증 완료 |
 | 20260916-studio-error-first | 오류 원문 우선·항상 펼침·두 편집 모드 일치 | DEPLOYED | [STATE](tasks/20260916-studio-error-first/STATE.md) | f8e1d291 배포·운영 파일 확인, 노트북 traceback 코드 줄도 수정 |
 | 20260916-coach-production-release | 구조형 AI 실운영 활성화·배포·검증 | DONE | [STATE](tasks/20260916-coach-production-release/STATE.md) | 학생 AI 활성화·실제 Luna 응답 검증, 새로고침 후 이용 |
 | 20260916-coach-learning-loop | 학생 오류·질문 누적으로 개선되는 기본 힌트 시스템 | DEPLOYED (collection off) | [STATE](tasks/20260916-coach-learning-loop/STATE.md) | 관리자 작업대·함수·규칙 배포, 선택적 관찰/사례 수집은 꺼짐 |
