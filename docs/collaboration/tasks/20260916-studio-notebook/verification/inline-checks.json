@@ -1,0 +1,16 @@
+{
+  "passed": true,
+  "fullWidth": true,
+  "noDuplicateConsole": true,
+  "inlineTurtle": true,
+  "inlineInput": true,
+  "inlineTkInteraction": true,
+  "syntaxErrorNoBlankGraphic": true,
+  "plainPrintNoGraphic": true,
+  "previousSnapshot": true,
+  "noTaskLeak": true,
+  "sameInterpreterAcrossCellsAndModes": true,
+  "tabletLandscapePortrait": true,
+  "enlargeRestore": true,
+  "errors": []
+}

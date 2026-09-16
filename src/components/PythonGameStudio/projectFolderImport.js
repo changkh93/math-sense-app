@@ -1,6 +1,6 @@
 import { PROJECT_LIMITS, assertFileSize, RUNTIME_VERSION, bytesToBase64, fileKind, normalizePath, validateProject } from './projectPolicy.mjs'
 
-const supported = /\.(py|csv|png|jpe?g|webp|ogg|wav|mp3|ttf|otf)$/i
+const supported = /\.(py|ipynb|csv|png|jpe?g|webp|ogg|wav|mp3|ttf|otf)$/i
 const ignoredDirectories = new Set(['__pycache__', 'node_modules', 'venv', 'env'])
 export async function readProjectFolder(entries) {
   if (!entries.length) throw new Error('폴더 안에 파일이 없습니다.')
@@ -22,12 +22,12 @@ export async function readProjectFolder(entries) {
     selected.push({ file, path: normalized, kind })
     if (selected.length > PROJECT_LIMITS.files) throw new Error('프로젝트는 파일 100개까지 가져올 수 있습니다.')
   }
-  const pythonPaths = selected.filter(item => item.kind === 'python').map(item => item.path).sort()
-  if (!pythonPaths.length) throw new Error('폴더 안에 실행할 Python(.py) 파일이 없습니다.')
+  const pythonPaths = selected.filter(item => ['python', 'notebook'].includes(item.kind)).map(item => item.path).sort()
+  if (!pythonPaths.length) throw new Error('폴더 안에 실행할 Python(.py) 또는 노트북(.ipynb) 파일이 없습니다.')
   const entrypoint = pythonPaths.includes('main.py') ? 'main.py' : pythonPaths.length === 1 ? pythonPaths[0] : pythonPaths.find(path => path.endsWith('/main.py')) || pythonPaths[0]
   const files = []
   for (const { file, path, kind } of selected) {
-    files.push(kind === 'python' ? { path, kind, text: await file.text() } : { path, kind, data: bytesToBase64(new Uint8Array(await file.arrayBuffer())) })
+    files.push(['python', 'notebook'].includes(kind) ? { path, kind, text: await file.text() } : { path, kind, data: bytesToBase64(new Uint8Array(await file.arrayBuffer())) })
   }
   const project = validateProject({ id: crypto.randomUUID(), title: root.slice(0, 80), schemaVersion: 1, runtimeVersion: RUNTIME_VERSION, entrypoint, files })
   return { project, skippedCount: skipped.length, skippedPaths: skipped.slice(0, 8), needsEntryChoice: !pythonPaths.includes('main.py') && pythonPaths.length > 1 }

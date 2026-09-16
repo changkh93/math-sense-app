@@ -59,7 +59,8 @@ try{
   assert.ok(Math.abs(box.width/box.height-4/3)<.01);assert.ok(dims.cw<=dims.vw+1&&dims.ch<=dims.vh+1)
   await page.getByRole('button',{name:'지우기',exact:true}).click()
   await canvas.click({position:{x:box.width*.25,y:box.height*.75}})
-  await waitText('CLICK');const match=(await logs()).match(/CLICK (\d+) (\d+)/);assert.ok(match);assert.ok(Math.abs(Number(match[1])-200)<=2&&Math.abs(Number(match[2])-450)<=2,match[0])
+  // SDL rounds CSS pointer pixels before scaling to source pixels on small canvases.
+  await waitText('CLICK');const match=(await logs()).match(/CLICK (\d+) (\d+)/);assert.ok(match);assert.ok(Math.abs(Number(match[1])-200)<=Math.ceil(dims.w/dims.cw)+1&&Math.abs(Number(match[2])-450)<=Math.ceil(dims.h/dims.ch)+1,match[0])
  }
  await run("name=input('이름: ')\nprint('HELLO',name)");await page.locator('.pgs-input-form input').waitFor();await page.locator('.pgs-input-form input').fill('학생');await page.locator('.pgs-input-form input').press('Enter');await waitText('HELLO 학생')
  assert.doesNotMatch(await logs(),/Traceback/)

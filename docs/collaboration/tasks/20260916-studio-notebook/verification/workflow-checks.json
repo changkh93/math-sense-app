@@ -1,0 +1,11 @@
+{
+  "passed": true,
+  "ipynbImportExport": true,
+  "markdown": true,
+  "cellReorderDelete": true,
+  "shiftEnterUnchangedSource": true,
+  "previousCellCompletion": true,
+  "csvRepeatedSaveReload": true,
+  "fileModeRegression": true,
+  "stopInfinitePygame": true
+}

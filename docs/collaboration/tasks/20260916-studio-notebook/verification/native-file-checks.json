@@ -1,0 +1,12 @@
+{
+  "passed": true,
+  "lazyCreation": true,
+  "independentPython": true,
+  "multipleNotebooks": true,
+  "reload": true,
+  "download": true,
+  "backupRestore": true,
+  "notebookOnlyFolder": true,
+  "actualAssignmentPicker": true,
+  "nativeJsonAttachment": true
+}

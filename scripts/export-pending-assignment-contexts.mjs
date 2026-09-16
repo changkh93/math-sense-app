@@ -1,3 +1,4 @@
+import { notebookSourceText } from '../src/components/PythonGameStudio/notebookFile.mjs';
 import admin from 'firebase-admin';
 import { readFileSync, writeFileSync } from 'fs';
 import {
@@ -613,14 +614,15 @@ function normalizeCodeLines(text = '') {
 }
 
 async function fetchCodeAttachmentText(attachment = {}) {
-  if (!attachment?.url || !['py', 'js', 'jsx', 'ts', 'tsx', 'html', 'css', 'json', 'md', 'txt'].includes(attachment.type)) {
+  if (!attachment?.url || !['py', 'ipynb', 'js', 'jsx', 'ts', 'tsx', 'html', 'css', 'json', 'md', 'txt'].includes(String(attachment.type).toLowerCase())) {
     return attachment;
   }
 
   try {
     const response = await fetch(attachment.url);
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
-    const text = await response.text();
+    const raw = await response.text();
+    const text = String(attachment.type).toLowerCase() === 'ipynb' ? notebookSourceText(raw) : raw;
     return {
       ...attachment,
       fetchStatus: 'ok',

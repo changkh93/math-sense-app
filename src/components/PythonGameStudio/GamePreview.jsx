@@ -23,6 +23,7 @@ export default function GamePreview({ run, onEvent }) {
   const [engineEpoch, setEngineEpoch] = useState(0)
   useEffect(() => { callbackRef.current = onEvent }, [onEvent])
   useEffect(() => {
+    const dispatch = event => callbackRef.current({ ...event, notebook: runRef.current?.notebook })
     const frame = frameRef.current
     const channel = new MessageChannel()
     const sessionId = crypto.randomUUID()
@@ -30,12 +31,13 @@ export default function GamePreview({ run, onEvent }) {
     let waitingId = null, waitingForStop = false
     let csvBaseline = new Map()
     const recover = () => {
-      if (!disposed) callbackRef.current({ type: 'INPUT_CANCEL' })
+      if (!disposed) dispatch({ type: 'INPUT_CANCEL' })
+      if (!disposed && runRef.current?.notebook) { dispatch({ type: 'KERNEL_LOST' }); runRef.current = null }
       if (!disposed) setEngineEpoch(value => value + 1)
     }
     const bootTimeout = setTimeout(() => {
       bootFailed = true
-      if (runRef.current) callbackRef.current({ type: 'ERROR', text: 'Python 실행 환경에 연결하지 못했습니다. 인터넷 연결을 확인하고 다시 실행해 주세요.' })
+      if (runRef.current) dispatch({ type: 'ERROR', text: 'Python 실행 환경에 연결하지 못했습니다. 인터넷 연결을 확인하고 다시 실행해 주세요.' })
     }, 90000)
     const send = next => {
       if (next && bootFailed) { recover(); return }
@@ -44,7 +46,7 @@ export default function GamePreview({ run, onEvent }) {
       waitingId = next?.id || crypto.randomUUID()
       waitingForStop = !next
       csvBaseline = new Map((next?.project.files || []).filter(file => file.kind === 'csv').map(file => [file.path, file.data]))
-      channel.port1.postMessage({ type: next ? 'RUN' : 'STOP', protocolVersion: 2, sessionId, runId: waitingId, project: next?.payload })
+      channel.port1.postMessage({ type: next ? 'RUN' : 'STOP', protocolVersion: 2, sessionId, runId: waitingId, project: next?.payload, notebook: next?.notebook })
       // A normal stop must acknowledge cleanup. Reset only an unresponsive engine.
       if (!next && engineReady && !document.hidden) watchdog = setTimeout(recover, 3500)
     }
@@ -69,7 +71,7 @@ export default function GamePreview({ run, onEvent }) {
           const request = JSON.parse(data.text)
           if (typeof request.requestId !== 'string' || typeof request.prompt !== 'string') return
           let submitted = false
-          callbackRef.current({ type: 'INPUT_REQUEST', requestId: request.requestId, prompt: request.prompt,
+          dispatch({ type: 'INPUT_REQUEST', requestId: request.requestId, prompt: request.prompt,
             submit: value => {
               if (submitted || disposed || data.runId !== runRef.current?.id || typeof value !== 'string' || value.length > 8192) return
               submitted = true
@@ -78,19 +80,30 @@ export default function GamePreview({ run, onEvent }) {
         } catch { /* Ignore malformed messages from the isolated runtime. */ }
         return
       }
+      if (data.type === 'DISPLAY' || data.type === 'CELL_RESULT') {
+        try {
+          if (!runRef.current?.notebook || typeof data.text !== 'string' || data.text.length > (data.type === 'DISPLAY' ? 100000 : 4000000)) return
+          const value = JSON.parse(data.text)
+          if (data.type === 'CELL_RESULT') {
+            if (!Array.isArray(value.images) || value.images.length > 22 || !value.images.every(image => ['image/png', 'image/svg+xml'].includes(image.mime) && typeof image.data === 'string' && /^[A-Za-z0-9+/]*={0,2}$/.test(image.data))) return
+          } else if (!(value.kind === 'text' && typeof value.text === 'string') && !(value.kind === 'table' && Array.isArray(value.columns) && value.columns.length <= 20 && value.columns.every(v => typeof v === 'string') && Array.isArray(value.rows) && value.rows.length <= 50 && value.rows.every(row => Array.isArray(row) && row.length <= 21 && row.every(v => typeof v === 'string')) && typeof value.summary === 'string')) return
+          dispatch({ type: data.type, value })
+        } catch { /* Never render unvalidated runtime payloads or HTML. */ }
+        return
+      }
       if (data.type === 'FILE_WRITE') {
         try {
           if (typeof data.text !== 'string' || data.text.length > 280000) throw new Error('CSV 저장 데이터가 너무 큽니다.')
           const file = JSON.parse(data.text)
-          const accepted = callbackRef.current({ type: 'FILE_WRITE', file, projectId: runRef.current.project.id, expectedData: csvBaseline.get(file.path) })
+          const accepted = dispatch({ type: 'FILE_WRITE', file, projectId: runRef.current.project.id, expectedData: csvBaseline.get(file.path) })
           if (accepted) csvBaseline.set(file.path, file.data)
         } catch {
-          callbackRef.current({ type: 'STDERR', text: 'CSV 저장 결과를 읽지 못했습니다. 파일 크기와 내용을 확인해 주세요.\n' })
+          dispatch({ type: 'STDERR', text: 'CSV 저장 결과를 읽지 못했습니다. 파일 크기와 내용을 확인해 주세요.\n' })
         }
         return
       }
-      if (!['READY','RUNNING','STDOUT','STDERR','ERROR','EXIT','INPUT_CANCEL'].includes(data.type)) return
-      callbackRef.current({ type: data.type, text: String(data.text || '').slice(0,8192) })
+      if (!['READY','RUNNING','STDOUT','STDERR','ERROR','EXIT','INPUT_CANCEL','KERNEL_RESET','CELL_START','SURFACE'].includes(data.type)) return
+      dispatch({ type: data.type, text: String(data.text || '').slice(0,8192) })
     }
     const hello = event => { if (event.source === frame.contentWindow && event.data?.type === 'RUNNER_HELLO' && event.data.protocolVersion === 2) connect() }
     const visibility = () => {

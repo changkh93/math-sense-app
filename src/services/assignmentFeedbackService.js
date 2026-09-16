@@ -1,3 +1,4 @@
+import { notebookSourceText } from '../components/PythonGameStudio/notebookFile.mjs';
 import {
   Timestamp,
   collection,
@@ -315,7 +316,7 @@ function classifyAttachment(attachment = {}) {
     category = 'image';
   } else if (['pdf', 'doc', 'docx', 'ppt', 'pptx'].includes(extension)) {
     category = 'document';
-  } else if (url.includes('colab.research.google.com') || name.endsWith('.ipynb')) {
+  } else if (url.includes('colab.research.google.com') || /\.ipynb$/i.test(name)) {
     category = 'notebook';
   }
 
@@ -1022,11 +1023,13 @@ function buildFeedbackPolicyGuidance(context) {
 }
 
 async function fetchCodeAttachmentText(attachment) {
-  if (!attachment?.url || attachment.category !== 'code') return attachment;
+  const notebookFile = attachment?.category === 'notebook' && /\.ipynb$/i.test(attachment.name || '');
+  if (!attachment?.url || (attachment.category !== 'code' && !notebookFile)) return attachment;
   try {
     const response = await fetch(attachment.url);
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
-    const text = await response.text();
+    const raw = await response.text();
+    const text = notebookFile ? notebookSourceText(raw) : raw;
     return {
       ...attachment,
       fetchStatus: 'ok',

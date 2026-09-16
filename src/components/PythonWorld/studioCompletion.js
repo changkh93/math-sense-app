@@ -27,7 +27,9 @@ export function studioCompletion(getProject) {
   const analyzer = createStudioAnalyzer(getProject)
   const path = () => getProject()?.path || 'main.py'
   const source = context => {
-    const result = analyzer.complete(context.state.doc.toString(), context.pos, path(), context.explicit)
+    const prefix = getProject()?.prefix || ''
+    const result = analyzer.complete(prefix + context.state.doc.toString(), prefix.length + context.pos, path(), context.explicit)
+    if (result) result.from -= prefix.length
     if (!result) return null
     let options = result.options
     if (result.global) {
@@ -46,7 +48,9 @@ export function studioCompletion(getProject) {
   }
   const signature = state => {
     if (!state.selection.main.empty) return null
-    const result = analyzer.signature(state.doc.toString(), state.selection.main.head, path())
+    const prefix = getProject()?.prefix || ''
+    const result = analyzer.signature(prefix + state.doc.toString(), prefix.length + state.selection.main.head, path())
+    if (result) result.pos -= prefix.length
     if (!result) return null
     return { pos: result.pos, above: true, create() {
       const dom = document.createElement('div'); dom.className = 'pgs-signature-help'

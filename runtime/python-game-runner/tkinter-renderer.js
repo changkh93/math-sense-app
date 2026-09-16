@@ -28,7 +28,7 @@
     title = document.createElement('div'); title.style.cssText = 'padding:6px 12px;background:#182438;color:white;font:14px system-ui'
     title.textContent = 'tk'
     grid = document.createElement('div'); grid.style.cssText = 'display:grid;align-items:center;justify-items:center;width:max-content'
-    panel.append(title, grid); host.append(panel); document.body.append(host)
+    panel.append(title, grid); host.append(panel); document.body.append(host); window.studioShowSurface?.('tk-root')
   }
   function font(node, value) {
     const parts = Array.isArray(value) ? value : [value, 12]
@@ -86,6 +86,7 @@
     }
   }
   window.studioTkCommand = encoded => {
+    if (host) window.studioShowSurface?.('tk-root')
     const c = JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(encoded), ch => ch.charCodeAt(0))))
     if (c.op === 'root') { root(); return }
     if (c.op === 'destroy') { reset(); return }

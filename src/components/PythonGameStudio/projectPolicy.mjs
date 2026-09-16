@@ -1,6 +1,7 @@
+import { normalizeNotebook } from './notebookFile.mjs'
 export const PROJECT_LIMITS = Object.freeze({ files: 100, codeBytes: 200 * 1024, assetBytes: 20 * 1024 * 1024, fontBytes: 30 * 1024 * 1024, totalBytes: 100 * 1024 * 1024 })
 export const RUNTIME_VERSION = 'pygame-web-0.9-cp312-v1'
-const types = { py: 'python', csv: 'csv', png: 'image', jpg: 'image', jpeg: 'image', webp: 'image', ogg: 'audio', wav: 'audio', mp3: 'audio', ttf: 'font', otf: 'font' }
+const types = { py: 'python', ipynb: 'notebook', csv: 'csv', png: 'image', jpg: 'image', jpeg: 'image', webp: 'image', ogg: 'audio', wav: 'audio', mp3: 'audio', ttf: 'font', otf: 'font' }
 export function fileByteLimit(kind) {
   return ['python', 'csv'].includes(kind) ? PROJECT_LIMITS.codeBytes : kind === 'font' ? PROJECT_LIMITS.fontBytes : PROJECT_LIMITS.assetBytes
 }
@@ -16,7 +17,7 @@ export function normalizeFolderPath(input) {
 }
 export function normalizePath(input) {
   const path = normalizeFolderPath(input)
-  if (!types[path.split('.').pop().toLowerCase()]) throw new Error('Python, CSV, PNG/JPG/WebP, OGG/WAV/MP3, TTF/OTF 파일을 사용해 주세요.')
+  if (!types[path.split('.').pop().toLowerCase()]) throw new Error('Python(.py), 노트북(.ipynb), CSV, PNG/JPG/WebP, OGG/WAV/MP3, TTF/OTF 파일을 사용해 주세요.')
   return path
 }
 export function fileKind(path) { return types[normalizePath(path).split('.').pop().toLowerCase()] }
@@ -81,12 +82,14 @@ export function validateProject(input) {
     const path = normalizePath(file.path), key = path.toLowerCase(), kind = fileKind(path)
     if (seen.has(key)) throw new Error(`${path}: 이름이 겹치는 파일이 있습니다.`)
     seen.add(key)
-    if (kind === 'python' && typeof file.text !== 'string') throw new Error(`${path}: 코드가 올바르지 않습니다.`)
-    const bytes = kind === 'python' ? new TextEncoder().encode(file.text) : base64ToBytes(file.data)
+    const textual = ['python', 'notebook'].includes(kind)
+    if (textual && typeof file.text !== 'string') throw new Error(`${path}: 코드가 올바르지 않습니다.`)
+    const text = kind === 'notebook' ? normalizeNotebook(file.text) : file.text
+    const bytes = textual ? new TextEncoder().encode(text) : base64ToBytes(file.data)
     assertFileSize(path, bytes.length)
-    if (kind !== 'python') validateAsset(path, bytes)
+    if (!textual) validateAsset(path, bytes)
     totalBytes += bytes.length
-    return kind === 'python' ? { path, kind, text: file.text } : { path, kind, data: file.data }
+    return textual ? { path, kind, text } : { path, kind, data: file.data }
   })
   for (const path of seen) {
     const parts = path.split('/'); parts.pop()
@@ -109,12 +112,12 @@ export function validateProject(input) {
   const folders = [...folderMap.values()].sort()
   if (totalBytes > PROJECT_LIMITS.totalBytes) throw new Error(`프로젝트 전체 용량 ${(totalBytes / 1024 / 1024).toFixed(1)} MB — 최대 ${PROJECT_LIMITS.totalBytes / 1024 / 1024} MB까지 저장할 수 있습니다.`)
   const entrypoint = normalizePath(input.entrypoint)
-  if (!files.some(f => f.path === entrypoint && f.kind === 'python')) throw new Error('실행할 Python 파일이 없습니다.')
+  if (!files.some(f => f.path === entrypoint && ['python', 'notebook'].includes(f.kind))) throw new Error('실행할 Python 또는 노트북 파일이 없습니다.')
   const revision = input.revision ?? 0
   if (!Number.isSafeInteger(revision) || revision < 0) throw new Error('저장 버전이 올바르지 않습니다.')
   return { id: input.id, title: input.title.trim(), schemaVersion: 1, runtimeVersion: RUNTIME_VERSION, entrypoint, revision, files, folders, totalBytes }
 }
 export function toRunnerProject(project) {
   const valid = validateProject(project)
-  return { entrypoint: valid.entrypoint, folders: valid.folders, files: valid.files.map(f => ({ path: f.path, data: f.kind === 'python' ? bytesToBase64(new TextEncoder().encode(f.text)) : f.data })) }
+  return { entrypoint: valid.entrypoint, folders: valid.folders, files: valid.files.map(f => ({ path: f.path, data: ['python', 'notebook'].includes(f.kind) ? bytesToBase64(new TextEncoder().encode(f.text)) : f.data })) }
 }

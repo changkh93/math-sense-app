@@ -19,7 +19,8 @@
       svg.append(title, drawings, actors)
       document.body.append(svg)
     }
-    document.getElementById('canvas').style.display = 'none'
+    if (window.studioShowSurface) window.studioShowSurface('turtle-canvas')
+    else document.getElementById('canvas').style.display = 'none'
     return svg
   }
   const pointsString = points => points.map(([x, y]) => `${x},${-y}`).join(' ')

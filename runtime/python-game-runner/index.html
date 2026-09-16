@@ -76,6 +76,23 @@ window.studioEndInput=(runId,requestId)=>{
   window.studioPendingInput=null;window.studioEmit('INPUT_CANCEL','',runId);
  }
 };
+window.studioVisualRun=null;
+window.studioShowSurface=id=>{
+ if(window.studioActiveRun && window.studioVisualRun!==window.studioActiveRun){window.studioVisualRun=window.studioActiveRun;window.studioEmit?.('SURFACE',id);}
+ for(const name of ['canvas','turtle-canvas','tk-root','plot-root']){const node=document.getElementById(name);if(node)node.style.display=name===id?(id==='tk-root'?'flex':'block'):'none';}};
+// Only inert image data crosses into notebook outputs, never executable HTML.
+window.studioNotebookSnapshot=(includeCanvas=false)=>{
+ const images=[];
+ if(window.studioVisualRun!==window.studioActiveRun)return JSON.stringify({images,truncated:false});
+ const svg=document.getElementById('turtle-canvas');
+ if(svg&&svg.style.display!=='none')images.push({mime:'image/svg+xml',data:btoa(unescape(encodeURIComponent(new XMLSerializer().serializeToString(svg))))});
+ for(const img of document.querySelectorAll('#plot-root:not([style*="display: none"]) img'))if(img.src.startsWith('data:image/png;base64,'))images.push({mime:'image/png',data:img.src.split(',')[1]});
+ const canvas=document.getElementById('canvas');
+ if(includeCanvas&&!images.length&&canvas.style.display!=='none'){try{images.push({mime:'image/png',data:canvas.toDataURL('image/png').split(',')[1]});}catch{/* Interactive canvas remains available. */}}
+ const kept=[];let size=0;
+ for(const image of images){size+=image.data.length;if(size>3500000)break;kept.push(image);}
+ return JSON.stringify({images:kept,truncated:kept.length<images.length});
+};
 window.studioTakeCommand=()=>{const command=window.studioCommand;window.studioCommand='';return command;};
 window.studioEmitEncoded=(type,data,runId)=>window.studioEmit(type,new TextDecoder().decode(Uint8Array.from(atob(data),c=>c.charCodeAt(0))),runId);
 window.custom_onload=function(){window.python=window.Module;window.Module.vt.xterm={write:()=>{}};};
@@ -86,7 +103,7 @@ window.studioEmit=(type,text='',runId=window.studioActiveRun)=>{
  if(!port)return;
  if(performance.now()-windowStart>1000){sent=0;windowStart=performance.now();}
  if((type==='STDOUT'||type==='STDERR')&&++sent>100)return;
- port.postMessage({protocolVersion:2,sessionId,runId,type,text:String(text).slice(0,type==='FILE_WRITE'?280000:type==='INPUT_REQUEST'?60000:8192)});
+ port.postMessage({protocolVersion:2,sessionId,runId,type,text:String(text).slice(0,type==='CELL_RESULT'?4000000:type==='DISPLAY'?100000:type==='FILE_WRITE'?280000:type==='INPUT_REQUEST'?60000:8192)});
  if(type==='READY'||type==='ENGINE_READY')document.getElementById('start').hidden=true;
  if(type==='ERROR'||type==='EXIT'||type==='STOPPED'){document.getElementById('start').hidden=true;document.getElementById('audio-note').hidden=true;}
 };
@@ -111,7 +128,7 @@ window.addEventListener('message',function connect(event){
 // Audio can be suspended by browser policy. It never gates Python execution.
 const audioContexts=new Set();
 window.studioResetPresentation=(preserveTurtle=false)=>{
- window.studioActiveRun=null;
+ window.studioActiveRun=null;window.studioVisualRun=null;
  window.studioPendingInput=null;
  window.studioTurtleReset(preserveTurtle);
  window.studioTkReset();
@@ -198,6 +215,7 @@ PLOT_SOURCE = __STUDIO_PLOT_SOURCE__
 PLOT_FONT = __STUDIO_PLOT_FONT__
 plot_session = None
 numpy_defaults = None
+pygame_surface_originals = {}
 ORIGINAL_WARNING_FILTERS = list(warnings.filters)
 
 def install_studio_turtle():
@@ -265,18 +283,23 @@ def project_packages(project):
     packages = set()
     supported = {'pygame', 'numpy', 'matplotlib'}
     for item in project['files']:
-        if not item['path'].lower().endswith('.py'): continue
+        if not item['path'].lower().endswith(('.py', '.ipynb')): continue
         try:
             source = base64.b64decode(item['data']).decode('utf-8')
-            source = '\n'.join('' if line.strip() == '!pip install ColabTurtlePlus' else line for line in source.splitlines())
-            tree = ast.parse(source)
-        except (SyntaxError, UnicodeError): continue
-        for node in ast.walk(tree):
-            if isinstance(node, ast.Import): packages.update(alias.name.split('.')[0] for alias in node.names)
-            elif isinstance(node, ast.ImportFrom): packages.add((node.module or '').split('.')[0])
-            elif isinstance(node, ast.Call) and node.args and isinstance(node.args[0], ast.Constant) and isinstance(node.args[0].value, str):
-                if (isinstance(node.func, ast.Name) and node.func.id == '__import__') or (isinstance(node.func, ast.Attribute) and node.func.attr == 'import_module'):
-                    packages.add(node.args[0].value.split('.')[0])
+            sources = [''.join(cell['source']) for cell in json.loads(source)['cells'] if cell['cell_type'] == 'code'] if item['path'].lower().endswith('.ipynb') else [source]
+        except (UnicodeError, ValueError, KeyError, TypeError): continue
+        # An unfinished later cell must not prevent imports in the current cell.
+        for source in sources:
+            try:
+                source = '\n'.join('' if line.strip() == '!pip install ColabTurtlePlus' else line for line in source.splitlines())
+                tree = ast.parse(source)
+            except SyntaxError: continue
+            for node in ast.walk(tree):
+                if isinstance(node, ast.Import): packages.update(alias.name.split('.')[0] for alias in node.names)
+                elif isinstance(node, ast.ImportFrom): packages.add((node.module or '').split('.')[0])
+                elif isinstance(node, ast.Call) and node.args and isinstance(node.args[0], ast.Constant) and isinstance(node.args[0].value, str):
+                    if (isinstance(node.func, ast.Name) and node.func.id == '__import__') or (isinstance(node.func, ast.Attribute) and node.func.attr == 'import_module'):
+                        packages.add(node.args[0].value.split('.')[0])
     packages &= supported
     if 'matplotlib' in packages:
         packages.update(('numpy', 'PIL', 'cycler', 'dateutil', 'fontTools', 'kiwisolver', 'packaging', 'pyparsing', 'six'))
@@ -299,7 +322,7 @@ class FrameCallFinder(ast.NodeVisitor):
 
 class GameCallGraph:
     """Resolve direct calls within this file; never infer a method by name alone."""
-    def __init__(self, tree, call_paths):
+    def __init__(self, tree, call_paths, notebook=False, external=()):
         self.functions, self.targets, self.lifted = {}, {}, set()
         self.input_calls = set()
         input_scopes = {}
@@ -312,7 +335,9 @@ class GameCallGraph:
                     if isinstance(method, (ast.FunctionDef, ast.AsyncFunctionDef)):
                         self.functions[(node.name, method.name)] = method
         self.keys = {id(node): key for key, node in self.functions.items()}
-        roots = {name: ('class', name) for name in classes}
+        roots = {name: ('function', ('', name)) for name in external if '.' not in name}
+        roots.update({name.split('.')[0]: ('external_object', name.split('.')[0]) for name in external if '.' in name})
+        roots.update({name: ('class', name) for name in classes})
         roots.update({key[1]: ('function', key) for key in self.functions if not key[0]})
         scopes = [(None, tree)] + list(self.functions.items())
         blocked, calls, seeds = set(), {}, set()
@@ -346,6 +371,8 @@ class GameCallGraph:
                 return value[1] if value and value[0] == 'function' else None
             if isinstance(n, ast.Attribute) and isinstance(n.value, ast.Name):
                 value = env.get(n.value.id)
+                if value and value[0] == 'external_object' and n.value.id + '.' + n.attr in external:
+                    return ('@', n.value.id + '.' + n.attr)
                 key = (value[1], n.attr) if value and value[0] in ('class', 'instance') else None
                 return key if key in self.functions else None
             return None
@@ -395,13 +422,16 @@ class GameCallGraph:
             key = pending.pop()
             if key in reachable: continue
             reachable.add(key); pending.extend(calls.get(key, ()))
+        if notebook: reachable.update(self.functions)
+        external_keys = {('@' if '.' in name else '', name) for name in external} - set(self.functions)
         eligible = {key for key, node in self.functions.items() if isinstance(node, ast.FunctionDef)} & reachable - blocked
+        seeds.update(key for key in eligible if calls[key] & external_keys)
         self.lifted = seeds & eligible
         while True:
             extra = {key for key in eligible if calls[key] & self.lifted} - self.lifted
             if not extra: break
             self.lifted.update(extra)
-        self.await_calls = {identity for identity, key in self.targets.items() if key in self.lifted}
+        self.await_calls = {identity for identity, key in self.targets.items() if key in self.lifted or key in external_keys}
         self.input_calls = {identity for identity, key in input_scopes.items()
                             if key is None or key in self.lifted or isinstance(self.functions[key], ast.AsyncFunctionDef)}
 
@@ -457,7 +487,7 @@ class BrowserGameLoops(ast.NodeTransformer):
         return node
     visit_For = visit_While
 
-def compile_project(source, filename, namespace):
+def compile_project(source, filename, namespace, notebook=False):
     # Accept only the lesson's exact Colab install directive. Never run shell/pip.
     # Tokenize first so a matching line inside a multiline string stays unchanged.
     import io, re, tokenize
@@ -475,6 +505,10 @@ def compile_project(source, filename, namespace):
     tree = ast.parse(source, filename=filename)
     # Resolve common pygame imports without guessing from text/comments/strings.
     aliases = {}
+    if notebook:
+        for name, value in namespace.items():
+            if isinstance(value, types.ModuleType) and value.__name__.startswith('pygame'):
+                aliases[name] = tuple(value.__name__.split('.'))
     for node in tree.body:
         if isinstance(node, ast.Import):
             for alias in node.names:
@@ -485,13 +519,27 @@ def compile_project(source, filename, namespace):
     frame_paths = [('pygame','display','update'), ('pygame','display','flip'), ('pygame','event','get'), ('pygame','event','poll')]
     call_paths = { (name,) + path[len(prefix):] for name, prefix in aliases.items() for path in frame_paths if path[:len(prefix)] == prefix }
     yield_name = '_metasense_frame_yield_' + str(id(namespace))
-    graph = GameCallGraph(tree, call_paths)
+    import inspect
+    external = [name for name, value in namespace.items() if inspect.iscoroutinefunction(value)] if notebook else ()
+    if notebook:
+        for name, value in list(namespace.items()):
+            cls = value if inspect.isclass(value) else type(value)
+            if getattr(cls, '__module__', '') == '__main__':
+                external.extend(name + '.' + method for method, _ in inspect.getmembers(cls, inspect.iscoroutinefunction))
+    graph = GameCallGraph(tree, call_paths, notebook, external)
     input_name = '_metasense_input_' + str(id(namespace))
     if graph.input_calls: namespace[input_name] = studio_input
     transformer = BrowserGameLoops(call_paths, yield_name, graph, input_name)
     tree = transformer.visit(tree)
     if transformer.changed:
         namespace[yield_name] = lambda: asyncio.sleep(0)
+    significant = [t for t in tokenize.generate_tokens(io.StringIO(source).readline) if t.type not in (tokenize.COMMENT, tokenize.NL, tokenize.NEWLINE, tokenize.INDENT, tokenize.DEDENT, tokenize.ENDMARKER)] if notebook else []
+    suppress = significant and significant[-1].string == ';'
+    if notebook and tree.body and isinstance(tree.body[-1], ast.Expr) and not suppress:
+        last = tree.body[-1]
+        name = '_metasense_display_' + str(id(namespace))
+        namespace[name] = notebook_display
+        last.value = ast.copy_location(ast.Call(func=ast.Name(id=name, ctx=ast.Load()), args=[last.value], keywords=[]), last.value)
     return compile(ast.fix_missing_locations(tree), filename, 'exec', flags=ast.PyCF_ALLOW_TOP_LEVEL_AWAIT)
 
 def cancel_user_callbacks(loop):
@@ -530,6 +578,8 @@ async def stop_current(preserve_turtle=False):
             plot_session = None
     pygame = sys.modules.get('pygame')
     if pygame is not None:
+        for name, original in pygame_surface_originals.items(): setattr(pygame.display, name, original)
+        pygame_surface_originals.clear()
         pygame.quit()
     if numpy_defaults:
         numpy = sys.modules.get('numpy')
@@ -562,42 +612,72 @@ async def stop_current(preserve_turtle=False):
     gc.collect()
     return True
 
+def notebook_display(value):
+    if value is None or isinstance(value, asyncio.Future): return
+    active['namespace']['_'] = value
+    pandas = sys.modules.get('pandas')
+    if pandas and isinstance(value, pandas.DataFrame):
+        small = value.head(50)
+        columns = list(small.columns)[:20]
+        result = {'kind': 'table', 'columns': [str(c)[:200] for c in columns],
+                  'rows': [[str(i)[:200]] + [str(row.get(c, ''))[:80] for c in columns]
+                           for i, row in zip(small.index, small.to_dict('records'))],
+                  'summary': str(value.shape) + (' · 일부 표시' if len(value) > 50 or len(value.columns) > 20 else '')}
+    else:
+        result = {'kind': 'text', 'text': repr(value)[:16000]}
+    emit('DISPLAY', json.dumps(result, ensure_ascii=False), active['id'])
+
 async def start_project(command):
     global active, plot_session, numpy_defaults
     run_id, project = command['runId'], command['project']
+    cell = command.get('notebook')
+    continuing = bool(cell and active and active.get('kernel') == cell['kernel'] and active.get('idle'))
     os.makedirs(ROOT, exist_ok=True)
+    previous_files = active.get('files', {}) if continuing else {}
+    incoming = {item['path']: item['data'] for item in project['files']}
+    for path in previous_files.keys() - incoming.keys():
+        full = ROOT + '/' + path
+        if os.path.isfile(full): os.remove(full)
     for folder in project.get('folders', []):
         if folder.startswith('/') or '\\' in folder or any(p in ('', '.', '..') for p in folder.split('/')):
             raise ValueError('Invalid project folder')
         os.makedirs(ROOT + '/' + folder, exist_ok=True)
-    for item in project['files']:
-        path = item['path']
+    for path, data in incoming.items():
         if path.startswith('/') or '\\' in path or any(p in ('', '.', '..') for p in path.split('/')):
             raise ValueError('Invalid project path')
+        if previous_files.get(path) == data: continue
         full = ROOT + '/' + path
         os.makedirs(os.path.dirname(full), exist_ok=True)
-        with open(full, 'wb') as output: output.write(base64.b64decode(item['data']))
+        with open(full, 'wb') as output: output.write(base64.b64decode(data))
     packages = project_packages(project)
     for package in sorted(packages - prepared_packages):
         await shell.preload_code('import ' + package, loaderhome='/tmp')
         prepared_packages.add(package)
-    # An updated Run/Stop supersedes a slow first package preparation.
     if platform.window.studioCommand:
-        os.chdir('/tmp'); shutil.rmtree(ROOT)
+        if not continuing:
+            os.chdir('/tmp')
+            shutil.rmtree(ROOT)
         return
     os.chdir(ROOT)
     sys.path[:] = [ROOT] + ORIGINAL_PATH
     sys.dont_write_bytecode = True
     source_path = ROOT + '/' + project['entrypoint']
     sys.argv[:] = [source_path]
-    module = types.ModuleType('__main__')
-    module.__file__ = source_path
-    sys.modules['__main__'] = module
-    namespace = module.__dict__
-    install_studio_turtle()
-    install_studio_tk()
-    context = {'id': run_id, 'namespace': namespace, 'baseline_tasks': set(asyncio.all_tasks()), 'tasks': [], 'deadline': time.monotonic() + 2, 'failed': False, 'input_lock': asyncio.Lock(), 'input_number': 0}
-    active = context
+    if continuing:
+        context = active
+        namespace = context['namespace']
+        context.update(id=run_id, tasks=[], failed=False, idle=False, files=incoming)
+    else:
+        module = types.ModuleType('__main__')
+        module.__file__ = source_path
+        sys.modules['__main__'] = module
+        namespace = module.__dict__
+        install_studio_turtle()
+        install_studio_tk()
+        context = {'id': run_id, 'namespace': namespace, 'baseline_tasks': set(asyncio.all_tasks()), 'tasks': [], 'deadline': time.monotonic() + 2, 'failed': False, 'input_lock': asyncio.Lock(), 'input_number': 0, 'kernel': cell['kernel'] if cell else None, 'idle': False, 'count': 0, 'files': incoming}
+        active = context
+        if cell: namespace['display'] = notebook_display
+        if cell: emit('KERNEL_RESET', run_id=run_id)
     builtins.input = unsupported_input
     platform.window.studioActiveRun = run_id
     sys.stdout, sys.stderr = StudioOutput('STDOUT', run_id), StudioOutput('STDERR', run_id)
@@ -606,16 +686,28 @@ async def start_project(command):
             raise RuntimeError('반복문이 화면을 멈췄습니다. 게임 루프에 await asyncio.sleep(0)을 넣어 주세요.')
         return trace
     context['trace'] = trace
-    if 'numpy' in packages:
+    if 'numpy' in packages and numpy_defaults is None:
         import numpy
-        if numpy_defaults is None: numpy_defaults = (numpy.geterr(), numpy.get_printoptions())
+        numpy_defaults = (numpy.geterr(), numpy.get_printoptions())
+    if 'numpy' in packages and not continuing:
+        import numpy
         numpy.seterr(divide='warn', over='warn', under='ignore', invalid='warn')
         numpy.random.seed(None)
         warnings.simplefilter('default', RuntimeWarning)
-    if 'matplotlib' in packages:
+    if 'matplotlib' in packages and plot_session is None:
         plot_module = types.ModuleType('studio_plot')
         exec(compile(PLOT_SOURCE, '/studio/studio_plot.py', 'exec'), plot_module.__dict__)
         plot_session = plot_module.install(platform.window, ROOT, PLOT_FONT)
+    if cell and 'pygame' in packages and not pygame_surface_originals:
+        import pygame
+        def surface_call(original):
+            def call(*args, **kwargs):
+                platform.window.studioShowSurface('canvas')
+                return original(*args, **kwargs)
+            return call
+        for name in ('set_mode', 'flip', 'update'):
+            pygame_surface_originals[name] = getattr(pygame.display, name)
+            setattr(pygame.display, name, surface_call(pygame_surface_originals[name]))
     context['deadline'] = time.monotonic() + 2
     async def watch(coroutine):
         try:
@@ -624,7 +716,6 @@ async def start_project(command):
             if not isinstance(error, (SystemExit, asyncio.CancelledError)):
                 context['failed'] = True
                 report(error, run_id)
-        # The session driver owns cleanup and EXIT; old tasks cannot exit a newer run.
     def game_run(coroutine, *args, **kwargs):
         task = asyncio.create_task(watch(coroutine))
         context['tasks'].append(task)
@@ -632,11 +723,17 @@ async def start_project(command):
     asyncio.run = game_run
     emit('READY', run_id=run_id)
     emit('RUNNING', run_id=run_id)
+    if cell:
+        context['count'] += 1
+        emit('CELL_START', str(context['count']), run_id)
     sys.settrace(trace)
     try:
-        with open(source_path, encoding='utf-8') as source:
-            result = eval(compile_project(source.read(), source_path, namespace), namespace)
-            if asyncio.iscoroutine(result): game_run(result)
+        if cell:
+            source = '\n' * max(0, min(100000, int(cell.get('line', 1))) - 1) + cell['source']
+        else:
+            with open(source_path, encoding='utf-8') as file: source = file.read()
+        result = eval(compile_project(source, source_path, namespace, notebook=bool(cell)), namespace)
+        if asyncio.iscoroutine(result): game_run(result)
     except BaseException as error:
         context['failed'] = True
         sys.settrace(None)
@@ -651,7 +748,8 @@ async def studio_boot():
         if raw:
             command = json.loads(raw)
             try:
-                if not await stop_current(): return
+                resume = command['type'] == 'RUN' and command.get('notebook') and active and active.get('idle') and active.get('kernel') == command['notebook'].get('kernel')
+                if not resume and not await stop_current(): return
                 if command['type'] == 'RUN':
                     await start_project(command)
                 else:
@@ -671,9 +769,19 @@ async def studio_boot():
                 sys.settrace(None)
                 active['failed'] = True
                 report(error, active['id'])
-            if active['failed'] or (all(task.done() for task in active['tasks']) and not platform.window.studioTurtleBusy() and not (tk and tk._busy())):
+            if not active.get('idle') and (active['failed'] or (all(task.done() for task in active['tasks']) and not platform.window.studioTurtleBusy() and (active.get('kernel') or not (tk and tk._busy())))):
                 run_id = active['id']
-                if not await stop_current(preserve_turtle=not active['failed']): return
+                sys.settrace(None)
+                if active.get('kernel'):
+                    if plot_session:
+                        try: plot_session[0]()
+                        except Exception as error:
+                            active['failed'] = True
+                            report(error, run_id)
+                    emit('CELL_RESULT', str(platform.window.studioNotebookSnapshot(bool(sys.modules.get('pygame') and sys.modules['pygame'].display.get_surface()))), run_id)
+                    active['idle'] = True
+                else:
+                    if not await stop_current(preserve_turtle=not active['failed']): return
                 emit('EXIT', run_id=run_id)
         await asyncio.sleep(.01)
 

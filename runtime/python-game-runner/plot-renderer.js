@@ -9,7 +9,7 @@
       Object.assign(root.style, { position: 'absolute', inset: '0', overflow: 'auto', background: '#080f20', padding: '12px', boxSizing: 'border-box', zIndex: '3' });
       document.body.append(root);
     }
-    root.hidden = false;
+    root.hidden = false; window.studioShowSurface?.('plot-root');
     let image = images.get(number);
     if (!image) {
       if (images.size >= 20) throw new Error('한 번에 그래프 20개까지 표시할 수 있습니다.');

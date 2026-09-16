@@ -38,10 +38,10 @@ export default function GameStudioAttachmentPicker({ uid, onAdd, onBusyChange, d
     {(error || listing.error) && <p role="alert">{error || listing.error}</p>}
     {rows?.length === 0 && !listing.error && <p>저장된 프로젝트가 없습니다. 코드 스튜디오에서 먼저 프로젝트를 만들어 주세요.</p>}
     {row && <>
-      <label>프로젝트<select aria-label="스튜디오 프로젝트" disabled={busy || disabled} value={row.project.id} onChange={e => { setSelectedId(e.target.value); setPaths([]); setError('') }}>{rows.map(item => <option key={item.key} value={item.project.id}>{item.project.title} · {item.project.files.filter(file => file.kind === 'python').length}개 Python 파일</option>)}</select></label>
+      <label>프로젝트<select aria-label="스튜디오 프로젝트" disabled={busy || disabled} value={row.project.id} onChange={e => { setSelectedId(e.target.value); setPaths([]); setError('') }}>{rows.map(item => <option key={item.key} value={item.project.id}>{item.project.title} · {item.project.files.filter(file => ['python', 'notebook'].includes(file.kind)).length}개 코드·노트북 파일</option>)}</select></label>
       <small>마지막 저장: {new Date(row.savedAt).toLocaleString('ko-KR')}</small>
-      <p>첨부할 .py 파일을 선택해 주세요.</p>
-      <div className="studio-attachment-files">{row.project.files.filter(file => file.kind === 'python' && /\.py$/i.test(file.path)).map(file => <label key={file.path}><input type="checkbox" disabled={busy || disabled} checked={paths.includes(file.path)} onChange={e => setPaths(previous => e.target.checked ? [...previous, file.path] : previous.filter(path => path !== file.path))} />{file.path}</label>)}</div>
+      <p>첨부할 .py 또는 .ipynb 파일을 선택해 주세요.</p>
+      <div className="studio-attachment-files">{row.project.files.filter(file => ['python', 'notebook'].includes(file.kind) && /\.(py|ipynb)$/i.test(file.path)).map(file => <label key={file.path}><input type="checkbox" disabled={busy || disabled} checked={paths.includes(file.path)} onChange={e => setPaths(previous => e.target.checked ? [...previous, file.path] : previous.filter(path => path !== file.path))} />{file.path}</label>)}</div>
       <p>첨부한 뒤 원본을 수정해도 첨부 사본은 바뀌지 않습니다. 수정본은 다시 첨부해 주세요. 과제 ‘전송’을 누를 때 업로드됩니다.</p>
       <button type="button" className="space-btn" disabled={busy || disabled || !paths.length} onClick={add}>{busy ? '첨부 준비 중…' : `선택한 파일 ${paths.length}개 첨부`}</button>
     </>}
