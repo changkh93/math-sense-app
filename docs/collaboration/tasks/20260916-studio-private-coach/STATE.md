@@ -1,0 +1,13 @@
+# Student-code structure and privacy
+- Goal: useful code-context AI help with identifiers/values removed before network; align terms/privacy.
+- Phase: DONE (local implementation; deployment/activation pending, 2026-09-16). Coordinator: Codex; implementation local, no external handoff.
+- Baseline: 14048c99. Existing unrelated marketing/crew/SEO changes preserved. Single writer in original workspace.
+- Scope: coach contract/UI/tests, Terms/PrivacyPolicy, operations record.
+- Acceptance: preserve repeated-name/import/call relationships; no original comments/strings/custom identifiers/numeric values in outbound payload; server rejects legacy/free text; unsupported syntax/value-dependent errors fail closed; no automatic paid calls; policies describe limits honestly.
+- ZDR: pending, not approved. No production activation or secret changes in this task.
+- Design: versioned structured tokens with finite vocabulary and bounded indices, server reconstructs code; source stays browser-local. No guarantee of universal anonymization or Python equivalence. Readiness review remains explicit.
+- Implemented: v2 token schema, bounded full-source scanner/window, consistent identifiers/literal placeholders, finite local finding IDs, server-only reconstruction, legacy payload rejection, explicit structureDataReady control, browser-only alias restoration. Terms/PrivacyPolicy AI amendments labelled proposed; deemed blanket consent removed.
+- Verified: 34 Node tests; targeted ESLint; syntax checks; diff whitespace; full npm build. Real WASM file/notebook regression passed. Focused browser preview/token-only request/alias restoration and policy tablet pages passed; screenshots reviewed.
+- Live educational sample: six synthetic Luna requests in two rounds, no student data or production DB changes. Initial internal field-label leakage fixed in prompt and output validation. Final constructor, spelling and missing-import answers manually reviewed; repeat calls cached. Evidence: live-smoke*.json, browser-checks.json, structure-preview.png, privacy.png, terms.png.
+- Next: review deployment + student rollout under OPERATIONS.md. Production unchanged; no commit/push/deploy or readiness mutation in this task. No further user input needed for completed local implementation.
+- Limits: not a universal anonymizer or Python interpreter; literals/unknown dynamic constructs and ambiguous notebook frames withheld. Guardian authorization, internal usage expiry cleanup/TTL and any actual overseas-transfer details need operational/legal confirmation before student activation. ZDR pending; no automatic raw-code path after approval.

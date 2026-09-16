@@ -17,6 +17,7 @@ const AdminLayout = lazy(() => import('./pages/Admin/AdminLayout'))
 const AdminDashboard = lazy(() => import('./pages/Admin/Dashboard'))
 const LiveStatus = lazy(() => import('./pages/Admin/LiveStatus'))
 const ParentManager = lazy(() => import('./pages/Admin/ParentManager'))
+const StudioCoachLearning = lazy(() => import('./pages/Admin/StudioCoachLearning'))
 const CrewApproval = lazy(() => import('./pages/Admin/CrewApproval'))
 const Applications = lazy(() => import('./pages/Admin/Applications'))
 const VacationCampAdmin = lazy(() => import('./pages/Admin/VacationCampAdmin'))
@@ -146,6 +147,7 @@ function App() {
         <Route path="parents" element={<ParentManager />} />
         <Route path="applications" element={<Applications />} />
         <Route path="vacation-camp" element={<VacationCampAdmin />} />
+        <Route path="studio-coach" element={<StudioCoachLearning />} />
         <Route path="crews" element={<CrewApproval />} />
         <Route path="crew-guests" element={<CrewGuestManager />} />
         <Route path="content" element={<ContentManager />} />

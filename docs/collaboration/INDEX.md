@@ -7,6 +7,9 @@ For an existing task, read its STATE.md and actual artifacts before continuing.
 
 | ID | Goal | Phase | State file | Next action |
 |---|---|---|---|---|
+| 20260916-coach-production-release | 구조형 AI 실운영 활성화·배포·검증 | ACTIVE | [STATE](tasks/20260916-coach-production-release/STATE.md) | 합성 인증 요청 검증 후 운영 증빙 기록 |
+| 20260916-coach-learning-loop | 학생 오류·질문 누적으로 개선되는 기본 힌트 시스템 | IMPLEMENTED (local verification) | [STATE](tasks/20260916-coach-learning-loop/STATE.md) | 질문·재실행 관찰, 관리자 개선 작업대, 검토·버전 적용·회수·총비용 계산. 배포/수집 미활성화 |
+| 20260916-studio-private-coach | 코드 구조 보존·개인정보 전송 최소화 및 약관 보완 | DONE (local; activation pending) | [STATE](tasks/20260916-studio-private-coach/STATE.md) | 34검사·WASM/화면·Luna 합성 예제·빌드 통과. 운영 배포·학생 활성화 전 |
 | 20260916-studio-error-coach | Luna 단일 모델·학생 오류 힌트·비용 제한 | RELEASED (AI activation pending) | [STATE](tasks/20260916-studio-error-coach/STATE.md) | d49240c5 푸시·Hosting/함수 배포·운영 해시 확인. 학생 AI는 데이터 설정 확인 후 활성화 |
 | 20260915-studio-project-import | 정시원 코드 스튜디오 프로젝트 가져오기 실패·용량 상향 | DONE (Hosting deployed) | [STATE](tasks/20260915-studio-project-import/STATE.md) | `1f0883e3` 배포·운영 해시 일치; 학생 강력 새로고침 후 재시도 |
 | 20260914-studio-responsive-preview | 패드 실행 화면 잘림·결과 가시성 | DONE (Hosting deployed) | [STATE](tasks/20260914-studio-responsive-preview/STATE.md) | 842fe2c6 푸시·운영 JS/CSS 해시 일치, 패드 실물 확인 후속 |

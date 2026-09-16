@@ -1,3 +1,4 @@
+import { learningSession } from './coachLearningClient'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { ArrowLeft, Play, Square, Upload, FileCode2, FolderPlus, Plus, Download, FolderOpen, Maximize2, Minimize2, Trash2, Code2, X } from 'lucide-react'
 import PythonEditor from '../PythonWorld/PythonEditor'
@@ -90,6 +91,7 @@ export default function PythonGameStudio({ uid = 'local-preview', onBack }) {
   const [previewExpanded, setPreviewExpanded] = useState(false)
   const [inputRequest, setInputRequest] = useState(null)
   const consoleOutput = useRef(null)
+  useEffect(() => { const session = learningSession(uid); return () => session.tracker.abandon() }, [uid])
   const [status, setStatus] = useState('stopped')
   const [logs, setLogs] = useState([])
   const [drawer, setDrawer] = useState(false)
@@ -184,7 +186,7 @@ export default function PythonGameStudio({ uid = 'local-preview', onBack }) {
     const output = consoleOutput.current
     if (output) output.scrollTop = output.scrollHeight
   }, [logs, inputRequest])
-  const stop = () => { cancelNotebook(); runGeneration.current++; setRun(null); setInputRequest(null); setStatus('stopped') }
+  const stop = () => { learningSession(uid).tracker.abandon(); cancelNotebook(); runGeneration.current++; setRun(null); setInputRequest(null); setStatus('stopped') }
   const runPath = ['python', 'notebook'].includes(activeFile?.kind) ? activeFile.path : project?.entrypoint
   const execute = async () => {
     if (project.files.find(file => file.path === runPath)?.kind === 'notebook') {
@@ -208,10 +210,10 @@ export default function PythonGameStudio({ uid = 'local-preview', onBack }) {
     finally { if (mounted.current) setBusy(false) }
   }
   useEffect(() => {
-    const hide = () => { if (document.hidden && !currentRun.current?.notebook) { runGeneration.current++; setRun(null); setInputRequest(null); setStatus('stopped') } }
+    const hide = () => { if (document.hidden && !currentRun.current?.notebook) { learningSession(uid).tracker.abandon(); runGeneration.current++; setRun(null); setInputRequest(null); setStatus('stopped') } }
     document.addEventListener('visibilitychange', hide)
     return () => document.removeEventListener('visibilitychange', hide)
-  }, [])
+  }, [uid])
   const handleEvent = useCallback(event => {
     notebookEvent(event)
     if (['KERNEL_RESET', 'KERNEL_LOST'].includes(event.type)) setLiveCell(null)
@@ -422,7 +424,7 @@ export default function PythonGameStudio({ uid = 'local-preview', onBack }) {
       } catch (error) { setNotice(error.message) } finally { setBusy(false) }
     }} />}</section>
     <div {...layout.separator('editor')} />
-    <section inert={editorMode !== 'notebook' && compactViewport && compactPanel === 'code' && !previewExpanded ? true : undefined} aria-hidden={editorMode !== 'notebook' && compactViewport && compactPanel === 'code' && !previewExpanded ? true : undefined} className={`pgs-preview-pane${previewExpanded ? ' pgs-preview-expanded' : ''}`} ref={preview}><div className="pgs-panel-title"><span>실행 화면</span><div>{previewExpanded && <><button disabled={busy || notebook.running} onClick={execute}><Play size={14} /> 다시 실행</button><button disabled={!run} onClick={stop}><Square size={14} /> 정지</button></>}<span className="pgs-fit-label">화면에 맞춤</span><button aria-label={previewExpanded ? '실행 화면 원래 크기로' : '실행 화면 크게 보기'} aria-pressed={previewExpanded} onClick={() => setPreviewExpanded(value => !value)}>{previewExpanded ? <Minimize2 size={16} /> : <Maximize2 size={16} />}</button></div></div><div className="pgs-game-frame"><GamePreview run={run} onEvent={handleEvent} /></div>{editorMode !== 'notebook' && <><div {...layout.separator('console')} /><div className="pgs-console"><div className="pgs-panel-title">출력 · 오류<button onClick={() => setLogs([])}>지우기</button></div><>{preferences.playful && <RunFeedback status={status} />}</><div className="pgs-console-scroll" ref={consoleOutput}>{logs.filter(log => log.coach && log.coach.projectId === project.id && log.coach.path === selected).slice(-1).map(log => <ErrorCoach key={log.id} uid={uid} source={log.coach.source} currentSource={activeFile?.text} text={log.text} />)}<div aria-live="polite">{!logs.length && <span className="pgs-console-hint">print() 출력과 오류가 여기에 표시됩니다.</span>}<OutputLogs logs={logs} collapseError={log => Boolean(log.coach && log.coach.projectId === project.id && log.coach.path === selected)} onJumpToError={jumpToError} /></div></div>{inputRequest && run && <StudioInput key={`${run.id}:${inputRequest.requestId}`} request={inputRequest} onSubmitted={() => { setInputRequest(null); setStatus('running') }} />}</div></>}</section></div></div>
+    <section inert={editorMode !== 'notebook' && compactViewport && compactPanel === 'code' && !previewExpanded ? true : undefined} aria-hidden={editorMode !== 'notebook' && compactViewport && compactPanel === 'code' && !previewExpanded ? true : undefined} className={`pgs-preview-pane${previewExpanded ? ' pgs-preview-expanded' : ''}`} ref={preview}><div className="pgs-panel-title"><span>실행 화면</span><div>{previewExpanded && <><button disabled={busy || notebook.running} onClick={execute}><Play size={14} /> 다시 실행</button><button disabled={!run} onClick={stop}><Square size={14} /> 정지</button></>}<span className="pgs-fit-label">화면에 맞춤</span><button aria-label={previewExpanded ? '실행 화면 원래 크기로' : '실행 화면 크게 보기'} aria-pressed={previewExpanded} onClick={() => setPreviewExpanded(value => !value)}>{previewExpanded ? <Minimize2 size={16} /> : <Maximize2 size={16} />}</button></div></div><div className="pgs-game-frame"><GamePreview uid={uid} run={run} onEvent={handleEvent} /></div>{editorMode !== 'notebook' && <><div {...layout.separator('console')} /><div className="pgs-console"><div className="pgs-panel-title">출력 · 오류<button onClick={() => setLogs([])}>지우기</button></div><>{preferences.playful && <RunFeedback status={status} />}</><div className="pgs-console-scroll" ref={consoleOutput}>{logs.filter(log => log.coach && log.coach.projectId === project.id && log.coach.path === selected).slice(-1).map(log => <ErrorCoach key={log.id} uid={uid} learningKey={log.coach.runId} learningScope={log.coach.scope} learningPath={log.coach.path} source={log.coach.source} currentSource={activeFile?.text} text={log.text} />)}<div aria-live="polite">{!logs.length && <span className="pgs-console-hint">print() 출력과 오류가 여기에 표시됩니다.</span>}<OutputLogs logs={logs} collapseError={log => Boolean(log.coach && log.coach.projectId === project.id && log.coach.path === selected)} onJumpToError={jumpToError} /></div></div>{inputRequest && run && <StudioInput key={`${run.id}:${inputRequest.requestId}`} request={inputRequest} onSubmitted={() => { setInputRequest(null); setStatus('running') }} />}</div></>}</section></div></div>
     {drawer && <div className="pgs-modal-backdrop"><section className="pgs-library" role="dialog" aria-modal="true" aria-label="내 프로젝트" aria-busy={importing}><div className="pgs-panel-title">내 프로젝트<button aria-label="프로젝트 목록 닫기" disabled={importing} onClick={() => setDrawer(false)}><X size={18} /></button></div>{notice && <p role="alert">{notice}</p>}<div className="pgs-library-actions"><button disabled={busy} onClick={() => { setDialogValue('나의 프로젝트'); setDialog('new') }}><Plus size={16} /> 새 프로젝트</button><button disabled={busy} onClick={() => folderInput.current.click()}><FolderOpen size={16} /> {importing ? '가져오는 중…' : '프로젝트 가져오기'}</button><button disabled={busy} onClick={() => importInput.current.click()}><Upload size={16} /> 백업 파일 복원</button><button disabled={busy} onClick={async () => { try { const { createMonsterProject } = await import('./monsterTemplate'); switchProject(await createMonsterProject()) } catch (error) { setNotice(error.message) } }}>몬스터 잡기 예제</button><button disabled={busy} onClick={async () => {
       setBusy(true)
       try {

@@ -1,0 +1,28 @@
+{
+  "passed": true,
+  "realWasmFileAndNotebook": true,
+  "outcomes": [
+    {
+      "mode": "file",
+      "outcome": "same-error",
+      "changed": false
+    },
+    {
+      "mode": "file",
+      "outcome": "completed",
+      "changed": true
+    },
+    {
+      "mode": "notebook",
+      "outcome": "surface-ended",
+      "changed": true
+    }
+  ],
+  "localQuestions": true,
+  "consent": true,
+  "remoteCard": true,
+  "adminLifecycleSynthetic": true,
+  "costCalculator": true,
+  "tabletFits": true,
+  "remoteCalls": 0
+}

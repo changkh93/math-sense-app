@@ -99,15 +99,10 @@ test('commented assignment gives local evidence without mistaking a multiline st
   assert.equal(localFeedback(error('NameError', "name 'a' is not defined", 4), 'text = """\n# a = 2\n"""\nprint(a)').ruleId, undefined)
 })
 
-test('AI grounding is computed only from complete minimized syntax evidence', async () => {
-  const { groundedSyntaxContext } = await import('./studioErrorCoachPolicy.mjs')
+test('missing-import finding survives as a finite code, never the private source', () => {
   const payload = makeCoachPayload('from ColabTurtlePlus.Turtle import # private@example.com', syntax('invalid syntax'))
-  const facts = groundedSyntaxContext(payload)
-  assert.equal(facts.ruleId, 'import-missing-target')
-  assert.ok(!JSON.stringify(facts).includes('private'))
-  assert.equal(groundedSyntaxContext({ ...payload, line: 10, snippet: '10: from math import' }), null)
-  assert.equal(groundedSyntaxContext({ ...payload, snippet: '1: from math import sqrt' }), null)
-  assert.equal(groundedSyntaxContext({ ...payload, errorType: 'NameError' }), null)
+  assert.equal(payload.finding, 'import-missing-target')
+  assert.ok(!JSON.stringify(payload).includes('private'))
 })
 
 test('constructor parentheses are diagnosed at creation rather than requesting an extra distance', () => {
@@ -159,29 +154,17 @@ test('do not guess constructor calls or spelling across rebinding, unknown objec
   assert.equal(localFeedback(error('NameError', "name 'score' is not defined", 2), 'score = 1\nprint(score)').ruleId, undefined)
 })
 
-test('error minimization retains diagnostic identifiers but not literal values, and grounding survives', async () => {
-  const { minimizeError, groundedSyntaxContext, validateCoachPayload } = await import('./studioErrorCoachPolicy.mjs')
-  assert.equal(minimizeError("NameError: name 'pritn' is not defined"), "NameError: name 'pritn' is not defined")
-  assert.ok(!minimizeError("KeyError: 'private_name'").includes('private_name'))
-  assert.ok(!minimizeError("ValueError: name 'private_name' is not defined").includes('private_name'))
-  assert.ok(!minimizeError("ValueError: invalid literal for int(): 'private@example.com'").includes('private@'))
-  const source = 'from turtle import Turtle\nt = Turtle\nt.forward(100)'
-  const e = error('TypeError', "Turtle.forward() missing 1 required positional argument: 'distance'", 3)
-  const payload = validateCoachPayload(makeCoachPayload(source, e))
-  assert.equal(groundedSyntaxContext(payload).ruleId, 'constructor-not-called')
-  const typo = validateCoachPayload(makeCoachPayload('score = 10\nprint(socre)', error('NameError', "name 'socre' is not defined", 2)))
-  assert.equal(groundedSyntaxContext(typo).ruleId, 'name-spelling')
-})
-
-test('module and imported class spelling survive privacy minimization', async () => {
-  const { groundedSyntaxContext, validateCoachPayload } = await import('./studioErrorCoachPolicy.mjs')
-  for (const [source, type, message, rule] of [
-    ['import numppy as np', 'ModuleNotFoundError', "No module named 'numppy'", 'module-spelling'],
-    ['from turtle import Trutle', 'ImportError', "cannot import name 'Trutle' from 'turtle'", 'import-spelling'],
+test('local spelling and constructor evidence survives as a finite finding, with original names removed', () => {
+  for (const [source, type, message, line, rule] of [
+    ['from turtle import Turtle\nt = Turtle\nt.forward(100)', 'TypeError', "Turtle.forward() missing 1 required positional argument: 'distance'", 3, 'constructor-not-called'],
+    ['score = 10\nprint(socre)', 'NameError', "name 'socre' is not defined", 2, 'name-spelling'],
+    ['import numppy as np', 'ModuleNotFoundError', "No module named 'numppy'", 1, 'module-spelling'],
+    ['from turtle import Trutle', 'ImportError', "cannot import name 'Trutle' from 'turtle'", 1, 'import-spelling'],
   ]) {
-    const e = error(type, message)
+    const e = error(type, message, line)
     assert.equal(localFeedback(e, source).ruleId, rule)
-    assert.equal(groundedSyntaxContext(validateCoachPayload(makeCoachPayload(source, e))).ruleId, rule)
+    assert.equal(makeCoachPayload(source, e).finding, rule)
+    assert.ok(!JSON.stringify(makeCoachPayload(source, e)).includes('socre'))
   }
 })
 

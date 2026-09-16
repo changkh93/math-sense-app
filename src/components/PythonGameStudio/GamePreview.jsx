@@ -1,3 +1,5 @@
+import { learningSession } from './coachLearningClient'
+import { scopeForRun } from './coachLearningTracker.mjs'
 import { useEffect, useRef, useState } from 'react'
 import { parseError } from '../../../functions/studioErrorCoachPolicy.mjs'
 import runnerHtml from '../../../runtime/python-game-runner/index.html?raw'
@@ -16,7 +18,7 @@ import plotFont from '../../../public/mars-expedition/assets/fonts/DoHyeon-Regul
 const runnerDocument = buildRunnerDocument(runnerHtml, turtlePython, turtleRenderer, tkPython, tkRenderer, pandasPython, plotPython, plotRenderer, plotFont)
 
 // One isolated interpreter per editor session. Runs replace files/state over the port.
-export default function GamePreview({ run, onEvent }) {
+export default function GamePreview({ uid, run, onEvent }) {
   const frameRef = useRef(null)
   const callbackRef = useRef(onEvent)
   const runRef = useRef(run)
@@ -28,7 +30,10 @@ export default function GamePreview({ run, onEvent }) {
       const snapshot = runRef.current
       const path = event.type === 'ERROR' ? parseError(event.text).path : ''
       const source = snapshot?.notebook && path === snapshot.project.entrypoint ? snapshot.notebook.source : snapshot?.project.files.find(file => file.path === path)?.text
-      return callbackRef.current({ ...event, notebook: snapshot?.notebook, coach: event.type === 'ERROR' && source !== undefined ? { source, path, projectId: snapshot.project.id } : null })
+      const parsed = event.type === 'ERROR' ? parseError(event.text) : null
+      if (event.type === 'KERNEL_LOST') learningSession(uid).tracker.abandon()
+      if (snapshot) learningSession(uid).tracker.event(snapshot.id, event.type, parsed ? `${parsed.type}:${parsed.message}` : '')
+      return callbackRef.current({ ...event, notebook: snapshot?.notebook, coach: event.type === 'ERROR' && source !== undefined ? { source, path, projectId: snapshot.project.id, runId: snapshot.id, scope: scopeForRun(snapshot) } : null })
     }
     const frame = frameRef.current
     const channel = new MessageChannel()
@@ -52,6 +57,7 @@ export default function GamePreview({ run, onEvent }) {
       waitingId = next?.id || crypto.randomUUID()
       waitingForStop = !next
       csvBaseline = new Map((next?.project.files || []).filter(file => file.kind === 'csv').map(file => [file.path, file.data]))
+      if (next) learningSession(uid).tracker.begin({ id: next.id, scope: scopeForRun(next), sourceFor: path => next.project.files.find(f => f.path === path)?.text, source: next.notebook?.source ?? next.project.files.find(f => f.path === next.project.entrypoint)?.text ?? '' })
       channel.port1.postMessage({ type: next ? 'RUN' : 'STOP', protocolVersion: 2, sessionId, runId: waitingId, project: next?.payload, notebook: next?.notebook })
       // A normal stop must acknowledge cleanup. Reset only an unresponsive engine.
       if (!next && engineReady && !document.hidden) watchdog = setTimeout(recover, 3500)
@@ -127,7 +133,7 @@ export default function GamePreview({ run, onEvent }) {
       window.removeEventListener('message', hello); frame.removeEventListener('load', connect)
       channel.port1.close(); channel.port2.close()
     }
-  }, [engineEpoch])
+  }, [engineEpoch, uid])
   useEffect(() => { runRef.current = run; sendRef.current?.(run) }, [run])
   return <div className="pgs-runtime">
     <iframe key={engineEpoch} ref={frameRef} title="Python 코드 실행 화면" srcDoc={runnerDocument} sandbox="allow-scripts" allow="autoplay" referrerPolicy="no-referrer" tabIndex={run ? 0 : -1} aria-hidden={!run} style={{ pointerEvents: run ? 'auto' : 'none' }} />

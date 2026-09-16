@@ -21,6 +21,7 @@ const AdminLayout = () => {
         </div>
         
         <nav className="admin-nav">
+          <Link to="/admin/studio-coach" className="nav-link"><span>코드 도움 개선</span></Link>
           <Link to="/admin" className="nav-link">
             <LayoutDashboard size={20} />
             <span>Dashboard</span>

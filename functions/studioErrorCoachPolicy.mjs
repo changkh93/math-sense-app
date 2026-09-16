@@ -1,53 +1,10 @@
 // Shared, credential-free contract. Never import the server handler in the web app.
 import { diagnoseLocalError } from './studioErrorCoachLocal.mjs'
-export const COACH_VERSION = 1
+import { makeStructurePayload, validateStructurePayload } from './studioCoachStructure.mjs'
+export const COACH_VERSION = 2
 export const COACH_MODEL = 'gpt-5.6-luna'
 export const ERROR_TYPES = ['SyntaxError', 'IndentationError', 'TabError', 'NameError', 'UnboundLocalError', 'TypeError', 'ValueError', 'IndexError', 'KeyError', 'ZeroDivisionError', 'FileNotFoundError', 'ModuleNotFoundError', 'ImportError', 'AttributeError', 'RuntimeError', 'Error']
 
-// Conservative minimization, not an anonymization guarantee. The student reviews
-// the exact excerpt; names can still occur in identifiers. Preserve line numbers.
-export function minimizeCode(source) {
-  let result = '', quote = '', triple = false
-  for (let i = 0; i < source.length; i++) {
-    const c = source[i]
-    if (quote) {
-      if (c === '\n') result += '\n'
-      if (c === '\\') { if (source[i + 1] === '\n') result += '\n'; i++; continue }
-      if (c === quote && (!triple || source.slice(i, i + 3) === quote.repeat(3))) {
-        result += triple ? '' : quote; i += triple ? 2 : 0; quote = ''; triple = false
-      }
-      continue
-    }
-    if (c === '#') { while (i < source.length && source[i] !== '\n') i++; if (i < source.length) result += '\n'; continue }
-    if (c === '"' || c === "'") {
-      quote = c; triple = source.slice(i, i + 3) === c.repeat(3)
-      result += triple ? c.repeat(3) + '<값>' + c.repeat(3) : c + '<값>'; i += triple ? 2 : 0; continue
-    }
-    result += c
-  }
-  return redactIdentifiers(result)
-}
-export function redactIdentifiers(text) {
-  return text.replace(/[\w.+-]+@[\w.-]+\.[a-z]{2,}/gi, '<이메일>')
-    .replace(/\b(?:sk-|AIza)[\w-]{12,}/g, '<키>')
-    .replace(/\b\d[\d ()+-]{8,}\d\b/g, '<번호>')
-    .replace(/[\w-]{40,}/g, '<긴 값>')
-}
-// Keep only identifier-shaped names from diagnostic slots. Arbitrary quoted
-// values (KeyError keys, input strings, paths) still go through minimization.
-// These names are visible in the privacy preview, just like code identifiers.
-export function minimizeError(message) {
-  const text = String(message)
-  // Only structurally known Python diagnostics, not arbitrary ValueError text.
-  if (!/^(NameError: name |AttributeError: |ImportError: cannot import name |ModuleNotFoundError: No module named |TypeError: .*missing \d+ required positional argument)/.test(text)) return minimizeCode(text)
-  const matches = [...text.matchAll(/(name |No module named |has no attribute |positional argument: )(['"])([\p{L}_][\p{L}\p{N}_]{0,39})\2/gu)]
-  let result = '', end = 0
-  for (const match of matches) {
-    result += minimizeCode(text.slice(end, match.index)) + match[1] + match[2] + redactIdentifiers(match[3]) + match[2]
-    end = match.index + match[0].length
-  }
-  return result + minimizeCode(text.slice(end))
-}
 export function parseError(text) {
   const lines = String(text || '').split('\n')
   const last = [...lines].reverse().find(line => /^(?:\w*(?:Error|Exception)|pygame\.error)(?::|$)/.test(line.trim()))?.trim() || ''
@@ -56,23 +13,8 @@ export function parseError(text) {
   const frame = frames.at(-1)
   return { type, message: last, path: frame?.[1] || '', line: frame ? Number(frame[2]) : 0, sameFileFrames: frame ? frames.filter(item => item[1] === frame[1]).length : 0, eligible: Boolean(last && frame) }
 }
-export function makeCoachPayload(source, error, mode = 'file') {
-  if (!error.eligible || !source || source.length > 250000) return null
-  // Notebook functions can have been defined in an earlier cell. The runtime
-  // currently reuses one filename; do not attribute that function to this cell.
-  if (mode === 'notebook' && error.path.endsWith('.ipynb') && (error.sameFileFrames > 1 || error.line > source.split('\n').length)) return null
-  // Minimize the full source first, so multiline strings begun above the excerpt
-  // cannot leak into it. Only the small window is ever sent to the server.
-  const lines = minimizeCode(source).split('\n'), line = Math.max(1, Math.min(error.line, lines.length))
-  const start = Math.max(0, line - 9), end = Math.min(lines.length, line + 4)
-  const snippet = lines.slice(start, end).map((text, i) => `${start + i + 1}: ${text.slice(0, 220)}`).join('\n').slice(0, 3200)
-  return { version: COACH_VERSION, mode, errorType: error.type, error: minimizeError(error.type === 'Error' ? `Error: ${error.message}` : error.message).slice(0, 500), line, snippet }
-}
-export function validateCoachPayload(data) {
-  if (!data || Object.keys(data).sort().join(',') !== 'error,errorType,line,mode,snippet,version' || data.version !== COACH_VERSION || !['file', 'notebook'].includes(data.mode) || !ERROR_TYPES.includes(data.errorType) || !Number.isInteger(data.line) || data.line < 1 || data.line > 100000 || typeof data.snippet !== 'string' || !data.snippet.trim() || data.snippet.length > 3200 || data.snippet.split('\n').length > 13 || typeof data.error !== 'string' || data.error.length > 500 || !data.error.startsWith(data.errorType)) throw new Error('invalid-payload')
-  // Defense in depth for clients bypassing the preview UI.
-  return { ...data, snippet: minimizeCode(data.snippet), error: minimizeError(data.error) }
-}
+export const makeCoachPayload = makeStructurePayload
+export const validateCoachPayload = validateStructurePayload
 
 const guides = {
   SyntaxError: ['이 줄의 문법을 아직 정확히 구분하지 못했어요.', '자세한 오류 보기에서 ^ 표시가 가리키는 부분을 찾아, 수업 예시의 같은 문장과 비교해 주세요.', '오류 표시 바로 앞이나 윗줄에서 시작한 문장이 끝났는지도 살펴보세요. 원인을 단정하기 어려우면 해당 줄을 선생님과 함께 확인해요.'],
@@ -94,14 +36,4 @@ const guides = {
 export function localGuide(error) { return guides[error.type === 'TabError' ? 'IndentationError' : error.type] || guides.Error }
 export function localFeedback(error, source, mode) {
   return diagnoseLocalError(error, source, mode) || { guide: localGuide(error), example: '', specific: false }
-}
-
-// Repeat supported diagnoses only on a complete, contiguous excerpt.
-// No original comments, runtime values, or extra client-supplied facts enter AI.
-export function groundedSyntaxContext(payload) {
-  const rows = payload.snippet.split('\n').map(text => text.match(/^(\d+): (.*)$/))
-  if (rows.some(row => !row) || Number(rows[0][1]) !== 1 || rows.some((row, index) => Number(row[1]) !== index + 1)) return null
-  const diagnosis = diagnoseLocalError({ type: payload.errorType, message: payload.error, line: payload.line }, rows.map(row => row[2]).join('\n'), payload.mode)
-  if (!diagnosis?.ruleId || diagnosis.ruleId === 'name-commented-assignment') return null
-  return { ruleId: diagnosis.ruleId, confidence: diagnosis.confidence, explanation: diagnosis.guide[0], nextStep: diagnosis.guide[1] }
 }

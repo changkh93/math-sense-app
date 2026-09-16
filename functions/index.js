@@ -37,6 +37,7 @@ const {
 const FUNCTIONS_REGION = "asia-northeast3";
 const regionalFunctions = functions.region(FUNCTIONS_REGION);
 Object.assign(exports, require("./studioErrorCoach.cjs")({ functions, admin, regionalFunctions }));
+Object.assign(exports, require("./studioCoachLearning.cjs").register({ functions, admin, regionalFunctions }));
 const accountDeletionFunctions = regionalFunctions.runWith({ timeoutSeconds: 540, memory: "1GB" });
 const guestSecurityFunctions = regionalFunctions.runWith({ secrets: ["GUEST_ABUSE_HASH_SECRET"] });
 // 퀴즈 배틀은 콜드 스타트를 허용해 유휴 인스턴스 비용을 없앤다.

@@ -1,0 +1,65 @@
+{
+  "projectId": "proj_S7uL2bHA4redF0r90zUcfxRe",
+  "at": "2026-09-16T11:58:25.975Z",
+  "syntheticOnly": true,
+  "productionModified": false,
+  "checks": [
+    {
+      "id": "constructor",
+      "passed": true,
+      "response": {
+        "status": 200,
+        "model": "gpt-5.6-luna",
+        "inputTokens": 594,
+        "outputTokens": 197
+      },
+      "advice": {
+        "explanation": "3행의 forward 호출에서 오류가 보였지만, 2행에서 Turtle을 괄호 없이 대입한 것이 먼저 확인할 부분입니다. 보통 Turtle은 객체를 만들어야 메서드를 사용할 수 있지만, 이 변환본만으로 정확한 원인은 확정할 수 없습니다.",
+        "hint": "2행의 `variable_1 = Turtle`을 살펴보세요. `Turtle`이 클래스 이름인지, 괄호를 붙여 객체를 생성해야 하는지 선생님이나 라이브러리 예제와 비교해 보세요.",
+        "question": "2행에서 `variable_1`에 저장된 것이 실제 거북이 객체인가요, 아니면 Turtle 클래스 자체인가요?",
+        "check": "2행을 확인한 뒤 다시 실행하고, 오류가 3행에서 사라지는지 또는 새 오류가 나타나는지 비교해 보세요."
+      },
+      "cachedRepeat": true
+    },
+    {
+      "id": "spelling",
+      "passed": true,
+      "response": {
+        "status": 200,
+        "model": "gpt-5.6-luna",
+        "inputTokens": 584,
+        "outputTokens": 178
+      },
+      "advice": {
+        "explanation": "2번째 줄에서 print가 variable_2를 사용하지만, 보이는 코드에는 variable_2를 만든 대입문이 없습니다. preliminaryLocalFinding은 이름 철자 문제일 가능성을 알려 주지만, 변환된 코드만으로 원래 이름은 알 수 없습니다.",
+        "hint": "1번째 줄의 variable_1과 2번째 줄의 variable_2가 같은 대상을 가리키려던 것인지 이름을 비교해 보세요. 특히 2번째 줄의 이름 철자를 먼저 확인하세요.",
+        "question": "1번째 줄에서 만든 이름과 2번째 줄에서 출력하려는 이름이 정확히 같은가요?",
+        "check": "이름을 확인하거나 알맞게 고친 뒤 파일을 다시 실행하고, NameError가 사라지는지 관찰해 보세요."
+      },
+      "cachedRepeat": true
+    },
+    {
+      "id": "missing-import",
+      "passed": true,
+      "response": {
+        "status": 200,
+        "model": "gpt-5.6-luna",
+        "inputTokens": 572,
+        "outputTokens": 158
+      },
+      "advice": {
+        "explanation": "1행의 import 문이 가져올 대상 없이 끝나서 Python 문법 오류가 날 가능성이 큽니다. 다만 변환된 코드라 원래 대상 이름은 확인할 수 없습니다.",
+        "hint": "1행의 `from ColabTurtlePlus.Turtle import` 뒤에 가져올 이름이 실제로 적혀 있는지 확인하고, 브라우저의 기존 힌트인 import 대상 누락 가능성도 함께 살펴보세요.",
+        "question": "1행에서 `import` 뒤가 바로 줄 끝에서 끝나는지 관찰해 보세요.",
+        "check": "대상을 확인한 뒤 파일을 다시 실행하고, 오류가 같은 줄에서 계속되는지 비교해 보세요."
+      },
+      "cachedRepeat": true
+    }
+  ],
+  "secret": {
+    "version": "4",
+    "state": "ENABLED",
+    "createdAt": "2026-09-16T10:23:20.345970Z"
+  },
+  "passed": true
+}

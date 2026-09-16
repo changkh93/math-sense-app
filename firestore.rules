@@ -1190,6 +1190,16 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // Coach improvement data is served only through authenticated callables.
+    match /studioCoachLearningControl/{id} { allow read, write: if false; }
+    match /studioCoachLearningPublic/{id} { allow read, write: if false; }
+    match /studioCoachLearningReceipts/{id} { allow read, write: if false; }
+    match /studioCoachLearningQuotas/{id} { allow read, write: if false; }
+    match /studioCoachLearningStats/{id} { allow read, write: if false; }
+    match /studioCoachLearningCosts/{id} { allow read, write: if false; }
+    match /studioCoachLearningSamples/{id} { allow read, write: if false; }
+    match /studioCoachLearningCards/{id} { allow read, write: if false; }
+
     // Weekly Growth Commands (Idempotency ledger - Server only)
     match /weeklyGrowthCommands/{commandId} {
       allow read, write: if false;
