@@ -71,3 +71,6 @@
 - 빌드와 관련 ESLint를 수행한다. 합성 Firestore 테스트는 실제 Firebase emulator/배포 검증을 대체하지 않는다.
 
 출시 시 기존 구조형 코치 변경과 함께 프런트, `studioErrorCoach`, 새 함수 4개(`studioCoachLearningManifest/Observe/Admin/Cleanup`), Firestore 규칙을 배포해야 한다. 다른 작업의 미커밋 변경은 별도로 검토한다. 배포 후에도 수집은 기본 꺼짐으로 유지하며, 관리자 화면·권한·일일 삭제의 실제 배포 상태를 점검한 뒤 필요한 고지·운영 준비를 확인하고 켠다. AI 학생용 준비 플래그는 별도다. 이 문서는 배포 완료 기록이 아니다.
+
+## Production status — 2026-09-16
+Functions/rules/admin UI are deployed. Optional observation and sample collection remain off; core structural AI is enabled independently. Daily cleanup also covers studioCoachUsage (3/40/100-day expiry thresholds), regardless of the optional collection flag. Scheduler is ENABLED; manual production cleanup was not executed. See [release record](../20260916-coach-production-release/STATE.md).

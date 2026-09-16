@@ -1,0 +1,46 @@
+{
+  "status": 200,
+  "checks": [
+    {
+      "url": "/assets/index-BAcc7oJm.js",
+      "matches": true,
+      "sha256": "10bc4c526a8ea2a3c8e9f8f5e8ffe99985b7e3a00828c95ac9756ff913228277"
+    },
+    {
+      "url": "/assets/vendor-motion-DYtcP7i3.js",
+      "matches": true,
+      "sha256": "29fa04d45f606d44bd10fd459555be0b12639152c20e0c571ac79229eb2c9805"
+    },
+    {
+      "url": "/assets/vendor-three-CYREyV_u.js",
+      "matches": true,
+      "sha256": "8da6dae61731ed14292a57ab597e5029126193093a8da946b6b6a8b575d6cc22"
+    },
+    {
+      "url": "/assets/vendor-charts-JyJp7xMO.js",
+      "matches": true,
+      "sha256": "088b691876818acb4e981e70b195c63169069c83c8fcf2aadc52206b66202fb0"
+    },
+    {
+      "url": "/assets/vendor-react-three-Caen7N4X.js",
+      "matches": true,
+      "sha256": "a004a46fd9d3852d56820a83da3a9d32c5783c7a0d0df6d8e2b77cb267ccddeb"
+    },
+    {
+      "url": "/assets/vendor-firebase-CRhvhPXE.js",
+      "matches": true,
+      "sha256": "313494e1e239d25566e52e0229da15a11e78170654142b675efaf12166898aed"
+    },
+    {
+      "url": "/assets/vendor-firebase-firestore-BraIygi-.js",
+      "matches": true,
+      "sha256": "4a0b7a14c53f31b7880e55c49196fea6c3870cad4c90143635a970e805b8cfe8"
+    },
+    {
+      "url": "/assets/index-DYs-KNB8.css",
+      "matches": true,
+      "sha256": "eb4fb52de80afa5422240a290e28c55738c69c0ac1d751e0552bfee7737fbbae"
+    }
+  ],
+  "passed": true
+}

@@ -1,0 +1,12 @@
+{
+  "at": "2026-09-16T12:48:18.001Z",
+  "mode": "--activate",
+  "syntheticOnly": true,
+  "checks": [
+    {
+      "name": "structural AI enabled; ZDR readiness remains false",
+      "passed": true
+    }
+  ],
+  "passed": true
+}

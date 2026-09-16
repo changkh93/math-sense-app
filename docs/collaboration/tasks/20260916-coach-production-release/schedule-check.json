@@ -1,0 +1,18 @@
+{
+  "at": "2026-09-16T12:49:55.698Z",
+  "mode": "--schedule-check",
+  "syntheticOnly": true,
+  "checks": [
+    {
+      "name": "daily cleanup schedule enabled",
+      "passed": true
+    }
+  ],
+  "scheduler": {
+    "state": "ENABLED",
+    "schedule": "every 24 hours",
+    "location": "us-central1"
+  },
+  "manualCleanupExecuted": false,
+  "passed": true
+}

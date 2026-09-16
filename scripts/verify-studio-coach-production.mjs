@@ -4,7 +4,7 @@ import {randomBytes} from 'node:crypto'
 import {writeFile} from 'node:fs/promises'
 import {makeCoachPayload,parseError} from '../functions/studioErrorCoachPolicy.mjs'
 const mode=process.argv[2]
-if(!['--activate','--verify'].includes(mode))throw new Error('Use --activate or --verify explicitly')
+if(!['--activate','--verify','--schedule-check'].includes(mode))throw new Error('Use --activate, --verify or --schedule-check explicitly')
 const project='math-sense-1f6a8', region='asia-northeast3'
 const req=createRequire(import.meta.url), cli=createRequire('/Users/selah/.npm-global/lib/node_modules/firebase-tools/package.json')
 const logger=cli('./lib/logger.js').logger;logger.silent=true;logger.clear()
@@ -13,16 +13,33 @@ await cli('./lib/requireAuth.js').requireAuth({project,nonInteractive:true,user:
 const token=async()=>ca.getAccessToken(account.tokens.refresh_token,cli('./lib/api.js').getScopes())
 const admin=req('firebase-admin')
 admin.initializeApp({projectId:project,credential:{getAccessToken:async()=>{const t=await token();return{access_token:t.access_token,expires_in:t.expires_in||3600}}}})
-const db=admin.firestore();db.settings({preferRest:true})
+// Use the already-authorized CLI OAuth session directly; no service-account file.
+const field=v=>v instanceof Date?{timestampValue:v.toISOString()}:typeof v==='boolean'?{booleanValue:v}:typeof v==='number'?{integerValue:String(v)}:typeof v==='string'?{stringValue:v}:{mapValue:{fields:Object.fromEntries(Object.entries(v).map(([k,x])=>[k,field(x)]))}}
+const value=v=>'booleanValue'in v?v.booleanValue:'integerValue'in v?Number(v.integerValue):'timestampValue'in v?new Date(v.timestampValue):'stringValue'in v?v.stringValue:Object.fromEntries(Object.entries(v.mapValue?.fields||{}).map(([k,x])=>[k,value(x)]))
+const document=async(path,method='GET',data,query='')=>{
+ const t=await token(),res=await fetch(`https://firestore.googleapis.com/v1/projects/${project}/databases/(default)/documents/${path}${query}`,{method,headers:{Authorization:`Bearer ${t.access_token}`,'Content-Type':'application/json'},...(data?{body:JSON.stringify({fields:Object.fromEntries(Object.entries(data).map(([k,v])=>[k,field(v)]))})}:{})})
+ if(method==='GET'&&res.status===404)return{exists:false,data:()=>undefined}
+ if(!res.ok){const error=new Error('firestore-operation');error.code=`firestore-${res.status}`;throw error}
+ const body=method==='DELETE'?{}:await res.json();return{exists:true,data:()=>Object.fromEntries(Object.entries(body.fields||{}).map(([k,v])=>[k,value(v)]))}
+}
+const db={doc:path=>({get:()=>document(path),delete:()=>document(path,'DELETE'),create:data=>document(path,'PATCH',data,'?currentDocument.exists=false'),set:(data,opts)=>document(path,'PATCH',data,opts?.merge?'?'+Object.keys(data).map(k=>'updateMask.fieldPaths='+encodeURIComponent(k)).join('&'):''),update:data=>document(path,'PATCH',data,'?'+Object.keys(data).map(k=>'updateMask.fieldPaths='+encodeURIComponent(k)).join('&')+'&currentDocument.exists=true')})}
 const evidence={at:new Date().toISOString(),mode,syntheticOnly:true,checks:[]}
 const check=(name,ok)=>{evidence.checks.push({name,passed:!!ok});if(!ok)throw new Error(name)}
 let uid, phase='config'
 try{
  if(mode==='--activate'){
-  await db.doc('studioCoachControl/config').set({enabled:true,structureDataReady:true,projectId:'proj_S7uL2bHA4redF0r90zUcfxRe',childDataReady:false,perUserDay:10,perDay:300,perMonth:3000,updatedAt:admin.firestore.FieldValue.serverTimestamp()},{merge:true})
+  await db.doc('studioCoachControl/config').set({enabled:true,structureDataReady:true,projectId:'proj_S7uL2bHA4redF0r90zUcfxRe',childDataReady:false,perUserDay:10,perDay:300,perMonth:3000,updatedAt:new Date()},{merge:true})
   await db.doc('studioCoachLearningControl/config').set({enabled:false,samplesEnabled:false},{merge:true})
   const config=(await db.doc('studioCoachControl/config').get()).data()
   check('structural AI enabled; ZDR readiness remains false',config.enabled===true&&config.structureDataReady===true&&config.childDataReady===false)
+ }else if(mode==='--schedule-check'){
+  phase='scheduler-metadata'
+  const fc=cli('./lib/functionsConfig.js'),config=await fc.getFirebaseConfig({project})
+  const location=fc.getAppEngineLocation(config)
+  const result=await cli('./lib/gcp/cloudscheduler.js').getJob(`projects/${project}/locations/${location}/jobs/firebase-schedule-studioCoachLearningCleanup-${region}`)
+  evidence.scheduler={state:result.body.state,schedule:result.body.schedule,location}
+  check('daily cleanup schedule enabled',result.status===200&&result.body.state==='ENABLED'&&result.body.schedule==='every 24 hours')
+  evidence.manualCleanupExecuted=false
  }else{
   const base=`https://${region}-${project}.cloudfunctions.net/`
   const call=async(name,data,idToken)=>{const res=await fetch(base+name,{method:'POST',headers:{'Content-Type':'application/json',...(idToken?{Authorization:`Bearer ${idToken}`}:{})},body:JSON.stringify({data}),signal:AbortSignal.timeout(60000)});return{status:res.status,body:await res.json()}}

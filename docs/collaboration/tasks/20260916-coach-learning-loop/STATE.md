@@ -33,3 +33,6 @@
 - 실제 Firebase emulator/배포 환경·실제 관리자 계정·일일 삭제 스케줄은 미검증. 로컬 backend fixture와 실제 브라우저 실행을 구분한다.
 - 프런트·기존 코치·새 함수 4개·Firestore 규칙을 함께 배포하고 관리자 권한/스케줄을 확인한 후 운영 설정을 켠다. AI 준비/ZDR 조건은 별도이며 그대로 유지.
 - 상세 동작·상한·배포 경로: [OPERATIONS.md](OPERATIONS.md). 설계 기준: [DESIGN.md](DESIGN.md).
+
+## 2026-09-16 production release supersedes local-only status above
+Source commit 67c3f71a pushed; Hosting, structural coach, learning functions and Firestore rules deployed. Student structural AI enabled and authenticated real Luna request verified. Optional learning collection/case reuse remains off. ZDR remains pending. See [release evidence](../20260916-coach-production-release/STATE.md) for exact scope, controls and verification limitations.
