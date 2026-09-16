@@ -58,3 +58,12 @@
 - Targeted studio ESLint: zero errors, existing cleanup-ref warning. assignmentFeedbackService.js still has five pre-existing lint errors (unused documentId/buildFeedbackWhitelistDto, duplicate focusScore, undefined quizMap twice); confirmed identical on HEAD. No unrelated feedback policy edits made.
 - Manual export script syntax checked only; it was not run against production. Real assignment upload and physical Safari/iPad were not exercised. No commit/push/deploy for this feature. Updated USAGE.md.
 - Next: review local implementation / release on request. No user action required for implementation completion.
+
+## Production release — 2026-09-16
+- User explicitly requested GitHub commit, push and production deployment.
+- Source commit `791f9efa` pushed to `origin/main`. Built from detached clean worktree `/tmp/metasense-notebook-release-791f9ef`; unrelated checkout changes excluded.
+- Release checks: 18 studio/native-notebook/attachment tests and 6 compiler/package tests passed; clean production build passed (11.36s).
+- Firebase Hosting `math-sense-1f6a8` release completed. No Functions, database or rules deployment.
+- `https://msense.me/python-game-studio` and release assets fetched successfully. SHA-256 matches clean build: `/assets/index-DJERmOR7.js` f13e2b79aee5afe5f43dde546d3d97a85aab091739f164a61e40779d16cb707b; `/assets/PythonGameStudioPage-BDNE7aol.js` 6331dd05900682c4a40c1239d3fb3120403e13d7dfc31d25c9a22a83842f887b.
+- No authenticated production student actions performed. Prior actual Chrome/WASM checks cover runtime behavior; deployment verified by matching production bytes.
+- Phase: DONE (Hosting deployed). Earlier local-only status entries are historical.
