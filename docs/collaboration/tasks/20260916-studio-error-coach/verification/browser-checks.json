@@ -1,0 +1,15 @@
+{
+  "passed": true,
+  "realWasmFileError": true,
+  "notebookCellError": true,
+  "tabletFits": true,
+  "noAutomaticApiCalls": true,
+  "actionableSyntaxBeforeClick": true,
+  "notebookTracebackUsesCellSource": true,
+  "tracebackCollapsedByDefault": true,
+  "privacyPreview": true,
+  "staleSourceGuard": true,
+  "successfulRerunClearsCoach": true,
+  "singleSyntheticRequestForThreeHints": true,
+  "liveApiTested": false
+}

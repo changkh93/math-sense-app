@@ -1,0 +1,16 @@
+{
+  "passed": true,
+  "modes": [
+    "file",
+    "notebook"
+  ],
+  "multiArgument": true,
+  "sameVisualLine": true,
+  "sepAndEnd": true,
+  "blankAndEmbeddedNewlines": true,
+  "loops": true,
+  "unicode": true,
+  "mixedStdoutStderr": true,
+  "noTrailingNewline": true,
+  "paidApiCalls": 0
+}

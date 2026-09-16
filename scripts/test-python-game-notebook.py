@@ -32,6 +32,17 @@ class NotebookCompilerTest(unittest.IsolatedAsyncioTestCase):
         await self.run_cell('x=42')
         with self.assertRaises(ZeroDivisionError): await self.run_cell('1/0')
         await self.run_cell('x');self.assertEqual(self.output[-1],42)
+    async def test_syntax_error_reports_cell_not_notebook_json(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as directory:
+            filename = pathlib.Path(directory) / 'notebook.ipynb'
+            filename.write_text('{\n"cells": []\n}')
+            with self.assertRaises(SyntaxError) as caught:
+                self.scope['compile_project']('print("hello world"a)', str(filename), self.ns, notebook=True)
+            self.assertEqual(caught.exception.lineno, 1)
+            self.assertEqual(caught.exception.filename, str(filename))
+            self.assertGreater(caught.exception.offset, 2)
+            self.assertEqual(caught.exception.text.strip(), 'print("hello world"a)')
 class NotebookPackageTest(unittest.TestCase):
     def test_incomplete_other_cell_does_not_block_numpy_or_matplotlib(self):
         scope = dict(ast=ast, json=json, base64=base64)

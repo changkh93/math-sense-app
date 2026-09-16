@@ -7,6 +7,7 @@ For an existing task, read its STATE.md and actual artifacts before continuing.
 
 | ID | Goal | Phase | State file | Next action |
 |---|---|---|---|---|
+| 20260916-studio-error-coach | Luna 단일 모델·학생 오류 힌트·비용 제한 | LIVE_CONNECTION_VERIFIED | [STATE](tasks/20260916-studio-error-coach/STATE.md) | Luna 연결·기본 오류 설명·print 개행 수정 검증. 학생 데이터 설정 확인 및 실운영 배포 남음 |
 | 20260915-studio-project-import | 정시원 코드 스튜디오 프로젝트 가져오기 실패·용량 상향 | DONE (Hosting deployed) | [STATE](tasks/20260915-studio-project-import/STATE.md) | `1f0883e3` 배포·운영 해시 일치; 학생 강력 새로고침 후 재시도 |
 | 20260914-studio-responsive-preview | 패드 실행 화면 잘림·결과 가시성 | DONE (Hosting deployed) | [STATE](tasks/20260914-studio-responsive-preview/STATE.md) | 842fe2c6 푸시·운영 JS/CSS 해시 일치, 패드 실물 확인 후속 |
 | 20260914-studio-font-upload | 큰 한글 TTF 업로드 실패 | DONE (Hosting deployed) | [STATE](tasks/20260914-studio-font-upload/STATE.md) | 공식 TTF 실기·842fe2c6 배포 검증 완료, 학생 새로고침 후 업로드 |

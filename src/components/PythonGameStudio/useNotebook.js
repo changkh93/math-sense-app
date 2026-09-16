@@ -39,7 +39,7 @@ export default function useNotebook({ projectRef, setRun, setStatus, setLogs, se
       const next = { ...old }
       if (event.type === 'SURFACE') next.surface = event.text
       if (event.type === 'CELL_START') next.count = Number(event.text)
-      if (['STDOUT', 'STDERR', 'ERROR'].includes(event.type)) next.logs = [...old.logs, { type: event.type, text: event.text }].slice(-100)
+      if (['STDOUT', 'STDERR', 'ERROR'].includes(event.type)) next.logs = [...old.logs, { type: event.type, text: event.text, coach: event.coach }].slice(-100)
       if (event.type === 'DISPLAY') next.displays = [...old.displays, event.value].slice(-20)
       if (event.type === 'CELL_RESULT') { next.images = event.value.images; next.truncated = event.value.truncated }
       if (event.type === 'ERROR') next.failed = true
@@ -66,7 +66,7 @@ export default function useNotebook({ projectRef, setRun, setStatus, setLogs, se
         if (token !== generation.current) break
         const cell = cells[i], request = crypto.randomUUID()
         setActiveIndex(i); setStatus('loading'); setLogs([]); setInputRequest(null)
-        setResults(previous => ({ ...previous, [kernel]: { ...previous[kernel], [i]: { source: cell.source, logs: [], displays: [], running: true } } }))
+        setResults(previous => ({ ...previous, [kernel]: { ...previous[kernel], [i]: { request, source: cell.source, logs: [], displays: [], running: true } } }))
         const done = new Promise(resolve => { pending.current = { id: request, resolve, failed: false } })
         setRun({ id: request, project: checked, payload, notebook: { kernel, index: i, source: cell.source, line: cell.line, request } })
         if (!await done) break

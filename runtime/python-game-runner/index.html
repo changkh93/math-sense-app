@@ -502,7 +502,17 @@ def compile_project(source, filename, namespace, notebook=False):
         ('\n' if line.endswith('\n') else '')
         if number not in string_lines and re.fullmatch(r'[ \t]*[!%]pip[ \t]+install[ \t]+ColabTurtlePlus[ \t]*(?:#[^\n]*)?\n?', line)
         else line for number, line in enumerate(source.splitlines(keepends=True), 1))
-    tree = ast.parse(source, filename=filename)
+    try:
+        tree = ast.parse(source, filename='<notebook-cell>' if notebook else filename)
+    except SyntaxError as error:
+        # A notebook's on-disk file is JSON, not the executed cell. Some Python
+        # builds look up syntax-error text by filename; retain the cell line.
+        if notebook and error.lineno:
+            error.filename = filename
+            source_lines = source.splitlines(keepends=True)
+            if error.lineno <= len(source_lines):
+                error.text = source_lines[error.lineno - 1]
+        raise
     # Resolve common pygame imports without guessing from text/comments/strings.
     aliases = {}
     if notebook:

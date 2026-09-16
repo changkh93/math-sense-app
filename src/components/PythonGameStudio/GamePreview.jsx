@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { parseError } from '../../../functions/studioErrorCoachPolicy.mjs'
 import runnerHtml from '../../../runtime/python-game-runner/index.html?raw'
 import turtlePython from '../../../runtime/python-game-runner/turtle.py?raw'
 import turtleRenderer from '../../../runtime/python-game-runner/turtle-renderer.js?raw'
@@ -23,7 +24,12 @@ export default function GamePreview({ run, onEvent }) {
   const [engineEpoch, setEngineEpoch] = useState(0)
   useEffect(() => { callbackRef.current = onEvent }, [onEvent])
   useEffect(() => {
-    const dispatch = event => callbackRef.current({ ...event, notebook: runRef.current?.notebook })
+    const dispatch = event => {
+      const snapshot = runRef.current
+      const path = event.type === 'ERROR' ? parseError(event.text).path : ''
+      const source = snapshot?.notebook && path === snapshot.project.entrypoint ? snapshot.notebook.source : snapshot?.project.files.find(file => file.path === path)?.text
+      return callbackRef.current({ ...event, notebook: snapshot?.notebook, coach: event.type === 'ERROR' && source !== undefined ? { source, path, projectId: snapshot.project.id } : null })
+    }
     const frame = frameRef.current
     const channel = new MessageChannel()
     const sessionId = crypto.randomUUID()
