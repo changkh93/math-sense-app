@@ -7,7 +7,7 @@ For an existing task, read its STATE.md and actual artifacts before continuing.
 
 | ID | Goal | Phase | State file | Next action |
 |---|---|---|---|---|
-| 20260916-studio-error-first | 오류 원문 우선·항상 펼침·두 편집 모드 일치 | VERIFIED | [STATE](tasks/20260916-studio-error-first/STATE.md) | 실운영 Hosting 반영 |
+| 20260916-studio-error-first | 오류 원문 우선·항상 펼침·두 편집 모드 일치 | DEPLOYED | [STATE](tasks/20260916-studio-error-first/STATE.md) | f8e1d291 배포·운영 파일 확인, 노트북 traceback 코드 줄도 수정 |
 | 20260916-coach-production-release | 구조형 AI 실운영 활성화·배포·검증 | DONE | [STATE](tasks/20260916-coach-production-release/STATE.md) | 학생 AI 활성화·실제 Luna 응답 검증, 새로고침 후 이용 |
 | 20260916-coach-learning-loop | 학생 오류·질문 누적으로 개선되는 기본 힌트 시스템 | DEPLOYED (collection off) | [STATE](tasks/20260916-coach-learning-loop/STATE.md) | 관리자 작업대·함수·규칙 배포, 선택적 관찰/사례 수집은 꺼짐 |
 | 20260916-studio-private-coach | 코드 구조 보존·개인정보 전송 최소화 및 약관 보완 | DEPLOYED / AI ACTIVE | [STATE](tasks/20260916-studio-private-coach/STATE.md) | 구조형 요청·실운영 인증 응답 확인, ZDR는 승인 대기 |
