@@ -136,7 +136,7 @@ def emit():
         elif number == 10:
             md += '**프로젝트 다운로드**로 기초 실험을 백업하고, **화성 탐사대 수업 준비**를 한 번 눌러 본 게임용 새 프로젝트를 만듭니다. 기존 기초 실험은 보존됩니다. 이번 단원의 에셋 확인 코드를 실행하고 11부터 본 게임을 작성합니다.\n\n'
         else:
-            md += '이전 단원의 마지막 main.py에서 이어갑니다. 누적 코드는 스크롤 창에서 읽거나, 스튜디오의 **화성 탐사대 단계 비교·수업 자료**에서 에셋을 포함한 별도 프로젝트로 열 수 있습니다. 직접 작성한 초안을 먼저 백업하세요.\n\n'
+            md += '이전 단원의 마지막 main.py에서 이어갑니다. 누적 코드는 각 단계의 코드 링크를 눌러 읽고 비교할 수 있습니다. 직접 작성한 초안을 먼저 백업하세요.\n\n'
         md += COMMENT_GUIDE + '\n'
         md += '[코드 스튜디오 열기](/python-game-studio) · [전체 수업 자료 ZIP](/mars-expedition/mars-expedition-course.zip) · [에셋 안내](/mars-expedition/ASSETS.html)\n'
         for step in steps:

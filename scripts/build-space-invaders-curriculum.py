@@ -357,7 +357,7 @@ for n,title in enumerate(TITLES,1):
     unit_steps=[s for s in STEPS if s['id'].startswith(f'{n:02}-')]
     intro=RULES if n==1 else f'이전 단원의 마지막 main.py에서 이어갑니다. 이번 단원은 **{title}**입니다. 에셋 경로와 프로젝트를 유지하고, 아래 순서대로 작은 기능을 추가합니다.'
     md=f'# Data Log {n:02} - {title}\n\n원강의 {n+50}강의 제작 순서에 대응합니다. [강의 위치](https://www.udemy.com/course/the-art-of-doing-video-game-creation-with-python-and-pygame/learn/lecture/{LECTURES[n-1]})는 순서 참고용이며 이 문서만으로 실습합니다.\n\n'+intro
-    md+='\n\n[코드 스튜디오 열기](/python-game-studio) · 내 프로젝트 → 우주 방어대 단계 비교·수업 자료에서 누적 코드나 임시 시험을 별도 프로젝트로 열 수 있습니다.\n\n## 입력과 실행 약속\n\n각 단계에서 먼저 정지를 누르고 main.py를 수정합니다. 여러 편집이 있으면 전부 마친 후 실행합니다. 실행 후 게임 화면을 클릭해야 키 입력이 게임에 전달됩니다. 코드는 왼쪽 공백까지 입력하며, 잘 모르겠는 이름은 바로 아래 설명에서 확인합니다. 단계 파일은 직접 작성한 코드와 비교·복구할 때 사용합니다.\n'
+    md+='\n\n[코드 스튜디오 열기](/python-game-studio) · 수업 준비는 처음 한 번만 합니다. 같은 프로젝트의 main.py를 이어서 작성하세요.\n\n## 입력과 실행 약속\n\n각 단계에서 먼저 정지를 누르고 main.py를 수정합니다. 여러 편집이 있으면 전부 마친 후 실행합니다. 실행 후 게임 화면을 클릭해야 키 입력이 게임에 전달됩니다. 코드는 왼쪽 공백까지 입력하며, 잘 모르겠는 이름은 바로 아래 설명에서 확인합니다. 단계 파일은 직접 작성한 코드와 비교·복구할 때 사용합니다.\n'
     md += '\n' + COMMENT_GUIDE + '\n'
     for s in unit_steps:
         md+=f"\n## {s['id']} - {s['title']}\n\n{s['reason']}\n\n"
