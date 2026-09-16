@@ -43,6 +43,35 @@ class NotebookCompilerTest(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(caught.exception.filename, str(filename))
             self.assertGreater(caught.exception.offset, 2)
             self.assertEqual(caught.exception.text.strip(), 'print("hello world"a)')
+    async def test_runtime_traceback_uses_each_executed_cell_not_json(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as directory:
+            filename = pathlib.Path(directory) / 'notebook.ipynb'
+            original = '{\n"metadata": {}\n}'
+            filename.write_text(original)
+            async def run(source):
+                code = self.scope['compile_project'](source, str(filename), self.ns, notebook=True)
+                result = eval(code, self.ns)
+                if inspect.isawaitable(result): await result
+            await run('def earlier():\n    return 1 / 0')
+            # Same filename, different code and line contents, retained function.
+            try:
+                await run('earlier()')
+            except ZeroDivisionError as error:
+                text = self.scope['format_studio_exception'](error)
+                self.assertIn('return 1 / 0', text)
+                self.assertIn('earlier()', text)
+                self.assertNotIn('"metadata":', text)
+            else: self.fail('Expected error from earlier cell')
+            try:
+                await run('print(missing_value)')
+            except NameError as error:
+                text = self.scope['format_studio_exception'](error)
+                self.assertIn('print(missing_value)', text)
+                self.assertNotIn('"metadata":', text)
+            else: self.fail('Expected NameError')
+            self.assertEqual(filename.read_text(), original)
+
 class NotebookPackageTest(unittest.TestCase):
     def test_incomplete_other_cell_does_not_block_numpy_or_matplotlib(self):
         scope = dict(ast=ast, json=json, base64=base64)

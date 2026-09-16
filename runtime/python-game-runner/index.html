@@ -244,7 +244,7 @@ def emit(kind, text='', run_id=None):
 
 def report(error, run_id):
     if not isinstance(error, (SystemExit, asyncio.CancelledError)):
-        emit('ERROR', ''.join(traceback.format_exception(error)), run_id)
+        emit('ERROR', format_studio_exception(error), run_id)
 
 class StudioOutput:
     def __init__(self, kind, run_id): self.kind, self.run_id = kind, run_id
@@ -550,7 +550,45 @@ def compile_project(source, filename, namespace, notebook=False):
         name = '_metasense_display_' + str(id(namespace))
         namespace[name] = notebook_display
         last.value = ast.copy_location(ast.Call(func=ast.Name(id=name, ctx=ast.Load()), args=[last.value], keywords=[]), last.value)
-    return compile(ast.fix_missing_locations(tree), filename, 'exec', flags=ast.PyCF_ALLOW_TOP_LEVEL_AWAIT)
+    code = compile(ast.fix_missing_locations(tree), filename, 'exec', flags=ast.PyCF_ALLOW_TOP_LEVEL_AWAIT)
+    if notebook:
+        import weakref
+        if not hasattr(compile_project, 'sources'):
+            compile_project.sources = weakref.WeakKeyDictionary()
+        lines = source.splitlines(keepends=True)
+        def remember(item):
+            compile_project.sources[item] = lines
+            for constant in item.co_consts:
+                if isinstance(constant, types.CodeType): remember(constant)
+        remember(code)
+    return code
+
+def format_studio_exception(error):
+    # ipynb files contain JSON. Keep the source for each executed code object,
+    # including functions from earlier cells, without replacing the saved file.
+    import traceback
+    rendered = traceback.TracebackException.from_exception(error)
+    sources = getattr(compile_project, 'sources', {})
+    seen = set()
+    def restore(exc, display):
+        if exc is None or display is None or id(exc) in seen: return
+        seen.add(id(exc))
+        tb = exc.__traceback__
+        for index, frame in enumerate(display.stack):
+            if tb is None: break
+            lines = sources.get(tb.tb_frame.f_code)
+            if lines is not None and 0 < tb.tb_lineno <= len(lines):
+                display.stack[index] = traceback.FrameSummary(
+                    frame.filename, frame.lineno, frame.name, lookup_line=False,
+                    line=lines[tb.tb_lineno - 1], end_lineno=frame.end_lineno,
+                    colno=frame.colno, end_colno=frame.end_colno)
+            tb = tb.tb_next
+        restore(exc.__cause__, display.__cause__)
+        restore(exc.__context__, display.__context__)
+        for child, detail in zip(getattr(exc, 'exceptions', ()), display.exceptions or ()):
+            restore(child, detail)
+    restore(error, rendered)
+    return ''.join(rendered.format())
 
 def cancel_user_callbacks(loop):
     for queue_name in ('_scheduled', '_ready'):

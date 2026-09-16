@@ -6,7 +6,7 @@
   "noAutomaticApiCalls": true,
   "actionableSyntaxBeforeClick": true,
   "notebookTracebackUsesCellSource": true,
-  "tracebackCollapsedByDefault": true,
+  "tracebackVisibleBeforeHints": true,
   "privacyPreview": true,
   "staleSourceGuard": true,
   "successfulRerunClearsCoach": true,
