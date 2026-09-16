@@ -7,6 +7,8 @@ For an existing task, read its STATE.md and actual artifacts before continuing.
 
 | ID | Goal | Phase | State file | Next action |
 |---|---|---|---|---|
+| 20260917-multipluvia-times-card-lab | 멀티플루비아 구구단 불빛 카드·체험 학습 재배치 | IMPLEMENTED_AND_VERIFIED | [STATE](tasks/20260917-multipluvia-times-card-lab/STATE.md) | 전통 암송형 2~12단 정적 GPT-Audio-1.5 음성팩·불빛 동기화·기기 음성 폴백 구현 및 검증 완료 |
+| 20260916-multipluvia-big-multiply-lab | 멀티플루비아 세 자리수 큰곱셈 체험 학습 | DONE (local; not deployed) | [STATE](tasks/20260916-multipluvia-big-multiply-lab/STATE.md) | 곱할 수는 노란색, 답 칸은 청록 점선으로 역할 구분; 브라우저/빌드 검증 완료 |
 | 20260916-studio-remove-comparison | 두 단계 비교 메뉴·관련 안내 제거, 자료 유지 | DONE | [STATE](tasks/20260916-studio-remove-comparison/STATE.md) | e8126074 배포·운영 문구/자료 검증 완료 |
 | 20260916-studio-error-first | 오류 원문 우선·항상 펼침·두 편집 모드 일치 | DEPLOYED | [STATE](tasks/20260916-studio-error-first/STATE.md) | f8e1d291 배포·운영 파일 확인, 노트북 traceback 코드 줄도 수정 |
 | 20260916-coach-production-release | 구조형 AI 실운영 활성화·배포·검증 | DONE | [STATE](tasks/20260916-coach-production-release/STATE.md) | 학생 AI 활성화·실제 Luna 응답 검증, 새로고침 후 이용 |

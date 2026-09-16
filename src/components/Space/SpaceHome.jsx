@@ -87,6 +87,8 @@ const PythonGameStudioPage = lazy(() => import('../PythonGameStudio/PythonGameSt
 const PythonProtocolHub = lazy(() => import('../PythonWorld/PythonProtocolHub'))
 const AlgorithmConstellationHub = lazy(() => import('../AlgorithmConstellation/client/hub/AlgorithmConstellationHub'))
 const ReadingLibraryView = lazy(() => import('./ReadingLibrary/ReadingLibraryView'))
+const MultiplicationCardLab = lazy(() => import('./MultiplicationCardLab'))
+const VerticalMultiplicationLab = lazy(() => import('./VerticalMultiplicationLab'))
 import { isWesternClassicCluster, filterWesternClassicRegions } from '../../constants/westernClassicNavigation'
 import { isCourseExplorerCluster } from './coursePlanetCatalog'
 import PublicHomeIntro from '../PublicHomeIntro'
@@ -113,6 +115,65 @@ function SpaceViewFallback() {
         선택한 탐사 모듈을 불러오고 있습니다.
       </small>
     </div>
+  )
+}
+
+function ExperienceLearningCard({ testId, eyebrow, badge, title, description, icon, accent, isMobile, onClick }) {
+  return (
+    <Motion.button
+      type="button"
+      data-testid={testId}
+      whileHover={isMobile ? undefined : { y: -4, scale: 1.01 }}
+      whileTap={{ scale: 0.98 }}
+      onClick={onClick}
+      style={{
+        width: '100%',
+        minHeight: isMobile ? 148 : 176,
+        padding: isMobile ? '1rem' : '1.3rem',
+        border: `1px solid ${accent.border}`,
+        borderRadius: isMobile ? 16 : 20,
+        background: accent.background,
+        boxShadow: accent.shadow,
+        color: 'white',
+        cursor: 'pointer',
+        display: 'grid',
+        gridTemplateColumns: 'auto minmax(0, 1fr) auto',
+        alignItems: 'center',
+        gap: isMobile ? '0.8rem' : '1.05rem',
+        textAlign: 'left',
+        overflow: 'hidden',
+      }}
+    >
+      <span
+        aria-hidden="true"
+        style={{
+          width: isMobile ? 50 : 62,
+          height: isMobile ? 50 : 62,
+          borderRadius: isMobile ? 15 : 20,
+          display: 'grid',
+          placeItems: 'center',
+          background: accent.icon,
+          color: '#05212a',
+          fontSize: isMobile ? '1.5rem' : '2rem',
+          boxShadow: accent.iconShadow,
+        }}
+      >
+        {icon}
+      </span>
+      <span style={{ minWidth: 0 }}>
+        <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.35rem', flexWrap: 'wrap' }}>
+          <strong style={{ color: accent.label, fontSize: '0.69rem', letterSpacing: '0.1em' }}>{eyebrow}</strong>
+          <span style={{ color: '#b8cdd8', fontSize: '0.7rem' }}>{badge}</span>
+        </span>
+        <strong className="font-title" style={{ display: 'block', fontSize: isMobile ? '1rem' : '1.2rem', marginBottom: '0.3rem' }}>
+          {title}
+        </strong>
+        <span style={{ display: 'block', color: '#b8cdd8', fontSize: isMobile ? '0.73rem' : '0.84rem', lineHeight: 1.5 }}>
+          {description}
+        </span>
+      </span>
+      <span aria-hidden="true" style={{ color: accent.label, fontSize: isMobile ? '1.2rem' : '1.5rem' }}>→</span>
+    </Motion.button>
   )
 }
 
@@ -857,6 +918,8 @@ function SpaceHome() {
   const [signupPrompt, setSignupPrompt] = useState(null)
   const [acceptedQuizBattle, setAcceptedQuizBattle] = useState(null)
   const [quizBattleReturnView, setQuizBattleReturnView] = useState('planet')
+  const [multiplicationCardLabOpen, setMultiplicationCardLabOpen] = useState(false)
+  const [verticalMultiplicationLabOpen, setVerticalMultiplicationLabOpen] = useState(false)
   const galaxyPlay = useGalaxyPlaySession({ uid: user?.uid, active: currentView === 'galaxy', isGuest: userData?.isGuest === true })
 
   useEffect(() => {
@@ -4462,6 +4525,34 @@ function SpaceHome() {
     )
   }
 
+  if (multiplicationCardLabOpen) {
+    return (
+      <Suspense fallback={<SpaceViewFallback />}>
+        <MultiplicationCardLab
+          userId={user?.uid}
+          onExit={() => {
+            setMultiplicationCardLabOpen(false)
+            soundManager.playClick?.()
+          }}
+        />
+      </Suspense>
+    )
+  }
+
+  if (verticalMultiplicationLabOpen) {
+    return (
+      <Suspense fallback={<SpaceViewFallback />}>
+        <VerticalMultiplicationLab
+          userId={user?.uid}
+          onExit={() => {
+            setVerticalMultiplicationLabOpen(false)
+            soundManager.playClick?.()
+          }}
+        />
+      </Suspense>
+    )
+  }
+
   // Main App
   return (
     <div className={`space-bg ${isMobile ? 'mobile-space-home' : ''}`} style={{ 
@@ -5474,6 +5565,70 @@ function SpaceHome() {
                       </Motion.div>
                     ))}
                   </div>
+
+                  {selectedRegionId === 'multiplication' && (
+                    <section
+                      aria-labelledby="multiplication-experience-title"
+                      style={{
+                        marginTop: isMobile ? '1.35rem' : '2.25rem',
+                        paddingTop: isMobile ? '1.1rem' : '1.5rem',
+                        borderTop: '1px solid rgba(69, 230, 210, 0.18)',
+                      }}
+                    >
+                      <div style={{ marginBottom: isMobile ? '0.8rem' : '1rem' }}>
+                        <strong id="multiplication-experience-title" className="font-title" style={{ display: 'block', color: '#effcff', fontSize: isMobile ? '1rem' : '1.22rem' }}>
+                          NEW · 체험 학습
+                        </strong>
+                        <span style={{ display: 'block', marginTop: '0.28rem', color: '#7fa0b0', fontSize: isMobile ? '0.72rem' : '0.82rem' }}>
+                          일반 학습에서 배운 곱셈을 직접 만지고 반복하며 익혀요.
+                        </span>
+                      </div>
+                      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(2, minmax(0, 1fr))', gap: isMobile ? '0.75rem' : '1rem' }}>
+                        <ExperienceLearningCard
+                          testId="times-card-lab-entry"
+                          eyebrow="먼저 도전"
+                          badge="2단~12단"
+                          title="구구단 불빛 카드"
+                          description="여러 단을 골라 카드를 맞혀요. 틀린 카드는 다시 만나고, 자주 틀린 문제는 다음날 먼저 연습해요."
+                          icon="✨"
+                          isMobile={isMobile}
+                          accent={{
+                            border: 'rgba(255, 192, 88, 0.48)',
+                            background: 'linear-gradient(120deg, rgba(87, 58, 22, 0.76), rgba(60, 43, 68, 0.84))',
+                            shadow: '0 14px 38px rgba(255, 166, 66, 0.12)',
+                            icon: 'linear-gradient(135deg, #ffe08b, #ff9b63)',
+                            iconShadow: '0 0 28px rgba(255, 190, 88, 0.28)',
+                            label: '#ffd27b',
+                          }}
+                          onClick={() => {
+                            setMultiplicationCardLabOpen(true)
+                            soundManager.playWarp?.()
+                          }}
+                        />
+                        <ExperienceLearningCard
+                          testId="big-multiply-lab-entry"
+                          eyebrow="다음 도전"
+                          badge="10개 미션"
+                          title="큰곱셈 조립소"
+                          description="왕새우쌤과 세 자리 수 × 세 자리 수를 한 칸씩 계산해요. 올림부터 마지막 세로 덧셈까지 직접!"
+                          icon="🧩"
+                          isMobile={isMobile}
+                          accent={{
+                            border: 'rgba(69, 230, 210, 0.48)',
+                            background: 'linear-gradient(115deg, rgba(18, 88, 106, 0.72), rgba(17, 48, 85, 0.82))',
+                            shadow: '0 14px 38px rgba(0, 210, 190, 0.13)',
+                            icon: 'linear-gradient(135deg, #45e6d2, #65a9ff)',
+                            iconShadow: '0 0 28px rgba(69, 230, 210, 0.28)',
+                            label: '#6ff5df',
+                          }}
+                          onClick={() => {
+                            setVerticalMultiplicationLabOpen(true)
+                            soundManager.playWarp?.()
+                          }}
+                        />
+                      </div>
+                    </section>
+                  )}
 
                   {/* Unified Bottom Back Button */}
                   <button 

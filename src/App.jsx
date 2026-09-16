@@ -54,6 +54,12 @@ const ReferralPolicy = lazy(() => import('./pages/ReferralPolicy'))
 const CrewGuestInvite = lazy(() => import('./pages/CrewGuestInvite'))
 const PythonGameStudioPage = lazy(() => import('./components/PythonGameStudio/PythonGameStudioPage'))
 const PythonGameStudioDev = import.meta.env.DEV ? lazy(() => import('./components/PythonGameStudio/PythonGameStudio')) : null
+const VerticalMultiplicationLabDev = import.meta.env.DEV
+  ? lazy(() => import('./components/Space/VerticalMultiplicationLab'))
+  : null
+const MultiplicationCardLabDev = import.meta.env.DEV
+  ? lazy(() => import('./components/Space/MultiplicationCardLab'))
+  : null
 
 const AlgorithmConstellationHub = lazy(() => import('./components/AlgorithmConstellation/client/hub/AlgorithmConstellationHub'))
 
@@ -129,6 +135,18 @@ function App() {
       )}
       <Route path="/python-game-studio" element={<PythonGameStudioPage />} />
       {PythonGameStudioDev && <Route path="/dev/python-game-studio" element={<PythonGameStudioDev />} />}
+      {VerticalMultiplicationLabDev && (
+        <Route
+          path="/dev/vertical-multiplication-lab"
+          element={<VerticalMultiplicationLabDev userId="local-qa" onExit={() => window.history.back()} />}
+        />
+      )}
+      {MultiplicationCardLabDev && (
+        <Route
+          path="/dev/multiplication-card-lab"
+          element={<MultiplicationCardLabDev userId="local-qa" onExit={() => window.history.back()} />}
+        />
+      )}
       <Route path="/algorithm-constellation" element={
         <PrivateRoute>
           <AlgorithmConstellationHub />

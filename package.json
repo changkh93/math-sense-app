@@ -60,6 +60,8 @@
     "test:workbook-input-mode": "node scripts/test-workbook-input-mode.mjs",
     "test:workbook-math-display": "node scripts/test-workbook-math-display.mjs && node scripts/test-latex-text-repair.mjs",
     "test:elementary-math-answer": "node scripts/test-elementary-math-answer.mjs",
+    "test:vertical-multiplication-lab": "node scripts/test-vertical-multiplication-lab.mjs",
+    "test:multiplication-card-lab": "node scripts/test-multiplication-card-lab.mjs",
     "test:mission-card-completion": "node scripts/test-mission-card-completion.mjs",
     "test:code-trace": "node scripts/test-code-trace-progress-utils.mjs && node scripts/test-code-trace-editor-contract.mjs && node --test scripts/test-python-game-completion.mjs",
     "test:galaxy-terrain": "node scripts/test-galaxy-walk-surfaces.mjs",

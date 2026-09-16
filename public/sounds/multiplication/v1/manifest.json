@@ -1,0 +1,1748 @@
+{
+  "version": 1,
+  "generatedAt": "2026-09-16T16:37:30.372Z",
+  "model": "gpt-audio-1.5",
+  "voice": "marin",
+  "tempo": 1.08,
+  "cadenceSeconds": 1.17,
+  "tables": {
+    "2": {
+      "src": "/sounds/multiplication/v1/table-2.mp3",
+      "cadenceSeconds": 1.17,
+      "statements": [
+        {
+          "offset": 0,
+          "duration": 1.1438,
+          "text": "이 일은 이"
+        },
+        {
+          "offset": 1.1438,
+          "duration": 1.2744,
+          "text": "이 이는 사"
+        },
+        {
+          "offset": 2.4182,
+          "duration": 1.1229,
+          "text": "이 삼은 육"
+        },
+        {
+          "offset": 3.5411,
+          "duration": 1.098,
+          "text": "이 사 팔"
+        },
+        {
+          "offset": 4.6391,
+          "duration": 1.5267,
+          "text": "이 오 십"
+        },
+        {
+          "offset": 6.1658,
+          "duration": 1.0907,
+          "text": "이 육 십이"
+        },
+        {
+          "offset": 7.2565,
+          "duration": 1.5795,
+          "text": "이 칠 십사"
+        },
+        {
+          "offset": 8.836,
+          "duration": 1.2377,
+          "text": "이 팔 십육"
+        },
+        {
+          "offset": 10.0737,
+          "duration": 1.3778,
+          "text": "이 구 십팔"
+        },
+        {
+          "offset": 11.4514,
+          "duration": 1.5495,
+          "text": "이 곱하기 십은 이십"
+        },
+        {
+          "offset": 13.0009,
+          "duration": 1.8136,
+          "text": "이 곱하기 십일은 이십이"
+        },
+        {
+          "offset": 14.8145,
+          "duration": 1.9974,
+          "text": "이 곱하기 십이는 이십사"
+        }
+      ],
+      "questions": [
+        {
+          "offset": 16.8119,
+          "duration": 0.6323,
+          "text": "이 일은?"
+        },
+        {
+          "offset": 17.4442,
+          "duration": 1.0878,
+          "text": "이 이는?"
+        },
+        {
+          "offset": 18.532,
+          "duration": 0.7476,
+          "text": "이 삼은?"
+        },
+        {
+          "offset": 19.2796,
+          "duration": 0.8046,
+          "text": "이 사는?"
+        },
+        {
+          "offset": 20.0842,
+          "duration": 0.7526,
+          "text": "이 오는?"
+        },
+        {
+          "offset": 20.8368,
+          "duration": 0.6521,
+          "text": "이 육은?"
+        },
+        {
+          "offset": 21.4889,
+          "duration": 0.8537,
+          "text": "이 칠은?"
+        },
+        {
+          "offset": 22.3425,
+          "duration": 0.6992,
+          "text": "이 팔은?"
+        },
+        {
+          "offset": 23.0417,
+          "duration": 0.6244,
+          "text": "이 구는?"
+        },
+        {
+          "offset": 23.6662,
+          "duration": 1.1315,
+          "text": "이 곱하기 십은?"
+        },
+        {
+          "offset": 24.7976,
+          "duration": 1.2715,
+          "text": "이 곱하기 십일은?"
+        },
+        {
+          "offset": 26.0691,
+          "duration": 1.2557,
+          "text": "이 곱하기 십이는?"
+        }
+      ],
+      "sourcePhrases": {
+        "statements": [
+          "이 일은 이",
+          "이 이는 사",
+          "이 삼은 육",
+          "이 사 팔",
+          "이 오 십",
+          "이 육 십이",
+          "이 칠 십사",
+          "이 팔 십육",
+          "이 구 십팔",
+          "이 곱하기 십은 이십",
+          "이 곱하기 십일은 이십이",
+          "이 곱하기 십이는 이십사"
+        ],
+        "questions": [
+          "이 일은?",
+          "이 이는?",
+          "이 삼은?",
+          "이 사는?",
+          "이 오는?",
+          "이 육은?",
+          "이 칠은?",
+          "이 팔은?",
+          "이 구는?",
+          "이 곱하기 십은?",
+          "이 곱하기 십일은?",
+          "이 곱하기 십이는?"
+        ]
+      }
+    },
+    "3": {
+      "src": "/sounds/multiplication/v1/table-3.mp3",
+      "cadenceSeconds": 1.17,
+      "statements": [
+        {
+          "offset": 0,
+          "duration": 1.3093,
+          "text": "삼 일은 삼"
+        },
+        {
+          "offset": 1.3093,
+          "duration": 1.272,
+          "text": "삼 이는 육"
+        },
+        {
+          "offset": 2.5813,
+          "duration": 1.2343,
+          "text": "삼 삼은 구"
+        },
+        {
+          "offset": 3.8155,
+          "duration": 1.3204,
+          "text": "삼 사 십이"
+        },
+        {
+          "offset": 5.136,
+          "duration": 1.5357,
+          "text": "삼 오 십오"
+        },
+        {
+          "offset": 6.6717,
+          "duration": 1.4898,
+          "text": "삼 육 십팔"
+        },
+        {
+          "offset": 8.1615,
+          "duration": 1.3481,
+          "text": "삼 칠 이십일"
+        },
+        {
+          "offset": 9.5097,
+          "duration": 1.1584,
+          "text": "삼 팔 이십사"
+        },
+        {
+          "offset": 10.6681,
+          "duration": 1.289,
+          "text": "삼 구 이십칠"
+        },
+        {
+          "offset": 11.9571,
+          "duration": 1.9542,
+          "text": "삼 곱하기 십은 삼십"
+        },
+        {
+          "offset": 13.9113,
+          "duration": 2.07,
+          "text": "삼 곱하기 십일은 삼십삼"
+        },
+        {
+          "offset": 15.9813,
+          "duration": 2.2215,
+          "text": "삼 곱하기 십이는 삼십육"
+        }
+      ],
+      "questions": [
+        {
+          "offset": 18.2028,
+          "duration": 0.6869,
+          "text": "삼 일은?"
+        },
+        {
+          "offset": 18.8897,
+          "duration": 0.7505,
+          "text": "삼 이는?"
+        },
+        {
+          "offset": 19.6402,
+          "duration": 1.0555,
+          "text": "삼 삼은?"
+        },
+        {
+          "offset": 20.6957,
+          "duration": 0.8047,
+          "text": "삼 사는?"
+        },
+        {
+          "offset": 21.5004,
+          "duration": 0.7116,
+          "text": "삼 오는?"
+        },
+        {
+          "offset": 22.212,
+          "duration": 0.7743,
+          "text": "삼 육은?"
+        },
+        {
+          "offset": 22.9863,
+          "duration": 0.8306,
+          "text": "삼 칠은?"
+        },
+        {
+          "offset": 23.8169,
+          "duration": 0.7795,
+          "text": "삼 팔은?"
+        },
+        {
+          "offset": 24.5963,
+          "duration": 0.8002,
+          "text": "삼 구는?"
+        },
+        {
+          "offset": 25.3965,
+          "duration": 1.2709,
+          "text": "삼 곱하기 십은?"
+        },
+        {
+          "offset": 26.6674,
+          "duration": 1.8305,
+          "text": "삼 곱하기 십일은?"
+        },
+        {
+          "offset": 28.4979,
+          "duration": 1.6119,
+          "text": "삼 곱하기 십이는?"
+        }
+      ],
+      "sourcePhrases": {
+        "statements": [
+          "삼 일은 삼",
+          "삼 이는 육",
+          "삼 삼은 구",
+          "삼 사 십이",
+          "삼 오 십오",
+          "삼 육 십팔",
+          "삼 칠 이십일",
+          "삼 팔 이십사",
+          "삼 구 이십칠",
+          "삼 곱하기 십은 삼십",
+          "삼 곱하기 십일은 삼십삼",
+          "삼 곱하기 십이는 삼십육"
+        ],
+        "questions": [
+          "삼 일은?",
+          "삼 이는?",
+          "삼 삼은?",
+          "삼 사는?",
+          "삼 오는?",
+          "삼 육은?",
+          "삼 칠은?",
+          "삼 팔은?",
+          "삼 구는?",
+          "삼 곱하기 십은?",
+          "삼 곱하기 십일은?",
+          "삼 곱하기 십이는?"
+        ]
+      }
+    },
+    "4": {
+      "src": "/sounds/multiplication/v1/table-4.mp3",
+      "cadenceSeconds": 1.17,
+      "statements": [
+        {
+          "offset": 0,
+          "duration": 1.1983,
+          "text": "사 일은 사"
+        },
+        {
+          "offset": 1.1983,
+          "duration": 1.4144,
+          "text": "사 이 팔"
+        },
+        {
+          "offset": 2.6127,
+          "duration": 1.6166,
+          "text": "사 삼 십이"
+        },
+        {
+          "offset": 4.2293,
+          "duration": 1.0801,
+          "text": "사 사 십육"
+        },
+        {
+          "offset": 5.3094,
+          "duration": 1.1063,
+          "text": "사 오 이십"
+        },
+        {
+          "offset": 6.4157,
+          "duration": 1.256,
+          "text": "사 육 이십사"
+        },
+        {
+          "offset": 7.6717,
+          "duration": 1.329,
+          "text": "사 칠 이십팔"
+        },
+        {
+          "offset": 9.0008,
+          "duration": 1.4968,
+          "text": "사 팔 삼십이"
+        },
+        {
+          "offset": 10.4976,
+          "duration": 1.3108,
+          "text": "사 구 삼십육"
+        },
+        {
+          "offset": 11.8084,
+          "duration": 1.7455,
+          "text": "사 곱하기 십은 사십"
+        },
+        {
+          "offset": 13.5538,
+          "duration": 2.0225,
+          "text": "사 곱하기 십일은 사십사"
+        },
+        {
+          "offset": 15.5763,
+          "duration": 2.1231,
+          "text": "사 곱하기 십이는 사십팔"
+        }
+      ],
+      "questions": [
+        {
+          "offset": 17.6994,
+          "duration": 0.7322,
+          "text": "사 일은?"
+        },
+        {
+          "offset": 18.4315,
+          "duration": 1.0752,
+          "text": "사 이는?"
+        },
+        {
+          "offset": 19.5067,
+          "duration": 0.7643,
+          "text": "사 삼은?"
+        },
+        {
+          "offset": 20.271,
+          "duration": 1.0733,
+          "text": "사 사는?"
+        },
+        {
+          "offset": 21.3444,
+          "duration": 0.7033,
+          "text": "사 오는?"
+        },
+        {
+          "offset": 22.0476,
+          "duration": 0.7014,
+          "text": "사 육은?"
+        },
+        {
+          "offset": 22.749,
+          "duration": 0.7774,
+          "text": "사 칠은?"
+        },
+        {
+          "offset": 23.5264,
+          "duration": 0.7191,
+          "text": "사 팔은?"
+        },
+        {
+          "offset": 24.2455,
+          "duration": 0.7895,
+          "text": "사 구는?"
+        },
+        {
+          "offset": 25.0351,
+          "duration": 1.2897,
+          "text": "사 곱하기 십은?"
+        },
+        {
+          "offset": 26.3248,
+          "duration": 1.4816,
+          "text": "사 곱하기 십일은?"
+        },
+        {
+          "offset": 27.8064,
+          "duration": 1.6401,
+          "text": "사 곱하기 십이는?"
+        }
+      ],
+      "sourcePhrases": {
+        "statements": [
+          "사 일은 사",
+          "사 이 팔",
+          "사 삼 십이",
+          "사 사 십육",
+          "사 오 이십",
+          "사 육 이십사",
+          "사 칠 이십팔",
+          "사 팔 삼십이",
+          "사 구 삼십육",
+          "사 곱하기 십은 사십",
+          "사 곱하기 십일은 사십사",
+          "사 곱하기 십이는 사십팔"
+        ],
+        "questions": [
+          "사 일은?",
+          "사 이는?",
+          "사 삼은?",
+          "사 사는?",
+          "사 오는?",
+          "사 육은?",
+          "사 칠은?",
+          "사 팔은?",
+          "사 구는?",
+          "사 곱하기 십은?",
+          "사 곱하기 십일은?",
+          "사 곱하기 십이는?"
+        ]
+      }
+    },
+    "5": {
+      "src": "/sounds/multiplication/v1/table-5.mp3",
+      "cadenceSeconds": 1.17,
+      "statements": [
+        {
+          "offset": 0,
+          "duration": 1.133,
+          "text": "오 일은 오"
+        },
+        {
+          "offset": 1.133,
+          "duration": 1.1382,
+          "text": "오 이 십"
+        },
+        {
+          "offset": 2.2712,
+          "duration": 1.653,
+          "text": "오 삼 십오"
+        },
+        {
+          "offset": 3.9242,
+          "duration": 1.5057,
+          "text": "오 사 이십"
+        },
+        {
+          "offset": 5.4299,
+          "duration": 1.5223,
+          "text": "오 오 이십오"
+        },
+        {
+          "offset": 6.9522,
+          "duration": 1.8845,
+          "text": "오 육 삼십"
+        },
+        {
+          "offset": 8.8367,
+          "duration": 1.3225,
+          "text": "오 칠 삼십오"
+        },
+        {
+          "offset": 10.1592,
+          "duration": 1.7162,
+          "text": "오 팔 사십"
+        },
+        {
+          "offset": 11.8754,
+          "duration": 1.3283,
+          "text": "오 구 사십오"
+        },
+        {
+          "offset": 13.2037,
+          "duration": 1.843,
+          "text": "오 곱하기 십은 오십"
+        },
+        {
+          "offset": 15.0468,
+          "duration": 1.8476,
+          "text": "오 곱하기 십일은 오십오"
+        },
+        {
+          "offset": 16.8944,
+          "duration": 1.8617,
+          "text": "오 곱하기 십이는 육십"
+        }
+      ],
+      "questions": [
+        {
+          "offset": 18.7561,
+          "duration": 0.9758,
+          "text": "오 일은?"
+        },
+        {
+          "offset": 19.7319,
+          "duration": 0.9978,
+          "text": "오 이는?"
+        },
+        {
+          "offset": 20.7297,
+          "duration": 1.0157,
+          "text": "오 삼은?"
+        },
+        {
+          "offset": 21.7453,
+          "duration": 1.0358,
+          "text": "오 사는?"
+        },
+        {
+          "offset": 22.7811,
+          "duration": 1.1307,
+          "text": "오 오는?"
+        },
+        {
+          "offset": 23.9119,
+          "duration": 1.0595,
+          "text": "오 육은?"
+        },
+        {
+          "offset": 24.9713,
+          "duration": 0.9738,
+          "text": "오 칠은?"
+        },
+        {
+          "offset": 25.9452,
+          "duration": 0.7726,
+          "text": "오 팔은?"
+        },
+        {
+          "offset": 26.7178,
+          "duration": 0.6975,
+          "text": "오 구는?"
+        },
+        {
+          "offset": 27.4153,
+          "duration": 1.227,
+          "text": "오 곱하기 십은?"
+        },
+        {
+          "offset": 28.6423,
+          "duration": 1.394,
+          "text": "오 곱하기 십일은?"
+        },
+        {
+          "offset": 30.0363,
+          "duration": 1.3691,
+          "text": "오 곱하기 십이는?"
+        }
+      ],
+      "sourcePhrases": {
+        "statements": [
+          "오 일은 오",
+          "오 이 십",
+          "오 삼 십오",
+          "오 사 이십",
+          "오 오 이십오",
+          "오 육 삼십",
+          "오 칠 삼십오",
+          "오 팔 사십",
+          "오 구 사십오",
+          "오 곱하기 십은 오십",
+          "오 곱하기 십일은 오십오",
+          "오 곱하기 십이는 육십"
+        ],
+        "questions": [
+          "오 일은?",
+          "오 이는?",
+          "오 삼은?",
+          "오 사는?",
+          "오 오는?",
+          "오 육은?",
+          "오 칠은?",
+          "오 팔은?",
+          "오 구는?",
+          "오 곱하기 십은?",
+          "오 곱하기 십일은?",
+          "오 곱하기 십이는?"
+        ]
+      }
+    },
+    "6": {
+      "src": "/sounds/multiplication/v1/table-6.mp3",
+      "cadenceSeconds": 1.17,
+      "statements": [
+        {
+          "offset": 0,
+          "duration": 1.2772,
+          "text": "육 일은 육"
+        },
+        {
+          "offset": 1.2772,
+          "duration": 1.4046,
+          "text": "육 이 십이"
+        },
+        {
+          "offset": 2.6818,
+          "duration": 1.2113,
+          "text": "육 삼 십팔"
+        },
+        {
+          "offset": 3.8931,
+          "duration": 1.4236,
+          "text": "육 사 이십사"
+        },
+        {
+          "offset": 5.3168,
+          "duration": 1.3135,
+          "text": "육 오 삼십"
+        },
+        {
+          "offset": 6.6302,
+          "duration": 1.5475,
+          "text": "육 육 삼십육"
+        },
+        {
+          "offset": 8.1777,
+          "duration": 1.499,
+          "text": "육 칠 사십이"
+        },
+        {
+          "offset": 9.6767,
+          "duration": 1.3818,
+          "text": "육 팔 사십팔"
+        },
+        {
+          "offset": 11.0585,
+          "duration": 1.2845,
+          "text": "육 구 오십사"
+        },
+        {
+          "offset": 12.343,
+          "duration": 1.7822,
+          "text": "육 곱하기 십은 육십"
+        },
+        {
+          "offset": 14.1252,
+          "duration": 1.8407,
+          "text": "육 곱하기 십일은 육십육"
+        },
+        {
+          "offset": 15.9658,
+          "duration": 1.9972,
+          "text": "육 곱하기 십이는 칠십이"
+        }
+      ],
+      "questions": [
+        {
+          "offset": 17.9631,
+          "duration": 0.8028,
+          "text": "육 일은?"
+        },
+        {
+          "offset": 18.7659,
+          "duration": 0.8921,
+          "text": "육 이는?"
+        },
+        {
+          "offset": 19.658,
+          "duration": 0.8918,
+          "text": "육 삼은?"
+        },
+        {
+          "offset": 20.5498,
+          "duration": 0.7913,
+          "text": "육 사는?"
+        },
+        {
+          "offset": 21.3411,
+          "duration": 0.7776,
+          "text": "육 오는?"
+        },
+        {
+          "offset": 22.1187,
+          "duration": 0.85,
+          "text": "육 육은?"
+        },
+        {
+          "offset": 22.9687,
+          "duration": 0.7258,
+          "text": "육 칠은?"
+        },
+        {
+          "offset": 23.6945,
+          "duration": 0.8033,
+          "text": "육 팔은?"
+        },
+        {
+          "offset": 24.4977,
+          "duration": 0.6841,
+          "text": "육 구는?"
+        },
+        {
+          "offset": 25.1819,
+          "duration": 1.5072,
+          "text": "육 곱하기 십은?"
+        },
+        {
+          "offset": 26.6891,
+          "duration": 1.4478,
+          "text": "육 곱하기 십일은?"
+        },
+        {
+          "offset": 28.1369,
+          "duration": 1.3975,
+          "text": "육 곱하기 십이는?"
+        }
+      ],
+      "sourcePhrases": {
+        "statements": [
+          "육 일은 육",
+          "육 이 십이",
+          "육 삼 십팔",
+          "육 사 이십사",
+          "육 오 삼십",
+          "육 육 삼십육",
+          "육 칠 사십이",
+          "육 팔 사십팔",
+          "육 구 오십사",
+          "육 곱하기 십은 육십",
+          "육 곱하기 십일은 육십육",
+          "육 곱하기 십이는 칠십이"
+        ],
+        "questions": [
+          "육 일은?",
+          "육 이는?",
+          "육 삼은?",
+          "육 사는?",
+          "육 오는?",
+          "육 육은?",
+          "육 칠은?",
+          "육 팔은?",
+          "육 구는?",
+          "육 곱하기 십은?",
+          "육 곱하기 십일은?",
+          "육 곱하기 십이는?"
+        ]
+      }
+    },
+    "7": {
+      "src": "/sounds/multiplication/v1/table-7.mp3",
+      "cadenceSeconds": 1.17,
+      "statements": [
+        {
+          "offset": 0,
+          "duration": 1.2842,
+          "text": "칠 일은 칠"
+        },
+        {
+          "offset": 1.2842,
+          "duration": 1.4121,
+          "text": "칠 이 십사"
+        },
+        {
+          "offset": 2.6963,
+          "duration": 1.2499,
+          "text": "칠 삼 이십일"
+        },
+        {
+          "offset": 3.9463,
+          "duration": 1.4223,
+          "text": "칠 사 이십팔"
+        },
+        {
+          "offset": 5.3685,
+          "duration": 1.7297,
+          "text": "칠 오 삼십오"
+        },
+        {
+          "offset": 7.0983,
+          "duration": 1.178,
+          "text": "칠 육 사십이"
+        },
+        {
+          "offset": 8.2763,
+          "duration": 1.1049,
+          "text": "칠 칠 사십구"
+        },
+        {
+          "offset": 9.3811,
+          "duration": 1.2085,
+          "text": "칠 팔 오십육"
+        },
+        {
+          "offset": 10.5896,
+          "duration": 1.2315,
+          "text": "칠 구 육십삼"
+        },
+        {
+          "offset": 11.821,
+          "duration": 1.8242,
+          "text": "칠 곱하기 십은 칠십"
+        },
+        {
+          "offset": 13.6453,
+          "duration": 2.2188,
+          "text": "칠 곱하기 십일은 칠십칠"
+        },
+        {
+          "offset": 15.8641,
+          "duration": 2.0964,
+          "text": "칠 곱하기 십이는 팔십사"
+        }
+      ],
+      "questions": [
+        {
+          "offset": 17.9605,
+          "duration": 0.7165,
+          "text": "칠 일은?"
+        },
+        {
+          "offset": 18.677,
+          "duration": 0.8013,
+          "text": "칠 이는?"
+        },
+        {
+          "offset": 19.4783,
+          "duration": 0.782,
+          "text": "칠 삼은?"
+        },
+        {
+          "offset": 20.2603,
+          "duration": 0.7864,
+          "text": "칠 사는?"
+        },
+        {
+          "offset": 21.0467,
+          "duration": 0.7668,
+          "text": "칠 오는?"
+        },
+        {
+          "offset": 21.8135,
+          "duration": 0.82,
+          "text": "칠 육은?"
+        },
+        {
+          "offset": 22.6335,
+          "duration": 0.738,
+          "text": "칠 칠은?"
+        },
+        {
+          "offset": 23.3715,
+          "duration": 0.7702,
+          "text": "칠 팔은?"
+        },
+        {
+          "offset": 24.1417,
+          "duration": 0.7301,
+          "text": "칠 구는?"
+        },
+        {
+          "offset": 24.8719,
+          "duration": 1.4046,
+          "text": "칠 곱하기 십은?"
+        },
+        {
+          "offset": 26.2765,
+          "duration": 1.2632,
+          "text": "칠 곱하기 십일은?"
+        },
+        {
+          "offset": 27.5396,
+          "duration": 1.6862,
+          "text": "칠 곱하기 십이는?"
+        }
+      ],
+      "sourcePhrases": {
+        "statements": [
+          "칠 일은 칠",
+          "칠 이 십사",
+          "칠 삼 이십일",
+          "칠 사 이십팔",
+          "칠 오 삼십오",
+          "칠 육 사십이",
+          "칠 칠 사십구",
+          "칠 팔 오십육",
+          "칠 구 육십삼",
+          "칠 곱하기 십은 칠십",
+          "칠 곱하기 십일은 칠십칠",
+          "칠 곱하기 십이는 팔십사"
+        ],
+        "questions": [
+          "칠 일은?",
+          "칠 이는?",
+          "칠 삼은?",
+          "칠 사는?",
+          "칠 오는?",
+          "칠 육은?",
+          "칠 칠은?",
+          "칠 팔은?",
+          "칠 구는?",
+          "칠 곱하기 십은?",
+          "칠 곱하기 십일은?",
+          "칠 곱하기 십이는?"
+        ]
+      }
+    },
+    "8": {
+      "src": "/sounds/multiplication/v1/table-8.mp3",
+      "cadenceSeconds": 1.17,
+      "statements": [
+        {
+          "offset": 0,
+          "duration": 1.3101,
+          "text": "팔 일은 팔"
+        },
+        {
+          "offset": 1.3101,
+          "duration": 1.5178,
+          "text": "팔 이 십육"
+        },
+        {
+          "offset": 2.828,
+          "duration": 1.423,
+          "text": "팔 삼 이십사"
+        },
+        {
+          "offset": 4.251,
+          "duration": 1.274,
+          "text": "팔 사 삼십이"
+        },
+        {
+          "offset": 5.525,
+          "duration": 1.4856,
+          "text": "팔 오 사십"
+        },
+        {
+          "offset": 7.0106,
+          "duration": 0.5393,
+          "text": "팔 육 사십팔"
+        },
+        {
+          "offset": 7.5498,
+          "duration": 1.2001,
+          "text": "팔 칠 오십육"
+        },
+        {
+          "offset": 8.75,
+          "duration": 1.4028,
+          "text": "팔 팔 육십사"
+        },
+        {
+          "offset": 10.1527,
+          "duration": 1.6296,
+          "text": "팔 구 칠십이"
+        },
+        {
+          "offset": 11.7823,
+          "duration": 1.9222,
+          "text": "팔 곱하기 십은 팔십"
+        },
+        {
+          "offset": 13.7045,
+          "duration": 2.1365,
+          "text": "팔 곱하기 십일은 팔십팔"
+        },
+        {
+          "offset": 15.841,
+          "duration": 2.0231,
+          "text": "팔 곱하기 십이는 구십육"
+        }
+      ],
+      "questions": [
+        {
+          "offset": 17.864,
+          "duration": 0.7252,
+          "text": "팔 일은?"
+        },
+        {
+          "offset": 18.5893,
+          "duration": 0.737,
+          "text": "팔 이는?"
+        },
+        {
+          "offset": 19.3263,
+          "duration": 0.8086,
+          "text": "팔 삼은?"
+        },
+        {
+          "offset": 20.1349,
+          "duration": 0.7796,
+          "text": "팔 사는?"
+        },
+        {
+          "offset": 20.9145,
+          "duration": 1.0411,
+          "text": "팔 오는?"
+        },
+        {
+          "offset": 21.9556,
+          "duration": 0.9996,
+          "text": "팔 육은?"
+        },
+        {
+          "offset": 22.9552,
+          "duration": 0.7431,
+          "text": "팔 칠은?"
+        },
+        {
+          "offset": 23.6983,
+          "duration": 0.7591,
+          "text": "팔 팔은?"
+        },
+        {
+          "offset": 24.4574,
+          "duration": 0.7584,
+          "text": "팔 구는?"
+        },
+        {
+          "offset": 25.2158,
+          "duration": 1.3319,
+          "text": "팔 곱하기 십은?"
+        },
+        {
+          "offset": 26.5477,
+          "duration": 1.3321,
+          "text": "팔 곱하기 십일은?"
+        },
+        {
+          "offset": 27.8798,
+          "duration": 1.5569,
+          "text": "팔 곱하기 십이는?"
+        }
+      ],
+      "sourcePhrases": {
+        "statements": [
+          "팔 일은 팔",
+          "팔 이 십육",
+          "팔 삼 이십사",
+          "팔 사 삼십이",
+          "팔 오 사십",
+          "팔 육 사십팔",
+          "팔 칠 오십육",
+          "팔 팔 육십사",
+          "팔 구 칠십이",
+          "팔 곱하기 십은 팔십",
+          "팔 곱하기 십일은 팔십팔",
+          "팔 곱하기 십이는 구십육"
+        ],
+        "questions": [
+          "팔 일은?",
+          "팔 이는?",
+          "팔 삼은?",
+          "팔 사는?",
+          "팔 오는?",
+          "팔 육은?",
+          "팔 칠은?",
+          "팔 팔은?",
+          "팔 구는?",
+          "팔 곱하기 십은?",
+          "팔 곱하기 십일은?",
+          "팔 곱하기 십이는?"
+        ]
+      }
+    },
+    "9": {
+      "src": "/sounds/multiplication/v1/table-9.mp3",
+      "cadenceSeconds": 1.17,
+      "statements": [
+        {
+          "offset": 0,
+          "duration": 1.2834,
+          "text": "구 일은 구"
+        },
+        {
+          "offset": 1.2834,
+          "duration": 1.1247,
+          "text": "구 이 십팔"
+        },
+        {
+          "offset": 2.4081,
+          "duration": 1.2901,
+          "text": "구 삼 이십칠"
+        },
+        {
+          "offset": 3.6982,
+          "duration": 1.5415,
+          "text": "구 사 삼십육"
+        },
+        {
+          "offset": 5.2397,
+          "duration": 1.3979,
+          "text": "구 오 사십오"
+        },
+        {
+          "offset": 6.6376,
+          "duration": 1.1268,
+          "text": "구 육 오십사"
+        },
+        {
+          "offset": 7.7645,
+          "duration": 0.6908,
+          "text": "구 칠 육십삼"
+        },
+        {
+          "offset": 8.4552,
+          "duration": 1.5801,
+          "text": "구 팔 칠십이"
+        },
+        {
+          "offset": 10.0354,
+          "duration": 1.355,
+          "text": "구 구 팔십일"
+        },
+        {
+          "offset": 11.3904,
+          "duration": 1.8873,
+          "text": "구 곱하기 십은 구십"
+        },
+        {
+          "offset": 13.2777,
+          "duration": 2.2445,
+          "text": "구 곱하기 십일은 구십구"
+        },
+        {
+          "offset": 15.5222,
+          "duration": 1.9344,
+          "text": "구 곱하기 십이는 백팔"
+        }
+      ],
+      "questions": [
+        {
+          "offset": 17.4566,
+          "duration": 0.6445,
+          "text": "구 일은?"
+        },
+        {
+          "offset": 18.1011,
+          "duration": 0.885,
+          "text": "구 이는?"
+        },
+        {
+          "offset": 18.9861,
+          "duration": 0.6782,
+          "text": "구 삼은?"
+        },
+        {
+          "offset": 19.6643,
+          "duration": 0.8505,
+          "text": "구 사는?"
+        },
+        {
+          "offset": 20.5148,
+          "duration": 0.7414,
+          "text": "구 오는?"
+        },
+        {
+          "offset": 21.2562,
+          "duration": 0.6937,
+          "text": "구 육은?"
+        },
+        {
+          "offset": 21.9499,
+          "duration": 0.7748,
+          "text": "구 칠은?"
+        },
+        {
+          "offset": 22.7247,
+          "duration": 0.674,
+          "text": "구 팔은?"
+        },
+        {
+          "offset": 23.3987,
+          "duration": 0.6973,
+          "text": "구 구는?"
+        },
+        {
+          "offset": 24.0959,
+          "duration": 1.1806,
+          "text": "구 곱하기 십은?"
+        },
+        {
+          "offset": 25.2765,
+          "duration": 1.5865,
+          "text": "구 곱하기 십일은?"
+        },
+        {
+          "offset": 26.863,
+          "duration": 1.3985,
+          "text": "구 곱하기 십이는?"
+        }
+      ],
+      "sourcePhrases": {
+        "statements": [
+          "구 일은 구",
+          "구 이 십팔",
+          "구 삼 이십칠",
+          "구 사 삼십육",
+          "구 오 사십오",
+          "구 육 오십사",
+          "구 칠 육십삼",
+          "구 팔 칠십이",
+          "구 구 팔십일",
+          "구 곱하기 십은 구십",
+          "구 곱하기 십일은 구십구",
+          "구 곱하기 십이는 백팔"
+        ],
+        "questions": [
+          "구 일은?",
+          "구 이는?",
+          "구 삼은?",
+          "구 사는?",
+          "구 오는?",
+          "구 육은?",
+          "구 칠은?",
+          "구 팔은?",
+          "구 구는?",
+          "구 곱하기 십은?",
+          "구 곱하기 십일은?",
+          "구 곱하기 십이는?"
+        ]
+      }
+    },
+    "10": {
+      "src": "/sounds/multiplication/v1/table-10.mp3",
+      "cadenceSeconds": 1.17,
+      "statements": [
+        {
+          "offset": 0,
+          "duration": 1.4029,
+          "text": "십 일은 십"
+        },
+        {
+          "offset": 1.4029,
+          "duration": 0.9947,
+          "text": "십 이 이십"
+        },
+        {
+          "offset": 2.3976,
+          "duration": 1.2559,
+          "text": "십 삼 삼십"
+        },
+        {
+          "offset": 3.6535,
+          "duration": 1.2082,
+          "text": "십 사 사십"
+        },
+        {
+          "offset": 4.8617,
+          "duration": 1.3113,
+          "text": "십 오 오십"
+        },
+        {
+          "offset": 6.173,
+          "duration": 1.5172,
+          "text": "십 육 육십"
+        },
+        {
+          "offset": 7.6902,
+          "duration": 1.2535,
+          "text": "십 칠 칠십"
+        },
+        {
+          "offset": 8.9437,
+          "duration": 1.4068,
+          "text": "십 팔 팔십"
+        },
+        {
+          "offset": 10.3505,
+          "duration": 1.038,
+          "text": "십 구 구십"
+        },
+        {
+          "offset": 11.3885,
+          "duration": 1.4732,
+          "text": "십 곱하기 십은 백"
+        },
+        {
+          "offset": 12.8618,
+          "duration": 1.8572,
+          "text": "십 곱하기 십일은 백십"
+        },
+        {
+          "offset": 14.719,
+          "duration": 2.1171,
+          "text": "십 곱하기 십이는 백이십"
+        }
+      ],
+      "questions": [
+        {
+          "offset": 16.836,
+          "duration": 0.9137,
+          "text": "십 일은?"
+        },
+        {
+          "offset": 17.7498,
+          "duration": 0.9306,
+          "text": "십 이는?"
+        },
+        {
+          "offset": 18.6803,
+          "duration": 0.6767,
+          "text": "십 삼은?"
+        },
+        {
+          "offset": 19.357,
+          "duration": 0.7979,
+          "text": "십 사는?"
+        },
+        {
+          "offset": 20.1549,
+          "duration": 0.8643,
+          "text": "십 오는?"
+        },
+        {
+          "offset": 21.0192,
+          "duration": 0.7102,
+          "text": "십 육은?"
+        },
+        {
+          "offset": 21.7294,
+          "duration": 0.8031,
+          "text": "십 칠은?"
+        },
+        {
+          "offset": 22.5325,
+          "duration": 0.7084,
+          "text": "십 팔은?"
+        },
+        {
+          "offset": 23.2409,
+          "duration": 0.6947,
+          "text": "십 구는?"
+        },
+        {
+          "offset": 23.9357,
+          "duration": 1.3951,
+          "text": "십 곱하기 십은?"
+        },
+        {
+          "offset": 25.3308,
+          "duration": 1.5833,
+          "text": "십 곱하기 십일은?"
+        },
+        {
+          "offset": 26.9141,
+          "duration": 1.3173,
+          "text": "십 곱하기 십이는?"
+        }
+      ],
+      "sourcePhrases": {
+        "statements": [
+          "십 일은 십",
+          "십 이 이십",
+          "십 삼 삼십",
+          "십 사 사십",
+          "십 오 오십",
+          "십 육 육십",
+          "십 칠 칠십",
+          "십 팔 팔십",
+          "십 구 구십",
+          "십 곱하기 십은 백",
+          "십 곱하기 십일은 백십",
+          "십 곱하기 십이는 백이십"
+        ],
+        "questions": [
+          "십 일은?",
+          "십 이는?",
+          "십 삼은?",
+          "십 사는?",
+          "십 오는?",
+          "십 육은?",
+          "십 칠은?",
+          "십 팔은?",
+          "십 구는?",
+          "십 곱하기 십은?",
+          "십 곱하기 십일은?",
+          "십 곱하기 십이는?"
+        ]
+      }
+    },
+    "11": {
+      "src": "/sounds/multiplication/v1/table-11.mp3",
+      "cadenceSeconds": 1.17,
+      "statements": [
+        {
+          "offset": 0,
+          "duration": 1.4843,
+          "text": "십일 일은 십일"
+        },
+        {
+          "offset": 1.4843,
+          "duration": 1.4238,
+          "text": "십일 이 이십이"
+        },
+        {
+          "offset": 2.9081,
+          "duration": 1.6814,
+          "text": "십일 삼 삼십삼"
+        },
+        {
+          "offset": 4.5895,
+          "duration": 1.5041,
+          "text": "십일 사 사십사"
+        },
+        {
+          "offset": 6.0936,
+          "duration": 1.2351,
+          "text": "십일 오 오십오"
+        },
+        {
+          "offset": 7.3287,
+          "duration": 1.6967,
+          "text": "십일 육 육십육"
+        },
+        {
+          "offset": 9.0253,
+          "duration": 1.9544,
+          "text": "십일 칠 칠십칠"
+        },
+        {
+          "offset": 10.9798,
+          "duration": 1.9698,
+          "text": "십일 팔 팔십팔"
+        },
+        {
+          "offset": 12.9496,
+          "duration": 1.4938,
+          "text": "십일 구 구십구"
+        },
+        {
+          "offset": 14.4434,
+          "duration": 1.7623,
+          "text": "십일 곱하기 십은 백십"
+        },
+        {
+          "offset": 16.2056,
+          "duration": 2.1225,
+          "text": "십일 곱하기 십일은 백이십일"
+        },
+        {
+          "offset": 18.3281,
+          "duration": 2.2799,
+          "text": "십일 곱하기 십이는 백삼십이"
+        }
+      ],
+      "questions": [
+        {
+          "offset": 20.608,
+          "duration": 0.8003,
+          "text": "십일 일은?"
+        },
+        {
+          "offset": 21.4083,
+          "duration": 0.8017,
+          "text": "십일 이는?"
+        },
+        {
+          "offset": 22.21,
+          "duration": 0.8216,
+          "text": "십일 삼은?"
+        },
+        {
+          "offset": 23.0315,
+          "duration": 0.8503,
+          "text": "십일 사는?"
+        },
+        {
+          "offset": 23.8819,
+          "duration": 0.797,
+          "text": "십일 오는?"
+        },
+        {
+          "offset": 24.6789,
+          "duration": 0.7994,
+          "text": "십일 육은?"
+        },
+        {
+          "offset": 25.4783,
+          "duration": 0.7982,
+          "text": "십일 칠은?"
+        },
+        {
+          "offset": 26.2765,
+          "duration": 0.7987,
+          "text": "십일 팔은?"
+        },
+        {
+          "offset": 27.0752,
+          "duration": 0.7527,
+          "text": "십일 구는?"
+        },
+        {
+          "offset": 27.8279,
+          "duration": 1.2931,
+          "text": "십일 곱하기 십은?"
+        },
+        {
+          "offset": 29.121,
+          "duration": 1.6221,
+          "text": "십일 곱하기 십일은?"
+        },
+        {
+          "offset": 30.7432,
+          "duration": 1.3612,
+          "text": "십일 곱하기 십이는?"
+        }
+      ],
+      "sourcePhrases": {
+        "statements": [
+          "십일 일은 십일",
+          "십일 이 이십이",
+          "십일 삼 삼십삼",
+          "십일 사 사십사",
+          "십일 오 오십오",
+          "십일 육 육십육",
+          "십일 칠 칠십칠",
+          "십일 팔 팔십팔",
+          "십일 구 구십구",
+          "십일 곱하기 십은 백십",
+          "십일 곱하기 십일은 백이십일",
+          "십일 곱하기 십이는 백삼십이"
+        ],
+        "questions": [
+          "십일 일은?",
+          "십일 이는?",
+          "십일 삼은?",
+          "십일 사는?",
+          "십일 오는?",
+          "십일 육은?",
+          "십일 칠은?",
+          "십일 팔은?",
+          "십일 구는?",
+          "십일 곱하기 십은?",
+          "십일 곱하기 십일은?",
+          "십일 곱하기 십이는?"
+        ]
+      }
+    },
+    "12": {
+      "src": "/sounds/multiplication/v1/table-12.mp3",
+      "cadenceSeconds": 1.17,
+      "statements": [
+        {
+          "offset": 0,
+          "duration": 1.4238,
+          "text": "십이 일은 십이"
+        },
+        {
+          "offset": 1.4238,
+          "duration": 1.2951,
+          "text": "십이 이 이십사"
+        },
+        {
+          "offset": 2.7189,
+          "duration": 1.4786,
+          "text": "십이 삼 삼십육"
+        },
+        {
+          "offset": 4.1975,
+          "duration": 1.6834,
+          "text": "십이 사 사십팔"
+        },
+        {
+          "offset": 5.8809,
+          "duration": 0.8607,
+          "text": "십이 오 육십"
+        },
+        {
+          "offset": 6.7416,
+          "duration": 1.4021,
+          "text": "십이 육 칠십이"
+        },
+        {
+          "offset": 8.1437,
+          "duration": 1.4098,
+          "text": "십이 칠 팔십사"
+        },
+        {
+          "offset": 9.5535,
+          "duration": 1.2649,
+          "text": "십이 팔 구십육"
+        },
+        {
+          "offset": 10.8184,
+          "duration": 1.3236,
+          "text": "십이 구 백팔"
+        },
+        {
+          "offset": 12.142,
+          "duration": 1.9706,
+          "text": "십이 곱하기 십은 백이십"
+        },
+        {
+          "offset": 14.1126,
+          "duration": 2.1656,
+          "text": "십이 곱하기 십일은 백삼십이"
+        },
+        {
+          "offset": 16.2782,
+          "duration": 2.1142,
+          "text": "십이 곱하기 십이는 백사십사"
+        }
+      ],
+      "questions": [
+        {
+          "offset": 18.3924,
+          "duration": 0.7538,
+          "text": "십이 일은?"
+        },
+        {
+          "offset": 19.1462,
+          "duration": 0.8655,
+          "text": "십이 이는?"
+        },
+        {
+          "offset": 20.0117,
+          "duration": 0.8966,
+          "text": "십이 삼은?"
+        },
+        {
+          "offset": 20.9083,
+          "duration": 0.8562,
+          "text": "십이 사는?"
+        },
+        {
+          "offset": 21.7645,
+          "duration": 1.08,
+          "text": "십이 오는?"
+        },
+        {
+          "offset": 22.8445,
+          "duration": 0.798,
+          "text": "십이 육은?"
+        },
+        {
+          "offset": 23.6425,
+          "duration": 0.8214,
+          "text": "십이 칠은?"
+        },
+        {
+          "offset": 24.464,
+          "duration": 0.7552,
+          "text": "십이 팔은?"
+        },
+        {
+          "offset": 25.2192,
+          "duration": 0.8662,
+          "text": "십이 구는?"
+        },
+        {
+          "offset": 26.0854,
+          "duration": 1.2975,
+          "text": "십이 곱하기 십은?"
+        },
+        {
+          "offset": 27.3829,
+          "duration": 1.3692,
+          "text": "십이 곱하기 십일은?"
+        },
+        {
+          "offset": 28.752,
+          "duration": 1.4095,
+          "text": "십이 곱하기 십이는?"
+        }
+      ],
+      "sourcePhrases": {
+        "statements": [
+          "십이 일은 십이",
+          "십이 이 이십사",
+          "십이 삼 삼십육",
+          "십이 사 사십팔",
+          "십이 오 육십",
+          "십이 육 칠십이",
+          "십이 칠 팔십사",
+          "십이 팔 구십육",
+          "십이 구 백팔",
+          "십이 곱하기 십은 백이십",
+          "십이 곱하기 십일은 백삼십이",
+          "십이 곱하기 십이는 백사십사"
+        ],
+        "questions": [
+          "십이 일은?",
+          "십이 이는?",
+          "십이 삼은?",
+          "십이 사는?",
+          "십이 오는?",
+          "십이 육은?",
+          "십이 칠은?",
+          "십이 팔은?",
+          "십이 구는?",
+          "십이 곱하기 십은?",
+          "십이 곱하기 십일은?",
+          "십이 곱하기 십이는?"
+        ]
+      }
+    }
+  }
+}
