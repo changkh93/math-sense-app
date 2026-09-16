@@ -68,3 +68,12 @@
 - PASS: scripts/qa-studio-print-output.mjs in real Chrome/WASM for both file and notebook modes. Exact text and rendered glyph top positions confirm `hello world 2` is one visual line. Covered custom sep/end, no trailing newline, explicit blank/embedded newlines, loops, Korean and mixed stdout/stderr. Tablet screenshot visually reviewed; zero API calls.
 - PASS: existing error-coach browser regression (free guidance/details/stale edits/AI preview), targeted ESLint (existing cleanup-ref warning only), production build (existing chunk/audio warnings) and git diff whitespace check. Evidence: verification/print-checks.json, print-file.png, print-notebook.png.
 - Local fix complete, no commit/push/deploy performed.
+
+
+## Production release — 2026-09-16
+- User explicitly requested GitHub commit/push and production deployment. Code commit d49240c5 pushed to origin/main. Only studio feature paths and the single functions/index.js export were staged; unrelated marketing, crew, rules, firebase.json and package.json edits preserved.
+- Clean detached release worktree: /tmp/metasense-coach-release-d49240c. Existing dependencies/build environment used without printing values. Release-source checks: 14 server/local tests, 7 notebook compiler tests, build passed. Prior browser QA covers real WASM, actionable hints, exact print output and tablet layouts.
+- Firebase deploy --only functions:studioErrorCoach,hosting --project math-sense-1f6a8 completed. New Node.js22 first-generation function in asia-northeast3; Secret accessor granted to the runtime service account for OPENAI_API_KEY. No other functions or rules deployed.
+- Production https://msense.me/python-game-studio HTTP200, entry assets and studio JS/CSS SHA256 match release build. Callable endpoint now returns HTTP401 UNAUTHENTICATED for a credential-free synthetic request, replacing 404. No student data or paid AI calls in deployment checks. Evidence: verification/production-release.json.
+- Firestore studioCoachControl/config read-only check: absent (404), so paid student AI remains disabled by server precondition. No activation/config write, TTL setup or readiness assertion performed. ZDR/child-data readiness still requires confirmation before activation. Basic local hints and output fixes are live now.
+- Phase: RELEASED / STUDENT_AI_ACTIVATION_PENDING. Commit/push/Hosting and function deployment request completed; full student AI availability remains explicitly pending. Existing large chunk/audio and Firebase legacy-config deprecation warnings did not block this deploy.
