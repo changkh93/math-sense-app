@@ -346,7 +346,7 @@ export default function PythonEducation() {
             그림을 그리고, 게임을 만들고, 수학을 실험합니다.
             <br />내 생각을 코드로 옮기고 결과를 확인하는 경험.
             <br />
-            메타센스는 그 과정에서 생각하는 힘을 기릅니다.
+            설치 없이 실행하고, 막히면 쉬운 설명과 AI 힌트로 다시 도전합니다.
           </p>
           <div className="pe-hero-actions">
             <a className="pe-cta" href="#apply">
@@ -362,6 +362,7 @@ export default function PythonEducation() {
               <Check size={16} />
               코딩을 몰라도 시작
             </span>
+            <a href="#ai-help"><Sparkles size={16} /> 막힐 때도 도움받으며</a>
             <span>
               <Check size={16} />
               설치 없이 브라우저에서
@@ -394,6 +395,25 @@ export default function PythonEducation() {
             <Play size={28} fill="currentColor" />
           </div>
         </a>
+      </section>
+      <section className="pe-wrap pe-ai-help" id="ai-help" aria-labelledby="pe-ai-help-title">
+        <div className="pe-ai-copy">
+          <p className="pe-eyebrow">“우리 아이가 막히면 어떡하죠?”</p>
+          <h2 id="pe-ai-help-title">오류가 나도,<br />다시 도전할 수 있도록.</h2>
+          <p>처음에는 괄호 하나, 철자 하나에서 멈추곤 합니다. 코드 스튜디오의 <strong>쉬운 기본 설명과 필요할 때 요청하는 AI 힌트</strong>가 아이의 다음 시도를 돕습니다.</p>
+          <p>어디를 고칠지 찾고, 직접 바꾸고, 다시 실행하기.<br /><strong>“내가 고쳤다!”는 작은 성취</strong>를 쌓아 가도록 함께합니다.</p>
+          <p className="pe-ai-parent">부모님이 오류의 정답을 찾아주실 필요는 없어요. 아이가 무엇을 바꾸고 다시 시도했는지 함께 살펴봐 주세요.</p>
+          <a className="pe-cta" href="#apply" data-position="learning">우리 아이의 첫 도전, 체험으로 시작하기 <ArrowRight size={18} /></a>
+        </div>
+        <div className="pe-ai-example" aria-label="오류를 고치는 학습 흐름 예시">
+          <div className="pe-ai-example-title"><Code2 size={20} /><span>괄호 하나를 빠뜨렸을 때</span><small>학습 흐름 예시</small></div>
+          <ol>
+            <li><span className="pe-ai-step">01</span><div><h3>오류 메시지를 먼저 읽어요</h3><pre><code>{'t = Turtle\nt.forward(100)'}</code></pre><p className="pe-ai-error">TypeError · 거북이를 움직이려다 오류가 났어요.</p></div></li>
+            <li><span className="pe-ai-step">02</span><div><h3>이해가 어려우면 힌트를 받아요</h3><p>기본 설명으로 고칠 곳을 찾고, 더 궁금하면 AI에게 도움을 요청해요.</p><blockquote>“Turtle은 설계도예요. Turtle()처럼 괄호를 붙이면 거북이를 만들 수 있어요.”</blockquote></div></li>
+            <li><span className="pe-ai-step">03</span><div><h3>내 손으로 고치고 다시 실행해요</h3><pre><code>t = Turtle<span className="pe-ai-fix">()</span></code></pre><p>결과를 비교하며 왜 고쳐졌는지 확인해요.</p></div></li>
+          </ol>
+          <p className="pe-ai-note">파일·노트북 모드 모두 지원합니다. AI 힌트는 지원되는 오류에서 요청할 수 있으며, 설명이 맞는지는 다시 실행해 확인합니다.</p>
+        </div>
       </section>
       <section className="pe-method">
         <div className="pe-wrap">
@@ -593,13 +613,13 @@ export default function PythonEducation() {
                 Code2,
                 '01 / 직접 실행',
                 '메타센스 코드 스튜디오',
-                '설치 없이 브라우저에서 코드를 쓰고 실행합니다. 파일과 이미지를 올리고, 오류를 고치며 결과를 바로 확인합니다.',
+                '설치 없이 코드를 쓰고 실행합니다. 오류 메시지와 쉬운 기본 설명을 먼저 읽고, 필요하면 AI 힌트를 받아 직접 고쳐 봅니다.',
               ],
               [
                 Send,
                 '02 / 과제 제출',
                 '내 코드와 생각을 함께',
-                '코드 스튜디오의 .py 파일을 과제에 첨부하고 오늘 배운 내용을 정리합니다. 완성 결과와 해결 과정을 함께 남깁니다.',
+                '코드 스튜디오의 .py 파일이나 .ipynb 노트북을 과제에 첨부하고 오늘 배운 내용을 정리합니다. 완성 결과와 해결 과정을 함께 남깁니다.',
               ],
               [
                 Sparkles,
@@ -663,6 +683,8 @@ export default function PythonEducation() {
             </li>
           </ul>
           <div className="pe-faq">
+            <details><summary>코딩을 모르는 부모도 아이를 도울 수 있나요?</summary><p>부모님이 코드를 대신 고쳐주실 필요는 없습니다. 아이는 코드 스튜디오에서 오류 메시지와 쉬운 기본 설명을 읽고, 필요하면 AI 힌트를 요청해 직접 수정하고 다시 실행합니다. 학부모 계정에서는 연결된 자녀의 학습 활동과 공개된 과제 피드백을 함께 살펴보실 수 있습니다.</p></details>
+            <details><summary>AI가 대신 풀어주면 아이가 생각할 기회가 줄지 않나요?</summary><p>오류가 나면 원래 오류 메시지부터 보여줍니다. 기본 설명과 AI 힌트는 고칠 곳과 확인할 방법을 안내하고, 코드를 수정하고 실행하는 일은 아이가 직접 합니다. AI 설명도 실행 결과로 확인하며, 제출한 과제는 선생님이 확인한 피드백으로 이어집니다.</p></details>
             <details>
               <summary>파이썬을 미리 설치해야 하나요?</summary>
               <p>
