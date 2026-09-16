@@ -7,6 +7,7 @@ For an existing task, read its STATE.md and actual artifacts before continuing.
 
 | ID | Goal | Phase | State file | Next action |
 |---|---|---|---|---|
+| 20260917-dividia-long-division-lab | 디비디아 20문제 세로 나눗셈 체험 학습 | DEPLOYED_AND_VERIFIED | [STATE](tasks/20260917-dividia-long-division-lab/STATE.md) | `4dc4d13` 배포, 5구간·154단계 및 실운영 파일 해시 검증 완료 |
 | 20260917-multipluvia-times-card-lab | 멀티플루비아 구구단 불빛 카드·체험 학습 재배치 | DEPLOYED_AND_VERIFIED | [STATE](tasks/20260917-multipluvia-times-card-lab/STATE.md) | `18078758` 푸시·Hosting 배포; 운영 카드 번들·음성팩 해시 일치 확인 |
 | 20260916-multipluvia-big-multiply-lab | 멀티플루비아 세 자리수 큰곱셈 체험 학습 | DEPLOYED_AND_VERIFIED | [STATE](tasks/20260916-multipluvia-big-multiply-lab/STATE.md) | `18078758` 푸시·Hosting 배포; 운영 큰곱셈 번들 해시 일치 확인 |
 | 20260916-studio-remove-comparison | 두 단계 비교 메뉴·관련 안내 제거, 자료 유지 | DONE | [STATE](tasks/20260916-studio-remove-comparison/STATE.md) | e8126074 배포·운영 문구/자료 검증 완료 |
