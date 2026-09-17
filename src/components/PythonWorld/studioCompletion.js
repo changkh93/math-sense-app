@@ -23,7 +23,13 @@ function applyCall(view, completion, from, to) {
   const insert = completion.label + (existing ? '' : '()')
   view.dispatch({ changes: { from, to, insert }, selection: { anchor: from + completion.label.length + (existing ? 0 : 1) }, annotations: pickedCompletion.of(completion), userEvent: 'input.complete' })
 }
-export function studioCompletion(getProject) {
+
+export function filterCompletionOptionsByPrefix(options, typed) {
+  if (!typed) return options
+  return options.filter(option => option.label.startsWith(typed))
+}
+
+export function studioCompletion(getProject, { strictPrefix = false } = {}) {
   const analyzer = createStudioAnalyzer(getProject)
   const path = () => getProject()?.path || 'main.py'
   const source = context => {
@@ -39,11 +45,20 @@ export function studioCompletion(getProject) {
       for (const c of snippets) if (!options.some(o => o.label === c.label && o.boost)) merged.set(c.label, c)
       options = [...merged.values()]
     }
+    const typed = context.state.sliceDoc(result.from, context.pos)
+    if (strictPrefix && typed) {
+      options = filterCompletionOptionsByPrefix(options, typed)
+      if (options.length === 0) return null
+    }
     return {
       from: result.from,
       options: options.map(option => ({ ...option, info: [option.signature, option.info].filter(Boolean).join('\n'),
         apply: option.apply || (!result.importing && !result.string && option.signature ? applyCall : undefined) })),
-      validFor: result.string ? /^[^'"\n]*$/ : /^[\p{L}\p{N}_]*$/u,
+      // Strict-prefix consumers must refresh the source after every edit so
+      // CodeMirror's fuzzy matcher cannot re-introduce substring candidates.
+      validFor: strictPrefix
+        ? text => text === typed
+        : result.string ? /^[^'"\n]*$/ : /^[\p{L}\p{N}_]*$/u,
     }
   }
   const signature = state => {

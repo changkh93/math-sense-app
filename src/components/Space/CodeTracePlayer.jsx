@@ -1121,7 +1121,7 @@ function CodeTraceEditor({
         extensions: [
           history(),
           python(),
-          ...studioCompletion(() => CODE_TRACE_COMPLETION_PROJECT),
+          ...studioCompletion(() => CODE_TRACE_COMPLETION_PROJECT, { strictPrefix: true }),
           closeBrackets(),
           syntaxHighlighting(codeTraceHighlightStyle, { fallback: true }),
           codeTracePlugin,
