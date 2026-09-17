@@ -52,6 +52,11 @@ const costOptimizedDataFunctions = regionalFunctions.runWith({
   memory: "256MB",
   timeoutSeconds: 60,
 });
+Object.assign(exports, require("./interactiveLearningRewards.cjs")({
+  functions,
+  admin,
+  callableFunctions: costOptimizedDataFunctions,
+}));
 
 const galaxyPlayTime = require("./galaxyPlayTime")({
   functions,

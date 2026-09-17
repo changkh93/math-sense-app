@@ -89,13 +89,20 @@ export function sanitizeLearningSummaryForCourse(summary = {}, courseId = '') {
   if (!summary || typeof summary !== 'object') return {};
   const normalizedCourse = normalizeCourseId(courseId);
   const isPython = normalizedCourse === 'python';
+  const copy = { ...summary };
+
+  // NEW · 체험 학습은 초등수학 섹터 전용이다.
+  if (normalizedCourse !== 'cluster_elementary') {
+    delete copy.interactiveLearnings;
+    copy.interactiveLearningCount = 0;
+    copy.interactiveLearningCrystalsEarned = 0;
+  }
 
   if (isPython) {
-    return { ...summary };
+    return copy;
   }
 
   // Non-Python courses: strip CODE TRACE and LUMI fields completely
-  const copy = { ...summary };
   delete copy.codeTraces;
   delete copy.inProgressCodeTraces;
   delete copy.lumiProtocols;
@@ -165,6 +172,9 @@ export function buildFeedbackWhitelistDto(feedbackContext = {}, courseId = '') {
     workbookCount: sanitizedSummary.workbookCount || 0,
     workbookProgressCount: sanitizedSummary.workbookProgressCount || 0,
     battleCount: sanitizedSummary.battleCount || 0,
+    interactiveLearningCount: sanitizedSummary.interactiveLearningCount || 0,
+    interactiveLearningCrystalsEarned: sanitizedSummary.interactiveLearningCrystalsEarned || 0,
+    interactiveLearnings: (sanitizedSummary.interactiveLearnings || []).slice(0, 12),
     titles: (sanitizedSummary.titles || []).slice(0, 8),
     excludedOtherCourseTitles: sanitizedSummary.excludedOtherCourseTitles || [],
     ...(isPython ? {

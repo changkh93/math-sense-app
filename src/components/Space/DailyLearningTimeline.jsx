@@ -138,6 +138,13 @@ const TYPE_CONFIG = {
     color: '#55f1c8',
     bg: 'rgba(85, 241, 200, 0.12)',
     border: 'rgba(85, 241, 200, 0.35)'
+  },
+  experience: {
+    icon: '🧩',
+    label: '체험 학습',
+    color: '#67e8f9',
+    bg: 'rgba(34, 211, 238, 0.1)',
+    border: 'rgba(103, 232, 249, 0.35)'
   }
 };
 
@@ -150,6 +157,7 @@ function GroupedView({ items, dailyStats, onActivityClick }) {
   const codeItems = items.filter(i => i.type === 'code');
   const workbookItems = items.filter(i => i.type === 'workbook');
   const battleItems = items.filter(i => i.type === 'battle');
+  const experienceItems = items.filter(i => i.type === 'experience');
   const codeTraceCount = dailyStats?.codeTraceCount ?? codeItems.filter(i => i.completed).length;
   const codeTraceProgressCount = dailyStats?.codeTraceProgressCount ?? codeItems.filter(i => !i.completed).length;
   const workbookCount = dailyStats?.workbookCount ?? workbookItems.filter(i => i.completed).length;
@@ -241,6 +249,16 @@ function GroupedView({ items, dailyStats, onActivityClick }) {
               }
               subValue={dailyStats?.lumiProtocolCrystalsEarned > 0 ? `광석 ${dailyStats.lumiProtocolCrystalsEarned}개` : null}
               color="#55f1c8"
+            />
+          )}
+
+          {(dailyStats?.interactiveLearningCount > 0 || experienceItems.length > 0) && (
+            <StatChip
+              icon="🧩"
+              label="체험 학습"
+              value={`${dailyStats?.interactiveLearningCount || experienceItems.reduce((sum, item) => sum + (item.completionCount || 1), 0)}회`}
+              subValue={dailyStats?.interactiveLearningCrystalsEarned > 0 ? `광석 ${dailyStats.interactiveLearningCrystalsEarned}개` : null}
+              color="#67e8f9"
             />
           )}
           
@@ -655,6 +673,19 @@ function GroupedCard({ item, index, onClick }) {
                 누적 광석 {item.crystalsEarnedTotal}개
               </span>
             ) : null}
+          </>
+        )}
+
+        {item.type === 'experience' && (
+          <>
+            <span className="font-tech" style={{ color: config.color, fontWeight: 'bold', background: 'rgba(0,0,0,0.3)', padding: '0.15rem 0.5rem', borderRadius: '4px' }}>
+              오늘 {item.completionCount || 1}개 완료
+            </span>
+            {item.crystalsEarnedToday > 0 && (
+              <span className="font-tech" style={{ color: 'var(--star-gold)', fontWeight: 'bold', background: 'rgba(0,0,0,0.3)', padding: '0.15rem 0.5rem', borderRadius: '4px' }}>
+                +{item.crystalsEarnedToday} 광석
+              </span>
+            )}
           </>
         )}
 

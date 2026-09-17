@@ -85,6 +85,55 @@ CODE TRACE 규정을 문서에 추가한 뒤에는 아래 구현을 함께 맞�
   - 초등수학→중등수학 레벨업 사례와 같은 날짜에 Python 전용 기록이 함께 있어도 중등수학 영상·퀴즈·데이터 로그만 인정되는지 확인한다.
   - 과정이 `unknown`이면 CODE TRACE/LUMI를 어떤 비-Python 과제에도 넣지 않는다. Python 귀속을 명시적으로 확인할 수 있을 때만 Python 과제에 포함한다.
 
+### NEW · 체험 학습 일일 기록·보상·과제 피드백 체크리스트
+
+초등수학 섹터의 체험 학습은 단순 화면 진입이나 로컬 진행률이 아니라 **실제 완료 단위**만 `users/{uid}/history`에 기록한다. 모든 기록은 `clusterId: "cluster_elementary"`, `type: "interactive_learning"`, `experienceType: "interactive_learning"`을 명시해 다른 과정으로 섞이지 않게 한다.
+
+#### 완료 단위와 기본 보상
+
+| 활동 | `activityId` | 완료 단위 | 최초 성공 보상 |
+|---|---|---|---:|
+| 구구단 불빛 카드 | `multiplication_cards` | 카드 정답 1개 | 3광석 |
+| 나눗셈 묶음 카드 | `division_cards` | 카드 정답 1개(몫과 나머지 모두 정답) | 3광석 |
+| 큰곱셈 조립소 | `vertical_multiplication` | 세로셈 미션 1개 완료 | 10광석 |
+| 세로 나눗셈 연구소 | `vertical_division` | 세로셈 미션 1개 완료 | 10광석 |
+
+- 광석 지급은 하루 단위가 아니다. 서로 다른 카드나 미션을 성공할 때마다 위 금액을 즉시 지급한다.
+- 같은 `activityId + completionKey`의 광석은 계정 전체에서 최초 한 번만 지급한다. 같은 카드를 다시 맞히거나 같은 미션을 재완료해도 중복 지급하지 않는다.
+- 복습 사실은 광석 보상과 분리한다. 같은 학습 항목을 다른 날 다시 완료하면 그날의 `history`에는 남기되, 이미 존재하는 보상 원장 때문에 광석은 0으로 기록한다. 같은 날 같은 항목의 중복 요청은 일일 기록도 한 건으로 합친다.
+- 서버가 허용 목록, 미션 범위, 보상액을 결정한다. 클라이언트가 보낸 광석 수나 사용자 ID를 신뢰하지 않는다.
+- 사용자 잔고, `dailyGrowth`/`weeklyGrowth`, `history`, `crystal_transactions(type: "interactive_learning_reward")`를 한 Firestore transaction에서 확정한다.
+- 광석 원장은 날짜 없는 `activityId + completionKey`, 학습 기록은 `KST 날짜 + activityId + completionKey`의 결정적 ID를 사용한다. 함수 재시도, 더블 클릭, 네트워크 재전송으로 중복 지급되어서는 안 된다.
+- 카드 수, 선택한 단, 오답 횟수, 미션 번호 같은 `metrics`는 피드백 근거용 요약이며 보상액을 바꾸지 않는다.
+- 정답/완료 직후 카드나 완료 화면에 광석 아이콘과 `+3 광석` 또는 `+10 광석`을 바로 표시한다. 덱을 모두 끝내거나 날짜가 바뀔 때까지 기다리지 않는다.
+
+#### 일일 학습 기록 표시
+
+- `useLearningHistory`에서 `interactive_learning`을 퀴즈·영상·워크북과 다른 `experience` 유형으로 정규화한다.
+- 일일 통계는 `interactiveLearningCount`, `interactiveLearningCrystalsEarned`를 별도로 집계한다.
+- 같은 체험 활동의 여러 세로셈 미션은 한 카드에 묶어 “오늘 N개 완료, +N광석”으로 보여 줄 수 있다.
+- `interactive_learning_reward` 원장은 이미 `history`로 표시된 보상이므로 타임라인에서 다시 한 줄로 중복 표시하지 않는다.
+
+#### 과제 평가·피드백 반영
+
+- `scripts/export-pending-assignment-contexts.mjs`와 `src/services/assignmentFeedbackService.js` 양쪽에서 `interactive_learning`을 일반 퀴즈 버킷에서 제외하고 `interactiveLearnings`, `interactiveLearningCount`, `interactiveLearningCrystalsEarned`로 제공한다.
+- 체험 학습은 `cluster_elementary` 과제에서만 실제 수학 연습·확인 활동으로 인정한다. Python·중등수학·고전 읽기 과제에는 포함하지 않는다.
+- 카드 정답과 세로셈 미션 완료는 구체적인 연습 근거다. 활동 제목과 완료 수를 칭찬할 수 있지만, 화면 진입·중간 로컬 저장을 완료로 단정하지 않는다.
+- 오답 횟수 같은 지표는 학생이 끝까지 다시 풀었다는 맥락과 함께 해석한다. 오답 수만으로 성실도나 개념 이해를 낮게 단정하지 않는다.
+- 체험 학습만 완료한 초등수학 학생을 “수학 기록 없음” 또는 “확인 활동 없음”으로 평가하지 않는다.
+- 체험 학습에서 받은 광석은 앱 내부 학습 보상이다. 과제 품질에 대한 `suggestedBonusCrystals`에 합산하거나 다시 지급하지 않는다.
+- 피드백 문구 예: “큰곱셈 조립소 미션 3개를 끝까지 완성해 자리 올림과 부분곱을 직접 연습한 기록이 확인됩니다.”
+
+#### 저장·회귀 검증
+
+- 같은 카드나 미션을 같은 날 두 번 완료해도 `history` 1건, 광석 원장 1건, 잔고 1회 증가인지 확인한다.
+- 다음 KST 날짜에는 같은 완료 단위의 복습 기록만 새로 생기고, 광석 원장과 잔고는 늘지 않는지 확인한다.
+- 다른 카드/미션은 같은 날이어도 각각 독립적으로 보상되는지 확인한다.
+- 카드 정답 직후와 세로셈 완료 직후 저장 중·광석 획득·이미 받은 항목·저장 실패 상태가 학생 눈높이로 표시되는지 확인한다.
+- 체험 학습 기록이 퀴즈 `averageScore`와 `quizCount`를 오염시키지 않는지 확인한다.
+- 초등수학 과제 컨텍스트에는 활동 제목·완료 단위·광석이 들어가고, 다른 과정 컨텍스트에는 들어가지 않는지 확인한다.
+- 앱 내부 체험 학습 광석을 과제 보너스로 중복 합산하지 않는지 확인한다.
+
 ### 퀴즈 배틀 코드 반영 체크리스트
 
 퀴즈 배틀 규정을 문서에 추가한 뒤에는 아래 구현을 함께 맞춘다.

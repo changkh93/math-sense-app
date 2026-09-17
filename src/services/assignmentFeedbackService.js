@@ -599,6 +599,9 @@ async function fetchLearningSummary(userId, dateStr, courseId = '', options = {}
       lumiProtocolProgressCount: 0,
       lumiProtocolMissionCount: 0,
       lumiProtocolCrystalsEarned: 0,
+      interactiveLearningCount: 0,
+      interactiveLearningCrystalsEarned: 0,
+      interactiveLearnings: [],
       workbooks: [],
       inProgressWorkbooks: [],
       codeTraces: [],
@@ -652,10 +655,11 @@ async function fetchLearningSummary(userId, dateStr, courseId = '', options = {}
     ? rows.filter((row) => row.type === 'lumi_protocol' || (row.type === 'python_mission' && (row.experienceType === 'lumi_protocol' || String(row.missionSetId || '').startsWith('lumi-'))))
     : [];
   const workbookRows = rows.filter((row) => row.type === 'workbook');
+  const interactiveLearningRows = rows.filter((row) => row.type === 'interactive_learning');
   // 퀴즈 배틀은 점수 체계(0~1500, 정답x100)가 일반 퀴즈(0~100)와 다르므로 별도로 분리한다.
   // 분리하지 않으면 배틀 점수가 averageScore를 오염시킨다.
   const battleRows = rows.filter((row) => row.type === 'quiz_battle');
-  const quizRows = rows.filter((row) => !['video', 'video_complete', 'text', 'data_log_read', 'attention', 'code_trace', 'lumi_protocol', 'python_mission', 'quiz_battle', 'workbook'].includes(row.type || 'quiz_pass'));
+  const quizRows = rows.filter((row) => !['video', 'video_complete', 'text', 'data_log_read', 'attention', 'code_trace', 'lumi_protocol', 'python_mission', 'quiz_battle', 'workbook', 'interactive_learning'].includes(row.type || 'quiz_pass'));
   const videoRows = rows.filter((row) => ['video', 'video_complete', 'recovery_mastery'].includes(row.type));
   const textRows = rows.filter((row) => ['text', 'data_log_read'].includes(row.type));
   const dataLogRows = rows.filter((row) => row.type === 'data_log_read');
@@ -710,6 +714,8 @@ async function fetchLearningSummary(userId, dateStr, courseId = '', options = {}
     lumiProtocolProgressCount: inProgressLumiProtocols.length,
     lumiProtocolMissionCount: lumiRows.length,
     lumiProtocolCrystalsEarned: lumiRows.reduce((sum, r) => sum + Number(r.crystalsEarned || 0), 0),
+    interactiveLearningCount: interactiveLearningRows.length,
+    interactiveLearningCrystalsEarned: interactiveLearningRows.reduce((sum, row) => sum + Number(row.crystalsEarned || 0), 0),
     workbookCount: workbookRows.length,
     workbookProgressCount: inProgressWorkbooks.length,
     workbookAverageScore: workbookScoreRows.length ? Math.round(workbookScoreRows.reduce((sum, score) => sum + score, 0) / workbookScoreRows.length) : null,
@@ -761,6 +767,14 @@ async function fetchLearningSummary(userId, dateStr, courseId = '', options = {}
       attemptCount: Number(row.attemptCount || 1),
       crystalsEarned: Number(row.crystalsEarned || 0),
       completed: true,
+    })),
+    interactiveLearnings: interactiveLearningRows.slice(0, 12).map((row) => ({
+      activityId: row.activityId || '',
+      completionKey: row.completionKey || '',
+      title: normalizeText(row.unitTitle || row.regionTitle || '체험 학습'),
+      crystalsEarned: Number(row.crystalsEarned || 0),
+      metrics: row.metrics && typeof row.metrics === 'object' ? row.metrics : {},
+      completed: row.completed === true,
     })),
     codeTraces: codeTraceRows.slice(0, 6).map((row) => ({
       unitId: row.unitId || '',
@@ -944,6 +958,10 @@ function buildEvidence(context = {}) {
   if ((dailyLearningSummary.workbookProgressCount || 0) > 0) {
     evidence.push(`진행 중 스마트 워크북 ${dailyLearningSummary.workbookProgressCount}건 확인`);
   }
+  if ((dailyLearningSummary.interactiveLearningCount || 0) > 0) {
+    const titles = [...new Set((dailyLearningSummary.interactiveLearnings || []).map((item) => item.title).filter(Boolean))];
+    evidence.push(`NEW · 체험 학습 ${dailyLearningSummary.interactiveLearningCount}건 완료${titles.length ? ` (${titles.join(', ')})` : ''}`);
+  }
   if (currentSubmission.codeComparison?.summary) {
     evidence.push(currentSubmission.codeComparison.summary);
   }
@@ -977,7 +995,8 @@ function buildFeedbackPolicyGuidance(context) {
     hasLumiActivity ||
     (learning.workbookCount || 0) > 0 ||
     (learning.workbookProgressCount || 0) > 0 ||
-    battleCount > 0
+    battleCount > 0 ||
+    (learning.interactiveLearningCount || 0) > 0
   );
   const hasSubmissionEvidence = Boolean(
     (submission.attachmentCount || 0) > 0 ||
@@ -990,7 +1009,7 @@ function buildFeedbackPolicyGuidance(context) {
   );
   const isVeryLowLearning = !hasCourseLearningRecord || (videoMinutes < Math.max(1, targetMinutes * 0.1) && !hasLearningFollowUpActivity);
   // 충분한 배틀 복습(완료 3회+ 또는 정답률 60%+, 포기 제외) 및 Python 코드 실습은 영상 없이도 합리적 학습 흐름으로 인정한다.
-  const isReasonableFlow = (videoMinutes >= targetMinutes * 0.45 && hasLearningFollowUpActivity) || hasPythonCodePractice || isSufficientBattleReview;
+  const isReasonableFlow = (videoMinutes >= targetMinutes * 0.45 && hasLearningFollowUpActivity) || hasPythonCodePractice || isSufficientBattleReview || (courseId === 'cluster_elementary' && (learning.interactiveLearningCount || 0) > 0);
 
   return {
     targetMinutes,
@@ -1011,6 +1030,8 @@ function buildFeedbackPolicyGuidance(context) {
       '영상 시간이 기준의 절반 안팎이고 퀴즈, 데이터 로그, 코드 제출, 제출문 정리 중 하나 이상이 있으면 성실한 학습 흐름으로 인정한다.',
       'Python 과제에서 CODE TRACE와 LUMI Protocol 완료/진행 기록은 영상/퀴즈와 다른 코드 실습 근거로 인정한다.',
       '스마트 워크북 완료/진행 기록은 풀이·재시도 기반의 확인 활동으로 인정하며, 일반 퀴즈 점수와 섞지 않고 워크북 평균과 진행 페이지를 별도로 해석한다.',
+      'NEW · 체험 학습 완료 기록은 초등수학의 실제 연습 근거로 인정한다. 카드 전체 완료와 세로셈 미션 완료만 근거로 쓰며 단순 화면 진입은 완료로 해석하지 않는다.',
+      '체험 학습에서 이미 지급된 광석은 앱 내부 학습 보상이다. 과제 평가의 suggestedBonusCrystals에 다시 더하거나 중복 지급하지 않는다.',
       '영상 시간 숫자만으로 "기준 학습량 대비 부족"이라고 쓰지 않는다.',
       '이미 퀴즈, 데이터 로그, CODE TRACE, LUMI Protocol이 있으면 "퀴즈나 데이터 로그까지 이어가라"는 개선 문구를 쓰지 않는다.',
       '개선점은 오답 이유 한 줄 정리, 코드 실행 결과, 직접 바꾼 코드 설명처럼 실제로 비어 있는 근거에서 고른다.',
@@ -1221,6 +1242,9 @@ export function createFallbackAssignmentFeedback(context, styleKey = 'balanced')
     : (learning.workbookProgressCount || 0) > 0
       ? `진행 중 스마트 워크북 ${learning.workbookProgressCount}건`
       : '';
+  const interactiveLearningNote = (learning.interactiveLearningCount || 0) > 0
+    ? `NEW · 체험 학습 ${learning.interactiveLearningCount}건 완료${learning.interactiveLearnings?.length ? ` (${[...new Set(learning.interactiveLearnings.map((item) => item.title).filter(Boolean))].join(', ')})` : ''}`
+    : '';
   // 퀴즈 배틀은 참여 횟수·승패·정답률을 한 줄로 요약한다.
   const battleNote = (learning.battleCount || 0) > 0
     ? `퀴즈 배틀 ${learning.battleCount}회 (승 ${learning.battleWinCount || 0} 무 ${learning.battleDrawCount || 0} 패 ${learning.battleLossCount || 0}${learning.battleAverageAccuracy !== null && learning.battleAverageAccuracy !== undefined ? `, 정답률 ${learning.battleAverageAccuracy}%` : ''})`
@@ -1238,7 +1262,9 @@ export function createFallbackAssignmentFeedback(context, styleKey = 'balanced')
       ? `${pythonPracticeNote}${learning.videoMinutes ? `과 영상 ${learning.videoMinutes}분` : ''}${learning.quizCount ? `, 퀴즈 ${learning.quizCount}건` : ''}${learning.dataLogCount ? `, 데이터 로그 ${learning.dataLogCount}건` : ''}이 확인되어, 코드를 직접 다루는 실습 활동까지 남았습니다.`
       : battleNote && !learning.videoMinutes && !(learning.quizCount || 0) && !(learning.dataLogCount || 0) && !workbookNote
         ? `${battleNote}로 기존 학습 범위를 경쟁하며 복습한 기록이 확인됩니다. 영상 없이도 배운 개념을 확인 활동으로 이어간 점은 좋습니다.`
-        : `영상 ${learning.videoMinutes}분에 ${learning.quizCount ? `퀴즈 ${learning.quizCount}건` : ''}${learning.quizCount && (learning.dataLogCount || workbookNote) ? ', ' : ''}${learning.dataLogCount ? `데이터 로그 ${learning.dataLogCount}건` : ''}${workbookNote ? `${learning.quizCount || learning.dataLogCount ? ', ' : ''}${workbookNote}` : ''}${battleNote ? `${learning.quizCount || learning.dataLogCount || workbookNote ? ', ' : ''}${battleNote}` : ''}${!learning.quizCount && !learning.dataLogCount && !workbookNote && !battleNote && hasAttachments ? '제출 자료' : ''}까지 이어진 점을 보면, 단순히 영상만 본 기록은 아닙니다.`
+        : interactiveLearningNote && !learning.videoMinutes && !(learning.quizCount || 0) && !(learning.dataLogCount || 0) && !workbookNote && !battleNote
+          ? `${interactiveLearningNote}가 확인되어, 개념을 직접 조작하고 계산한 연습 기록이 남았습니다.`
+          : `영상 ${learning.videoMinutes}분에 ${learning.quizCount ? `퀴즈 ${learning.quizCount}건` : ''}${learning.quizCount && (learning.dataLogCount || workbookNote || interactiveLearningNote) ? ', ' : ''}${learning.dataLogCount ? `데이터 로그 ${learning.dataLogCount}건` : ''}${workbookNote ? `${learning.quizCount || learning.dataLogCount ? ', ' : ''}${workbookNote}` : ''}${interactiveLearningNote ? `${learning.quizCount || learning.dataLogCount || workbookNote ? ', ' : ''}${interactiveLearningNote}` : ''}${battleNote ? `${learning.quizCount || learning.dataLogCount || workbookNote || interactiveLearningNote ? ', ' : ''}${battleNote}` : ''}${!learning.quizCount && !learning.dataLogCount && !workbookNote && !interactiveLearningNote && !battleNote && hasAttachments ? '제출 자료' : ''}까지 이어진 점을 보면, 단순히 영상만 본 기록은 아닙니다.`
     : '';
 
   const improvement = weakness

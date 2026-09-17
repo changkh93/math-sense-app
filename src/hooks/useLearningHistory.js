@@ -43,6 +43,8 @@ export function useLearningHistory(userId, dateStr) {
     lumiProtocolProgressCount: 0,
     lumiProtocolMissionCount: 0,
     lumiProtocolCrystalsEarned: 0,
+    interactiveLearningCount: 0,
+    interactiveLearningCrystalsEarned: 0,
     totalVideoSeconds: 0,
     isAssignmentSubmitted: false,
     attentionHits: 0,
@@ -164,6 +166,8 @@ export function useLearningHistory(userId, dateStr) {
       lumiProtocolProgressCount: 0,
       lumiProtocolMissionCount: 0,
       lumiProtocolCrystalsEarned: 0,
+      interactiveLearningCount: 0,
+      interactiveLearningCrystalsEarned: 0,
       missionLabCount: 0,
       missionLabProgressCount: 0,
       totalVideoSeconds: 0,
@@ -254,6 +258,10 @@ export function useLearningHistory(userId, dateStr) {
         stats.lumiProtocolMissionCount++;
         stats.lumiProtocolCrystalsEarned += Number(data.crystalsEarned || 0);
         displayType = 'lumi_protocol';
+      } else if (hType === 'interactive_learning') {
+        stats.interactiveLearningCount++;
+        stats.interactiveLearningCrystalsEarned += Number(data.crystalsEarned || 0);
+        displayType = 'interactive_learning';
       } else if (hType === 'python_mission') {
         const isLumi = data.experienceType === 'lumi_protocol' ||
           String(data.missionSetId || '').startsWith('lumi-') ||
@@ -292,7 +300,9 @@ export function useLearningHistory(userId, dateStr) {
             : displayType === 'code_trace'
               ? '⌨️'
               : displayType === 'lumi_protocol'
-                ? '🛰️'
+              ? '🛰️'
+              : displayType === 'interactive_learning'
+                ? '🧩'
               : displayType === 'python_mission'
                 ? '🛰️'
               : displayType === 'workbook'
@@ -310,7 +320,9 @@ export function useLearningHistory(userId, dateStr) {
               : displayType === 'code_trace'
                 ? '코드 따라쓰기'
               : displayType === 'lumi_protocol'
-                ? 'LUMI PROTOCOL'
+              ? 'LUMI PROTOCOL'
+              : displayType === 'interactive_learning'
+                ? '체험 학습'
               : displayType === 'python_mission'
                 ? 'MISSION LAB'
               : displayType === 'workbook'
@@ -352,6 +364,7 @@ export function useLearningHistory(userId, dateStr) {
         tType === 'workbook_reward' ||
         tType === 'workbook_penalty' ||
         tType === 'lumi_protocol_mission_reward'
+        || tType === 'interactive_learning_reward'
       ) return;
 
       let displayType = 'general';
@@ -706,7 +719,7 @@ export function useLearningHistory(userId, dateStr) {
 
 /** Learning-only activity types for grouping */
 const LEARNING_TYPES = new Set([
-  'quiz_pass', 'quiz_in_progress', 'video_reward', 'video_view', 'video_attention', 'data_log_read', 'code_trace', 'python_mission', 'lumi_protocol', 'quiz_battle', 'workbook', 'workbook_in_progress'
+  'quiz_pass', 'quiz_in_progress', 'video_reward', 'video_view', 'video_attention', 'data_log_read', 'code_trace', 'python_mission', 'lumi_protocol', 'interactive_learning', 'quiz_battle', 'workbook', 'workbook_in_progress'
 ]);
 
 /**
@@ -755,8 +768,8 @@ function resolveTitle(act) {
 
   // 4. Extract from the display title (strip emoji prefixes)
   const cleaned = (act.title || '')
-    .replace(/^(?:🚀|🎬|📝|⌨️|🛰️|🧮|⏳|💎|🛒|🧊|🎁|✅|🗣️|📌|⚔️)\s*/u, '')
-    .replace(/^(현장 탐사\(퀴즈\)|퀴즈 탐사|퀴즈|영상 보상|영상 학습 완료|영상 학습 진행|영상 학습|영상 열람|데이터 로그 열람|CODE TRACE|코드 따라쓰기|MISSION LAB|스마트 워크북|퀴즈 배틀)[:\s]*/g, '')
+    .replace(/^(?:🚀|🎬|📝|⌨️|🛰️|🧮|🧩|⏳|💎|🛒|🧊|🎁|✅|🗣️|📌|⚔️)\s*/u, '')
+    .replace(/^(현장 탐사\(퀴즈\)|퀴즈 탐사|퀴즈|영상 보상|영상 학습 완료|영상 학습 진행|영상 학습|영상 열람|데이터 로그 열람|CODE TRACE|코드 따라쓰기|MISSION LAB|스마트 워크북|퀴즈 배틀|체험 학습)[:\s]*/g, '')
     .replace(/\s*보상\s*\(.*?\)\s*$/g, '')
     .trim();
   if (cleaned && cleaned.length > 0) return cleaned;
@@ -790,6 +803,7 @@ function buildGroupedActivities(rawActivities) {
     }
     else if (act.type === 'workbook' || act.type === 'workbook_in_progress') normalizedType = 'workbook';
     else if (act.type === 'quiz_battle') normalizedType = 'battle';
+    else if (act.type === 'interactive_learning') normalizedType = 'experience';
 
     // 배틀은 각 경기마다 별도 카드로 표시하기 위해 battleId 기준으로 그룹핑한다.
     const groupKey = normalizedType === 'battle'
@@ -832,6 +846,7 @@ function buildGroupedActivities(rawActivities) {
         crystalsEarnedTotal: 0,
         earnedExerciseCount: 0,
         totalPracticeCount: 0,
+        completionCount: 0,
         bestAccuracy: null,
         lastMode: '',
         battleId: '',
@@ -974,6 +989,12 @@ function buildGroupedActivities(rawActivities) {
         group.lastMissionTitle = meta.lastMissionId;
       }
       group.completed = group.completed || meta.missionLabCompleted === true || (group.completedMissionCount >= group.totalMissionCount && group.totalMissionCount > 0);
+    }
+    if (normalizedType === 'experience') {
+      group.completionCount += 1;
+      group.completed = true;
+      group.crystalsEarnedToday += Number(act.crystalsEarned || 0);
+      group.crystalsEarnedTotal += Number(act.crystalsEarned || 0);
     }
   });
 

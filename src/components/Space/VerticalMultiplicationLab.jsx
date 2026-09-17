@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { ArrowLeft, Check, ChevronRight, Delete, RotateCcw, Sparkles, Waves } from 'lucide-react'
 import soundManager from '../../utils/SoundManager'
+import { useInteractiveLearningReward } from '../../hooks/useInteractiveLearningReward'
+import InteractiveLearningRewardNotice from './InteractiveLearningRewardNotice'
 import {
   PLACE_LABELS,
   VERTICAL_MULTIPLICATION_PROBLEMS,
@@ -115,6 +117,7 @@ function VerticalMultiplicationLab({ userId, onExit }) {
   const writeInputRef = useRef(null)
   const carryInputRef = useRef(null)
   const advanceTimerRef = useRef(null)
+  const { claimCompletion, rewardState, resetRewardState } = useInteractiveLearningReward(userId)
 
   const mission = useMemo(
     () => buildVerticalMultiplication(VERTICAL_MULTIPLICATION_PROBLEMS[missionIndex]),
@@ -172,6 +175,7 @@ function VerticalMultiplicationLab({ userId, onExit }) {
       setProgress((current) => ({ ...current, currentMission: missionIndex, currentStep: 0 }))
     }
     setScreen('work')
+    resetRewardState()
     resetInputs()
     soundManager.playWarp?.()
   }
@@ -224,6 +228,11 @@ function VerticalMultiplicationLab({ userId, onExit }) {
     })
     setStepIndex(0)
     setScreen('complete')
+    claimCompletion({
+      activityId: 'vertical_multiplication',
+      completionKey: `mission-${missionIndex + 1}`,
+      metrics: { missionNumber: missionIndex + 1, problem: `${mission.a} × ${mission.b}`, errorCount: progress.totalErrors },
+    })
     soundManager.playAchievement?.()
   }
   const nextMission = () => {
@@ -443,6 +452,7 @@ function VerticalMultiplicationLab({ userId, onExit }) {
               <div className="vml-earned">
                 <span>✓ 자리 맞추기</span><span>✓ 곱셈 올림</span><span>✓ 세 수 더하기</span>
               </div>
+              <InteractiveLearningRewardNotice state={rewardState} />
               <button type="button" className="vml-primary" onClick={nextMission}>
                 {missionIndex === 9 ? '마스터 결과 보기' : '다음 미션 열기'} <ChevronRight size={19} />
               </button>

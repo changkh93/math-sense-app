@@ -3,6 +3,8 @@ import { ArrowLeft, Check, ChevronRight, Delete, RotateCcw, Sparkles, Trophy, Vo
 import soundManager from '../../utils/SoundManager'
 import { playMultiplicationChantAudio, primeMultiplicationChantAudio } from './multiplicationChantAudio'
 import { buildMultiplicationStatement } from './multiplicationCardLabModel'
+import { useInteractiveLearningReward } from '../../hooks/useInteractiveLearningReward'
+import InteractiveLearningRewardNotice from './InteractiveLearningRewardNotice'
 import {
   DIVISION_TABLES,
   buildDivisionGroups,
@@ -149,6 +151,7 @@ export default function DivisionCardLab({ userId, onExit }) {
   const speechRunRef = useRef(0)
   const audioStopRef = useRef(null)
   const today = getKoreanDateKey()
+  const { claimCompletion, rewardState, resetRewardState } = useInteractiveLearningReward(userId)
   const currentCard = queue[cardIndex]
   const practiceFacts = useMemo(() => selectPracticeDivisionFacts(factStats), [factStats])
   const previewPlan = useMemo(() => buildDivisionStudyPlan(selectedTables, factStats, { today, random: () => 0.5, includePractice: practiceSelected }), [factStats, practiceSelected, selectedTables, today])
@@ -212,7 +215,7 @@ export default function DivisionCardLab({ userId, onExit }) {
     if (!nextPlan.queue.length) return
     primeMultiplicationChantAudio(nextPlan.queue.map((fact) => fact.divisor))
     setPlan(nextPlan); setQueue(nextPlan.queue); setCardIndex(0); setFace('front'); setAnswer(''); setRemainderAnswer(''); setActiveAnswer('quotient'); setOutcome(null)
-    setMasteredIds(new Set()); setRetryIds(new Set()); setRound(1); setSessionErrors(0); setSpokenStep(0); setSpeechState('idle'); setScreen('study')
+    setMasteredIds(new Set()); setRetryIds(new Set()); setRound(1); setSessionErrors(0); setSpokenStep(0); setSpeechState('idle'); resetRewardState(); setScreen('study')
     soundManager.playWarp?.()
   }
   const submitAnswer = (event) => {
@@ -223,7 +226,14 @@ export default function DivisionCardLab({ userId, onExit }) {
     setFactStats((current) => updateFactStats(current, currentCard.id, correct, today))
     if (!correct) { setMasteredIds((current) => { const next = new Set(current); next.delete(currentCard.id); return next }); setRetryIds((current) => new Set(current).add(currentCard.id)); setSessionErrors((count) => count + 1) }
     setOutcome({ correct, given: Number(answer), givenRemainder }); setFace('back'); setSpeechState('idle')
-    if (correct) soundManager.playCorrect?.(); else soundManager.playError?.()
+    if (correct) {
+      claimCompletion({
+        activityId: 'division_cards',
+        completionKey: `card-${currentCard.dividend}d${currentCard.divisor}`,
+        metrics: { dividend: currentCard.dividend, divisor: currentCard.divisor, quotient: currentCard.quotient, remainder: currentCard.remainder, round },
+      })
+      soundManager.playCorrect?.()
+    } else soundManager.playError?.()
   }
   const showNextCard = (confidence) => {
     const needsRetry = !outcome?.correct || confidence === 'hard'
@@ -236,11 +246,15 @@ export default function DivisionCardLab({ userId, onExit }) {
     else {
       const retryQueue = buildDivisionRetryQueue(nextRetryIds, plan.allFacts)
       if (retryQueue.length) { setQueue(retryQueue); setCardIndex(0); setRound((value) => value + 1) }
-      else { setScreen('complete'); soundManager.playComplete?.(); return }
+      else {
+        setScreen('complete')
+        soundManager.playComplete?.()
+        return
+      }
     }
-    setAnswer(''); setRemainderAnswer(''); setActiveAnswer('quotient'); setOutcome(null); setFace('front'); setSpokenStep(0); setSpeechState('idle'); soundManager.playClick?.()
+    setAnswer(''); setRemainderAnswer(''); setActiveAnswer('quotient'); setOutcome(null); setFace('front'); setSpokenStep(0); setSpeechState('idle'); resetRewardState(); soundManager.playClick?.()
   }
-  const resetToSetup = () => { setScreen('setup'); setPlan(null); setQueue([]); setAnswer(''); setRemainderAnswer(''); setActiveAnswer('quotient'); setOutcome(null); setSpokenStep(0); setSpeechState('idle'); soundManager.playClick?.() }
+  const resetToSetup = () => { setScreen('setup'); setPlan(null); setQueue([]); setAnswer(''); setRemainderAnswer(''); setActiveAnswer('quotient'); setOutcome(null); setSpokenStep(0); setSpeechState('idle'); resetRewardState(); soundManager.playClick?.() }
   const phaseLabel = currentCard?.phase === 'focus' ? '오늘의 집중 카드' : currentCard?.phase === 'practice' ? '다시 만나기 카드' : currentCard?.phase === 'retry' ? `다시 도전 ${round - 1}회` : '오늘의 전체 카드'
   const canStart = previewPlan.queue.length > 0
   const selectionLabel = [...selectedTables.map((table) => `${table}단`), ...(practiceSelected ? ['다시 만나기'] : [])].join(' · ')
@@ -281,6 +295,7 @@ export default function DivisionCardLab({ userId, onExit }) {
                     {!outcome?.correct && <p className="mcl-given-answer">내가 쓴 답: 몫 {outcome?.given}, 나머지 {outcome?.givenRemainder}</p>}
                     <DivisionGroups fact={currentCard} spokenStep={currentCard.quotient} revealAnswer />
                     <p className="dcl-family"><b>{currentCard.divisor} × {currentCard.quotient}{currentCard.remainder > 0 ? ` + ${currentCard.remainder}` : ''} = {currentCard.dividend}</b><span>그래서 {currentCard.dividend} ÷ {currentCard.divisor} = {currentCard.quotient}{currentCard.remainder > 0 ? `, 나머지 ${currentCard.remainder}` : ''}</span></p>
+                    <InteractiveLearningRewardNotice state={rewardState} />
                     <div className="mcl-confidence-prompt"><strong>이 카드는 어땠나요?</strong><small>{outcome?.correct ? '느낌을 골라 주면 다음 연습을 더 똑똑하게 준비해요.' : '틀린 카드는 어느 버튼을 눌러도 다시 나와요.'}</small></div>
                     <div className="mcl-confidence-actions"><button type="button" className="is-easy" onClick={() => showNextCard('easy')}><Check size={20} /> 아주 쉬워요</button><button type="button" className="is-hard" onClick={() => showNextCard('hard')}><RotateCcw size={19} /> 조금 어려워요</button></div>
                   </article>
@@ -290,7 +305,7 @@ export default function DivisionCardLab({ userId, onExit }) {
             </div>
           </section>
         )}
-        {screen === 'complete' && <section className="mcl-complete"><div className="mcl-trophy"><Trophy size={54} /></div><small>오늘의 나눗셈 묶기 완료</small><h1>다시 만날 카드가 0장이에요!</h1><p>{selectionLabel}의 모든 수를 정확히 묶었어요. 어려웠던 카드는 ‘다시 만나기’에 모아 또 연습할 수 있어요.</p><div className="mcl-complete-stats"><span><strong>{plan?.allFacts.length || 0}</strong>전체 카드</span><span><strong>{masteredIds.size}</strong>마지막에 맞힌 카드</span><span><strong>{sessionErrors}</strong>다시 생각한 횟수</span></div><div className="mcl-complete-actions"><button type="button" onClick={startStudy}>한 번 더 섞기</button><button type="button" onClick={resetToSetup}>다른 단 고르기</button></div></section>}
+        {screen === 'complete' && <section className="mcl-complete"><div className="mcl-trophy"><Trophy size={54} /></div><small>오늘의 나눗셈 묶기 완료</small><h1>다시 만날 카드가 0장이에요!</h1><p>{selectionLabel}의 모든 수를 정확히 묶었어요. 어려웠던 카드는 ‘다시 만나기’에 모아 또 연습할 수 있어요.</p><div className="mcl-complete-stats"><span><strong>{plan?.allFacts.length || 0}</strong>전체 카드</span><span><strong>{masteredIds.size}</strong>마지막에 맞힌 카드</span><span><strong>{sessionErrors}</strong>다시 생각한 횟수</span></div><InteractiveLearningRewardNotice state={rewardState} /><div className="mcl-complete-actions"><button type="button" onClick={startStudy}>한 번 더 섞기</button><button type="button" onClick={resetToSetup}>다른 단 고르기</button></div></section>}
       </main>
     </div>
   )

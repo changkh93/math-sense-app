@@ -14,6 +14,8 @@ import {
   updateFactStats,
 } from './multiplicationCardLabModel'
 import { playMultiplicationChantAudio, primeMultiplicationChantAudio } from './multiplicationChantAudio'
+import { useInteractiveLearningReward } from '../../hooks/useInteractiveLearningReward'
+import InteractiveLearningRewardNotice from './InteractiveLearningRewardNotice'
 import './MultiplicationCardLab.css'
 
 const DEFAULT_PROGRESS = { selectedTables: [2], practiceSelected: false, factStats: {} }
@@ -175,6 +177,7 @@ function MultiplicationCardLab({ userId, onExit }) {
   const speechRunRef = useRef(0)
   const audioStopRef = useRef(null)
   const today = getKoreanDateKey()
+  const { claimCompletion, rewardState, resetRewardState } = useInteractiveLearningReward(userId)
 
   const currentCard = queue[cardIndex]
   const practiceFacts = useMemo(() => selectPracticeFacts(factStats), [factStats])
@@ -291,6 +294,7 @@ function MultiplicationCardLab({ userId, onExit }) {
     setSessionErrors(0)
     setSpokenStep(0)
     setSpeechState('idle')
+    resetRewardState()
     setScreen('study')
     soundManager.playWarp?.()
   }
@@ -312,8 +316,14 @@ function MultiplicationCardLab({ userId, onExit }) {
     setOutcome({ correct, given: Number(answer) })
     setFace('back')
     setSpeechState('idle')
-    if (correct) soundManager.playCorrect?.()
-    else soundManager.playError?.()
+    if (correct) {
+      claimCompletion({
+        activityId: 'multiplication_cards',
+        completionKey: `card-${currentCard.table}x${currentCard.multiplier}`,
+        metrics: { table: currentCard.table, multiplier: currentCard.multiplier, answer: currentCard.answer, round },
+      })
+      soundManager.playCorrect?.()
+    } else soundManager.playError?.()
   }
 
   const showNextCard = (confidence) => {
@@ -350,6 +360,7 @@ function MultiplicationCardLab({ userId, onExit }) {
     setFace('front')
     setSpokenStep(0)
     setSpeechState('idle')
+    resetRewardState()
     soundManager.playClick?.()
   }
 
@@ -361,6 +372,7 @@ function MultiplicationCardLab({ userId, onExit }) {
     setOutcome(null)
     setSpokenStep(0)
     setSpeechState('idle')
+    resetRewardState()
     soundManager.playClick?.()
   }
 
@@ -510,6 +522,7 @@ function MultiplicationCardLab({ userId, onExit }) {
                     {!outcome?.correct && <p className="mcl-given-answer">내가 쓴 답: {outcome?.given}</p>}
                     <RectangleProof fact={currentCard} />
                     <p>세로 {currentCard.table}칸, 가로 {currentCard.multiplier}칸인 직사각형에는 모두 {currentCard.answer}칸이 있어요.</p>
+                    <InteractiveLearningRewardNotice state={rewardState} />
                     <div className="mcl-confidence-prompt">
                       <strong>이 카드는 어땠나요?</strong>
                       <small>{outcome?.correct ? '느낌을 골라 주면 다음 연습을 더 똑똑하게 준비해요.' : '틀린 카드는 어느 버튼을 눌러도 반드시 다시 나와요.'}</small>
@@ -542,6 +555,7 @@ function MultiplicationCardLab({ userId, onExit }) {
               <span><strong>{masteredIds.size}</strong>마지막에 맞힌 카드</span>
               <span><strong>{sessionErrors}</strong>다시 생각한 횟수</span>
             </div>
+            <InteractiveLearningRewardNotice state={rewardState} />
             <div className="mcl-complete-actions">
               <button type="button" onClick={startStudy}>한 번 더 섞기</button>
               <button type="button" onClick={resetToSetup}>다른 단 고르기</button>

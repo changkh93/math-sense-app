@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { ArrowDown, ArrowLeft, Check, ChevronRight, Delete, RotateCcw, Sparkles } from 'lucide-react'
 import soundManager from '../../utils/SoundManager'
+import { useInteractiveLearningReward } from '../../hooks/useInteractiveLearningReward'
+import InteractiveLearningRewardNotice from './InteractiveLearningRewardNotice'
 import {
   DIVISION_ACTION_LABELS,
   DIVISION_ZONES,
@@ -209,6 +211,7 @@ export default function VerticalDivisionLab({ userId, onExit, initialMission = n
   const [feedback, setFeedback] = useState(null)
   const inputRef = useRef(null)
   const timerRef = useRef(null)
+  const { claimCompletion, rewardState, resetRewardState } = useInteractiveLearningReward(userId)
 
   const mission = useMemo(() => buildVerticalDivision(VERTICAL_DIVISION_PROBLEMS[missionIndex]), [missionIndex])
   const currentStepIndex = Math.min(stepIndex, mission.steps.length - 1)
@@ -246,6 +249,7 @@ export default function VerticalDivisionLab({ userId, onExit, initialMission = n
       setProgress((current) => ({ ...current, currentMission: missionIndex, currentStep: 0 }))
     }
     setScreen('work')
+    resetRewardState()
     clearStep()
     soundManager.playWarp?.()
   }
@@ -266,6 +270,11 @@ export default function VerticalDivisionLab({ userId, onExit, initialMission = n
     }))
     setStepIndex(0)
     setScreen('complete')
+    claimCompletion({
+      activityId: 'vertical_division',
+      completionKey: `mission-${missionIndex + 1}`,
+      metrics: { missionNumber: missionIndex + 1, problem: `${mission.dividend} ÷ ${mission.divisor}`, errorCount: progress.totalErrors },
+    })
     soundManager.playAchievement?.()
   }
 
@@ -367,6 +376,7 @@ export default function VerticalDivisionLab({ userId, onExit, initialMission = n
               <p>MISSION {missionIndex + 1} COMPLETE</p>
               <h1>{mission.dividend} ÷ {mission.divisor} = {mission.quotient}{mission.remainder ? ` ··· ${mission.remainder}` : ''}</h1>
               <h2>{mission.remainder ? `몫 ${mission.quotient}, 나머지 ${mission.remainder}` : '나머지 없이 정확히 나누었어요!'}</h2>
+              <InteractiveLearningRewardNotice state={rewardState} />
               <button type="button" className="vdl-primary" onClick={nextMission}>{missionIndex === 19 ? '마스터 결과 보기' : '다음 미션'} <ChevronRight /></button>
               <button type="button" className="vdl-link" onClick={() => { setScreen('briefing'); clearStep() }}><RotateCcw size={16} /> 다시 풀기</button>
             </div>
