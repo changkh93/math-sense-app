@@ -2,8 +2,8 @@
 
 - Original goal: 곱셈 구구 카드처럼 나눗셈 카드를 만들고, `56 ÷ 8`에서 기존 8단 음성을 `팔 일은 팔`부터 `팔 칠 오십육`까지 들려주며 8개씩 묶인 그림과 소리를 동기화한다. 곱셈 관계는 `8 × 7 = 56` 순서로 표현하고, 오답·어려운 카드를 반복 학습하게 한다.
 - Coordinator: Codex (local implementation and verification)
-- Phase: DONE (local; not deployed)
-- Last updated: 2026-09-17 KST (remainder-card expansion verified)
+- Phase: DEPLOYED_AND_VERIFIED
+- Last updated: 2026-09-17 KST (production deployment verified)
 - Baseline: `e4eafa83`; shared checkout contains unrelated modified and untracked user work. Preserve it and restrict edits to the ownership below.
 - Worktree/branch: shared checkout; no external handoff.
 
@@ -58,7 +58,9 @@
 - Added separate quotient/remainder inputs with a shared touch keypad. Blank remainder is accepted as zero for exact division; remainder cards require the correct remainder, and the back verifies `divisor × quotient + remainder = dividend`.
 - Increased front/back card sizing so the complete numeric keypad and check button remain inside the card. Browser QA verified the `9 ÷ 2` front at `1/12`-style deck size, four 2-dot groups, one loose remainder dot, two centered people with count 4, and an unclipped keypad (`padBottom <= cardBottom`). Entering quotient 4 and remainder 1 revealed `2 × 4 + 1 = 9` and the matching remainder explanation.
 - Final checks passed: division-card model test, multiplication-card regression, 20-mission/154-step vertical-division regression, scoped ESLint, production build, and browser interaction/visual QA.
+- Released implementation commit `863f538d` to `main` and deployed that exact clean checkout to Firebase Hosting project `math-sense-1f6a8`.
+- Production verification passed at `https://math-sense-1f6a8.web.app`: deployed `DivisionCardLab` JavaScript and CSS SHA-256 hashes exactly match the clean release build.
 
 ## Next action
 
-- Optional: collect student feedback, then commit/push/deploy when the user requests release. Current changes remain local and uncommitted.
+- Optional: collect student feedback from the live release and iterate in a new scoped task.
