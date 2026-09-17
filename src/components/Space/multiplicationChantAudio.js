@@ -59,7 +59,7 @@ export function primeMultiplicationChantAudio(tables) {
   }
 }
 
-export function playMultiplicationChantAudio(fact, { onStep, onEnd, onError } = {}) {
+export function playMultiplicationChantAudio(fact, { onStep, onEnd, onError, revealTarget = false } = {}) {
   let cancelled = false
   const sources = []
   const timers = []
@@ -82,10 +82,11 @@ export function playMultiplicationChantAudio(fact, { onStep, onEnd, onError } = 
     await context.resume()
     if (cancelled) return
 
-    const statements = tableData.statements?.slice(0, Math.max(0, fact.multiplier - 1)) || []
+    const statements = tableData.statements?.slice(0, revealTarget ? fact.multiplier : Math.max(0, fact.multiplier - 1)) || []
     const question = tableData.questions?.[fact.multiplier - 1]
-    if (!question) throw new Error('The requested multiplication question audio is missing')
-    const phrases = [...statements, question]
+    if (!revealTarget && !question) throw new Error('The requested multiplication question audio is missing')
+    if (revealTarget && statements.length !== fact.multiplier) throw new Error('The requested multiplication statement audio is missing')
+    const phrases = revealTarget ? statements : [...statements, question]
     let startAt = context.currentTime + 0.04
 
     phrases.forEach((phrase, index) => {

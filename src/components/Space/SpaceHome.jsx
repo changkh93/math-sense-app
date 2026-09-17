@@ -89,6 +89,7 @@ const AlgorithmConstellationHub = lazy(() => import('../AlgorithmConstellation/c
 const ReadingLibraryView = lazy(() => import('./ReadingLibrary/ReadingLibraryView'))
 const MultiplicationCardLab = lazy(() => import('./MultiplicationCardLab'))
 const VerticalMultiplicationLab = lazy(() => import('./VerticalMultiplicationLab'))
+const DivisionCardLab = lazy(() => import('./DivisionCardLab'))
 const VerticalDivisionLab = lazy(() => import('./VerticalDivisionLab'))
 import { isWesternClassicCluster, filterWesternClassicRegions } from '../../constants/westernClassicNavigation'
 import { isCourseExplorerCluster } from './coursePlanetCatalog'
@@ -921,6 +922,7 @@ function SpaceHome() {
   const [quizBattleReturnView, setQuizBattleReturnView] = useState('planet')
   const [multiplicationCardLabOpen, setMultiplicationCardLabOpen] = useState(false)
   const [verticalMultiplicationLabOpen, setVerticalMultiplicationLabOpen] = useState(false)
+  const [divisionCardLabOpen, setDivisionCardLabOpen] = useState(false)
   const [verticalDivisionLabOpen, setVerticalDivisionLabOpen] = useState(false)
   const galaxyPlay = useGalaxyPlaySession({ uid: user?.uid, active: currentView === 'galaxy', isGuest: userData?.isGuest === true })
 
@@ -4569,6 +4571,20 @@ function SpaceHome() {
     )
   }
 
+  if (divisionCardLabOpen) {
+    return (
+      <Suspense fallback={<SpaceViewFallback />}>
+        <DivisionCardLab
+          userId={user?.uid}
+          onExit={() => {
+            setDivisionCardLabOpen(false)
+            soundManager.playClick?.()
+          }}
+        />
+      </Suspense>
+    )
+  }
+
   // Main App
   return (
     <div className={`space-bg ${isMobile ? 'mobile-space-home' : ''}`} style={{ 
@@ -5737,27 +5753,50 @@ function SpaceHome() {
                         </div>
                         <span style={{ color: '#ffbd78', fontSize: '0.7rem', whiteSpace: 'nowrap' }}>20개 미션</span>
                       </div>
-                      <ExperienceLearningCard
-                        testId="vertical-division-lab-entry"
-                        eyebrow="작은 수부터 천의 자리까지"
-                        badge="몫 → 곱하기 → 빼기 → 내려오기"
-                        title="나눗셈 내려오기 연구소"
-                        description="왕새우쌤과 네 동작을 정확한 자리에 한 칸씩 써요. 다음 숫자가 화살표를 타고 제자리로 내려와요."
-                        icon="↘"
-                        isMobile
-                        accent={{
-                          border: 'rgba(255, 184, 104, 0.48)',
-                          background: 'linear-gradient(115deg, rgba(76, 45, 30, 0.78), rgba(13, 70, 79, 0.84))',
-                          shadow: '0 12px 34px rgba(255, 159, 91, 0.1)',
-                          icon: 'linear-gradient(135deg, #ffc576, #55dfd2)',
-                          iconShadow: '0 0 26px rgba(255, 180, 100, 0.24)',
-                          label: '#ffd093',
-                        }}
-                        onClick={() => {
-                          setVerticalDivisionLabOpen(true)
-                          soundManager.playWarp?.()
-                        }}
-                      />
+                      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(2, minmax(0, 1fr))', gap: isMobile ? '0.7rem' : '0.9rem' }}>
+                        <ExperienceLearningCard
+                          testId="division-card-lab-entry"
+                          eyebrow="먼저 도전"
+                          badge="2단~12단"
+                          title="나눗셈 묶음 카드"
+                          description="같은 수씩 묶으며 몫을 찾아요. 구구단 소리와 묶음 불빛을 따라가고, 어려운 카드는 다시 만나요."
+                          icon="🟠"
+                          isMobile
+                          accent={{
+                            border: 'rgba(255, 194, 105, 0.5)',
+                            background: 'linear-gradient(115deg, rgba(89, 55, 25, 0.8), rgba(17, 65, 72, 0.84))',
+                            shadow: '0 12px 34px rgba(255, 172, 76, 0.12)',
+                            icon: 'linear-gradient(135deg, #ffe091, #ff9d5c)',
+                            iconShadow: '0 0 26px rgba(255, 184, 88, 0.26)',
+                            label: '#ffd093',
+                          }}
+                          onClick={() => {
+                            setDivisionCardLabOpen(true)
+                            soundManager.playWarp?.()
+                          }}
+                        />
+                        <ExperienceLearningCard
+                          testId="vertical-division-lab-entry"
+                          eyebrow="다음 도전"
+                          badge="20개 미션"
+                          title="나눗셈 내려오기 연구소"
+                          description="왕새우쌤과 몫·곱하기·빼기·내려오기를 정확한 자리에 한 칸씩 써요."
+                          icon="↘"
+                          isMobile
+                          accent={{
+                            border: 'rgba(89, 223, 210, 0.46)',
+                            background: 'linear-gradient(115deg, rgba(32, 65, 62, 0.78), rgba(13, 56, 79, 0.84))',
+                            shadow: '0 12px 34px rgba(66, 216, 201, 0.1)',
+                            icon: 'linear-gradient(135deg, #ffc576, #55dfd2)',
+                            iconShadow: '0 0 26px rgba(85, 223, 210, 0.24)',
+                            label: '#75eadb',
+                          }}
+                          onClick={() => {
+                            setVerticalDivisionLabOpen(true)
+                            soundManager.playWarp?.()
+                          }}
+                        />
+                      </div>
                     </section>
                   )}
                   <MissionLeaderboard user={user} chapterId={selectedChapterDocId} chapterTitle={chapters?.length === 1 ? activeRegion?.title : activeChapter?.title} />
