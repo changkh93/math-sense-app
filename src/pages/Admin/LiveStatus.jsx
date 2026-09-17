@@ -1,12 +1,13 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { collection, onSnapshot } from 'firebase/firestore';
 import { db } from '../../firebase';
-import { Activity, Clock, AlertTriangle, X, Play, RefreshCw, FileText, CheckCircle2 } from 'lucide-react';
+import { Activity, Clock, AlertTriangle, ExternalLink, X, Play, RefreshCw, FileText, CheckCircle2 } from 'lucide-react';
 import { useClusters } from '../../hooks/useContent';
 import { useAdminTodayAttendance } from '../../hooks/useAssignments';
 import { useLearningHistory } from '../../hooks/useLearningHistory';
 import { useAllUserPresence } from '../../hooks/useRealtimePresence';
 import { getTodayKST, getKSTComponents, KST_DAY_LABELS, scheduleIncludesDay } from '../../utils/streakUtils';
+import { partitionCrewParticipation } from '../../utils/liveStatusCrew';
 import './Admin.css';
 
 // -------------------------------------------------------------
@@ -25,8 +26,8 @@ const formatTimeElapsed = (ms) => {
 // -------------------------------------------------------------
 // LiveUserRow Component: Displays a single student's row
 // -------------------------------------------------------------
-const LiveUserRow = ({ user, onViewDetails }) => {
-  const [now, setNow] = useState(Date.now());
+const LiveUserRow = ({ user, onViewDetails, crewParticipation = null }) => {
+  const [now, setNow] = useState(() => Date.now());
   const today = getTodayKST();
   
   // Use the hook to get today's history
@@ -135,6 +136,16 @@ const LiveUserRow = ({ user, onViewDetails }) => {
              </span>
            </div>
         )}
+        {crewParticipation && (
+          <div style={{
+            marginTop: 6,
+            fontSize: '0.8rem',
+            color: crewParticipation.joined ? '#00ffa0' : '#ff7b72',
+            fontWeight: 700
+          }}>
+            {crewParticipation.joined ? '✓ 오늘 집중방 참여 확인' : '⚠ 오늘 집중방 미참여'}
+          </div>
+        )}
         {(timeInCurrentLocation > 60000 && currentLocation !== '우주 공간(메인) 대기 중') && (
            <div style={{ fontSize: '0.8rem', color: isStuck ? '#ffb703' : 'rgba(255,255,255,0.5)', marginTop: 4 }}>
              <Clock size={12} style={{ display: 'inline', marginRight: 4, verticalAlign: 'middle' }} />
@@ -197,11 +208,12 @@ const LiveUserRow = ({ user, onViewDetails }) => {
 // LiveStatus Page
 // -------------------------------------------------------------
 export default function LiveStatus() {
-  const { data: clusters = [], isLoading: clustersLoading } = useClusters();
+  const { data: clusters = [] } = useClusters();
   const todayStr = getTodayKST();
-  const { data: todayAttendance = [], isLoading: attendanceLoading } = useAdminTodayAttendance(todayStr);
+  const { data: todayAttendance = [] } = useAdminTodayAttendance(todayStr);
 
   const [selectedClusterId, setSelectedClusterId] = useState('all');
+  const [selectedCrewId, setSelectedCrewId] = useState('all');
   const [userProfiles, setUserProfiles] = useState([]);
   const presenceByUid = useAllUserPresence(true);
   const [parentsMap, setParentsMap] = useState({});
@@ -290,15 +302,33 @@ export default function LiveStatus() {
     });
   }, [nowDate, presenceByUid, userProfiles]);
 
-  // Filter by cluster
+  const crewTabs = useMemo(() => Object.entries(crewsMap)
+    .map(([id, crew]) => ({ id, ...crew }))
+    .filter(crew => !['archived', 'rejected'].includes(crew.status || 'pending'))
+    .sort((a, b) => String(a.name || '').localeCompare(String(b.name || ''), 'ko')),
+  [crewsMap]);
+
+  const selectedCrew = selectedCrewId === 'all' ? null : crewsMap[selectedCrewId];
+
+  // Overall view keeps the existing course filter. A crew tab always shows the
+  // crew's actual member roster, independent of course access.
   const filteredUsers = useMemo(() => {
+    if (selectedCrewId !== 'all') {
+      const memberIds = new Set(crewsMap[selectedCrewId]?.memberIds || []);
+      return users.filter(u => u.crewId === selectedCrewId || memberIds.has(u.uid));
+    }
     if (selectedClusterId === 'all') return users;
     return users.filter(u => {
       // Either liveStatus says they are in this cluster, or their clusterAccess allows it
       return (u.liveStatus?.clusterId === selectedClusterId) || 
              (u.clusterAccess && u.clusterAccess[selectedClusterId] === 'active');
     });
-  }, [users, selectedClusterId]);
+  }, [crewsMap, selectedClusterId, selectedCrewId, users]);
+
+  const selectedCrewParticipation = useMemo(() => {
+    if (selectedCrewId === 'all') return { absent: [], joined: [] };
+    return partitionCrewParticipation(filteredUsers, selectedCrewId, todayStr);
+  }, [filteredUsers, selectedCrewId, todayStr]);
 
   // Group by Crew and Online Status
   const { onlineWithoutCrew, offlineWithoutCrew, usersByCrew } = useMemo(() => {
@@ -350,17 +380,13 @@ export default function LiveStatus() {
         
         if (!isToday) return;
 
-        // Verify time (Must have started, and grace period passed)
-        // Let's flag them if class started and 5 mins passed, but class hasn't finished yet.
+        // Flag absences as soon as class starts. There is intentionally no grace period.
         const [startH, startM] = (schedule.startTime || "00:00").split(':').map(Number);
         const [endH, endM] = (schedule.endTime || "23:59").split(':').map(Number);
         
         const startTimeInMins = startH * 60 + startM;
         const endTimeInMins = endH * 60 + endM;
-        const graceEndMins = startTimeInMins + 5; 
-
-        // If class is currently on-going and grace period has passed
-        if (currentTimeInMins >= graceEndMins && currentTimeInMins <= endTimeInMins) {
+        if (currentTimeInMins >= startTimeInMins && currentTimeInMins <= endTimeInMins) {
           // Check which users have this cluster & day in participation
           users.forEach(u => {
             if (!u.participation) return;
@@ -435,9 +461,42 @@ export default function LiveStatus() {
 
       <div className="content-grid" style={{ gridTemplateColumns: '1fr', flex: 1 }}>
         <div className="editor-section block-appear glass" style={{ padding: '20px', background: 'rgba(10, 15, 30, 0.6)' }}>
-           
+           {/* Overall / crew tabs */}
+           <div style={{
+             display: 'flex',
+             gap: '8px',
+             overflowX: 'auto',
+             paddingBottom: '10px',
+             marginBottom: '16px',
+             borderBottom: '1px solid rgba(255,255,255,0.1)'
+           }}>
+             {[{ id: 'all', name: '전체' }, ...crewTabs].map(crew => {
+               const active = selectedCrewId === crew.id;
+               return (
+                 <button
+                   key={crew.id}
+                   type="button"
+                   onClick={() => setSelectedCrewId(crew.id)}
+                   style={{
+                     flex: '0 0 auto',
+                     padding: '9px 14px',
+                     borderRadius: '999px',
+                     border: `1px solid ${active ? '#00f3ff' : 'rgba(255,255,255,0.14)'}`,
+                     background: active ? 'rgba(0,243,255,0.16)' : 'rgba(255,255,255,0.04)',
+                     color: active ? '#7df9ff' : 'rgba(255,255,255,0.72)',
+                     fontWeight: 800,
+                     cursor: 'pointer',
+                     whiteSpace: 'nowrap'
+                   }}
+                 >
+                   {crew.name || '이름 없는 크루'}
+                 </button>
+               );
+             })}
+           </div>
+
            {/* Late Students Dashboard */}
-           {lateStudentsList.length > 0 && (
+           {selectedCrewId === 'all' && lateStudentsList.length > 0 && (
              <div style={{
                background: 'rgba(255, 69, 0, 0.1)',
                border: '1px solid #ff4500',
@@ -447,7 +506,7 @@ export default function LiveStatus() {
                animation: 'pulse-warning 2s infinite'
              }}>
                <h3 style={{ margin: '0 0 15px 0', color: '#ffb703', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                 <AlertTriangle size={20} /> 미접속/지각 탐사원 ({lateStudentsList.length}명)
+                 <AlertTriangle size={20} /> 결석/미접속 학생 ({lateStudentsList.length}명)
                </h3>
                
                <div style={{ display: 'grid', gap: '10px', marginBottom: '20px' }}>
@@ -496,10 +555,89 @@ export default function LiveStatus() {
              </div>
            )}
 
+           {selectedCrew && (
+             <div style={{ marginBottom: '20px' }}>
+               <div style={{
+                 display: 'flex',
+                 justifyContent: 'space-between',
+                 alignItems: 'center',
+                 gap: '12px',
+                 flexWrap: 'wrap',
+                 padding: '14px 16px',
+                 borderRadius: '12px',
+                 background: 'rgba(0, 243, 255, 0.07)',
+                 border: '1px solid rgba(0, 243, 255, 0.22)',
+                 marginBottom: '12px'
+               }}>
+                 <div>
+                   <strong style={{ color: '#7df9ff', fontSize: '1.05rem' }}>{selectedCrew.name || '스터디 크루'}</strong>
+                   <div style={{ color: 'rgba(255,255,255,0.58)', fontSize: '0.82rem', marginTop: 4 }}>
+                     오늘 집중방 참여 {selectedCrewParticipation.joined.length}명 · 미참여 {selectedCrewParticipation.absent.length}명
+                   </div>
+                 </div>
+                 {selectedCrew.googleMeetUrl ? (
+                   <a
+                     href={selectedCrew.googleMeetUrl}
+                     target="_blank"
+                     rel="noopener noreferrer"
+                     style={{
+                       display: 'inline-flex',
+                       alignItems: 'center',
+                       gap: '7px',
+                       padding: '9px 13px',
+                       borderRadius: '8px',
+                       border: '1px solid rgba(0,243,255,0.4)',
+                       background: 'rgba(0,243,255,0.12)',
+                       color: '#7df9ff',
+                       textDecoration: 'none',
+                       fontWeight: 800
+                     }}
+                   >
+                     <ExternalLink size={16} /> 집중방 바로가기
+                   </a>
+                 ) : (
+                   <span style={{ color: '#ffb703', fontSize: '0.85rem' }}>등록된 Google Meet 링크 없음</span>
+                 )}
+               </div>
+
+               {selectedCrewParticipation.absent.length > 0 ? (
+                 <div style={{
+                   background: 'rgba(255, 69, 0, 0.1)',
+                   border: '1px solid rgba(255, 99, 71, 0.75)',
+                   borderRadius: '12px',
+                   padding: '16px'
+                 }}>
+                   <h3 style={{ margin: '0 0 12px', color: '#ff9f7a', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '1rem' }}>
+                     <AlertTriangle size={18} /> 오늘 집중방 미참여 ({selectedCrewParticipation.absent.length}명)
+                   </h3>
+                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                     {selectedCrewParticipation.absent.map(student => (
+                       <span key={student.uid} style={{
+                         padding: '7px 10px',
+                         borderRadius: '7px',
+                         background: 'rgba(0,0,0,0.28)',
+                         color: 'white',
+                         fontSize: '0.88rem',
+                         fontWeight: 700
+                       }}>
+                         {student.studentName || student.name || '알 수 없음'}
+                       </span>
+                     ))}
+                   </div>
+                 </div>
+               ) : (
+                 <div style={{ padding: '12px 14px', borderRadius: '10px', background: 'rgba(0,255,160,0.08)', border: '1px solid rgba(0,255,160,0.22)', color: '#7fffc6' }}>
+                   ✓ 모든 크루원이 오늘 집중방에 참여했습니다.
+                 </div>
+               )}
+             </div>
+           )}
+
            {/* Controls */}
            <div style={{ display: 'flex', gap: '15px', marginBottom: '20px', alignItems: 'center' }}>
+             {selectedCrewId === 'all' && <>
              <span style={{ fontWeight: 'bold' }}>필터링:</span>
-             <select 
+             <select
                 value={selectedClusterId}
                 onChange={(e) => setSelectedClusterId(e.target.value)}
                 style={{ 
@@ -517,13 +655,14 @@ export default function LiveStatus() {
                   <option key={c.docId || c.id} value={c.docId || c.id}>{c.name}</option>
                 ))}
               </select>
+              </>}
               
-              <div style={{ marginLeft: 'auto', display: 'flex', gap: '15px', fontSize: '0.9rem' }}>
+              <div style={{ marginLeft: 'auto', display: 'flex', gap: '15px', fontSize: '0.9rem', flexWrap: 'wrap' }}>
                  <span style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
                     <div style={{ width: 10, height: 10, borderRadius: '50%', background: '#00ffa0' }}></div> 온라인
                  </span>
                  <span style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                    <div style={{ width: 10, height: 10, borderRadius: '50%', background: '#ffb703' }}></div> 자리 비움 (5분+)
+                    <div style={{ width: 10, height: 10, borderRadius: '50%', background: '#ffb703' }}></div> 자리 비움
                  </span>
                  <span style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
                     <div style={{ width: 10, height: 10, borderRadius: '50%', background: '#4a5568' }}></div> 오프라인 (15분+)
@@ -557,10 +696,36 @@ export default function LiveStatus() {
                    ) : filteredUsers.length === 0 ? (
                      <tr>
                         <td colSpan="5" style={{ padding: '30px', textAlign: 'center', color: 'rgba(255,255,255,0.5)' }}>
-                           최근 24시간 이내 접속 기록이 있는 학생이 없습니다.
+                           {selectedCrew ? '이 크루에 등록된 학생이 없습니다.' : '표시할 학생이 없습니다.'}
                         </td>
                      </tr>
                    ) : (
+                     selectedCrew ? (
+                       <>
+                         {selectedCrewParticipation.absent.map(user => (
+                           <LiveUserRow
+                             key={user.uid}
+                             user={user}
+                             crewParticipation={{ joined: false }}
+                             onViewDetails={(u, acts) => {
+                               setSelectedUser(u);
+                               setSelectedActivities(acts);
+                             }}
+                           />
+                         ))}
+                         {selectedCrewParticipation.joined.map(user => (
+                           <LiveUserRow
+                             key={user.uid}
+                             user={user}
+                             crewParticipation={{ joined: true }}
+                             onViewDetails={(u, acts) => {
+                               setSelectedUser(u);
+                               setSelectedActivities(acts);
+                             }}
+                           />
+                         ))}
+                       </>
+                     ) : (
                      <>
                         {/* Online users without a Crew */}
                         {onlineWithoutCrew.map(user => (
@@ -628,6 +793,7 @@ export default function LiveStatus() {
                           />
                         ))}
                      </>
+                     )
                    )}
                 </tbody>
               </table>

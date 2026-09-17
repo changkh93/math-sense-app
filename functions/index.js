@@ -11147,6 +11147,17 @@ exports.enterStudyCrewMeet = regionalFunctions.https.onCall(async (data, context
   if (!googleMeetUrl) {
     throw new functions.https.HttpsError("failed-precondition", "운영자가 Google Meet 주소를 준비 중입니다.");
   }
+
+  // Google Meet 자체 참가자 명단은 앱에서 직접 조회할 수 없으므로,
+  // 회원이 앱의 집중방 입장 버튼을 사용한 시점을 오늘의 참여 근거로 남긴다.
+  if (!guest) {
+    const now = new Date();
+    await db.collection("users").doc(uid).set({
+      lastCrewMeetEnteredAt: now,
+      lastCrewMeetEnteredDate: getKSTDateString(now),
+      lastCrewMeetEnteredCrewId: crewId,
+    }, { merge: true });
+  }
   return {
     success: true,
     googleMeetUrl,
