@@ -7,7 +7,10 @@ For an existing task, read its STATE.md and actual artifacts before continuing.
 
 | ID | Goal | Phase | State file | Next action |
 |---|---|---|---|---|
-| 20260917-interactive-learning-record-rewards | 체험 학습 일일 기록·멱등 광석·과제 피드백 반영 | DEPLOYED | [STATE](tasks/20260917-interactive-learning-record-rewards/STATE.md) | `75b92343` 함수+Hosting 배포 완료; 로그인 학생 최초/중복 완료 실데이터 확인 |
+| 20260917-fractonis-fraction-reduction-lab | 프락토니스 약분 묶음·압축 체험 학습 | DEPLOYED_AND_VERIFIED | [STATE](tasks/20260917-fractonis-fraction-reduction-lab/STATE.md) | `7223c3c1` 배포; 기약분수 도달 기록·10광석·운영 번들 확인 |
+| 20260917-fractonis-equivalent-fraction-lab | 프락토니스 같은 크기 분수 겹침 렌즈 | DEPLOYED_AND_VERIFIED | [STATE](tasks/20260917-fractonis-equivalent-fraction-lab/STATE.md) | `7223c3c1` 배포; 미션 완료 기록·10광석·운영 번들 확인 |
+| 20260917-fractonis-common-denominator-lab | 프락토니스 통분 겹침 렌즈 | DEPLOYED_AND_VERIFIED | [STATE](tasks/20260917-fractonis-common-denominator-lab/STATE.md) | `7223c3c1` 배포; 통분·비교 완료 기록·10광석·운영 번들 확인 |
+| 20260917-interactive-learning-record-rewards | 체험 학습 일일 기록·멱등 광석·과제 피드백 반영 | DEPLOYED_AND_VERIFIED | [STATE](tasks/20260917-interactive-learning-record-rewards/STATE.md) | `7223c3c1` 함수+Hosting 배포; 7종 계약·운영 분수 번들 확인 |
 | 20260917-dividia-division-card-lab | 디비디아 나눗셈 묶음·구구단 음성 카드 | DEPLOYED_AND_VERIFIED | [STATE](tasks/20260917-dividia-division-card-lab/STATE.md) | `863f538d`를 `main`과 Firebase Hosting에 배포하고 운영 JS/CSS 해시 일치 확인 |
 | 20260917-dividia-long-division-lab | 디비디아 20문제 세로 나눗셈 체험 학습 | DEPLOYED_AND_VERIFIED | [STATE](tasks/20260917-dividia-long-division-lab/STATE.md) | `4dc4d13` 배포, 5구간·154단계 및 실운영 파일 해시 검증 완료 |
 | 20260917-multipluvia-times-card-lab | 멀티플루비아 구구단 불빛 카드·체험 학습 재배치 | DEPLOYED_AND_VERIFIED | [STATE](tasks/20260917-multipluvia-times-card-lab/STATE.md) | `18078758` 푸시·Hosting 배포; 운영 카드 번들·음성팩 해시 일치 확인 |

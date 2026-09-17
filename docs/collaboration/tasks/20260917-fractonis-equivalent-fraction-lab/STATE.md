@@ -2,7 +2,7 @@
 
 - Task ID: `20260917-fractonis-equivalent-fraction-lab`
 - Owner: Codex (local implementation; no external relay)
-- Phase: DONE_LOCAL
+- Phase: DEPLOYED_AND_VERIFIED
 - Baseline: `a0475b61`
 - Workspace: shared dirty worktree; preserve unrelated changes
 
@@ -60,4 +60,7 @@ Add a student-facing interactive experience to the fraction planet where a paper
 
 ## Next
 
-Await student/teacher review. Commit, push, reward/record integration, and production deployment are intentionally not included until requested.
+- Commit `7223c3c1` was pushed to `origin/main` and deployed to Firebase Hosting at `https://math-sense-1f6a8.web.app`.
+- Each guided mission now records `interactive_learning` completion and grants 10 crystals only on its first lifetime success through the idempotent server ledger.
+- Production returned HTTP 200 for the exact `EquivalentFractionLab-BHHuHDNi.js` and shared reward-notice bundles produced from the clean deployment worktree.
+- Remaining optional check: authenticated student completion smoke test against Firestore history and reward-ledger documents.

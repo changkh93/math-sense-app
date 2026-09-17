@@ -2,7 +2,7 @@
 
 - Task ID: `20260917-fractonis-fraction-reduction-lab`
 - Owner: Codex (local implementation; no external relay)
-- Phase: DONE_LOCAL
+- Phase: DEPLOYED_AND_VERIFIED
 - Baseline: shared dirty worktree; preserve unrelated changes
 
 ## Original goal
@@ -54,4 +54,9 @@ Create a precise, creative interactive fraction-reduction tool where each square
 - In-app browser multi-step QA for `12/18` — verified choosing 2 is accepted as a correct common divisor, produces `6/9`, keeps the mission active, then accepts 3 and records the complete history `12/18 = 6/9 = 2/3` before marking the mission complete.
 - `npm run build` — passed. Existing audio-manifest documentation/provisional notices and chunk-size warnings remain informational.
 
-No commit, push, deployment, reward integration, or production data write was performed.
+## Deployment
+
+- Commit `7223c3c1` was pushed to `origin/main` and deployed to Firebase Hosting at `https://math-sense-1f6a8.web.app`.
+- A mission records completion and grants 10 crystals only after the student reaches an irreducible fraction, including multi-step reduction; the server ledger prevents duplicate rewards.
+- Production returned HTTP 200 for the exact `FractionReductionLab-jSFiuKe7.js` and shared reward-notice bundles produced from the clean deployment worktree.
+- Remaining optional check: authenticated student completion smoke test against Firestore history and reward-ledger documents.

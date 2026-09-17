@@ -2,7 +2,7 @@
 
 - Task ID: `20260917-fractonis-common-denominator-lab`
 - Owner: Codex (local implementation; no external relay)
-- Phase: DONE_LOCAL
+- Phase: DEPLOYED_AND_VERIFIED
 - Baseline: shared dirty worktree; preserve unrelated changes
 
 ## Goal
@@ -65,3 +65,10 @@ Add a separate fraction-planet experience where students overlay two divider len
 - Re-ran the focused model/integration test, focused ESLint, `git diff --check`, production build, and narrow-browser visual QA before and after overlaying the lenses.
 - Follow-up: enlarged and centered the shared unit fraction, and removed double grid lines by replacing overlapping base/lens/cell borders with one final grid layer after snapping.
 - Follow-up: removed the `이미 만나는 분모` / one-lens-unchanged concept and all non-coprime denominator pairs. Every mission now subdivides both cards using the opposite denominator, so the final unit cells have the same area and the same rectangular shape up to rotation.
+
+## Deployment
+
+- Commit `7223c3c1` was pushed to `origin/main` and deployed to Firebase Hosting at `https://math-sense-1f6a8.web.app`.
+- Each mission records completion and grants 10 crystals only after both equivalent fractions and the comparison are correct; the server ledger prevents duplicate rewards.
+- Production returned HTTP 200 for the exact `CommonDenominatorLab-CWgxA5E9.js` and shared reward-notice bundles produced from the clean deployment worktree.
+- Remaining optional check: authenticated student completion smoke test against Firestore history and reward-ledger documents.

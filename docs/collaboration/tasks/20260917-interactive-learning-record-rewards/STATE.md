@@ -6,13 +6,14 @@ NEW · 체험 학습 전 종의 실제 완료를 일일 학습 기록에 남기�
 
 ## Status
 
-- Phase: DEPLOYED_BASE_WITH_LOCAL_FRACTION_EXTENSION
+- Phase: DEPLOYED_AND_VERIFIED
 - Baseline: `be1b8472`
 - Working tree: shared and dirty; unrelated changes must remain untouched.
-- Implementation commit: `75b92343` (`main`, pushed to `origin/main`).
+- Base implementation commit: `75b92343`.
+- Fraction extension commit: `7223c3c1` (`main`, pushed to `origin/main`).
 - Deployment: Firebase function `completeInteractiveLearningActivity` and Hosting deployed successfully to project `math-sense-1f6a8`.
 - Production URL: `https://math-sense-1f6a8.web.app`
-- Local extension: 분수 겹침 렌즈, 통분 겹침 렌즈, 약분 묶음 연구소의 기록·10광석 보상·피드백 근거 연동까지 구현했으며 아직 배포하지 않았다.
+- Fraction extension deployment: Firebase function `completeInteractiveLearningActivity` and Hosting deployed successfully from a clean `7223c3c1` worktree.
 
 ## Decisions
 
@@ -47,6 +48,8 @@ NEW · 체험 학습 전 종의 실제 완료를 일일 학습 기록에 남기�
 - `node scripts/test-fraction-reduction-lab.mjs` — passed.
 - `npx eslint src/components/Space/EquivalentFractionLab.jsx src/components/Space/CommonDenominatorLab.jsx src/components/Space/FractionReductionLab.jsx scripts/test-interactive-learning-rewards.mjs` — passed.
 - `npm run build` — passed again after the three fraction-lab integrations (including prerender and guide build).
+- Clean-worktree production build and all reward/fraction/course-isolation tests — passed immediately before deployment.
+- Production HTTP checks — exact SpaceHome, three fraction-lab, and reward-notice bundles all returned 200.
 - `node --check` for callable/export/service files — passed.
 - `npm --prefix functions run lint` remains unusable because the existing functions ESLint configuration reports CommonJS globals (`require`, `module`, `exports`) and 200+ pre-existing errors across the functions tree; the new policy tests and syntax checks pass.
 
@@ -61,5 +64,4 @@ NEW · 체험 학습 전 종의 실제 완료를 일일 학습 기록에 남기�
 
 ## Remaining
 
-- Deploy the extended callable policy and Hosting bundle before treating the three fraction labs as production-enabled.
 - Authenticated student smoke test for each fraction lab: confirm a first mission success creates one daily history row and one lifetime reward ledger row, while a duplicate creates neither extra crystals nor an extra same-day history row.
