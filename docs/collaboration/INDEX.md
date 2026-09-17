@@ -7,6 +7,7 @@ For an existing task, read its STATE.md and actual artifacts before continuing.
 
 | ID | Goal | Phase | State file | Next action |
 |---|---|---|---|---|
+| 20260917-live-status-crew-attendance | 실시간 학습 현황 결석 우선·크루 탭·집중방 참여 확인 | DEPLOYED_AND_VERIFIED | [STATE](tasks/20260917-live-status-crew-attendance/STATE.md) | `895746ed` Functions+Hosting 배포·운영 번들 확인; 관리자 실데이터 클릭 확인만 남음 |
 | 20260917-fractonis-fraction-reduction-lab | 프락토니스 약분 묶음·압축 체험 학습 | DEPLOYED_AND_VERIFIED | [STATE](tasks/20260917-fractonis-fraction-reduction-lab/STATE.md) | `7223c3c1` 배포; 기약분수 도달 기록·10광석·운영 번들 확인 |
 | 20260917-fractonis-equivalent-fraction-lab | 프락토니스 같은 크기 분수 겹침 렌즈 | DEPLOYED_AND_VERIFIED | [STATE](tasks/20260917-fractonis-equivalent-fraction-lab/STATE.md) | `7223c3c1` 배포; 미션 완료 기록·10광석·운영 번들 확인 |
 | 20260917-fractonis-common-denominator-lab | 프락토니스 통분 겹침 렌즈 | DEPLOYED_AND_VERIFIED | [STATE](tasks/20260917-fractonis-common-denominator-lab/STATE.md) | `7223c3c1` 배포; 통분·비교 완료 기록·10광석·운영 번들 확인 |
