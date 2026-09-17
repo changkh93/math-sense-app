@@ -3,7 +3,6 @@ import { motion, AnimatePresence } from 'framer-motion';
 import ReactMarkdown from 'react-markdown';
 import { useAuth } from '../../hooks/useAuth';
 import {
-  useApplyMissingAssignmentPenalties,
   useRecordAttendance,
   useStudentAssignments,
   useStudentAssignmentWarnings,
@@ -295,7 +294,6 @@ export default function AssignmentHub({ clusterId, regionId, initialDateStr, onC
   const [shareModalBook, setShareModalBook] = useState(null);
   const unsentDraftRef = useRef({ dirty: false });
   const previousTodayRef = useRef(todayKST);
-  const penaltySweepKeyRef = useRef('');
   const currentWeeklyGrowthWeekKey = useMemo(() => getMondayDateKey(todayKST), [todayKST]);
   const isCurrentWeeklyGrowthCompleted = weeklyGrowthStatus?.weekStartKey === currentWeeklyGrowthWeekKey
     && weeklyGrowthStatus?.status === 'completed';
@@ -370,7 +368,6 @@ export default function AssignmentHub({ clusterId, regionId, initialDateStr, onC
   const { data: clusters } = useClusters();
   const submitMutation = useSubmitAssignment();
   const attendanceMutation = useRecordAttendance();
-  const penaltyMutation = useApplyMissingAssignmentPenalties();
 
   useEffect(() => {
     if (!assignments?.length) return;
@@ -405,29 +402,6 @@ export default function AssignmentHub({ clusterId, regionId, initialDateStr, onC
     });
     return Array.from(byDate.values());
   }, [assignments, optimisticAssignmentsByDate]);
-
-  useEffect(() => {
-    if (!user?.uid || !clusterId) return;
-
-    const sweepKey = `${user.uid}:${clusterId}:${todayKST}`;
-    if (penaltySweepKeyRef.current === sweepKey || penaltyMutation.isPending) return;
-
-    penaltySweepKeyRef.current = sweepKey;
-    penaltyMutation.mutate(
-      { userId: user.uid, clusterId },
-      {
-        onSuccess: (result) => {
-          if (result?.applied > 0) {
-            console.info('과제 미제출 서버 검토 차감 적용:', result);
-          }
-        },
-        onError: (error) => {
-          penaltySweepKeyRef.current = '';
-          console.error('과제 미제출 서버 검토 실패:', error);
-        }
-      }
-    );
-  }, [user?.uid, clusterId, todayKST, penaltyMutation]);
 
   const clusterData = useMemo(() => {
     return clusters?.find(c => c.id === clusterId || c.docId === clusterId);

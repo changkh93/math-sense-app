@@ -32,7 +32,7 @@ import SectorLeaderboard from './SectorLeaderboard' // Leaderboard Integration
 import MissionLeaderboard from './MissionLeaderboard' // Leaderboard Integration
 import CrewMothershipFlyby from './CrewMothershipFlyby'
 import { useGlobalActiveRoomId } from '../../utils/roomState'
-import { useRecordAttendance, useStudentAttendance } from '../../hooks/useAssignments'
+import { useApplyMissingAssignmentPenalties, useRecordAttendance, useStudentAttendance } from '../../hooks/useAssignments'
 
 // import { useParticles, createParticleBurst } from './ParticleEffects'
 import { buildStreakWriteAudit, calculateStreakUpdate, getTodayKST, getMondayKSTKey, calculateStreakFromHistory, extractDefendedDates, extractLearningActivityDates, isRadarActive } from '../../utils/streakUtils'
@@ -98,6 +98,25 @@ import { isWesternClassicCluster, filterWesternClassicRegions } from '../../cons
 import { isCourseExplorerCluster } from './coursePlanetCatalog'
 import PublicHomeIntro from '../PublicHomeIntro'
 import Footer from '../common/Footer'
+
+const ASSIGNMENT_PENALTY_SWEEP_STORAGE_PREFIX = 'metasense.assignmentPenaltySweep.v1'
+
+function getAssignmentPenaltySweepClusterIds(userData, accessClaims) {
+  if (!userData || userData.isGuest || userData.role === 'admin' || userData.role === 'parent') return []
+
+  if (accessClaims?.version >= 1) {
+    return [...new Set((accessClaims.courses || []).filter(Boolean))].sort()
+  }
+
+  return Object.entries(userData.clusterAccess || {})
+    .filter(([, status]) => status === 'active')
+    .map(([clusterId]) => clusterId)
+    .sort()
+}
+
+function getAssignmentPenaltySweepStorageKey(userId, clusterId) {
+  return `${ASSIGNMENT_PENALTY_SWEEP_STORAGE_PREFIX}:${userId}:${clusterId}`
+}
 
 function SpaceViewFallback() {
   return (
@@ -892,6 +911,9 @@ function SpaceHome() {
   const navigate = useNavigate()
   const location = useLocation()
   const { user, userData, accessClaims, loading: authLoading } = useAuth()
+  const { mutateAsync: applyMissingAssignmentPenalties } = useApplyMissingAssignmentPenalties()
+  const penaltySweepInFlightRef = useRef(new Set())
+  const penaltySweepCompletedRef = useRef(new Set())
   const [learningSummary, setLearningSummary] = useState(null)
   const [recentCompletionHistory, setRecentCompletionHistory] = useState([])
   const [loadingHistory, setLoadingHistory] = useState(true)
@@ -1339,6 +1361,69 @@ function SpaceHome() {
         : access[clusterId] === 'active';
     });
   }, [accessClaims, clusters, loadingClusters, user, userData]);
+
+  const penaltySweepClusterIds = useMemo(
+    () => getAssignmentPenaltySweepClusterIds(userData, accessClaims),
+    [accessClaims, userData]
+  )
+  const penaltySweepClusterKey = penaltySweepClusterIds.join('|')
+
+  useEffect(() => {
+    if (
+      authLoading
+      || !user?.uid
+      || !userData
+      || userData.dataLoadError
+      || userData.recoveryRequired
+      || penaltySweepClusterIds.length === 0
+    ) return
+
+    const runDailySweeps = async () => {
+      for (const clusterId of penaltySweepClusterIds) {
+        const storageKey = getAssignmentPenaltySweepStorageKey(user.uid, clusterId)
+        const dailySweepKey = `${storageKey}:${todayKSTForAttendance}`
+        let wasCompletedOnThisBrowser = penaltySweepCompletedRef.current.has(dailySweepKey)
+        try {
+          wasCompletedOnThisBrowser = wasCompletedOnThisBrowser || localStorage.getItem(storageKey) === todayKSTForAttendance
+        } catch {
+          // In-memory de-duplication still protects this session when storage is unavailable.
+        }
+
+        if (wasCompletedOnThisBrowser || penaltySweepInFlightRef.current.has(dailySweepKey)) continue
+
+        penaltySweepInFlightRef.current.add(dailySweepKey)
+        try {
+          const result = await applyMissingAssignmentPenalties({
+            userId: user.uid,
+            clusterId,
+          })
+          penaltySweepCompletedRef.current.add(dailySweepKey)
+          try {
+            localStorage.setItem(storageKey, todayKSTForAttendance)
+          } catch {
+            // The successful server result remains valid even in private-storage modes.
+          }
+          if (result?.applied > 0) {
+            console.info('과제 미제출 일일 검토 차감 적용:', result)
+          }
+        } catch (error) {
+          console.error('과제 미제출 일일 검토 실패:', error)
+        } finally {
+          penaltySweepInFlightRef.current.delete(dailySweepKey)
+        }
+      }
+    }
+
+    runDailySweeps()
+  }, [
+    authLoading,
+    applyMissingAssignmentPenalties,
+    penaltySweepClusterKey,
+    penaltySweepClusterIds,
+    todayKSTForAttendance,
+    user?.uid,
+    userData,
+  ])
 
   const activeClusterData = useMemo(() => {
     if (!selectedClusterId) return null;
