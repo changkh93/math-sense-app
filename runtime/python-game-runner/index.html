@@ -213,6 +213,7 @@ TK_SOURCE = __STUDIO_TK_SOURCE__
 PANDAS_SOURCE = __STUDIO_PANDAS_SOURCE__
 PLOT_SOURCE = __STUDIO_PLOT_SOURCE__
 PLOT_FONT = __STUDIO_PLOT_FONT__
+STUDIO_FONTS_SOURCE = __STUDIO_FONTS_SOURCE__
 plot_session = None
 numpy_defaults = None
 pygame_surface_originals = {}
@@ -729,6 +730,12 @@ async def start_project(command):
     builtins.input = unsupported_input
     platform.window.studioActiveRun = run_id
     sys.stdout, sys.stderr = StudioOutput('STDOUT', run_id), StudioOutput('STDERR', run_id)
+    if 'pygame' in packages:
+        import pygame
+        import pygame.sysfont as pygame_sysfont
+        studio_fonts = types.ModuleType('studio_fonts')
+        exec(compile(STUDIO_FONTS_SOURCE, '/studio/studio_fonts.py', 'exec'), studio_fonts.__dict__)
+        studio_fonts.install(pygame_sysfont, PLOT_FONT)
     def trace(frame, event, arg):
         if event == 'line' and frame.f_code.co_filename.startswith(ROOT + '/') and time.monotonic() > context['deadline']:
             raise RuntimeError('반복문이 화면을 멈췄습니다. 게임 루프에 await asyncio.sleep(0)을 넣어 주세요.')

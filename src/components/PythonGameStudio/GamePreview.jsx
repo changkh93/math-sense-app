@@ -14,8 +14,9 @@ import pandasPython from '../../../runtime/python-game-runner/studio_pandas.py?r
 import plotPython from '../../../runtime/python-game-runner/studio_plot.py?raw'
 import plotRenderer from '../../../runtime/python-game-runner/plot-renderer.js?raw'
 import plotFont from '../../../public/mars-expedition/assets/fonts/DoHyeon-Regular.ttf?inline'
+import studioFontsPython from '../../../runtime/python-game-runner/studio_fonts.py?raw'
 
-const runnerDocument = buildRunnerDocument(runnerHtml, turtlePython, turtleRenderer, tkPython, tkRenderer, pandasPython, plotPython, plotRenderer, plotFont)
+const runnerDocument = buildRunnerDocument(runnerHtml, turtlePython, turtleRenderer, tkPython, tkRenderer, pandasPython, plotPython, plotRenderer, plotFont, studioFontsPython)
 
 // One isolated interpreter per editor session. Runs replace files/state over the port.
 export default function GamePreview({ uid, run, onEvent }) {

@@ -1,9 +1,10 @@
 // Build one self-contained document for both the app and standalone runner.
-export function buildRunnerDocument(html, turtlePython, turtleRenderer, tkPython, tkRenderer, pandasPython, plotPython = '', plotRenderer = '', plotFont = '') {
+export function buildRunnerDocument(html, turtlePython, turtleRenderer, tkPython, tkRenderer, pandasPython, plotPython = '', plotRenderer = '', plotFont = '', studioFontsPython = '') {
   return html
     .replace('<!-- STUDIO_PLOT_RENDERER -->', () => `<script>${plotRenderer}</script>`)
     .replace('__STUDIO_PLOT_SOURCE__', () => JSON.stringify(plotPython).replaceAll('<', '\\u003c'))
     .replace('__STUDIO_PLOT_FONT__', () => JSON.stringify(plotFont))
+    .replace('__STUDIO_FONTS_SOURCE__', () => JSON.stringify(studioFontsPython).replaceAll('<', '\\u003c'))
     .replace('<!-- STUDIO_TK_RENDERER -->', () => `<script>${tkRenderer}</script>`)
     .replace('__STUDIO_TK_SOURCE__', () => JSON.stringify(tkPython).replaceAll('<', '\\u003c'))
     .replace('__STUDIO_PANDAS_SOURCE__', () => JSON.stringify(pandasPython).replaceAll('<', '\\u003c'))
