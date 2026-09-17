@@ -8,6 +8,9 @@ const components = [
   ['src/components/Space/DivisionCardLab.jsx', 'division_cards', 'card-${currentCard.dividend}d${currentCard.divisor}'],
   ['src/components/Space/VerticalMultiplicationLab.jsx', 'vertical_multiplication', 'mission-${missionIndex + 1}'],
   ['src/components/Space/VerticalDivisionLab.jsx', 'vertical_division', 'mission-${missionIndex + 1}'],
+  ['src/components/Space/EquivalentFractionLab.jsx', 'equivalent_fractions', 'mission-${missionIndex + 1}'],
+  ['src/components/Space/CommonDenominatorLab.jsx', 'common_denominator', 'mission-${missionIndex + 1}'],
+  ['src/components/Space/FractionReductionLab.jsx', 'fraction_reduction', 'mission-${missionIndex + 1}'],
 ]
 
 for (const [path, activityId, completionKey] of components) {
@@ -29,11 +32,16 @@ for (const path of ['src/services/assignmentFeedbackService.js', 'scripts/export
   assert.ok(source.includes("'interactive_learning'"), `${path} separates the activity from quizzes`)
 }
 
+const feedbackService = read('src/services/assignmentFeedbackService.js')
+assert.ok(feedbackService.includes('같은 크기 분수·통분·약분 탐구의 최종 완료'))
+assert.ok(feedbackService.includes('기약분수에 도달한 때 완료로 해석'))
+
 const manual = read('docs/manual-assignment-feedback-workflow.md')
 assert.ok(manual.includes('NEW · 체험 학습 일일 기록·보상·과제 피드백 체크리스트'))
 assert.ok(manual.includes('suggestedBonusCrystals') && manual.includes('다시 지급하지 않는다'))
 assert.ok(manual.includes('카드 정답 1개') && manual.includes('3광석'))
 assert.ok(manual.includes('세로셈 미션 1개') && manual.includes('10광석'))
+assert.ok(manual.includes('분수 겹침 렌즈') && manual.includes('통분 겹침 렌즈') && manual.includes('약분 묶음 연구소'))
 
 const coursePolicy = read('src/services/coursePolicyUtils.js')
 assert.ok(coursePolicy.includes("normalizedCourse !== 'cluster_elementary'"), 'non-elementary prompts strip interactive learning')

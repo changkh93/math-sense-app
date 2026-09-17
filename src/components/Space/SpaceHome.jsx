@@ -91,6 +91,9 @@ const MultiplicationCardLab = lazy(() => import('./MultiplicationCardLab'))
 const VerticalMultiplicationLab = lazy(() => import('./VerticalMultiplicationLab'))
 const DivisionCardLab = lazy(() => import('./DivisionCardLab'))
 const VerticalDivisionLab = lazy(() => import('./VerticalDivisionLab'))
+const EquivalentFractionLab = lazy(() => import('./EquivalentFractionLab'))
+const CommonDenominatorLab = lazy(() => import('./CommonDenominatorLab'))
+const FractionReductionLab = lazy(() => import('./FractionReductionLab'))
 import { isWesternClassicCluster, filterWesternClassicRegions } from '../../constants/westernClassicNavigation'
 import { isCourseExplorerCluster } from './coursePlanetCatalog'
 import PublicHomeIntro from '../PublicHomeIntro'
@@ -924,6 +927,9 @@ function SpaceHome() {
   const [verticalMultiplicationLabOpen, setVerticalMultiplicationLabOpen] = useState(false)
   const [divisionCardLabOpen, setDivisionCardLabOpen] = useState(false)
   const [verticalDivisionLabOpen, setVerticalDivisionLabOpen] = useState(false)
+  const [equivalentFractionLabOpen, setEquivalentFractionLabOpen] = useState(false)
+  const [commonDenominatorLabOpen, setCommonDenominatorLabOpen] = useState(false)
+  const [fractionReductionLabOpen, setFractionReductionLabOpen] = useState(false)
   const galaxyPlay = useGalaxyPlaySession({ uid: user?.uid, active: currentView === 'galaxy', isGuest: userData?.isGuest === true })
 
   useEffect(() => {
@@ -4585,6 +4591,48 @@ function SpaceHome() {
     )
   }
 
+  if (equivalentFractionLabOpen) {
+    return (
+      <Suspense fallback={<SpaceViewFallback />}>
+        <EquivalentFractionLab
+          userId={user?.uid}
+          onExit={() => {
+            setEquivalentFractionLabOpen(false)
+            soundManager.playClick?.()
+          }}
+        />
+      </Suspense>
+    )
+  }
+
+  if (commonDenominatorLabOpen) {
+    return (
+      <Suspense fallback={<SpaceViewFallback />}>
+        <CommonDenominatorLab
+          userId={user?.uid}
+          onExit={() => {
+            setCommonDenominatorLabOpen(false)
+            soundManager.playClick?.()
+          }}
+        />
+      </Suspense>
+    )
+  }
+
+  if (fractionReductionLabOpen) {
+    return (
+      <Suspense fallback={<SpaceViewFallback />}>
+        <FractionReductionLab
+          userId={user?.uid}
+          onExit={() => {
+            setFractionReductionLabOpen(false)
+            soundManager.playClick?.()
+          }}
+        />
+      </Suspense>
+    )
+  }
+
   // Main App
   return (
     <div className={`space-bg ${isMobile ? 'mobile-space-home' : ''}`} style={{ 
@@ -5655,6 +5703,91 @@ function SpaceHome() {
                           }}
                           onClick={() => {
                             setVerticalMultiplicationLabOpen(true)
+                            soundManager.playWarp?.()
+                          }}
+                        />
+                      </div>
+                    </section>
+                  )}
+
+                  {selectedRegionId === 'fractions' && (
+                    <section
+                      aria-labelledby="fraction-experience-title"
+                      style={{
+                        marginTop: isMobile ? '1.35rem' : '2.25rem',
+                        paddingTop: isMobile ? '1.1rem' : '1.5rem',
+                        borderTop: '1px solid rgba(118, 103, 255, 0.2)',
+                      }}
+                    >
+                      <div style={{ marginBottom: isMobile ? '0.8rem' : '1rem' }}>
+                        <strong id="fraction-experience-title" className="font-title" style={{ display: 'block', color: '#effcff', fontSize: isMobile ? '1rem' : '1.22rem' }}>
+                          NEW · 체험 학습
+                        </strong>
+                        <span style={{ display: 'block', marginTop: '0.28rem', color: '#7fa0b0', fontSize: isMobile ? '0.72rem' : '0.82rem' }}>
+                          분수카드를 겹치고 조각을 묶으며, 같은 크기 분수·통분·약분의 원리를 발견해요.
+                        </span>
+                      </div>
+                      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, minmax(0, 1fr))', gap: isMobile ? '0.75rem' : '1rem' }}>
+                        <ExperienceLearningCard
+                          testId="equivalent-fraction-lab-entry"
+                          eyebrow="관찰하고 발견하기"
+                          badge="6개 렌즈 탐구"
+                          title="분수 겹침 렌즈"
+                          description="종이카드 위에 투명카드를 끌어 겹쳐요. 색칠한 넓이는 그대로인데 분자와 분모가 함께 늘어나는 순간을 직접 확인해요."
+                          icon="▦"
+                          isMobile={isMobile}
+                          accent={{
+                            border: 'rgba(146, 124, 255, 0.5)',
+                            background: 'linear-gradient(120deg, rgba(44, 72, 119, 0.82), rgba(76, 42, 111, 0.8))',
+                            shadow: '0 14px 38px rgba(113, 94, 255, 0.14)',
+                            icon: 'linear-gradient(135deg, #74f1de, #9b87ff)',
+                            iconShadow: '0 0 28px rgba(141, 116, 255, 0.3)',
+                            label: '#a99aff',
+                          }}
+                          onClick={() => {
+                            setEquivalentFractionLabOpen(true)
+                            soundManager.playWarp?.()
+                          }}
+                        />
+                        <ExperienceLearningCard
+                          testId="common-denominator-lab-entry"
+                          eyebrow="겹치고 비교하기"
+                          badge="8개 공통 칸"
+                          title="통분 렌즈 연구소"
+                          description="서로 다른 두 분수카드에 투명 렌즈를 겹쳐 같은 크기의 방을 만들어요. 통분한 두 분수를 직접 쓰고 크기도 비교해요."
+                          icon="▥"
+                          isMobile={isMobile}
+                          accent={{
+                            border: 'rgba(82, 226, 210, 0.5)',
+                            background: 'linear-gradient(120deg, rgba(22, 91, 105, 0.82), rgba(77, 48, 118, 0.82))',
+                            shadow: '0 14px 38px rgba(77, 220, 207, 0.14)',
+                            icon: 'linear-gradient(135deg, #5ce8d2, #c09dff)',
+                            iconShadow: '0 0 28px rgba(101, 223, 214, 0.28)',
+                            label: '#71ead8',
+                          }}
+                          onClick={() => {
+                            setCommonDenominatorLabOpen(true)
+                            soundManager.playWarp?.()
+                          }}
+                        />
+                        <ExperienceLearningCard
+                          testId="fraction-reduction-lab-entry"
+                          eyebrow="묶고 압축하기"
+                          badge="8개 약분 탐구"
+                          title="약분 묶음 연구소"
+                          description="정사각형 분수 빌딩의 작은 칸을 같은 수만큼 묶어요. 빌딩 전체에 남는 칸이 없을 때 더 간단한 큰 방 빌딩으로 바뀌는 모습을 관찰해요."
+                          icon="⊟"
+                          isMobile={isMobile}
+                          accent={{
+                            border: 'rgba(255, 196, 99, 0.52)',
+                            background: 'linear-gradient(120deg, rgba(14, 101, 89, 0.84), rgba(112, 69, 41, 0.8))',
+                            shadow: '0 14px 38px rgba(255, 190, 89, 0.12)',
+                            icon: 'linear-gradient(135deg, #61ebcc, #ffc56a)',
+                            iconShadow: '0 0 28px rgba(255, 194, 97, 0.28)',
+                            label: '#ffd077',
+                          }}
+                          onClick={() => {
+                            setFractionReductionLabOpen(true)
                             soundManager.playWarp?.()
                           }}
                         />

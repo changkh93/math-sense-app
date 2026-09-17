@@ -10,12 +10,15 @@ const {
   resolveInteractiveLearningCompletion,
 } = require("./interactiveLearningRewardPolicy.cjs");
 
-test("defines the four student-facing experiences and rewards", () => {
-  assert.equal(Object.keys(INTERACTIVE_LEARNING_ACTIVITIES).length, 4);
+test("defines all seven student-facing experiences and rewards", () => {
+  assert.equal(Object.keys(INTERACTIVE_LEARNING_ACTIVITIES).length, 7);
   assert.equal(INTERACTIVE_LEARNING_ACTIVITIES.multiplication_cards.reward, 3);
   assert.equal(INTERACTIVE_LEARNING_ACTIVITIES.division_cards.reward, 3);
   assert.equal(INTERACTIVE_LEARNING_ACTIVITIES.vertical_multiplication.reward, 10);
   assert.equal(INTERACTIVE_LEARNING_ACTIVITIES.vertical_division.reward, 10);
+  assert.equal(INTERACTIVE_LEARNING_ACTIVITIES.equivalent_fractions.reward, 10);
+  assert.equal(INTERACTIVE_LEARNING_ACTIVITIES.common_denominator.reward, 10);
+  assert.equal(INTERACTIVE_LEARNING_ACTIVITIES.fraction_reduction.reward, 10);
 });
 
 test("accepts only allowlisted completion keys", () => {
@@ -27,6 +30,12 @@ test("accepts only allowlisted completion keys", () => {
   assert.equal(resolveInteractiveLearningCompletion({ activityId: "vertical_multiplication", completionKey: "mission-11" }, now).ok, false);
   assert.equal(resolveInteractiveLearningCompletion({ activityId: "vertical_division", completionKey: "mission-20" }, now).ok, true);
   assert.equal(resolveInteractiveLearningCompletion({ activityId: "vertical_division", completionKey: "mission-21" }, now).ok, false);
+  assert.equal(resolveInteractiveLearningCompletion({ activityId: "equivalent_fractions", completionKey: "mission-6" }, now).ok, true);
+  assert.equal(resolveInteractiveLearningCompletion({ activityId: "equivalent_fractions", completionKey: "mission-7" }, now).ok, false);
+  assert.equal(resolveInteractiveLearningCompletion({ activityId: "common_denominator", completionKey: "mission-8" }, now).ok, true);
+  assert.equal(resolveInteractiveLearningCompletion({ activityId: "common_denominator", completionKey: "mission-9" }, now).ok, false);
+  assert.equal(resolveInteractiveLearningCompletion({ activityId: "fraction_reduction", completionKey: "mission-18" }, now).ok, true);
+  assert.equal(resolveInteractiveLearningCompletion({ activityId: "fraction_reduction", completionKey: "mission-19" }, now).ok, false);
 });
 
 test("separates lifetime reward ids from KST daily history ids", () => {

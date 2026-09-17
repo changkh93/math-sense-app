@@ -29,6 +29,27 @@ const INTERACTIVE_LEARNING_ACTIVITIES = Object.freeze({
     reward: 10,
     completionPattern: /^mission-(?:[1-9]|1\d|20)$/,
   }),
+  equivalent_fractions: Object.freeze({
+    title: "분수 겹침 렌즈",
+    regionId: "fractions",
+    regionTitle: "프락토니스",
+    reward: 10,
+    completionPattern: /^mission-[1-6]$/,
+  }),
+  common_denominator: Object.freeze({
+    title: "통분 겹침 렌즈",
+    regionId: "fractions",
+    regionTitle: "프락토니스",
+    reward: 10,
+    completionPattern: /^mission-[1-8]$/,
+  }),
+  fraction_reduction: Object.freeze({
+    title: "약분 묶음 연구소",
+    regionId: "fractions",
+    regionTitle: "프락토니스",
+    reward: 10,
+    completionPattern: /^mission-(?:[1-9]|1[0-8])$/,
+  }),
 });
 
 function getKSTDateString(now = new Date()) {

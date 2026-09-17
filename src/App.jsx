@@ -66,6 +66,15 @@ const DivisionCardLabDev = import.meta.env.DEV
 const VerticalDivisionLabDev = import.meta.env.DEV
   ? lazy(() => import('./components/Space/VerticalDivisionLab'))
   : null
+const EquivalentFractionLabDev = import.meta.env.DEV
+  ? lazy(() => import('./components/Space/EquivalentFractionLab'))
+  : null
+const CommonDenominatorLabDev = import.meta.env.DEV
+  ? lazy(() => import('./components/Space/CommonDenominatorLab'))
+  : null
+const FractionReductionLabDev = import.meta.env.DEV
+  ? lazy(() => import('./components/Space/FractionReductionLab'))
+  : null
 
 const AlgorithmConstellationHub = lazy(() => import('./components/AlgorithmConstellation/client/hub/AlgorithmConstellationHub'))
 
@@ -163,6 +172,24 @@ function App() {
         <Route
           path="/dev/vertical-division-lab"
           element={<VerticalDivisionLabDev userId="local-qa" onExit={() => window.history.back()} />}
+        />
+      )}
+      {EquivalentFractionLabDev && (
+        <Route
+          path="/dev/equivalent-fraction-lab"
+          element={<EquivalentFractionLabDev userId="local-qa" onExit={() => window.history.back()} />}
+        />
+      )}
+      {CommonDenominatorLabDev && (
+        <Route
+          path="/dev/common-denominator-lab"
+          element={<CommonDenominatorLabDev userId="local-qa" onExit={() => window.history.back()} />}
+        />
+      )}
+      {FractionReductionLabDev && (
+        <Route
+          path="/dev/fraction-reduction-lab"
+          element={<FractionReductionLabDev userId="local-qa" onExit={() => window.history.back()} />}
         />
       )}
       <Route path="/algorithm-constellation" element={
