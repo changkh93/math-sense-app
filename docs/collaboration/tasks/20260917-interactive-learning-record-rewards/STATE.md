@@ -6,10 +6,12 @@ NEW · 체험 학습 네 종의 실제 완료를 일일 학습 기록에 남기�
 
 ## Status
 
-- Phase: DONE_LOCAL
+- Phase: DEPLOYED
 - Baseline: `be1b8472`
 - Working tree: shared and dirty; unrelated changes must remain untouched.
-- Deployment: not requested in this turn.
+- Implementation commit: `75b92343` (`main`, pushed to `origin/main`).
+- Deployment: Firebase function `completeInteractiveLearningActivity` and Hosting deployed successfully to project `math-sense-1f6a8`.
+- Production URL: `https://math-sense-1f6a8.web.app`
 
 ## Decisions
 
@@ -50,4 +52,4 @@ NEW · 체험 학습 네 종의 실제 완료를 일일 학습 기록에 남기�
 
 ## Remaining
 
-- Deploy the callable and Hosting together when requested, then verify with an authenticated student account that a first success creates one daily history row and one lifetime reward ledger row, while a duplicate creates neither extra crystals nor an extra same-day history row.
+- Authenticated student smoke test: confirm a first success creates one daily history row and one lifetime reward ledger row, while a duplicate creates neither extra crystals nor an extra same-day history row.
