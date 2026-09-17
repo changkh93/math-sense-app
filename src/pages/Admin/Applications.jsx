@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { collection, doc, onSnapshot, orderBy, query, setDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, doc, getDocs, onSnapshot, orderBy, query, setDoc, serverTimestamp, where } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
 import { ClipboardList, Phone, Gift, CheckCircle2 } from 'lucide-react';
 import { db, functions } from '../../firebase';
@@ -75,6 +75,8 @@ const fieldStyle = { width: '100%', boxSizing: 'border-box', marginTop: 4, paddi
 
 export default function Applications() {
   const [applications, setApplications] = useState([]);
+  const [referrerStudentNames, setReferrerStudentNames] = useState({});
+  const [referrerParentNames, setReferrerParentNames] = useState({});
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('all');
 
@@ -86,6 +88,51 @@ export default function Applications() {
     });
     return () => unsub();
   }, []);
+
+  useEffect(() => {
+    const studentUids = [...new Set(applications.map(app => app.referrerStudentUid).filter(Boolean))];
+    const parentUids = [...new Set(applications.map(app => app.referrerParentUid).filter(Boolean))];
+    if (studentUids.length === 0 && parentUids.length === 0) {
+      return undefined;
+    }
+
+    let cancelled = false;
+    const fetchNames = async (collectionName, uids, getName) => {
+      const names = {};
+      // Firestore `in` queries accept at most 30 values per request.
+      for (let i = 0; i < uids.length; i += 30) {
+        const batch = uids.slice(i, i + 30);
+        const nameQuery = query(collection(db, collectionName), where('__name__', 'in', batch));
+        const snapshot = await getDocs(nameQuery);
+        snapshot.docs.forEach(profileDoc => {
+          names[profileDoc.id] = getName(profileDoc.data());
+        });
+      }
+      return names;
+    };
+
+    Promise.all([
+      fetchNames('users', studentUids, userData => (
+        userData.studentName || userData.name || userData.displayName || userData.publicDisplayName || ''
+      )),
+      fetchNames('parents', parentUids, parentData => (
+        parentData.name || parentData.parentName || parentData.displayName || ''
+      ))
+    ]).then(([studentNames, parentNames]) => {
+      if (cancelled) return;
+      setReferrerStudentNames(studentNames);
+      setReferrerParentNames(parentNames);
+    }).catch(error => {
+      console.error('Failed to load referrer names:', error);
+      if (cancelled) return;
+      setReferrerStudentNames({});
+      setReferrerParentNames({});
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [applications]);
 
   const filtered = useMemo(() => {
     if (filter === 'all') return applications;
@@ -148,7 +195,11 @@ export default function Applications() {
                     <div style={{ marginTop: 8, color: '#bbf7d0', fontSize: '0.92rem' }}>
                       {app.referralInviteId ? <>
                         추천 혜택: {app.oneMonthReferralTrial ? '4주 무료체험' : '확인 필요'}<br />
-                        추천 학생 UID: {app.referrerStudentUid || '-'} · 추천 학부모 UID: {app.referrerParentUid || '-'}<br />
+                        추천 학생: {app.referrerStudentUid
+                          ? `${referrerStudentNames[app.referrerStudentUid] || '이름 확인 불가'} (UID: ${app.referrerStudentUid})`
+                          : '-'} · 추천 학부모: {app.referrerParentUid
+                          ? `${referrerParentNames[app.referrerParentUid] || '이름 확인 불가'} (UID: ${app.referrerParentUid})`
+                          : '-'}<br />
                         초대 기록: {app.referralInviteId}
                       </> : <>추천 수강생: {app.referredStudentName || '-'} · 추천인 전화: {formatPhone(app.referrerParentPhone)}</>}
                     </div>
