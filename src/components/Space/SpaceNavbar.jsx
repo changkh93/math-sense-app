@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { signOut } from 'firebase/auth';
 import { httpsCallable } from 'firebase/functions';
 import { doc, getDoc, onSnapshot } from 'firebase/firestore';
-import { Bell, ExternalLink, MessageCircle, Video } from 'lucide-react';
+import { Bell, ExternalLink, HeartHandshake, MessageCircle, Video } from 'lucide-react';
 import { ACCOUNT_DELETION_CALL_TIMEOUT_MS, auth, db, functions } from '../../firebase';
 import { useAuth } from '../../hooks/useAuth';
 import soundManager from '../../utils/SoundManager';
@@ -31,6 +31,12 @@ const LIVE_SUPPORT_LINKS = [
     subtitle: '선생님과 일대일로 소통하고 질문하는 공간',
     href: 'https://meet.google.com/qzg-psru-qnc',
     Icon: MessageCircle
+  },
+  {
+    label: '1:1 성장방',
+    subtitle: '선생님과 30분간 화면을 함께 보며 공부와 고민을 나누는 공간',
+    href: 'https://meet.google.com/tha-vabu-tio',
+    Icon: HeartHandshake
   }
 ];
 
