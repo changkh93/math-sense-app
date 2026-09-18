@@ -97,6 +97,7 @@ const FractionReductionLab = lazy(() => import('./FractionReductionLab'))
 import { isWesternClassicCluster, filterWesternClassicRegions } from '../../constants/westernClassicNavigation'
 import { isCourseExplorerCluster } from './coursePlanetCatalog'
 import PublicHomeIntro from '../PublicHomeIntro'
+import PublicHomeLoginDialog from '../PublicHomeLoginDialog'
 import Footer from '../common/Footer'
 
 const ASSIGNMENT_PENALTY_SWEEP_STORAGE_PREFIX = 'metasense.assignmentPenaltySweep.v1'
@@ -931,6 +932,9 @@ function SpaceHome() {
   const [todayKSTForAttendance, setTodayKSTForAttendance] = useState(() => getTodayKST())
   const [activeRoomId, setActiveRoomId] = useGlobalActiveRoomId()
   const [loginPanelOpen, setLoginPanelOpen] = useState(false)
+  useEffect(() => {
+    if (!user && location.hash === '#login') setLoginPanelOpen(true)
+  }, [user, location.hash])
   const [loginId, setLoginId] = useState('')
   const [loginPassword, setLoginPassword] = useState('')
   const [loginLoading, setLoginLoading] = useState(false)
@@ -3578,23 +3582,6 @@ function SpaceHome() {
 
   // No sound engine sync needed for typing anymore
 
-  const letterVariants = {
-    hidden: { opacity: 0, scale: 0, y: 0, filter: "blur(20px)" },
-    visible: (i) => ({ 
-      opacity: 1, 
-      scale: 1,
-      y: 0,
-      filter: "blur(0px)",
-      textShadow: "0 0 20px #00f3ff, 0 0 40px rgba(0, 243, 255, 0.4)",
-      transition: { 
-        delay: 0.1 + i * 0.04,
-        type: "spring", 
-        stiffness: 100, 
-        damping: 15
-      }
-    })
-  }
-
   // Loading State with Timeout & Error handling
   const hasAccountDataIssue = Boolean(userData?.dataLoadError || userData?.recoveryRequired)
   const isUserDataPending = Boolean(user && !userData && !hasAccountDataIssue)
@@ -3602,6 +3589,8 @@ function SpaceHome() {
   // render inside the shell with their own loading/error states, so one slow
   // Firestore request cannot strand the page on a full-screen loader.
   const isLoading = authLoading || isUserDataPending
+
+  if (isLoading && !user) return <><PublicHomeIntro /><Footer /></>
 
   if (isLoading) {
     return (
@@ -3628,363 +3617,11 @@ function SpaceHome() {
     )
   }
 
-  // Login Screen
+  // Public education homepage; existing authentication handlers are unchanged.
   if (!user) {
-    const titleText = "META SENSE"
-    
-    return (
-      <>
-      <div className="space-bg logged-out-home" style={{ display: 'flex', flexDirection: 'column', minHeight: 0 }}>
-        <StarField count={200} />
-        <div className="nebula-bg" />
-        <div
-          style={{
-            position: 'absolute',
-            top: 18,
-            left: '50%',
-            transform: 'translateX(-50%)',
-            zIndex: 140,
-            width: 'min(1120px, calc(100% - 28px))',
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            gap: 12,
-            pointerEvents: 'auto'
-          }}
-        >
-          <button
-            type="button"
-            onClick={() => navigate('/')}
-            className="font-title"
-            style={{
-              border: 'none',
-              background: 'transparent',
-              color: 'var(--crystal-cyan)',
-              fontWeight: 900,
-              cursor: 'pointer',
-              textShadow: '0 0 12px rgba(0,212,255,0.6)'
-            }}
-          >
-            META SENSE
-          </button>
-          <div className="login-public-actions">
-            {[
-              ['무료체험', '/trial', '1주일 무료'],
-              ['전화상담', '/consultation'],
-              ['회원가입', '/signup']
-            ].map(([label, path, badge]) => (
-              <button
-                key={path}
-                type="button"
-                onClick={() => navigate(path)}
-                className={`font-tech login-public-action${path === '/trial' ? ' login-public-action--trial' : ''}`}
-                aria-label={path === '/trial' ? '1주일 무료체험 신청' : label}
-              >
-                <span className="login-public-action__label">{label}</span>
-                {badge && <span className="login-public-action__badge">{badge}</span>}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <AnimatePresence>
-          {signupPrompt && (
-            <Motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              style={{
-                position: 'fixed',
-                inset: 0,
-                zIndex: 260,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                padding: isMobile ? 18 : 24,
-                background: 'rgba(2, 6, 18, 0.68)',
-                backdropFilter: 'blur(8px)'
-              }}
-              role="dialog"
-              aria-modal="true"
-              aria-labelledby="signup-required-title"
-            >
-              <Motion.div
-                initial={{ opacity: 0, y: 22, scale: 0.96 }}
-                animate={{ opacity: 1, y: 0, scale: 1 }}
-                exit={{ opacity: 0, y: 12, scale: 0.98 }}
-                transition={{ duration: 0.2 }}
-                className="hud-border"
-                style={{
-                  width: 'min(100%, 460px)',
-                  borderRadius: 18,
-                  background: 'linear-gradient(180deg, rgba(17, 25, 48, 0.96), rgba(8, 12, 30, 0.96))',
-                  boxShadow: '0 0 40px rgba(0, 212, 255, 0.18)',
-                  padding: isMobile ? '1.25rem' : '1.5rem',
-                  color: 'white'
-                }}
-              >
-                <div className="font-title" id="signup-required-title" style={{
-                  color: 'var(--crystal-cyan)',
-                  fontSize: isMobile ? '1.25rem' : '1.45rem',
-                  marginBottom: '0.85rem',
-                  textShadow: '0 0 14px rgba(0, 212, 255, 0.55)'
-                }}>
-                  회원가입이 필요합니다
-                </div>
-                <p style={{
-                  margin: 0,
-                  color: 'rgba(255,255,255,0.78)',
-                  lineHeight: 1.7,
-                  fontSize: isMobile ? '0.98rem' : '1.05rem'
-                }}>
-                  이 계정은 아직 메타센스 회원으로 등록되어 있지 않습니다. 회원가입을 먼저 완료한 뒤 같은 화면에서 로그인해 주세요.
-                </p>
-                {signupPrompt.email && (
-                  <div className="font-tech" style={{
-                    marginTop: '1rem',
-                    border: '1px solid rgba(0, 212, 255, 0.18)',
-                    background: 'rgba(0, 212, 255, 0.08)',
-                    borderRadius: 12,
-                    padding: '0.8rem 0.9rem',
-                    color: 'rgba(255,255,255,0.82)',
-                    wordBreak: 'break-all'
-                  }}>
-                    시도한 계정: {signupPrompt.email}
-                  </div>
-                )}
-                <div style={{
-                  display: 'flex',
-                  flexDirection: isMobile ? 'column' : 'row',
-                  gap: 10,
-                  marginTop: '1.35rem'
-                }}>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setSignupPrompt(null)
-                      navigate('/signup')
-                    }}
-                    className="font-tech"
-                    style={{
-                      flex: 1,
-                      border: 'none',
-                      borderRadius: 12,
-                      background: 'linear-gradient(135deg, var(--crystal-cyan), #7c3aed)',
-                      color: '#04111f',
-                      padding: '0.9rem 1rem',
-                      fontWeight: 900,
-                      cursor: 'pointer',
-                      fontSize: '1rem'
-                    }}
-                  >
-                    회원가입하기
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setSignupPrompt(null)}
-                    className="font-tech"
-                    style={{
-                      flex: 1,
-                      border: '1px solid rgba(255,255,255,0.18)',
-                      borderRadius: 12,
-                      background: 'rgba(255,255,255,0.08)',
-                      color: 'white',
-                      padding: '0.9rem 1rem',
-                      fontWeight: 800,
-                      cursor: 'pointer',
-                      fontSize: '1rem'
-                    }}
-                  >
-                    닫기
-                  </button>
-                </div>
-              </Motion.div>
-            </Motion.div>
-          )}
-        </AnimatePresence>
-        
-        <div className="space-container login-layout" style={{ 
-          flex: 1, // Take available vertical space
-          display: 'flex', 
-          flexDirection: 'column',
-          alignItems: 'center', 
-          justifyContent: 'center', // 화면 중앙 정렬
-          textAlign: 'center',
-          position: 'relative',
-          zIndex: 10,
-          padding: isMobile ? '7rem 1.5rem 4rem' : '7rem 2rem 5rem'
-        }}>
-          {/* 왼쪽 행성 장식 */}
-          <div style={{ 
-            position: 'absolute',
-            top: '30%',
-            left: isMobile ? '15px' : '40px',
-            transform: 'translateY(-50%)',
-            width: isMobile ? '120px' : '180px',
-            height: isMobile ? '120px' : '180px',
-            pointerEvents: 'none',
-            zIndex: 5,
-            display: loginPanelOpen ? 'none' : 'block'
-          }}>
-            <Suspense fallback={null}>
-              <Planet3D 
-                color="#4a90e2" 
-                size={isMobile ? 0.5 : 0.7} 
-                height={isMobile ? '100px' : '160px'}
-                showSpaceship={false} 
-                interactive={false} 
-                showFormulas={false}
-                equipment={equipment} 
-                isBoosting={false}
-              />
-            </Suspense>
-            {/* Fail-safe circle */}
-            <div style={{
-              position: 'absolute',
-              top: '50%',
-              left: '50%',
-              transform: 'translate(-50%, -50%)',
-              width: isMobile ? '60px' : '100px',
-              height: isMobile ? '60px' : '100px',
-              borderRadius: '50%',
-              background: 'radial-gradient(circle, #1e3a5f 0%, #0a0a1a 70%)',
-              boxShadow: '0 0 30px rgba(0, 212, 255, 0.3)',
-              zIndex: -1
-            }} />
-          </div>
-
-          {/* 중앙 컨텐츠 */}
-          <div style={{ 
-            display: 'flex', 
-            flexDirection: 'column', 
-            alignItems: 'center', 
-            gap: loginPanelOpen ? (isMobile ? '0.8rem' : '1rem') : (isMobile ? '1.5rem' : '2rem'),
-            maxWidth: '800px',
-            width: '100%'
-          }}>
-            {/* 타이틀 섹션 */}
-            <div
-              className="login-header"
-              style={{
-                width: '100%',
-                pointerEvents: 'none',
-                display: loginPanelOpen ? 'none' : 'block'
-              }}
-            >
-              <Motion.div
-                initial={{ opacity: 0, scale: 0.8 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ duration: 1.5, ease: "easeOut" }}
-                style={{ display: 'flex', justifyContent: 'center', marginBottom: loginPanelOpen ? '0.45rem' : (isMobile ? '1rem' : '2rem') }}
-              >
-                <img
-                  src="/m-logo.svg"
-                  alt="Meta Sense Logo"
-                  style={{
-                    width: loginPanelOpen ? (isMobile ? '52px' : '72px') : (isMobile ? '80px' : '120px'),
-                    filter: 'drop-shadow(0 0 20px rgba(0, 243, 255, 0.5))',
-                    transition: 'width 0.25s ease'
-                  }}
-                />
-              </Motion.div>
-              <Motion.div 
-                initial="hidden"
-                animate="visible"
-                className="font-title"
-                style={{ 
-                  marginBottom: '0.8rem',
-                  display: loginPanelOpen ? 'none' : 'flex',
-                  gap: isMobile ? '0.3rem' : '0.6rem',
-                  flexWrap: 'wrap',
-                  justifyContent: 'center',
-                  position: 'relative',
-                  zIndex: 100
-                }}
-              >
-                {titleText.split(" ").map((word, i) => (
-                  <div key={i} style={{ display: 'flex' }}>
-                     {word.split("").map((char, j) => {
-                       const index = i * 10 + j
-                       return (
-                         <Motion.span
-                           key={j}
-                           custom={index}
-                           variants={letterVariants}
-                           id={`letter-${i}-${j}`}
-                           style={{ 
-                             fontSize: loginPanelOpen ? (isMobile ? '1.8rem' : '2.75rem') : (isMobile ? '2.2rem' : '4rem'), 
-                             color: '#ffffff',
-                             textShadow: '0 0 20px #00f3ff, 0 0 40px #00f3ff',
-                             display: 'inline-block',
-                             fontWeight: 900,
-                             transition: 'font-size 0.25s ease'
-                           }}
-                         >
-                           {char}
-                         </Motion.span>
-                       )
-                     })}
-                     <span style={{ width: isMobile ? '0.6rem' : '1.2rem' }}></span>
-                  </div>
-                ))}
-              </Motion.div>
-              
-              <Motion.p 
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 1 }}
-                className="font-tech"
-                style={{ 
-                  color: 'var(--crystal-cyan)', 
-                  fontSize: loginPanelOpen ? (isMobile ? '0.78rem' : '0.92rem') : (isMobile ? '0.95rem' : '1.2rem'),
-                  letterSpacing: loginPanelOpen ? '2px' : '3px',
-                  textShadow: '0 0 10px var(--crystal-glow)',
-                  margin: 0
-                }}
-              >
-                SYSTEM ONLINE. WAITING FOR PILOT.
-              </Motion.p>
-            </div>
-            
-            {/* 컨트롤 섹션: 버튼 + 토글 가로 배치 */}
-            <Motion.div 
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 1.2 }}
-              className="login-controls"
-              style={{ 
-                display: 'flex', 
-                flexDirection: isMobile ? 'column' : 'row',
-                alignItems: 'center', 
-                justifyContent: 'center',
-                gap: isMobile ? '1rem' : '1.5rem',
-                marginTop: loginPanelOpen ? '0' : '1rem'
-              }}
-            >
-              <Motion.button 
-                whileHover={{ scale: 1.05, boxShadow: "0 0 30px var(--neon-blue)" }}
-                whileTap={{ scale: 0.95 }}
-                className="glass-card font-title"
-                onClick={handleLogin}
-                style={{
-                  padding: loginPanelOpen ? (isMobile ? '0.9rem 2rem' : '0.95rem 2.6rem') : (isMobile ? '1.2rem 3rem' : '1.2rem 3.5rem'),
-                  fontSize: loginPanelOpen ? (isMobile ? '1rem' : '1.08rem') : (isMobile ? '1.2rem' : '1.3rem'),
-                  color: 'var(--text-bright)',
-                  cursor: 'pointer',
-                  border: '2px solid var(--crystal-cyan)',
-                  background: 'rgba(0, 212, 255, 0.15)',
-                  boxShadow: '0 0 15px rgba(0, 212, 255, 0.2)',
-                  whiteSpace: 'nowrap',
-                  width: isMobile ? '100%' : 'auto',
-                  transition: 'all 0.25s ease'
-                }}
-              >
-                시스템 접속 (LOGIN)
-              </Motion.button>
-            </Motion.div>
-
-            <AnimatePresence>
-              {loginPanelOpen && (
+    return <>
+      <PublicHomeIntro onLogin={handleLogin} />
+      <PublicHomeLoginDialog open={loginPanelOpen} onClose={() => setLoginPanelOpen(false)}>
                 <Motion.form
                   onSubmit={handleCredentialLogin}
                   initial={{ opacity: 0, y: 18, scale: 0.96 }}
@@ -4006,11 +3643,12 @@ function SpaceHome() {
                   }}
                 >
                   <div className="font-title" style={{ color: 'var(--text-bright)', fontSize: '1rem', textAlign: 'left' }}>
-                    ACCESS CREDENTIALS
+                    아이디로 로그인
                   </div>
                   <input
                     value={loginId}
                     onChange={(e) => setLoginId(e.target.value)}
+                    aria-label="아이디 또는 전화번호"
                     placeholder="아이디 또는 전화번호"
                     autoComplete="username"
                     style={{
@@ -4029,6 +3667,7 @@ function SpaceHome() {
                     type="password"
                     value={loginPassword}
                     onChange={(e) => setLoginPassword(e.target.value)}
+                    aria-label="비밀번호"
                     placeholder="비밀번호"
                     autoComplete="current-password"
                     style={{
@@ -4062,7 +3701,7 @@ function SpaceHome() {
                     style={{
                       border: 'none',
                       borderRadius: 10,
-                      background: loginLoading ? 'rgba(0,212,255,0.35)' : 'var(--crystal-cyan)',
+                      background: loginLoading ? '#91a981' : '#dcedb8',
                       color: '#04111f',
                       padding: '0.82rem 1rem',
                       fontWeight: 900,
@@ -4074,7 +3713,7 @@ function SpaceHome() {
                   </button>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10, color: 'rgba(255,255,255,0.38)', fontSize: '0.8rem' }}>
                     <span style={{ flex: 1, height: 1, background: 'rgba(255,255,255,0.12)' }} />
-                    <span className="font-tech">OR</span>
+                    <span className="font-tech">또는</span>
                     <span style={{ flex: 1, height: 1, background: 'rgba(255,255,255,0.12)' }} />
                   </div>
                   <button
@@ -4130,7 +3769,7 @@ function SpaceHome() {
                   )}
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10, color: 'rgba(255,255,255,0.38)', fontSize: '0.8rem' }}>
                     <span style={{ flex: 1, height: 1, background: 'rgba(255,255,255,0.12)' }} />
-                    <span className="font-tech">GUEST</span>
+                    <span className="font-tech">초대받은 학습자</span>
                     <span style={{ flex: 1, height: 1, background: 'rgba(255,255,255,0.12)' }} />
                   </div>
                   <button
@@ -4175,6 +3814,7 @@ function SpaceHome() {
                                 handleGuestInviteLogin()
                               }
                             }}
+                            aria-label="게스트 초대 링크"
                             placeholder="게스트 초대 링크를 붙여 넣어 주세요"
                             inputMode="url"
                             autoComplete="off"
@@ -4217,15 +3857,9 @@ function SpaceHome() {
                     )}
                   </AnimatePresence>
                 </Motion.form>
-              )}
-            </AnimatePresence>
-          </div>
-        </div>
-      </div>
-      <PublicHomeIntro />
+      </PublicHomeLoginDialog>
       <Footer />
-      </>
-    )
+    </>
   }
 
   if (hasAccountDataIssue) {

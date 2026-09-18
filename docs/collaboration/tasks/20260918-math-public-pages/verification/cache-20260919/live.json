@@ -1,0 +1,22 @@
+[
+  {
+    "path": "/math/",
+    "title": "초등수학, 원리를 보고 설명하는 공부 | 메타센스",
+    "headers": "HTTP/2 200 \ncache-control: no-cache\ncontent-type: text/html; charset=utf-8\netag: \"45e2a038731c33637113a32db7b9df31ca120e8d422d66090bec0b25d615c580\"\nlast-modified: Fri, 18 Sep 2026 15:07:00 GMT\nstrict-transport-security: max-age=31556926\naccept-ranges: bytes\ndate: Fri, 18 Sep 2026 15:14:50 GMT\nx-served-by: cache-icn1450083-ICN\nx-cache: MISS\nx-cache-hits: 0\nx-timer: S1789744490.477571,VS0,VE97\nvary: x-fh-requested-host, accept-encoding\nalt-svc: h3=\":443\";ma=86400,h3-29=\":443\";ma=86400,h3-27=\":443\";ma=86400\n\n"
+  },
+  {
+    "path": "/math/books/",
+    "title": "수학감각 교재 7종 소개: 종이책·PDF 안내 | 메타센스",
+    "headers": "HTTP/2 200 \ncache-control: no-cache\ncontent-type: text/html; charset=utf-8\netag: \"9e5a6d92541c3e7dc1fb87371c26aa5466ffee6c9390bb7dfa45eb0c869366cb\"\nlast-modified: Fri, 18 Sep 2026 15:07:00 GMT\nstrict-transport-security: max-age=31556926\naccept-ranges: bytes\ndate: Fri, 18 Sep 2026 15:14:50 GMT\nx-served-by: cache-icn1450032-ICN\nx-cache: MISS\nx-cache-hits: 0\nx-timer: S1789744491.647738,VS0,VE106\nvary: x-fh-requested-host, accept-encoding\nalt-svc: h3=\":443\";ma=86400,h3-29=\":443\";ma=86400,h3-27=\":443\";ma=86400\n\n"
+  },
+  {
+    "path": "/math/guides/",
+    "title": "초등수학 학습 노트 | 메타센스",
+    "headers": "HTTP/2 200 \ncache-control: no-cache\ncontent-type: text/html; charset=utf-8\netag: \"2f67d3d5cd274f069d3f233ee268a537e54f52c1c7a6da6ce82b61ec4107ee0f\"\nlast-modified: Fri, 18 Sep 2026 15:07:00 GMT\nstrict-transport-security: max-age=31556926\naccept-ranges: bytes\ndate: Fri, 18 Sep 2026 15:14:50 GMT\nx-served-by: cache-icn1450064-ICN\nx-cache: MISS\nx-cache-hits: 0\nx-timer: S1789744491.808502,VS0,VE146\nvary: x-fh-requested-host, accept-encoding\nalt-svc: h3=\":443\";ma=86400,h3-29=\":443\";ma=86400,h3-27=\":443\";ma=86400\n\n"
+  },
+  {
+    "path": "/math-application/index.html",
+    "title": "초등수학 7일 무료체험 신청서",
+    "headers": "HTTP/2 200 \ncache-control: max-age=3600\ncontent-type: text/html; charset=utf-8\netag: \"d6edc5729750d2c77ad3d5b11bdd76b087367df35e92bae90a8941aac7ebaafb\"\nlast-modified: Fri, 18 Sep 2026 15:07:00 GMT\nstrict-transport-security: max-age=31556926\naccept-ranges: bytes\ndate: Fri, 18 Sep 2026 15:14:51 GMT\nx-served-by: cache-icn1450022-ICN\nx-cache: MISS\nx-cache-hits: 0\nx-timer: S1789744491.135392,VS0,VE171\nvary: x-fh-requested-host, accept-encoding\nalt-svc: h3=\":443\";ma=86400,h3-29=\":443\";ma=86400,h3-27=\":443\";ma=86400\ncontent-length: 429\n\n"
+  }
+]

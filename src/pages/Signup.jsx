@@ -64,7 +64,10 @@ export default function Signup() {
       <main style={{ maxWidth: 760, margin: '0 auto' }}>
         <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 34 }}>
           <Link to="/" style={{ color: '#67e8f9', textDecoration: 'none', fontWeight: 900 }}>META SENSE</Link>
-          <Link to="/terms" style={{ color: '#cbd5e1', textDecoration: 'none', fontWeight: 700 }}>약관보기</Link>
+          <nav aria-label="가입 관련 정책" style={{ display: 'flex', gap: 14, flexWrap: 'wrap', justifyContent: 'flex-end', fontSize: 13 }}>
+            <a href="/terms" target="_blank" rel="noopener noreferrer" style={{ color: '#cbd5e1' }}>이용약관 ↗</a>
+            <a href="/privacy" target="_blank" rel="noopener noreferrer" style={{ color: '#cbd5e1' }}>개인정보처리방침 ↗</a>
+          </nav>
         </header>
 
         <section style={{ textAlign: 'center', marginBottom: 30 }}>
@@ -82,10 +85,17 @@ export default function Signup() {
             </div>
             <input style={inputStyle} value={parentName} onChange={(e) => setParentName(e.target.value)} placeholder="학부모 이름" required />
             <input style={inputStyle} value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="학부모 전화번호" inputMode="tel" required />
-            <label style={{ display: 'flex', gap: 10, alignItems: 'flex-start', color: 'rgba(255,255,255,0.84)', lineHeight: 1.5 }}>
-              <input type="checkbox" checked={termsAccepted} onChange={(e) => setTermsAccepted(e.target.checked)} style={{ marginTop: 4 }} />
-              <span><Link to="/terms" style={{ color: '#67e8f9' }}>이용약관 및 개인정보 처리</Link>에 동의합니다. (필수)</span>
-            </label>
+            <div style={{ display: 'grid', gap: 10, color: 'rgba(255,255,255,0.84)', lineHeight: 1.6 }}>
+              <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap' }}>
+                <a href="/terms" target="_blank" rel="noopener noreferrer" style={{ color: '#67e8f9' }}>이용약관 (새 탭)</a>
+                <a href="/privacy" target="_blank" rel="noopener noreferrer" style={{ color: '#67e8f9' }}>개인정보처리방침 (새 탭)</a>
+              </div>
+              <p style={{ margin: 0, fontSize: 13, color: '#cbd5e1' }}>각 문서는 새 탭에서 열립니다. 확인 후 이 가입 화면으로 돌아오면 입력 내용이 유지됩니다.</p>
+              <label style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+                <input type="checkbox" checked={termsAccepted} onChange={(e) => setTermsAccepted(e.target.checked)} style={{ marginTop: 5 }} />
+                <span>이용약관 및 개인정보 처리에 동의합니다. (필수)</span>
+              </label>
+            </div>
             <button type="submit" disabled={loading} style={{ border: 'none', borderRadius: 13, padding: '15px 18px', background: loading ? 'rgba(0,212,255,0.35)' : 'linear-gradient(135deg, #00d4ff, #7c3aed)', color: 'white', fontWeight: 900, fontSize: '1.05rem', cursor: loading ? 'not-allowed' : 'pointer' }}>
               {loading ? '처리 중...' : 'Google 인증으로 학부모 회원가입'}
             </button>

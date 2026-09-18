@@ -49,3 +49,14 @@
 - 현재 로그인된 Chrome에서 https://msense.me/math/ 및 /math/books/가 소개 대신 Multi-Verse 학습 앱으로 열림. /trial은 소개·신청 화면 확인.
 - 이전 정적 배포 검증 결과를 삭제하지 않으나 현재 정상 동작 보증으로 사용하지 않음. 배포 누락/로그인 영향/호스팅 경로 원인 미확정.
 - 마케팅 링크는 스토어와 /trial로 교체 저장. 우선 후속: 비로그인 실제 응답·현재호스팅 버전·정적 파일·라우팅 대조 후 복구. 이번 마케팅 작업에서는 앱코드/배포 변경 없음.
+
+## 00:16 수학 공개페이지 메인 이동 진단
+- 사용자 /math/가 메인으로 돌아간다는 보고로 실제 Chrome에서 재현.
+- 서버 직접 응답은 /math/, /math/books/, /math/guides/ 모두 정상 정적HTML·고유제목·Cache-Control:no-cache. 신청서도 HTTP200 확인.
+- 현재Hosting 5f68316f6898c7af, 배포시각2026-09-19 00:07 KST. 이번 진단에서 새로 배포한 버전이 아님.
+- Chrome 네트워크: /math/ 응답 fromDiskCache:true, fromServiceWorker:false. 이전 9/18 23:40/23:46 응답 Cache-Control:max-age=3600, last-modified9/18 19:53. 옛 학습앱 문서가 디스크 캐시에 남아 메인으로 이동함.
+- 임시 캐시비활성 진단→최신문서 정상→원래 캐시설정 복원. 강력새로고침으로 최신화면 확인했으나 일반 링크 재진입에는 옛 캐시가 다시 잡힌 사례 있음. 브라우저 전체캐시/로그인/사용자 데이터는 삭제하지 않음.
+- https://msense.me/math/?v=20260919 는 캐시 정상설정에서 정상 표시 확인·탭 유지. 기존캐시가 남은 사용자에게 즉시 접근용으로 안내. 공식 canonical은 /math/ 유지.
+- 신청서 표시 및 수학과 고전읽기 기본선택 확인. 실제 신청 제출은 하지 않음.
+- 코드/설정 변경·신규배포 없음. 현재 no-cache가 재수신된 뒤에는 서버재검증 적용. 과거 캐시 만료 전에는 우회주소/강력새로고침 필요할 수 있음.
+- 서버 증거: docs/collaboration/tasks/20260918-math-public-pages/verification/cache-20260919/live.json.

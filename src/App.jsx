@@ -1,6 +1,7 @@
 import PublicSeo from './components/PublicSeo'
 import { lazy, Suspense, useEffect } from 'react'
-import { Navigate, Routes, Route } from 'react-router-dom'
+import { Navigate, Routes, Route, useLocation } from 'react-router-dom'
+import PublicHomeIntro from './components/PublicHomeIntro'
 import './App.css'
 import Footer from './components/common/Footer'
 import './styles/space-theme.css' /* Global Space Theme */
@@ -95,6 +96,8 @@ const AlgorithmConstellationDevHub = import.meta.env.DEV
   : null
 
 function RouteFallback() {
+  const { pathname } = useLocation()
+  if (pathname === '/') return <><PublicHomeIntro /><Footer /></>
   return (
     <div
       role="status"

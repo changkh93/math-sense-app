@@ -7,6 +7,7 @@ For an existing task, read its STATE.md and actual artifacts before continuing.
 
 | ID | Goal | Phase | State file | Next action |
 |---|---|---|---|---|
+| 20260919-public-home-redesign | 로그아웃 메인 전면 개편 | DEPLOYED_AND_VERIFIED | [STATE](tasks/20260919-public-home-redesign/STATE.md) | 97bb8d0da6eec149 Hosting 배포, 모바일·로그인 창·HTML 검증 완료 |
 | 20260918-manual-assignment-feedback | 현재 대기 과제 상세 수동 피드백 | COMPLETE | [STATE](tasks/20260918-manual-assignment-feedback/STATE.md) | 37건 상세 초안 저장·재조회 완료, 비AI 모든 필드/사용자29명 불변, 추가 제출0 |
 | 20260918-marketing-resume | 여행 후 마케팅3번 이후 실행 | ACTIVE | [STATE](tasks/20260918-marketing-resume/STATE.md) | 5채널·GA·FAQ·교류 완료, 네이버CAPTCHA/인스타앱 링크 후속 |
 | 20260917-live-status-crew-attendance | 실시간 학습 현황 결석 우선·크루 탭·집중방 참여 확인 | DEPLOYED_AND_VERIFIED | [STATE](tasks/20260917-live-status-crew-attendance/STATE.md) | `895746ed` Functions+Hosting 배포·운영 번들 확인; 관리자 실데이터 클릭 확인만 남음 |
@@ -106,4 +107,4 @@ Keep completed rows for traceability. Do not overwrite other sessions' records.
 
 - State: `docs/collaboration/tasks/20260917-fractonis-fraction-reduction-lab/STATE.md`
 
-| 20260918-math-public-pages | 초등수학 과정·수학감각 교재·초기 콘텐츠 10편 | DONE | [STATE](tasks/20260918-math-public-pages/STATE.md) | 14 정적 페이지 운영 공개·모바일/본문/FAQ/사이트맵 검증 완료 |
+| 20260918-math-public-pages | 초등수학 과정·수학감각 교재·초기 콘텐츠 10편 | DONE | [STATE](tasks/20260918-math-public-pages/STATE.md) | 14 정적페이지 공개. 9/19 서버정상·Chrome 옛1시간캐시로 메인 이동 확인, 우회주소/신청서 검증·진단설정복원 |

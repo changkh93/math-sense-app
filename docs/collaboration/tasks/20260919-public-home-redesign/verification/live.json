@@ -1,0 +1,32 @@
+{
+  "version": "projects/math-sense-1f6a8/sites/math-sense-1f6a8/versions/97bb8d0da6eec149",
+  "releaseTime": "2026-09-18T15:30:37.321Z",
+  "checks": [
+    {
+      "url": "https://msense.me/",
+      "bytes": 14089,
+      "matchesBuild": true
+    },
+    {
+      "url": "https://msense.me/home-assets/home.css",
+      "bytes": 16548,
+      "matchesBuild": true
+    },
+    {
+      "url": "https://msense.me/math/",
+      "bytes": 21711,
+      "matchesBuild": true
+    },
+    {
+      "url": "https://msense.me/python",
+      "bytes": 37140,
+      "matchesBuild": true
+    },
+    {
+      "url": "https://msense.me/trial",
+      "bytes": 27852,
+      "matchesBuild": true
+    }
+  ],
+  "redirectsFollowed": true
+}
