@@ -33,3 +33,8 @@
 - Hosting 배포 완료. 운영 /signup에서 두 링크가 각각 /terms, /privacy 새 탭 생성 확인. 개인정보처리방침 본문 표시 확인.
 - 임시 이름 입력 후 개인정보 링크를 열어도 원래 /signup과 입력값 유지 확인, 테스트 입력은 비움. 동의/가입 제출은 하지 않음.
 - ESLint, Google 인증 흐름 검사, 배포 빌드, 공개 SEO 검사 통과.
+
+## 후속: 새로고침 시 스타일 없는 화면 노출 수정
+- 원인: 홈페이지 CSS link가 React root 내부 컴포넌트에 있어 초기 본문 노출·클라이언트 재마운트 시 스타일 수명이 불안정함.
+- 수정: index.html head의 렌더 차단 stylesheet로 이동, PublicHomeIntro 내부 link 제거. SPA fallback에도 유지.
+- 검증: 빌드·SEO 회귀 검사 통과. JavaScript를 끈 로컬 새로고침에서도 완성된 디자인 표시, JavaScript 복원 후 headCSS=true/bodyCSS=false 및 grid·배경 유지 확인. 테스트용 실행 차단 설정 복원.

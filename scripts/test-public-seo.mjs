@@ -11,12 +11,18 @@ for (const [path, meta] of Object.entries(publicSeo)) {
   assert(html.includes('<h1>') && html.includes('href="/'));
   assert(!html.includes('noindex'));
   assert(html.includes(`content="${meta.description}"`));
+  if (path === '/') {
+    const head = html.split('</head>')[0];
+    assert(head.includes('<link rel="stylesheet" href="/home-assets/home.css">'), 'Homepage CSS must block the first paint from the persistent document head');
+    assert.equal((html.match(/href="\/home-assets\/home.css"/g) || []).length, 1, 'Homepage CSS must not be remounted inside the React root');
+  }
   titles.add(meta.title);
 }
 assert.equal(titles.size, 3);
 const fallback = await readFile('dist/spa.html', 'utf8');
 assert(!fallback.includes('rel="canonical"'));
 assert(fallback.includes('<div id="root"></div>'));
+assert(fallback.split('</head>')[0].includes('href="/home-assets/home.css"'), 'SPA navigation must retain homepage styles');
 const sitemap = await readFile('dist/sitemap.xml', 'utf8');
 for (const path of Object.keys(publicSeo)) assert(sitemap.includes(`<loc>https://msense.me${path}</loc>`));
 console.log('PASS: 3 public HTML bodies, unique metadata, sitemap, isolated SPA fallback');

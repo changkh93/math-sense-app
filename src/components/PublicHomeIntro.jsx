@@ -11,7 +11,6 @@ export default function PublicHomeIntro({ onLogin }) {
   const [active, setActive] = useState('tools')
   const current = evidence.find(item => item.id === active)
   return <div className="ms-home">
-    <link rel="stylesheet" href="/home-assets/home.css" />
     <a className="ms-skip" href="#home-main">본문으로 이동</a>
     <header className="ms-header">
       <a className="ms-brand" href="/" aria-label="메타센스 홈"><img src="/m-logo.svg" alt="" width="35" height="35" /><span>메타센스<small>스스로 배우는 힘</small></span></a>
