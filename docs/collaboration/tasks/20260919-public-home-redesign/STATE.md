@@ -39,3 +39,9 @@
 - 원인: 홈페이지 CSS link가 React root 내부 컴포넌트에 있어 초기 본문 노출·클라이언트 재마운트 시 스타일 수명이 불안정함.
 - 수정: index.html head의 렌더 차단 stylesheet로 이동, PublicHomeIntro 내부 link 제거. SPA fallback에도 유지.
 - 검증: 빌드·SEO 회귀 검사 통과. JavaScript를 끈 로컬 새로고침에서도 완성된 디자인 표시, JavaScript 복원 후 headCSS=true/bodyCSS=false 및 grid·배경 유지 확인. 테스트용 실행 차단 설정 복원.
+
+## 후속: 파이썬 새로고침 공통 로딩 화면 제거
+- 원인: prerender된 파이썬 본문을 createRoot가 교체한 뒤 lazy route와 전역 퀴즈배틀 수신기가 같은 Suspense에서 대기하여 학습 앱 로딩 화면 노출.
+- 수정: /python(/ 포함)·/trial/python·/trial·/consultation 초기 진입은 해당 공개 모듈을 준비한 뒤 React 시작. 준비 중 기존 HTML 유지, 준비 완료 컴포넌트는 동기 렌더. 전역 배틀 수신기는 독립 Suspense(null)로 분리.
+- 모듈 다운로드 실패는 기존 ErrorBoundary 경로로 처리. 데이터/API 변경 없음.
+- 검증: 지연 모듈 대기·중복 요청 방지·완료 후 동기 참조·실패 재시도 단위검사, 빌드, 공개 SEO·Google 인증 검사 통과. 로컬 /python/ 실제 제목·무료체험 안내 표시 확인. 후속 새로고침 UI 검증은 브라우저 연결 오류로 중단되어 운영 배포 후 다시 확인.

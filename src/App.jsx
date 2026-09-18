@@ -2,6 +2,7 @@ import PublicSeo from './components/PublicSeo'
 import { lazy, Suspense, useEffect } from 'react'
 import { Navigate, Routes, Route, useLocation } from 'react-router-dom'
 import PublicHomeIntro from './components/PublicHomeIntro'
+import { createRouteModule } from './utils/preloadableRoute'
 import './App.css'
 import Footer from './components/common/Footer'
 import './styles/space-theme.css' /* Global Space Theme */
@@ -46,8 +47,24 @@ const QuestionDetail = lazy(() => import('./pages/Community/QuestionDetail'))
 const PublicProfile = lazy(() => import('./pages/Community/PublicProfile'))
 const PrivacyPolicy = lazy(() => import('./pages/PrivacyPolicy'))
 const InviteHandler = lazy(() => import('./pages/InviteHandler'))
-const PythonEducation = lazy(() => import('./pages/PythonEducation'))
-const PublicApplication = lazy(() => import('./pages/PublicApplication'))
+const pythonModule = createRouteModule(() => import('./pages/PythonEducation'))
+const applicationModule = createRouteModule(() => import('./pages/PublicApplication'))
+const LazyPythonEducation = lazy(pythonModule.load)
+const LazyPublicApplication = lazy(applicationModule.load)
+function PythonEducation(props) {
+  const Page = pythonModule.getComponent() || LazyPythonEducation
+  return <Page {...props} />
+}
+function PublicApplication(props) {
+  const Page = applicationModule.getComponent() || LazyPublicApplication
+  return <Page {...props} />
+}
+export function preparePublicEntry(pathname) {
+  const path = pathname.replace(/\/+$/, '') || '/'
+  if (path === '/python' || path === '/trial/python') return pythonModule.load()
+  if (path === '/trial' || path === '/consultation') return applicationModule.load()
+  return Promise.resolve()
+}
 const VacationCamp = lazy(() => import('./pages/VacationCamp'))
 const Signup = lazy(() => import('./pages/Signup'))
 const Terms = lazy(() => import('./pages/Terms'))
@@ -121,7 +138,7 @@ function App() {
       <DirectMemoArrivalAlert />
       <PublicSeo />
       <Suspense fallback={<RouteFallback />}>
-      <QuizBattleChallengeReceiver />
+      <Suspense fallback={null}><QuizBattleChallengeReceiver /></Suspense>
       <Routes>
       <Route path="/" element={<SpaceHome />} />
       <Route path="/journey" element={<Navigate to="/?view=journey" replace />} />

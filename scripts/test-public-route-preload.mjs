@@ -1,0 +1,21 @@
+import assert from 'node:assert/strict';
+import { createRouteModule } from '../src/utils/preloadableRoute.js';
+let resolve, calls = 0;
+const route = createRouteModule(() => { calls++; return new Promise(r => { resolve = r; }); });
+assert.equal(route.getComponent(), undefined);
+const first = route.load();
+assert.equal(route.load(), first);
+const Page = () => null;
+resolve({ default: Page });
+await first;
+assert.equal(route.getComponent(), Page);
+assert.equal(calls, 1);
+let attempts = 0;
+const retry = createRouteModule(async () => {
+  if (++attempts === 1) throw new Error('temporary fetch failure');
+  return { default: Page };
+});
+await assert.rejects(retry.load());
+await retry.load();
+assert.equal(retry.getComponent(), Page);
+console.log('PASS: public route preload waits, deduplicates, resolves synchronously and retries failures');
