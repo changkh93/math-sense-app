@@ -5,12 +5,13 @@ const port = Number(process.env.PYTHON_GAME_RUNNER_PORT || 4178)
 const sources = await Promise.all(['index.html', 'turtle.py', 'turtle-renderer.js', 'tkinter.py', 'tkinter-renderer.js', 'studio_pandas.py', 'studio_plot.py', 'plot-renderer.js'].map(name => readFile(new URL(`../runtime/python-game-runner/${name}`, import.meta.url), 'utf8')))
 const font = (await readFile(new URL('../public/mars-expedition/assets/fonts/DoHyeon-Regular.ttf', import.meta.url))).toString('base64')
 const studioFonts = await readFile(new URL('../runtime/python-game-runner/studio_fonts.py', import.meta.url), 'utf8')
-const html = buildRunnerDocument(...sources, font, studioFonts)
+const requests = await readFile(new URL('../runtime/python-game-runner/studio_requests.py', import.meta.url), 'utf8')
+const html = buildRunnerDocument(...sources, font, studioFonts, requests)
 http.createServer((req, res) => {
   if (req.url !== '/' && req.url !== '/index.html') { res.writeHead(404); res.end(); return }
   res.writeHead(200, {
     'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store',
-    'Content-Security-Policy': "default-src 'none'; script-src 'unsafe-inline' 'unsafe-eval' https://pygame-web.github.io; connect-src https://pygame-web.github.io; style-src 'unsafe-inline'; img-src blob: data:; media-src blob: data: https://pygame-web.github.io; worker-src blob:; frame-ancestors http://localhost:* http://127.0.0.1:*",
+    'Content-Security-Policy': "default-src 'none'; script-src 'unsafe-inline' 'unsafe-eval' https://pygame-web.github.io; connect-src https:; style-src 'unsafe-inline'; img-src blob: data:; media-src blob: data: https://pygame-web.github.io; worker-src blob:; frame-ancestors http://localhost:* http://127.0.0.1:*",
     'Permissions-Policy': 'camera=(), microphone=(), geolocation=(), usb=()',
     'Referrer-Policy': 'no-referrer',
   }); res.end(html)

@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>MetaSense Code Runner</title>
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline' 'unsafe-eval' https://pygame-web.github.io; connect-src https://pygame-web.github.io; style-src 'unsafe-inline'; img-src blob: data:; media-src blob: data: https://pygame-web.github.io; worker-src blob:;">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline' 'unsafe-eval' https://pygame-web.github.io; connect-src https:; style-src 'unsafe-inline'; img-src blob: data:; media-src blob: data: https://pygame-web.github.io; worker-src blob:;">
 <style>
 html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#080f20;color:#dbeafe;font:14px system-ui}body{display:grid;grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(0,1fr);place-items:center;min-width:0;min-height:0}#turtle-canvas{width:100%;height:100%;min-width:0;min-height:0}#canvas{max-width:100%;max-height:100%;object-fit:contain;outline:none}#canvas3d,#stdout,#transfer,#html{display:none!important}#start{position:absolute;inset:0;display:grid;place-content:center;text-align:center;background:#080f20ee;gap:14px}button{font:inherit;background:#83f3cd;border:0;border-radius:12px;padding:14px 24px;cursor:pointer;color:#08271f}#note{max-width:320px;line-height:1.6}#start[hidden],#audio-note[hidden]{display:none}#audio-note{position:absolute;bottom:16px;max-width:90%;padding:8px 12px;border-radius:8px;background:#182438dd;color:#dbeafe;font-size:12px;pointer-events:none}
 </style>
@@ -95,6 +95,37 @@ window.studioNotebookSnapshot=(includeCanvas=false)=>{
 };
 window.studioTakeCommand=()=>{const command=window.studioCommand;window.studioCommand='';return command;};
 window.studioEmitEncoded=(type,data,runId)=>window.studioEmit(type,new TextDecoder().decode(Uint8Array.from(atob(data),c=>c.charCodeAt(0))),runId);
+window.studioFetchEncoded=async encoded=>{
+ const decode=text=>new TextDecoder().decode(Uint8Array.from(atob(text),c=>c.charCodeAt(0)));
+ const encode=bytes=>{let text='';for(let offset=0;offset<bytes.length;offset+=0x8000)text+=String.fromCharCode(...bytes.subarray(offset,offset+0x8000));return btoa(text);};
+ const reply=value=>encode(new TextEncoder().encode(JSON.stringify(value)));
+ let request;
+ try{request=JSON.parse(decode(String(encoded)));}catch{return reply({error:'요청 데이터를 읽지 못했습니다.',kind:'connection'});}
+ const timeout=Math.max(0.1,Math.min(30,Number(request.timeout)||10))*1000;
+ const controller=new AbortController();
+ const timer=setTimeout(()=>controller.abort('timeout'),timeout);
+ try{
+  const response=await fetch(String(request.url),{
+   method:String(request.method||'GET'),headers:request.headers||{},
+   body:['GET','HEAD'].includes(String(request.method||'GET').toUpperCase())?undefined:Uint8Array.from(atob(request.body||''),c=>c.charCodeAt(0)),
+   redirect:request.allowRedirects===false?'manual':'follow',credentials:'omit',referrerPolicy:'no-referrer',signal:controller.signal,
+  });
+  const bytes=new Uint8Array(await response.arrayBuffer());
+  if(bytes.length>2*1024*1024)return reply({error:'응답이 Code Studio 제한(2 MB)을 넘었습니다.',kind:'connection'});
+  return reply({status:response.status,url:response.url,reason:response.statusText,headers:Object.fromEntries(response.headers.entries()),body:encode(bytes)});
+ }catch(error){
+  const timedOut=controller.signal.aborted;
+  return reply({error:timedOut?'요청 시간이 초과되었습니다.':'네트워크 요청에 실패했습니다. 주소와 서버의 CORS 허용 여부를 확인해 주세요.',kind:timedOut?'timeout':'connection'});
+ }finally{clearTimeout(timer);}
+};
+window.studioFetches=new Map();
+window.studioFetchStart=(id,encoded)=>{
+ if(window.studioFetches.has(id))return;
+ const pending={result:''};window.studioFetches.set(id,pending);
+ window.studioFetchEncoded(encoded).then(result=>{if(window.studioFetches.get(id)===pending)pending.result=String(result);});
+};
+window.studioFetchTake=id=>window.studioFetches.get(id)?.result||'';
+window.studioFetchEnd=id=>window.studioFetches.delete(id);
 window.custom_onload=function(){window.python=window.Module;window.Module.vt.xterm={write:()=>{}};};
 window.alert=function(text){window.studioEmit?.('ERROR',String(text));};
 (()=>{
@@ -214,6 +245,7 @@ PANDAS_SOURCE = __STUDIO_PANDAS_SOURCE__
 PLOT_SOURCE = __STUDIO_PLOT_SOURCE__
 PLOT_FONT = __STUDIO_PLOT_FONT__
 STUDIO_FONTS_SOURCE = __STUDIO_FONTS_SOURCE__
+REQUESTS_SOURCE = __STUDIO_REQUESTS_SOURCE__
 plot_session = None
 numpy_defaults = None
 pygame_surface_originals = {}
@@ -239,6 +271,18 @@ def install_studio_tk():
         module.__dict__['_save_csv'] = lambda path, data: emit('FILE_WRITE', json.dumps({'path': path, 'data': base64.b64encode(data).decode('ascii')}), active['id'])
         exec(compile(source, module.__file__, 'exec'), module.__dict__)
         sys.modules[name] = module
+
+def install_studio_requests():
+    module = types.ModuleType('requests')
+    module.__file__ = '/studio/requests.py'
+    module.__dict__['_bridge'] = platform.window
+    exec(compile(REQUESTS_SOURCE, module.__file__, 'exec'), module.__dict__)
+    exceptions = types.ModuleType('requests.exceptions')
+    for name in ('RequestException', 'HTTPError', 'ConnectionError', 'Timeout', 'TooManyRedirects'):
+        setattr(exceptions, name, getattr(module, name))
+    module.exceptions = exceptions
+    sys.modules['requests'] = module
+    sys.modules['requests.exceptions'] = exceptions
 
 def emit(kind, text='', run_id=None):
     platform.window.studioEmitEncoded(kind, base64.b64encode(str(text).encode('utf-8')).decode('ascii'), run_id)
@@ -282,7 +326,7 @@ async def studio_input(prompt='', /):
 
 def project_packages(project):
     packages = set()
-    supported = {'pygame', 'numpy', 'matplotlib'}
+    supported = {'pygame', 'numpy', 'matplotlib', 'requests'}
     for item in project['files']:
         if not item['path'].lower().endswith(('.py', '.ipynb')): continue
         try:
@@ -354,7 +398,9 @@ class GameCallGraph:
                 if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)): env[n.name] = None
                 if isinstance(n, (ast.Import, ast.ImportFrom)):
                     for alias in n.names:
-                        if alias.name != '*': env[alias.asname or alias.name.split('.')[0]] = None
+                        if alias.name != '*':
+                            bound = alias.asname or alias.name.split('.')[0]
+                            if bound not in roots: env[bound] = None
             for n in nodes(body):
                 if isinstance(n, ast.Assign) and isinstance(n.value, ast.Call) and isinstance(n.value.func, ast.Name) and n.value.func.id in classes:
                     for target in n.targets:
@@ -514,24 +560,35 @@ def compile_project(source, filename, namespace, notebook=False):
             if error.lineno <= len(source_lines):
                 error.text = source_lines[error.lineno - 1]
         raise
-    # Resolve common pygame imports without guessing from text/comments/strings.
+    # Resolve common pygame and requests imports without guessing from
+    # text/comments/strings. Direct requests calls become awaits; their callers
+    # are lifted through the same conservative call graph used for input().
     aliases = {}
+    request_external = []
+    request_methods = {'request', 'get', 'options', 'head', 'post', 'put', 'patch', 'delete'}
     if notebook:
         for name, value in namespace.items():
             if isinstance(value, types.ModuleType) and value.__name__.startswith('pygame'):
                 aliases[name] = tuple(value.__name__.split('.'))
+            elif isinstance(value, types.ModuleType) and value.__name__ == 'requests':
+                request_external.extend(name + '.' + method for method in request_methods)
     for node in tree.body:
         if isinstance(node, ast.Import):
             for alias in node.names:
                 if alias.name == 'pygame': aliases[alias.asname or 'pygame'] = ('pygame',)
+                elif alias.name == 'requests':
+                    name = alias.asname or 'requests'
+                    request_external.extend(name + '.' + method for method in request_methods)
         elif isinstance(node, ast.ImportFrom) and node.level == 0 and (node.module or '').startswith('pygame'):
             for alias in node.names:
                 if alias.name != '*': aliases[alias.asname or alias.name] = tuple(node.module.split('.')) + (alias.name,)
+        elif isinstance(node, ast.ImportFrom) and node.level == 0 and node.module == 'requests':
+            request_external.extend(alias.asname or alias.name for alias in node.names if alias.name in request_methods)
     frame_paths = [('pygame','display','update'), ('pygame','display','flip'), ('pygame','event','get'), ('pygame','event','poll')]
     call_paths = { (name,) + path[len(prefix):] for name, prefix in aliases.items() for path in frame_paths if path[:len(prefix)] == prefix }
     yield_name = '_metasense_frame_yield_' + str(id(namespace))
     import inspect
-    external = [name for name, value in namespace.items() if inspect.iscoroutinefunction(value)] if notebook else ()
+    external = ([name for name, value in namespace.items() if inspect.iscoroutinefunction(value)] if notebook else []) + request_external
     if notebook:
         for name, value in list(namespace.items()):
             cls = value if inspect.isclass(value) else type(value)
@@ -641,7 +698,7 @@ async def stop_current(preserve_turtle=False):
     sys.path[:] = ORIGINAL_PATH
     sys.argv[:] = ORIGINAL_ARGV
     sys.modules['__main__'] = ORIGINAL_MAIN
-    for name in ('turtle', 'ColabTurtlePlus.Turtle', 'ColabTurtlePlus', 'tkinter', 'pandas'):
+    for name in ('turtle', 'ColabTurtlePlus.Turtle', 'ColabTurtlePlus', 'tkinter', 'pandas', 'requests.exceptions', 'requests'):
         sys.modules.pop(name, None)
     sys.dont_write_bytecode = ORIGINAL_DONT_WRITE
     os.environ.clear(); os.environ.update(ORIGINAL_ENV)
@@ -699,9 +756,11 @@ async def start_project(command):
         os.makedirs(os.path.dirname(full), exist_ok=True)
         with open(full, 'wb') as output: output.write(base64.b64decode(data))
     packages = project_packages(project)
-    for package in sorted(packages - prepared_packages):
+    for package in sorted(packages - prepared_packages - {'requests'}):
         await shell.preload_code('import ' + package, loaderhome='/tmp')
         prepared_packages.add(package)
+    if 'requests' in packages and 'requests' not in sys.modules:
+        install_studio_requests()
     if platform.window.studioCommand:
         if not continuing:
             os.chdir('/tmp')
