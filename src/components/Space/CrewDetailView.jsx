@@ -1479,7 +1479,7 @@ export default function CrewDetailView({ onBack }) {
         <section className="crew-growth-status">
           <div className="crew-growth-status__head">
             <div><span className="font-tech">CREW GROWTH MISSION · V2</span><strong className="font-title">크루 성장 현황</strong></div>
-            <b className="font-tech">{growthEvent?.eligibleCount ?? '…'} / 40명 <span style={{ fontSize: '0.78rem', color: '#94a3b8' }}>(다음: {growthEvent?.target || 20}명)</span></b>
+            <b className="font-tech">인정 {growthEvent?.eligibleCount ?? '…'} / 40명 <span style={{ fontSize: '0.78rem', color: '#94a3b8' }}>(다음: {growthEvent?.target || 20}명)</span></b>
           </div>
           <div className="crew-growth-status__metrics">
             <div><span>정식 크루원</span><strong>{growthEvent?.memberCount ?? crewMemberIds.length}명</strong></div>

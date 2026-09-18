@@ -999,6 +999,28 @@
 #course-videos { scroll-margin-top: 90px; }
 .pe-player-heading a { margin-left: auto; color: #a8bad0; font-size: 12px; text-decoration: underline; white-space: nowrap; }
 
+.pe-results, .pe-trust { padding-block: 64px; }
+.pe-results h2, .pe-trust h2 { font-size: clamp(26px, 3vw, 40px); line-height: 1.4; margin-bottom: 18px; }
+.pe-results > p, .pe-trust p { color: var(--pe-muted); max-width: 850px; margin-bottom: 24px; }
+.pe-result-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 22px; margin: 30px 0; }
+.pe-result-grid article { background: #111e30; border-radius: 18px; padding: 16px; }
+.pe-result-grid button { background: transparent; border: 0; color: inherit; width: 100%; padding: 0; text-align: left; }
+.pe-result-grid img { width: 100%; aspect-ratio: 16/9; object-fit: cover; border-radius: 10px; }
+.pe-result-grid button span { display: flex; gap: 8px; align-items: center; color: var(--pe-mint); margin: 12px 0; }
+.pe-result-grid h3 { font-size: 19px; }
+.pe-result-grid p { color: var(--pe-muted); }
+.pe-trust { border-top: 1px solid #27354b; }
+.pe-trust p a, .pe-apply-copy p a { text-decoration: underline; }
+.pe-optional { margin: 20px 0; }
+.pe-optional summary { cursor: pointer; color: var(--pe-muted); }
+.pe-optional label { margin-top: 14px; }
+.pe-next-steps { padding-left: 22px; margin-block: 25px; }
+#apply, #courses { scroll-margin-top: 32px; }
+@media (max-width: 700px) { .pe-result-grid { grid-template-columns: 1fr; } .pe-results, .pe-trust { padding-block: 40px; } }
+.pe-hero-preview { display: block; width: 100%; aspect-ratio: 16/9; object-fit: contain; background: #08111e; }
+.pe-preview-toggle { border: 1px solid #486078; border-radius: 8px; margin: 12px; padding: 6px 12px; background: #152439; color: #edf4ff; }
+.pe-offer { font-weight: 700; color: var(--pe-mint) !important; margin-top: 18px !important; }
+
 /* Parent reassurance: a concrete error-to-retry learning example. */
 .pe-reassurance a{display:inline-flex;align-items:center;gap:7px;color:var(--pe-mint);text-decoration:underline;text-underline-offset:4px}
 .pe-ai-help{padding-block:64px;display:grid;grid-template-columns:1fr 1fr;gap:56px;align-items:center;scroll-margin-top:40px;word-break:keep-all;overflow-wrap:break-word}

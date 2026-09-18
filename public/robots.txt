@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /
+Sitemap: https://msense.me/sitemap.xml

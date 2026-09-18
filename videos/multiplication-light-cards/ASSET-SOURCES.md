@@ -1,0 +1,1 @@
+실제 앱 컴포넌트를 로컬 개인정보 없는 local-qa 상태에서 조작하여 캡처. 원본 사용자 운영 학습 화면은 변경하지 않음. lights.mp4는 실제 브라우저 screencast 타임스탬프 유지. chant.wav는 메타센스 보유 table-4 음성팩의4×1~5/4×6 질문을 제품 cadence1.17초로 배치. AI학습음성 표기 포함. 배경음: 기존 프로젝트 자체제작 arcade-pop-original.wav. 글꼴 DoHyeon OFL 동봉. 학생 사례·성과 아님.

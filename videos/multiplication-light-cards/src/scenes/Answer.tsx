@@ -1,0 +1,1 @@
+import React from 'react';import {Frame,Crop} from '../Frame';export const Answer=()=>{return <Frame step='03  답 쓰고 원리 확인하기' title={'4 × 6 = 24\n칸으로 확인해요'} sub={'4줄에 6칸씩, 모두 24칸.\n답과 그림을 함께 연결해요.'}><Crop src='answer-correct.png' x={805} y={355} w={750} h={675} top={610}/></Frame>};

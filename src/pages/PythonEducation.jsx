@@ -1,5 +1,6 @@
+import { trackPython, pythonAttribution } from '../utils/pythonFunnel';
 import courseMusic from '../data/pythonCourseMusic.json';
-import { createElement, useEffect, useRef, useState } from 'react'
+import { createElement, useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { Link } from 'react-router-dom'
 import { httpsCallable } from 'firebase/functions'
 import {
@@ -87,7 +88,7 @@ const grades = [
 ]
 
 function PythonTrialForm() {
-  const token = new URLSearchParams(window.location.search).get('ref') || ''
+  const token = new URLSearchParams(typeof window === 'undefined' ? '' : window.location.search).get('ref') || ''
   const [referral, setReferral] = useState(null)
   const [form, setForm] = useState({
     applicantName: '',
@@ -101,6 +102,7 @@ function PythonTrialForm() {
   const [state, setState] = useState('idle')
   const [error, setError] = useState('')
   const locked = useRef(false)
+  const started = useRef(false)
   useEffect(() => {
     if (!token) return
     let active = true
@@ -129,21 +131,25 @@ function PythonTrialForm() {
       return
     }
     locked.current = true
+    trackPython('python_submit')
     setState('sending')
     setError('')
     try {
-      await httpsCallable(
+      const response = await httpsCallable(
         functions,
         'submitPublicApplication',
       )({
         ...form,
         type: 'trial',
         selectedCourse: '파이썬 코딩',
-        message: `[파이썬 전용 소개 페이지]\n${form.message}`.slice(0, 1000),
+        message: `[파이썬 전용 소개 페이지] ${pythonAttribution(window.location.search)}\n${form.message}`.slice(0, 1000),
         referralToken: referral?.valid ? token : '',
       })
+      if (response.data?.success !== true) throw new Error('접수를 확인하지 못했습니다. 다시 시도해 주세요.')
+      trackPython('python_success')
       setState('done')
     } catch (failure) {
+      trackPython('python_error', 'submission')
       setError(
         failure.message ||
           '신청을 저장하지 못했습니다. 잠시 후 다시 시도해 주세요.',
@@ -155,11 +161,11 @@ function PythonTrialForm() {
   }
   if (state === 'done')
     return (
-      <div className="pe-form pe-success" role="status">
+      <div id="apply" className="pe-form pe-success" role="status">
         <Check size={42} />
         <h3>파이썬 체험 신청이 접수되었습니다.</h3>
         <p>
-          담당자가 연락드려 학생의 경험과 일정을 확인하고 체험 시작을
+          신청 후 1일 이내 담당자가 연락드려 학생의 경험과 일정을 확인하고 체험 시작을
           안내합니다.
         </p>
         <a href="#courses">
@@ -168,7 +174,7 @@ function PythonTrialForm() {
       </div>
     )
   return (
-    <form className="pe-form" onSubmit={submit} aria-busy={state === 'sending'}>
+    <form id="apply" className="pe-form" onFocus={() => { if (!started.current) { started.current = true; trackPython('python_form_start') } }} onSubmit={submit} aria-busy={state === 'sending'}>
       <div className="pe-form-top">
         <span>PYTHON TRIAL</span>
         <strong>
@@ -228,6 +234,7 @@ function PythonTrialForm() {
           </select>
         </label>
       </div>
+      <details className="pe-optional"><summary>연락 시간·코딩 경험 남기기 (선택)</summary>
       <label>
         연락 가능한 시간 <span>(선택)</span>
         <input
@@ -249,6 +256,7 @@ function PythonTrialForm() {
           rows={3}
         />
       </label>
+      </details>
       <label className="pe-consent">
         <input
           type="checkbox"
@@ -279,7 +287,7 @@ function PythonTrialForm() {
         <ArrowRight size={20} />
       </button>
       <small>
-        접수 확인 후 시작일을 안내합니다. 체험 후 자동 결제되지 않습니다.
+        신청 후 1일 이내 연락드려 시작일을 안내합니다. 체험 후 자동 결제되지 않습니다.
       </small>
     </form>
   )
@@ -288,28 +296,22 @@ function PythonTrialForm() {
 export default function PythonEducation() {
   const [selected, setSelected] = useState(0)
   const [gamePlaying, setGamePlaying] = useState(false)
+  const prefersReduced = useSyncExternalStore(
+    (notify) => { const query = window.matchMedia('(prefers-reduced-motion: reduce)'); query.addEventListener('change', notify); return () => query.removeEventListener('change', notify) },
+    () => window.matchMedia('(prefers-reduced-motion: reduce)').matches,
+    () => true,
+  )
+  const [previewOverride, setPreviewOverride] = useState(null)
+  const previewMotion = previewOverride ?? !prefersReduced
   const course = courses[selected]
   const video = useRef(null)
+  const viewTracked = useRef(false)
   useEffect(() => {
-    const previous = document.title
-    const existing = document.querySelector('meta[name="description"]')
-    const description = existing || document.createElement('meta')
-    const previousDescription = description.getAttribute('content')
-    description.name = 'description'
-    description.content =
-      '그림과 게임에서 수학과 알고리즘까지. 메타센스 코드 스튜디오로 직접 만들며 사고력을 기르는 초·중등 파이썬 교육. 여섯 과정의 실제 시연 영상을 보고 무료체험을 신청하세요.'
-    if (!existing) document.head.appendChild(description)
-    document.title = '메타센스 파이썬 | 직접 만들며 기르는 사고력 · 무료체험'
-    return () => {
-      document.title = previous
-      if (!existing) description.remove()
-      else if (previousDescription === null)
-        description.removeAttribute('content')
-      else description.content = previousDescription
-    }
+    if (!viewTracked.current) { trackPython('python_view'); viewTracked.current = true }
   }, [])
   function select(index, reveal = false) {
     video.current?.pause()
+    trackPython('python_video', courses[index].id)
     setSelected(index)
     setGamePlaying(false)
     if (reveal) requestAnimationFrame(() => {
@@ -317,7 +319,7 @@ export default function PythonEducation() {
     })
   }
   return (
-    <main className="python-education">
+    <main className="python-education" onClick={(e) => { const link = e.target.closest('a[href="#apply"]'); if (link) trackPython('python_cta', link.dataset.position || 'page') }}>
       <header className="pe-nav">
         <Link className="pe-brand" to="/">
           <img src="/m-logo.svg" alt="" />
@@ -325,6 +327,7 @@ export default function PythonEducation() {
         </Link>
         <nav aria-label="파이썬 과정 안내">
           <a href="#courses">학습 과정</a>
+            <a href="/python/guides/">학습 노트</a>
           <a href="#learning">학습 관리</a>
           <a className="pe-cta pe-cta-small" href="#apply">
             무료체험 신청 <ArrowUpRight size={17} />
@@ -335,28 +338,28 @@ export default function PythonEducation() {
         <div className="pe-hero-copy">
           <div className="pe-eyebrow">
             <span />
-            초·중등 파이썬, 메타센스에서
+            초등 3학년부터 · 온라인 파이썬 자율 학습
           </div>
           <h1>
-            게임을 하던 아이가,
+            게임을 좋아하는 아이,
             <br />
-            <em>규칙을 만드는 아이로.</em>
+            <em>이제 직접 만들어 볼까요?</em>
           </h1>
           <p>
-            그림을 그리고, 게임을 만들고, 수학을 실험합니다.
-            <br />내 생각을 코드로 옮기고 결과를 확인하는 경험.
-            <br />
-            설치 없이 실행하고, 막히면 쉬운 설명과 AI 힌트로 다시 도전합니다.
+            처음이라면 그림을 움직이는 작은 코드부터.
+            <br />기초를 익힌 뒤 게임·데이터 프로젝트로 이어집니다.
+            <br />설치 없이 실행하고, 막히면 쉬운 설명과 AI 힌트로 다시 도전합니다.
           </p>
           <div className="pe-hero-actions">
             <a className="pe-cta" href="#apply">
-              우리 아이, 무료로 시작하기 <ArrowUpRight size={21} />
+              파이썬 무료체험 신청하기 <ArrowUpRight size={21} />
             </a>
             <a className="pe-watch" href="#courses">
               <Play size={17} fill="currentColor" />
               소개 영상 6편 둘러보기
             </a>
           </div>
+          <p className="pe-offer">7일 무료체험 · 정규 수강 월 15만 원</p>
           <div className="pe-reassurance">
             <span>
               <Check size={16} />
@@ -373,28 +376,12 @@ export default function PythonEducation() {
             </span>
           </div>
         </div>
-        <a
-          href="#courses"
-          className="pe-hero-visual"
-          aria-label="실제 수업 화면과 과정 영상 보기"
-        >
-          <div className="pe-windowbar">
-            <span />
-            <span />
-            <span />
-            <b>METASENSE / CODE STUDIO</b>
-          </div>
-          <img
-            src="/python-showcase/foundation-screen.webp"
-            alt="코드 스튜디오에서 파이썬 코드를 작성하고 거북이 그림을 실행하는 시연"
-            fetchPriority="high"
-          />
-          <div className="pe-visual-caption">
-            <Code2 size={20} />
-            <span>아이의 생각이, 눈앞의 결과로.</span>
-            <Play size={28} fill="currentColor" />
-          </div>
-        </a>
+        <div className="pe-hero-visual">
+          <div className="pe-windowbar"><span /><span /><span /><b>METASENSE / CODE STUDIO</b></div>
+          {previewMotion ? <video className="pe-hero-preview" autoPlay muted loop playsInline controls preload="metadata" poster="/python-showcase/foundation-screen.webp" aria-label="처음 파이썬 실제 시연 8초 미리보기"><source src="/python-showcase/foundation-preview.mp4" type="video/mp4" /></video> : <img src="/python-showcase/foundation-screen.webp" alt="파이썬 코드를 실행해 그림을 그리는 교육자 시연" fetchPriority="high" />}
+          <div className="pe-visual-caption"><Code2 size={20} /><span>입문 시연 · 숫자를 바꾸고 실행해 보기</span></div>
+          <button className="pe-preview-toggle" onClick={() => setPreviewOverride(!previewMotion)}>{previewMotion ? '움직이는 미리보기 끄기' : '8초 미리보기 재생'}</button>
+        </div>
       </section>
       <section className="pe-wrap pe-ai-help" id="ai-help" aria-labelledby="pe-ai-help-title">
         <div className="pe-ai-copy">
@@ -414,6 +401,18 @@ export default function PythonEducation() {
           </ol>
           <p className="pe-ai-note">파일·노트북 모드 모두 지원합니다. AI 힌트는 지원되는 오류에서 요청할 수 있으며, 설명이 맞는지는 다시 실행해 확인합니다.</p>
         </div>
+      </section>
+      <section className="pe-wrap pe-results" aria-labelledby="pe-results-title">
+        <p className="pe-eyebrow">실제 수업 예제로 보는 배움</p>
+        <h2 id="pe-results-title">작은 코드를 바꾸는 경험이,<br />내 프로그램으로 이어집니다.</h2>
+        <p>아래는 교육자가 준비한 시연 예제입니다. 처음부터 모두 만들거나 정해진 기간에 완성한다는 뜻은 아닙니다.</p>
+        <div className="pe-result-grid">
+          {[['foundation', '첫 시작 · 그림과 반복', '각도를 바꾸면 무늬가 어떻게 달라질까요?', 0], ['game', '기초 이후 · 게임 프로젝트', '좌표·충돌·점수를 코드로 연결합니다.', 2], ['math', '확장 · 수학과 데이터', '값을 바꾸고 그래프의 변화를 비교합니다.', 4]].map(([id, title, text, index]) => <article key={id}>
+            <button onClick={() => select(index, true)} aria-label={`${title} 시연 보기`}><img loading="lazy" src={`/python-showcase/${id}-poster.webp`} alt={title} /><span><Play size={20} /> 실제 시연 보기</span></button>
+            <h3>{title}</h3><p>{text}</p>
+          </article>)}
+        </div>
+        <a className="pe-cta" href="#apply" data-position="results">우리 아이의 시작 단계 알아보기 <ArrowRight size={18} /></a>
       </section>
       <section className="pe-method">
         <div className="pe-wrap">
@@ -653,7 +652,14 @@ export default function PythonEducation() {
           </div>
         </div>
       </section>
-      <section className="pe-apply pe-wrap" id="apply">
+      <section className="pe-wrap pe-trust">
+        <h2>수학감각 시리즈 저자가 만든 메타센스</h2>
+          <p><a href="/python/guides/">파이썬을 시작하는 부모님을 위한 학습 노트 읽기 →</a></p>
+        <p>답을 따라 쓰는 데서 멈추지 않고, 왜 그렇게 되는지 설명하는 공부를 지향합니다. 파이썬에서도 결과를 예상하고, 실행하고, 바뀐 이유를 설명하는 과정을 연결합니다.</p>
+        <p>둘시네가 운영합니다. <a href="https://smartstore.naver.com/dulcine" target="_blank" rel="noopener noreferrer">수학감각 교재 확인 ↗</a> · <a href="https://blog.naver.com/metasense_edu/224406758717" target="_blank" rel="noopener noreferrer">코드 스튜디오 자세히 보기 ↗</a></p>
+        <a className="pe-cta" href="#apply" data-position="learning">파이썬 무료체험 신청하기 <ArrowRight size={18} /></a>
+      </section>
+      <section className="pe-apply pe-wrap" id="trial-details">
         <div className="pe-apply-copy">
           <p className="pe-eyebrow">LET’S WRITE THE FIRST LINE</p>
           <h2>
@@ -682,9 +688,16 @@ export default function PythonEducation() {
               신청 확인 후 일정과 시작 방법을 안내해요.
             </li>
           </ul>
+          <ol className="pe-next-steps"><li>아래 양식으로 체험 신청</li><li>1일 이내 담당자가 경험·시작 단계와 일정 확인</li><li>안내받은 방법으로 체험 시작</li></ol>
+          <p>신청이 곧바로 수강 등록이나 결제가 되지는 않습니다. <a href="https://pf.kakao.com/_xfxkGDn" target="_blank" rel="noopener noreferrer">먼저 카카오로 질문하기 ↗</a></p>
           <div className="pe-faq">
+            <details><summary>신청 후 언제 연락받고, 학습 질문은 어떻게 확인하나요?</summary><p>체험 신청 후 1일 이내에 시작 안내를 드립니다. 이는 체험 신청의 첫 연락 기준이며 모든 과제 피드백의 응답 시간을 뜻하지 않습니다. 학습 중 질문 위치와 피드백 확인 방법은 시작 안내에서 확인합니다.</p></details>
+            <details><summary>체험 기간과 수강료는 어떻게 되나요?</summary><p>기본 체험은7일 무료이며 정규 수강료는 월15만 원입니다. 신청 후1일 이내 연락드립니다. 체험이 끝나도 자동 결제되지 않습니다.</p></details>
+            <details><summary>몇 학년부터, 어떤 방식으로 배우나요?</summary><p>초등 3학년부터 참여할 수 있는 자율 학습 과정입니다. 정해진 시간의 실시간 강의가 아니라, 학습하고 과제를 제출하며 선생님의 피드백을 받는 방식입니다.</p></details>
+            <details><summary>코딩이 처음인데 게임부터 만드나요?</summary><p>처음 파이썬의 기초 활동부터 시작합니다. 게임 프로젝트는 기초 이후 단계이며, 현재 경험과 이해 정도를 확인해 시작 지점을 안내합니다.</p></details>
             <details><summary>코딩을 모르는 부모도 아이를 도울 수 있나요?</summary><p>부모님이 코드를 대신 고쳐주실 필요는 없습니다. 아이는 코드 스튜디오에서 오류 메시지와 쉬운 기본 설명을 읽고, 필요하면 AI 힌트를 요청해 직접 수정하고 다시 실행합니다. 학부모 계정에서는 연결된 자녀의 학습 활동과 공개된 과제 피드백을 함께 살펴보실 수 있습니다.</p></details>
             <details><summary>AI가 대신 풀어주면 아이가 생각할 기회가 줄지 않나요?</summary><p>오류가 나면 원래 오류 메시지부터 보여줍니다. 기본 설명과 AI 힌트는 고칠 곳과 확인할 방법을 안내하고, 코드를 수정하고 실행하는 일은 아이가 직접 합니다. AI 설명도 실행 결과로 확인하며, 제출한 과제는 선생님이 확인한 피드백으로 이어집니다.</p></details>
+            <details><summary>수학을 잘해야 하나요?</summary><p>입문 활동과 파이썬 수학 과정은 구분됩니다. 지금 할 수 있는 활동과 관심사를 확인해 시작 단계를 안내합니다.</p></details>
             <details>
               <summary>파이썬을 미리 설치해야 하나요?</summary>
               <p>
@@ -711,7 +724,7 @@ export default function PythonEducation() {
         <PythonTrialForm />
       </section>
       <div className="pe-video-credits pe-wrap">
-        <p>새 과정 영상은 시연용 예제로 촬영했습니다. 각 과정에 서로 다른 배경음악을 사용했습니다.</p>
+        <p>과정 영상은 메타센스 도구에서 코드를 직접 실행한 화면입니다. 각 과정에 서로 다른 배경음악을 사용했습니다.</p>
         <details>
           <summary>과정별 음악 출처</summary>
           <ul>
@@ -726,6 +739,7 @@ export default function PythonEducation() {
         </details>
       </div>
       <footer className="pe-footer pe-wrap">
+        <p><a href="/math/">초등수학 과정</a> · <a href="/math/books/">수학감각 교재 소개</a></p>
         <Link className="pe-brand" to="/">
           METASENSE <span>PYTHON</span>
         </Link>

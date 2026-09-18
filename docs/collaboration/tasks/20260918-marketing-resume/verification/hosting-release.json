@@ -1,0 +1,23 @@
+{
+  "release": "projects/1075562222654/sites/math-sense-1f6a8/channels/live/releases/1789688388655000",
+  "version": "sites/math-sense-1f6a8/versions/7f8b498c74f63cd8",
+  "previous": "sites/math-sense-1f6a8/versions/67a285bc562ddbe8",
+  "paths": [
+    "/index.html",
+    "/trial/index.html",
+    "/python/index.html",
+    "/python/guides/index.html",
+    "/python/guides/editorial/index.html",
+    "/python/guides/first-python-age/index.html",
+    "/python/guides/scratch-to-python/index.html",
+    "/python/guides/first-turtle-drawing/index.html",
+    "/python/guides/game-and-programming/index.html",
+    "/python/guides/read-python-errors/index.html",
+    "/python/guides/ai-and-child-thinking/index.html",
+    "/python/guides/self-paced-feedback/index.html",
+    "/python/guides/submit-code-and-thinking/index.html",
+    "/python/guides/parent-learning-records/index.html",
+    "/python/guides/python-trial-checklist/index.html",
+    "/marketing-analytics.js"
+  ]
+}

@@ -16,7 +16,7 @@
 .crew-directory-hangar {
   --crew-directory-accent: #00d4ff;
   position: relative;
-  height: 152px;
+  height: 190px;
   margin: -1.1rem -1.1rem 1rem;
   overflow: hidden;
   border-bottom: 1px solid color-mix(in srgb, var(--crew-directory-accent) 22%, rgba(255,255,255,.08));
@@ -44,18 +44,42 @@
   transition: transform .35s ease, filter .35s ease;
 }
 
-.crew-directory-hangar__profile {
+.crew-directory-hangar__profile-stage {
   position: absolute;
   z-index: 2;
   inset: 0 0 43px;
-  width: 100%;
-  height: calc(100% - 43px);
-  object-fit: cover;
+  overflow: hidden;
   opacity: 0;
-  filter: saturate(.92) contrast(1.04);
+  background: rgba(2, 7, 21, .96);
 }
 
-.crew-directory-hangar.has-profile-image .crew-directory-hangar__profile {
+.crew-directory-hangar__profile,
+.crew-directory-hangar__profile-backdrop {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+}
+
+.crew-directory-hangar__profile-backdrop {
+  inset: -10%;
+  width: 120%;
+  height: 120%;
+  object-fit: cover;
+  opacity: .42;
+  filter: blur(18px) saturate(.95) brightness(.58);
+  transform: scale(1.04);
+}
+
+.crew-directory-hangar__profile {
+  z-index: 1;
+  inset: 0;
+  box-sizing: border-box;
+  padding: 7px 10px;
+  object-fit: contain;
+  filter: saturate(1.02) contrast(1.03) drop-shadow(0 8px 18px rgba(0,0,0,.38));
+}
+
+.crew-directory-hangar.has-profile-image .crew-directory-hangar__profile-stage {
   animation: crew-profile-dissolve 12s ease-in-out infinite;
 }
 
@@ -219,13 +243,13 @@
 
 @media (max-width: 768px) {
   .crew-directory-guide { grid-template-columns: 1fr; }
-  .crew-directory-hangar { height: 146px; }
+  .crew-directory-hangar { height: 176px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .crew-directory-card:hover .crew-directory-hangar__ship { transform: none; }
   .crew-directory-hangar.is-building .crew-directory-hangar__dock > svg { animation: none; }
-  .crew-directory-hangar.has-profile-image .crew-directory-hangar__profile { animation: none; opacity: 1; }
+  .crew-directory-hangar.has-profile-image .crew-directory-hangar__profile-stage { animation: none; opacity: 1; }
   .crew-directory-hangar.has-profile-image .crew-directory-hangar__ship {
     animation: none;
     z-index: 4;

@@ -1,0 +1,88 @@
+{
+  "results": [
+    {
+      "path": "/math/",
+      "status": 200,
+      "body": true
+    },
+    {
+      "path": "/math/books/",
+      "status": 200,
+      "body": true
+    },
+    {
+      "path": "/math/guides/counting-place-value/",
+      "status": 200,
+      "body": true
+    },
+    {
+      "path": "/math/guides/regrouping-addition/",
+      "status": 200,
+      "body": true
+    },
+    {
+      "path": "/math/guides/subtraction-number-line/",
+      "status": 200,
+      "body": true
+    },
+    {
+      "path": "/math/guides/multiplication-light-cards/",
+      "status": 200,
+      "body": true
+    },
+    {
+      "path": "/math/guides/division-meaning/",
+      "status": 200,
+      "body": true
+    },
+    {
+      "path": "/math/guides/fraction-whole/",
+      "status": 200,
+      "body": true
+    },
+    {
+      "path": "/math/guides/equivalent-fractions/",
+      "status": 200,
+      "body": true
+    },
+    {
+      "path": "/math/guides/video-to-workbook/",
+      "status": 200,
+      "body": true
+    },
+    {
+      "path": "/math/guides/quiz-battle-review/",
+      "status": 200,
+      "body": true
+    },
+    {
+      "path": "/math/guides/growth-conversation/",
+      "status": 200,
+      "body": true
+    },
+    {
+      "path": "/math/guides/",
+      "status": 200,
+      "body": true
+    },
+    {
+      "path": "/math/guides/editorial/",
+      "status": 200,
+      "body": true
+    },
+    {
+      "path": "/math-assets/math.css",
+      "status": 200
+    },
+    {
+      "path": "/math-assets/light-cards.png",
+      "status": 200
+    },
+    {
+      "path": "/math-assets/fraction-book.jpg",
+      "status": 200
+    }
+  ],
+  "sitemap": "math and Python preserved",
+  "checkedAt": "2026-09-18T05:46:54.327Z"
+}

@@ -51,3 +51,24 @@ PDF: 브랜드·채널 역할·상담 동선의 기초. 100일 TXT와 XLSX: 확�
 - 2026-09-10 저녁 반영: [실행 증거](daily/2026-09-10/EXECUTION.md), [교류·후보](daily/2026-09-10/ENGAGEMENT.md), [주소 수정 영상](daily/2026-09-10/assets/multiplication-msense-corrected.mp4), [마지막 화면 검증](daily/2026-09-10/assets/multiplication-msense-outro.png). 낮 직접 작업 산출물이며 저녁 신규 외부 실행이 아님. 기존 오전 초안은 미발행 후속 소재로 보존.
 
 - 2026-09-11: [오늘 계획](daily/2026-09-11/JOURNAL.md), [부모 질문·응답·후속 시연 초안](daily/2026-09-11/DRAFTS.md). 로컬 기획 산출물, 외부 공개·성과 증거 아님.
+
+## 2026-09-13 SEO/AEO/GEO/SNS 개편 자료
+- SEO-AEO-GEO-SNS-PLAN.md: 현행 우선 전략·주간 리듬·다음7일·공식 가이드
+- CALENDAR.md: 9/14~12/16 개편 일정. CALENDAR-LEGACY-20260908.md: 과거 계획 보관
+- ../../content/python-guides/: 원본10편·catalog·편집방법·장기100후보
+- PYTHON-GUIDE-ASSETS.md: 실제 캡처·AI 삽화·익명처리 검토 기준
+- daily/2026-09-13/GUIDE-SNS-PACK.md: 첫 콘텐츠 SNS 재활용 초안(게시 미실행)
+
+- 2026-09-15: [일지](daily/2026-09-15/JOURNAL.md), [첫 그림 채널별 원고·촬영안](daily/2026-09-15/DRAFTS.md). 기존10편 로컬 대조와 재활용 초안, 실제 영상·외부 발행 증거 아님.
+
+- 2026-09-16: [일지](daily/2026-09-16/JOURNAL.md), [채널별 실행 준비표·응답 초안](daily/2026-09-16/RELEASE-CHECKLIST.md). 9/15 원고의 재활용 선행 작업과 증거 기록 양식. 새 게시·실제 문의 증거 아님.
+
+- 2026-09-17: [일지](daily/2026-09-17/JOURNAL.md), [자율학습·피드백 수정 초안과 근거](daily/2026-09-17/FEEDBACK-REVISION.md). 기존2편/catalog·과제 로컬 소스·초안 공개 구분 검토. 운영 확인·원본 반영·배포 미실행.
+
+## 2026-09-18 추가 자료
+
+- [업무 점검표](daily/2026-09-18/BACKLOG-REVIEW.md): 여행 후 재개 우선순위, 이후 실행과 구분.
+- [실행·성과](daily/2026-09-18/EXECUTION.md): Google/GA/FAQ·기존 콘텐츠 지표·협업 대기 근거.
+- [첫 그림 공개 결과](daily/2026-09-18/FIRST-DRAWING-PUBLISH.md): 실제5채널URL·검증 범위·연결 한계.
+- [교류·제휴 후속](daily/2026-09-18/PARTNERS-FOLLOWUP.md): 댓글1건·후보3곳 확인과 미발송 제안 초안.
+- [오전 후속 계획](daily/2026-09-18/MORNING-PLAN.md):09:12 예약 로컬 계획·응답 초안·관측 틀. 실행 성과 아님.

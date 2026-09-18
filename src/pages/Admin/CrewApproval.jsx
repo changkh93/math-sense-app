@@ -543,7 +543,7 @@ function CrewProfileImageManager({ crew, busyId, setBusyId, onSaved }) {
       if (optimized.size > CREW_PROFILE_IMAGE_MAX_STORED_BYTES) {
         throw new Error('압축한 이미지가 2MB를 넘습니다. 더 작은 이미지를 선택해주세요.');
       }
-      uploadedPath = buildCrewProfileImageStoragePath(crew.id);
+      uploadedPath = buildCrewProfileImageStoragePath(crew.id, crew.leaderId);
       const uploadedRef = ref(storage, uploadedPath);
       await uploadBytes(uploadedRef, optimized, {
         contentType: 'image/jpeg',
@@ -555,7 +555,7 @@ function CrewProfileImageManager({ crew, busyId, setBusyId, onSaved }) {
         profileImageUrl,
         profileImagePath: uploadedPath,
       });
-      if (isOwnedCrewProfileImagePath(crew.profileImagePath, crew.id) && crew.profileImagePath !== uploadedPath) {
+      if (isOwnedCrewProfileImagePath(crew.profileImagePath, crew.id, crew.leaderId) && crew.profileImagePath !== uploadedPath) {
         deleteObject(ref(storage, crew.profileImagePath)).catch((cleanupError) => console.warn('이전 크루 이미지 정리 실패:', cleanupError));
       }
       setFile(null);
@@ -581,7 +581,7 @@ function CrewProfileImageManager({ crew, busyId, setBusyId, onSaved }) {
         profileImageUrl: '',
         profileImagePath: '',
       });
-      if (isOwnedCrewProfileImagePath(crew.profileImagePath, crew.id)) {
+      if (isOwnedCrewProfileImagePath(crew.profileImagePath, crew.id, crew.leaderId)) {
         await deleteObject(ref(storage, crew.profileImagePath)).catch((cleanupError) => console.warn('크루 이미지 파일 정리 실패:', cleanupError));
       }
       setFile(null);

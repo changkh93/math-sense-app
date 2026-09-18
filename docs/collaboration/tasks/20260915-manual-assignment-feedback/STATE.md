@@ -1,0 +1,21 @@
+# 20260915-manual-assignment-feedback
+
+- Goal: 현재 대기중 과제 전체 상세 수동 검토 및 초안 저장.
+- Phase: DONE
+- Updated: 2026-09-15 KST
+- Owner: Codex 단독 학생 피드백 검토, 외부 위임 없음.
+- Baseline: a98171bcb40e2ed08e95746d3ae3fa4bd43a8f2f.
+- Dirty state: 기존 크루·마케팅·공개 페이지·함수·설정 수정 보존. 앱 코드 수정 범위 아님.
+- Scope: 대기 41건, 제출일 2026-09-10/11/14. AI 초안 필드만 저장, 공개/상태/지급 불변.
+- Acceptance: 원본·질문·이전반응·당일 과정 기록 개별 검토, 코드 원문 비교, 독서 동일 bookId 쪽수 비교, 누적/중복 제외, 저장 전후 검증.
+- Artifacts: /private/tmp/feedback-20260915-* (학생 자료는 저장소에 추가하지 않음).
+- Result: 41/41 상세 수동 피드백 초안 저장 및 재조회 검증 완료. 학생별 640~1191자, 학부모 요약·강점·개선점·이전 비교·근거·루브릭 포함.
+- Review: 현재 첨부 Python 원문 8개(문법 검사 포함), 손글씨 2장, 연결된 Google Docs 해당 날짜 노트 이미지, 이전 Colab 노트북 원문 및 이전 Python 파일 비교. 수학 예시 검산. 수업 자료 ZIP HTTP 200 확인. 오락용 외부 이미지 링크는 접근 불가로 추측하지 않음.
+- Isolation: 이전 제출은 같은 과정 및 현재 제출일보다 앞선 날짜로 다시 제한. 초등 레벨업 수학 인정, 수학/Python/고전 교차 합산 금지. 영상 누적·중복과 워크북 누적 진행을 당일 완료로 표현하지 않음. 고전 reading 원본 복원, 동일 bookId만 쪽수 비교.
+- Educational QA: 연립방정식 해 없음/무수히 많음, 회전체 회전축/단면 조건, 나눗셈의 0 조건, 괄호/import/초기화 문법, 미완성 오답 풀이 등 개별 교정. 불확실한 쪽수·표시 문제·입력 오타는 단정하지 않음.
+- Bonus proposals: 20×2, 25×10, 30×14, 35×11, 40×4. 고전 7건은 전용 4항목 루브릭 합계, 퀴즈 미확인에 따른 상한 반영. 모두 제안이며 실제 지급 없음.
+- Verification: 2026-09-15T07:39:58.587Z에 41건 본문·payload 일치, 비-AI 필드 전부 불변, status=submitted 유지, 추가 대기 0건 확인. 총 대기는 초안 전용이므로 41건 유지.
+- Checks: /private/tmp/feedback-20260915-before-verification.json 및 after-verification.json 모두 errors=[]. Feedback SHA256: 4fa004cc3012b12ba43c6dadbce9371ed99e0c35dd6f937ecccd1cd66dee99ac.
+- Limits: 학생 게임 실제 GUI 실행·관리자 화면 렌더링은 미검증. 현재 코드 AST 6개 통과, 2개 기존 문법 오류 확인 후 피드백에 반영. 앱 코드/학생 코드 수정 및 공개/지급 없음.
+- Next: 운영자가 관리자 화면에서 초안을 확인한 뒤 필요 시 직접 승인·게시.
+- User action: 없음.

@@ -1,0 +1,10 @@
+#math-application .public-app{min-height:0;border-radius:18px;padding:0;background:#102d29;color:#fff}
+#math-application .public-app>header,#math-application .public-app>footer,#math-application .public-stars,#math-application main>section:not(.application-layout),#math-application .application-info{display:none!important}
+#math-application main{margin:0;padding:0;max-width:none}
+#math-application .application-layout{display:block;padding:20px;margin:0;max-width:none}
+#math-application .application-form{width:100%;margin:0;background:#12372f;border:0}
+#math-application h2,#math-application h1{color:#fff}
+#math-application .complete-panel{margin:0;padding:40px}
+#math-application input,#math-application select,#math-application textarea{font-family:inherit}
+@media(max-width:600px){#math-application .application-layout{padding:8px}#math-application .application-form{padding:18px}}
+#math-application main>:not(.application-layout){display:none!important}

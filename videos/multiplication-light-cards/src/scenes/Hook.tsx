@@ -1,0 +1,1 @@
+import React from 'react';import {Frame,Crop} from '../Frame';export const Hook=()=>{return <Frame step='구구단, 답만 외우고 있나요?' title={'불빛을 따라\n곱셈이 보인다'} sub={'보고, 듣고, 직접 풀어보는\n구구단 불빛 카드'}><Crop src='answer-correct.png' x={1020} y={530} w={330} h={300} top={660}/></Frame>};

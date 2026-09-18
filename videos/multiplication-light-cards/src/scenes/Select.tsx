@@ -1,0 +1,1 @@
+import React from 'react';import {Frame,Crop} from '../Frame';export const Select=()=>{return <Frame step='01  연습할 단 고르기' title={'오늘은 4단부터\n하나씩, 차근차근'} sub={'여러 단을 골라 함께 연습할 수도 있어요.'}><Crop src='setup.png' x={1010} y={170} w={780} h={135} top={690}/><Crop src='setup.png' x={570} y={320} w={1220} h={220} top={960}/></Frame>};

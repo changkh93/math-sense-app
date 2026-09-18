@@ -1,0 +1,62 @@
+[
+  {
+    "url": "https://msense.me/python/guides/first-python-age/",
+    "static_body": true,
+    "json_ld": true,
+    "crawler_response": "success"
+  },
+  {
+    "url": "https://msense.me/python/guides/scratch-to-python/",
+    "static_body": true,
+    "json_ld": true,
+    "crawler_response": "success"
+  },
+  {
+    "url": "https://msense.me/python/guides/first-turtle-drawing/",
+    "static_body": true,
+    "json_ld": true,
+    "crawler_response": "success"
+  },
+  {
+    "url": "https://msense.me/python/guides/game-and-programming/",
+    "static_body": true,
+    "json_ld": true,
+    "crawler_response": "success"
+  },
+  {
+    "url": "https://msense.me/python/guides/read-python-errors/",
+    "static_body": true,
+    "json_ld": true,
+    "crawler_response": "success"
+  },
+  {
+    "url": "https://msense.me/python/guides/ai-and-child-thinking/",
+    "static_body": true,
+    "json_ld": true,
+    "crawler_response": "success"
+  },
+  {
+    "url": "https://msense.me/python/guides/self-paced-feedback/",
+    "static_body": true,
+    "json_ld": true,
+    "crawler_response": "success"
+  },
+  {
+    "url": "https://msense.me/python/guides/submit-code-and-thinking/",
+    "static_body": true,
+    "json_ld": true,
+    "crawler_response": "success"
+  },
+  {
+    "url": "https://msense.me/python/guides/parent-learning-records/",
+    "static_body": true,
+    "json_ld": true,
+    "crawler_response": "success"
+  },
+  {
+    "url": "https://msense.me/python/guides/python-trial-checklist/",
+    "static_body": true,
+    "json_ld": true,
+    "crawler_response": "success"
+  }
+]

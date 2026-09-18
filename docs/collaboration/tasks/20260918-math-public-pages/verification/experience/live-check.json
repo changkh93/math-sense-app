@@ -1,0 +1,137 @@
+[
+  {
+    "path": "/math/index.html",
+    "status": 200,
+    "bytes": 21734
+  },
+  {
+    "path": "/math/books/index.html",
+    "status": 200,
+    "bytes": 12318
+  },
+  {
+    "path": "/math/guides/counting-place-value/index.html",
+    "status": 200,
+    "bytes": 8882
+  },
+  {
+    "path": "/math/guides/regrouping-addition/index.html",
+    "status": 200,
+    "bytes": 8323
+  },
+  {
+    "path": "/math/guides/subtraction-number-line/index.html",
+    "status": 200,
+    "bytes": 8369
+  },
+  {
+    "path": "/math/guides/multiplication-light-cards/index.html",
+    "status": 200,
+    "bytes": 9068
+  },
+  {
+    "path": "/math/guides/division-meaning/index.html",
+    "status": 200,
+    "bytes": 8675
+  },
+  {
+    "path": "/math/guides/fraction-whole/index.html",
+    "status": 200,
+    "bytes": 8384
+  },
+  {
+    "path": "/math/guides/equivalent-fractions/index.html",
+    "status": 200,
+    "bytes": 8461
+  },
+  {
+    "path": "/math/guides/video-to-workbook/index.html",
+    "status": 200,
+    "bytes": 8348
+  },
+  {
+    "path": "/math/guides/quiz-battle-review/index.html",
+    "status": 200,
+    "bytes": 8599
+  },
+  {
+    "path": "/math/guides/growth-conversation/index.html",
+    "status": 200,
+    "bytes": 8938
+  },
+  {
+    "path": "/math/guides/index.html",
+    "status": 200,
+    "bytes": 7063
+  },
+  {
+    "path": "/math/guides/editorial/index.html",
+    "status": 200,
+    "bytes": 3306
+  },
+  {
+    "path": "/math-assets/math.css",
+    "status": 200,
+    "bytes": 7289
+  },
+  {
+    "path": "/math-assets/light-cards.png",
+    "status": 200,
+    "bytes": 95215
+  },
+  {
+    "path": "/math-assets/fraction-book.jpg",
+    "status": 200,
+    "bytes": 113940
+  },
+  {
+    "path": "/math-assets/daily-learning.png",
+    "status": 200,
+    "bytes": 150572
+  },
+  {
+    "path": "/math-assets/growth-report.png",
+    "status": 200,
+    "bytes": 243766
+  },
+  {
+    "path": "/math-assets/video-learning.png",
+    "status": 200,
+    "bytes": 64954
+  },
+  {
+    "path": "/math-assets/workbook-learning.png",
+    "status": 200,
+    "bytes": 113018
+  },
+  {
+    "path": "/math-assets/quiz-learning.png",
+    "status": 200,
+    "bytes": 84676
+  },
+  {
+    "path": "/math-application/application.js",
+    "status": 200,
+    "bytes": 1262775
+  },
+  {
+    "path": "/math-application/application.css",
+    "status": 200,
+    "bytes": 26951
+  },
+  {
+    "path": "/math-application/index.html",
+    "status": 200,
+    "bytes": 429
+  },
+  {
+    "path": "/sitemap.xml",
+    "status": 200,
+    "bytes": 2734
+  },
+  {
+    "path": "/llms.txt",
+    "status": 200,
+    "bytes": 6971
+  }
+]

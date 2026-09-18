@@ -47,3 +47,6 @@
 ## User-directed positioning update
 
 User chose to retain Kakao name and position MetaSense as operated by Dulcine. Rename no longer required. Applied Instagram/Naver bios, shortened Naver title, Kakao first greeting, published and pinned onboarding post114505358. Public IG/Naver/Kakao inspected. Detailed final copy and limitations: docs/marketing/official-channels/POSITIONING.md. Kakao short profile replacement blocked by validation; original retained. Business certification remains unapplied. Basic positioning improvements completed with stated platform limitation; no customer support inquiry sent.
+
+## 2026-09-18 카카오 심사 신청 완료 — 사용자 보고
+사용자가 개인사업자임을 확인하고 비즈니스 채널 심사 신청 완료·심사 진행 중이라고 보고했다. 신청 업무는 완료로 종료. Codex가 신청 화면이나 승인 결과를 직접 확인한 것은 아니며, 인증 승인 완료로 기록하지 않는다. 남은 업무는 심사 결과 확인 및 보완 요청이 있는 경우 대응이다. Instagram /python 링크 추가도 사용자 완료이므로 두 항목을 재요청하지 않는다.

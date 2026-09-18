@@ -1,0 +1,40 @@
+[
+  {
+    "path": "/",
+    "status": 200,
+    "type": "text/html; charset=utf-8",
+    "title": "메타센스 | 수학·파이썬·고전읽기 · 스스로 배우는 힘",
+    "h1": "<h1>메타센스 | 스스로 배우는 힘</h1>",
+    "robots": null
+  },
+  {
+    "path": "/trial",
+    "status": 200,
+    "type": "text/html; charset=utf-8",
+    "title": "메타센스 무료체험 | 수학·파이썬·고전읽기 과정 안내",
+    "h1": "<h1><span>시키지 않아도,</span><span>스스로 공부하는 힘</span></h1>",
+    "robots": null
+  },
+  {
+    "path": "/python",
+    "status": 200,
+    "type": "text/html; charset=utf-8",
+    "title": "초등·중학생 파이썬 코딩 | 프로젝트로 배우는 Python · 메타센스",
+    "h1": "<h1>게임을 좋아하는 아이,<br/><em>이제 직접 만들어 볼까요?</em></h1>",
+    "robots": null
+  },
+  {
+    "path": "/sitemap.xml",
+    "status": 200,
+    "type": "application/xml",
+    "robots": null,
+    "body": "<?xml version=\"1.0\" encoding=\"UTF-8\"?><urlset xmlns=\"http://www.sitemaps.org/schemas/sitemap/0.9\"><url><loc>https://msense.me/</loc></url><url><loc>https://msense.me/trial</loc></url><url><loc>https://msense.me/python</loc></url><url><loc>https://msense.me/python/guides/</loc></url><url><loc>https://msense.me/python/guides/editorial/</loc></url><url><loc>https://msense.me/python/guides/first-python-age/</loc><lastmod>2026-09-13</lastmod></url><url><loc>https://msense.me/python/guides/scratch-to-python/</loc><lastmod>2026-09-13</lastmod></url><url><loc>https://msense.me/python/guides/first-turtle-drawing/</loc><lastmod>2026-09-13</lastmod></url><url><loc>https://msense.me/python/guides/game-and-programming/</loc><lastmod>2026-09-13</lastmod></url><url><loc>https://msense.me/python/guides/read-python-errors/</loc><lastmod>2026-09-13</lastmod></url><url><loc>https://msense.me/python/guides/ai-and-child-thinking/</loc><lastmod>2026-09-13</lastmod></url><url><loc>https://msense.me/python/guides/self-paced-feedback/</loc><lastmod>2026-09-13</lastmod></url><url><loc>https://msense.me/python/guides/submit-code-and-thinking/</loc><lastmod>2026-09-13</lastmod></url><url><loc>https://msense.me/python/guides/parent-learning-records/</loc><lastmod>2026-09-13</lastmod></url><url><loc>https://msense.me/python/guides/python-trial-checklist/</loc><lastmod>2026-09-13</lastmod></url></urlset>"
+  },
+  {
+    "path": "/robots.txt",
+    "status": 200,
+    "type": "text/plain; charset=utf-8",
+    "robots": null,
+    "body": "User-agent: *\nAllow: /\nSitemap: https://msense.me/sitemap.xml\n"
+  }
+]

@@ -2,18 +2,33 @@
 
 매일 시작은 이 문서에서 한다. 작성·실행·기록 담당은 Codex. 기준 시간대는 Asia/Seoul이다.
 
+- [SEO + AEO/GEO + SNS 현행 전략](SEO-AEO-GEO-SNS-PLAN.md)
+- [파이썬 학습 노트](https://msense.me/python/guides/) / [이미지 출처·학생 자료 기준](PYTHON-GUIDE-ASSETS.md)
 - [매일 운영 절차](OPERATING.md)
-- [100일 날짜별 할 일](CALENDAR.md) — 2026-09-08~12-16, 100일
+- [개편 날짜별 할 일](CALENDAR.md) — 2026-09-14~12-16 / [과거100일 계획](CALENDAR-LEGACY-20260908.md)
 - [논의와 결정](DECISIONS.md)
 - [전체 자료 목록](SOURCES.md) / [원본 추출 자료](reference)
 - [9월 7일 개설 이력](daily/2026-09-07/JOURNAL.md)
 - [9월 8일 일지와 남은 일](daily/2026-09-08/JOURNAL.md) / [상세 실행 증거](daily/2026-09-08/EXECUTION.md)
 - [제휴 후보](daily/2026-09-08/PARTNERS.md) / [교류 기록](daily/2026-09-08/RESEARCH.md)
 
-## 현재 상태 — 2026-09-12 17:27 KST
+## 현재 상태 — 2026-09-18 직접 실행
 
-[오늘 일지](daily/2026-09-12/JOURNAL.md) / [수학 질문 초안](daily/2026-09-12/DRAFTS.md).
-예약 공개·문의·알림·모바일 동선은 새 검증 증거가 없어 이월. 수학 영상 대본만 준비했으며 외부 발행하지 않았다.9/11 저녁 마감 저장 누락을 오늘 확인하여 기록했다. 다음은 주말의 가벼운 기존 문의·예약 확인,9/14 주간 회고다.
+가격비교 추가 검토: 네이버 도서 카탈로그 매칭완료0건 확인. 에누리·다나와는 사용안함/연결 가능, 추가판매수수료2%. [등록 조건·비용·우선순위](daily/2026-09-18/PRICE-COMPARISON-REVIEW.md).
+
+밤 검색진단: 도서 서비스16개 확인, 전자책3종 발행정보·곱셈ISBN 정정 저장. 순위진단0은 전체미노출이 아님(상위검색어200위/전일기준/광고제외). 영상강의 유형·타도서ISBN 정정경로 담당자확인 이월. [원인·실행·측정 계획](daily/2026-09-18/SMARTSTORE-SEARCH-AUDIT.md).
+
+초등수학 [과정](https://msense.me/math/) · [수학감각 교재](https://msense.me/math/books/) · [학습 노트 10편](https://msense.me/math/guides/) 공개 완료. 총14 정적 HTML·모바일·FAQ·사이트맵 검증. 실제 학습 화면6종·학부모 문제별 설명·7일 무료체험 신청서 추가 공개. 학부모 실제 화면 캡처, 나머지 운영 조건 확정과 기존 앱 진입 링크 배포·전환 계측·색인 확인은 후속.
+
+스마트스토어: 수세기·덧뺄셈·분수세트 3개 도서 등록 및 실제 구매평 원문 보강, 네이버도서 서비스 정상 확인. 수세기/덧뺄셈 공개 검색 확인. 분수세트 공개검색과 구매평 캡처 이미지 반영은 후속. [상세 검증](../collaboration/tasks/20260910-smartstore-growth/20260918-REVIEWS-SEARCH.md).
+
+[오늘 일지](daily/2026-09-18/JOURNAL.md) / [실행·성과](daily/2026-09-18/EXECUTION.md) / [첫 그림5채널 공개](daily/2026-09-18/FIRST-DRAWING-PUBLISH.md) / [교류·제휴 후속](daily/2026-09-18/PARTNERS-FOLLOWUP.md).
+
+1번 문의·신청과2번 모바일 접수·알림은 사용자 완료 보고. Google 소유확인·사이트맵15페이지 처리·/python 및/trial 색인 요청 접수, GA4 실제 수신 연결, 기존 콘텐츠5채널 성과 점검, 도움 안내·FAQ 운영 반영, 첫 그림20초5채널 공개, 교류 댓글1건·제휴후보3곳 재확인 완료.
+
+네이버는 09:23 소유확인·사이트맵 제출·홈/파이썬/체험 수집 요청 접수 완료(색인 미확인). Instagram /python 링크 추가는 사용자 완료 보고. 남은 순서: 실제 신청 발생 시 GA 완료 이벤트 수신 확인 / 24시간 뒤 같은 기간 성과 비교. 카카오 비즈니스 채널 심사 신청은 사용자 완료 보고(9/18). 현재 심사 진행 중이며 승인 결과 확인만 후속 업무로 유지. 구글 색인 요청 접수와 실제 색인 완료는 구분한다.
+
+[9/18 오전 후속 계획·응답 초안](daily/2026-09-18/MORNING-PLAN.md): 09:12 예약 로컬 점검 완료. 외부 상태 변화 없음.
 
 ## 일지 인덱스
 
@@ -24,7 +39,13 @@
 | 2026-09-09 | 기록 마감·표지/영상 주소/체험 검증 이월 | [JOURNAL](daily/2026-09-09/JOURNAL.md) |
 | 2026-09-10 | 저녁 마감·배포 완료·알림 등 일부 이월 | [JOURNAL](daily/2026-09-10/JOURNAL.md) |
 | 2026-09-11 | 오전 기록 있음·저녁 저장 누락 | [JOURNAL](daily/2026-09-11/JOURNAL.md) |
-| 2026-09-12 |17:27 계획·초안·누락 기록 | [JOURNAL](daily/2026-09-12/JOURNAL.md) |
+| 2026-09-12 | 저녁 마감·초안 완료·외부 성과 미확인 | [JOURNAL](daily/2026-09-12/JOURNAL.md) |
+| 2026-09-13 | 파이썬 개선 배포·운영 확인, 측정 연결 후속 | [JOURNAL](daily/2026-09-13/JOURNAL.md) |
+| 2026-09-14 | 중간 기록·주간 회고·직접 대화 후속, 정규 저녁 마감 미확인 | [JOURNAL](daily/2026-09-14/JOURNAL.md) |
+| 2026-09-15 | 저녁 기록 마감·10편 로컬 대조·원고 준비, 영상/게시/측정 이월 | [JOURNAL](daily/2026-09-15/JOURNAL.md) |
+| 2026-09-16 | 저녁 기록 마감·실행 준비/응답 초안 완료, 영상/게시/측정 이월 | [JOURNAL](daily/2026-09-16/JOURNAL.md) |
+| 2026-09-17 | 저녁 마감·구구단5채널 공개 완료, 파이썬 적용/측정 이월 | [JOURNAL](daily/2026-09-17/JOURNAL.md) |
+| 2026-09-18 | 야간 추가: 전자책3종 발행정보·곱셈ISBN 정정, 도서 서비스16개 확인, 순위진단 가이드 반영·영상 등록경로 문의 이월 | [JOURNAL](daily/2026-09-18/JOURNAL.md) |
 
 실행 때마다 해당 날짜 행을 추가한다. 빠진 날짜는 ‘실행 기록 없음’으로 복구하며 했던 것처럼 소급 작성하지 않는다.
 
@@ -51,3 +72,15 @@
 
 ## 9/9 저녁 마감
 [오늘 일지](daily/2026-09-09/JOURNAL.md)에 실행·미확인 성과·9/10 우선순위를 반영했다. [풋터 링크](official-channels/FOOTER-LINKS.md) 정리 완료, 사이트 적용은 미확인. 오후 외부 수치는 조회하지 않았다. 릴스 표지 적용·영상 속 주소 수정·체험 접수 검증은 이월한다.
+
+## 2026-09-17 direct publication update
+User-requested 36-second multiplication-light-cards video completed (1080x1920 H.264/AAC).
+Published and UI-confirmed:
+- YouTube: https://youtube.com/shorts/uxCs22tO2Qk
+- Instagram: https://www.instagram.com/metasense_edu/reel/DdXwISNN_Hw/
+- Kakao: https://pf.kakao.com/_xfxkGDn/114615049
+Naver Blog and Clip remain UNPUBLISHED pending switch from personal login to official metasense_edu account. User has been asked; prepared copy is in docs/marketing/daily/2026-09-17/LIGHT-CARDS-PUBLISH.md. Resume these two channels without re-uploading the three completed channels. Existing Python plans preserved. No paid spend or bulk messages. Conversion results not measured.
+
+## 2026-09-17 Naver completion
+Official metasense_edu login confirmed after user switch. Blog published in elementary math / education category with search enabled and native MP4 attached: https://blog.naver.com/metasense_edu/224414685487
+Naver Clip published (public list confirmed; education category, AI audio disclosure, 36-second playback verified). Media ID: 90F85704B27F1E71A957C2262953FCCA04AD. Clip links to the new blog. All five requested channels are now published; no login blocker remains. Full URLs: docs/marketing/daily/2026-09-17/LIGHT-CARDS-PUBLISH.md.

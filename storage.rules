@@ -21,10 +21,11 @@ service firebase.storage {
         firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.role == 'admin';
     }
 
-    function canManageCrewImage(crewId) {
+    function canManageCrewImage(ownerUid) {
       return isMemberAuth() && (
-        isAdmin() ||
-        firestore.get(/databases/(default)/documents/crews/$(crewId)).data.leaderId == request.auth.uid
+        request.auth.uid == ownerUid ||
+        isWorkbookOperator() ||
+        isAdmin()
       );
     }
 
@@ -86,12 +87,12 @@ service firebase.storage {
     }
 
     // Public-facing Study Crew identity art. Only admins can curate it.
-    match /crew-profile-images/{crewId}/{fileName} {
+    match /crew-profile-images/{ownerUid}/{crewId}/{fileName} {
       allow read: if isMemberAuth();
-      allow create, update: if canManageCrewImage(crewId) &&
+      allow create, update: if canManageCrewImage(ownerUid) &&
         request.resource.size <= 2 * 1024 * 1024 &&
         request.resource.contentType.matches('image/(jpeg|png|webp)');
-      allow delete: if canManageCrewImage(crewId);
+      allow delete: if canManageCrewImage(ownerUid);
     }
 
     // Owner-managed reference images for objects placed in a Galaxy world.

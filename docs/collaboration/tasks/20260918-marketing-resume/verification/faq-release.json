@@ -1,0 +1,11 @@
+{
+  "release": "projects/1075562222654/sites/math-sense-1f6a8/channels/live/releases/1789688764282000",
+  "version": "sites/math-sense-1f6a8/versions/710a8bf49f3c1fdc",
+  "previous": "sites/math-sense-1f6a8/versions/7f8b498c74f63cd8",
+  "paths": [
+    "/python/guides/self-paced-feedback/index.html",
+    "/python/guides/index.html",
+    "/sitemap.xml",
+    "/llms.txt"
+  ]
+}

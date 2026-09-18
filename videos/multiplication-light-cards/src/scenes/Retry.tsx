@@ -1,0 +1,1 @@
+import React from 'react';import {Frame,Crop} from '../Frame';export const Retry=()=>{return <Frame step='04  어려웠다면 한 번 더' title={'맞혔어도 어렵다면\n다시 연습해요'} sub={'틀린 카드와 ‘조금 어려워요’ 카드는\n다시 만나요.'}><Crop src='answer-correct.png' x={910} y={840} w={545} h={140} top={730}/><Crop src='retry-next.png' x={1010} y={170} w={780} h={135} top={1080}/></Frame>};

@@ -1,0 +1,107 @@
+{
+  "name": "sites/math-sense-1f6a8/releases/1789710367056000",
+  "version": {
+    "name": "sites/math-sense-1f6a8/versions/744d1c015020af69",
+    "status": "FINALIZED",
+    "config": {
+      "headers": [
+        {
+          "headers": {
+            "Cache-Control": "public, max-age=31536000, immutable"
+          },
+          "glob": "/assets/**"
+        },
+        {
+          "headers": {
+            "Cache-Control": "no-cache, no-store, must-revalidate"
+          },
+          "glob": "/"
+        },
+        {
+          "headers": {
+            "Cache-Control": "no-cache, no-store, must-revalidate"
+          },
+          "glob": "/index.html"
+        },
+        {
+          "headers": {
+            "Cache-Control": "public, max-age=31536000, immutable"
+          },
+          "glob": "/sounds/multiplication/v1/**"
+        },
+        {
+          "headers": {
+            "Cache-Control": "public, max-age=86400, stale-while-revalidate=604800"
+          },
+          "glob": "/sounds/**"
+        },
+        {
+          "headers": {
+            "Cache-Control": "no-cache"
+          },
+          "glob": "/python{,/**}"
+        },
+        {
+          "headers": {
+            "Cache-Control": "no-cache"
+          },
+          "glob": "/trial{,/**}"
+        },
+        {
+          "headers": {
+            "Cache-Control": "no-cache"
+          },
+          "glob": "/math{,/**}"
+        }
+      ],
+      "rewrites": [
+        {
+          "glob": "/math",
+          "path": "/math/index.html"
+        },
+        {
+          "glob": "/trial",
+          "path": "/trial/index.html"
+        },
+        {
+          "glob": "/python",
+          "path": "/python/index.html"
+        },
+        {
+          "glob": "/trial/python",
+          "path": "/python/index.html"
+        },
+        {
+          "glob": "/pdfs/**",
+          "path": "/pdf-not-found.html"
+        },
+        {
+          "glob": "**",
+          "path": "/spa.html"
+        }
+      ]
+    },
+    "labels": {
+      "deployment-tool": "cli-firebase"
+    },
+    "createTime": "2026-09-18T05:45:34.221658Z",
+    "createUser": {
+      "email": "paul@dulcine.net",
+      "imageUrl": "https://lh3.googleusercontent.com/a/ACg8ocJdoqBpCDubD0jgsZ8guClA7ek5rA5bDJOwRTuFVXOQwpWYRA=mo"
+    },
+    "finalizeTime": "2026-09-18T05:46:06.209751Z",
+    "finalizeUser": {
+      "email": "paul@dulcine.net",
+      "imageUrl": "https://lh3.googleusercontent.com/a/ACg8ocJdoqBpCDubD0jgsZ8guClA7ek5rA5bDJOwRTuFVXOQwpWYRA=mo"
+    },
+    "fileCount": "1237",
+    "versionBytes": "272887317"
+  },
+  "type": "DEPLOY",
+  "releaseTime": "2026-09-18T05:46:07.056Z",
+  "message": "Static elementary math course, books and 10 guides only; preserve existing app",
+  "releaseUser": {
+    "email": "paul@dulcine.net",
+    "imageUrl": "https://lh3.googleusercontent.com/a/ACg8ocJdoqBpCDubD0jgsZ8guClA7ek5rA5bDJOwRTuFVXOQwpWYRA=mo"
+  }
+}

@@ -79,7 +79,7 @@ const courseCatalog = [
     id: 'python-coding',
     name: '파이썬 코딩',
     shortName: '파이썬 코딩',
-    schedule: '월화수목금, 주 5회',
+    schedule: '자율 학습',
     price: '월 150,000원',
     image: '/images/clusters/python.png',
     tone: 'red',
@@ -118,7 +118,6 @@ const testimonials = [
 
 const classSchedule = [
   { time: '17:00-17:50', mon: '수학과 고전읽기', tue: '수학과 고전읽기', wed: '수학과 고전읽기', thu: '수학과 고전읽기', fri: '수학과 고전읽기' },
-  { time: '19:00-19:50', mon: '파이썬 코딩', tue: '파이썬 코딩', wed: '파이썬 코딩', thu: '파이썬 코딩', fri: '파이썬 코딩' },
   { time: '20:00-20:50', mon: '스스로Math-AI', tue: '-', wed: '스스로Math-AI', thu: '스스로Math-AI', fri: '스스로Math-AI' },
   { time: '21:00-21:50', mon: '서양고전 탐구', tue: '-', wed: '서양고전 탐구', thu: '서양고전 탐구', fri: '서양고전 탐구' },
 ];
@@ -173,19 +172,19 @@ const faqItems = [
   ['어떤 과정을 체험할 수 있나요?', '초등 수학과 고전읽기, 서양고전 탐구, 중등 스스로Math-AI, 파이썬 코딩 중 관심 과정을 선택할 수 있습니다. 통합 패키지는 무료체험 대상이 아닙니다.'],
 ];
 
-export default function PublicApplication({ fixedType }) {
+export default function PublicApplication({ fixedType, initialCourse = '' }) {
   const params = useParams();
   const navigate = useNavigate();
   const type = fixedType || params.type || 'trial';
   const isTrial = type === 'trial';
-  const referralToken = useMemo(() => new URLSearchParams(window.location.search).get('ref') || '', []);
+  const referralToken = useMemo(() => new URLSearchParams((typeof window === 'undefined' ? '' : window.location.search)).get('ref') || '', []);
   const [referralPreview, setReferralPreview] = useState(null);
   const [form, setForm] = useState({
     applicantName: '',
     parentPhone: '',
     studentName: '',
     grade: '',
-    selectedCourse: '',
+    selectedCourse: initialCourse,
     preferredTime: '',
     referredStudentName: '',
     referrerParentPhone: '',
@@ -323,6 +322,7 @@ export default function PublicApplication({ fixedType }) {
             {isReferralTrial && (
               <div className="referral-applied-note">추천 혜택이 적용되었습니다. 일반 체험보다 긴 4주 동안 충분히 경험해 보세요.</div>
             )}
+            <p className="python-trial-entry"><Link to={`/python${(typeof window === 'undefined' ? '' : window.location.search)}`}>파이썬이 궁금하신가요? 초3부터 · 자율 학습 · 월15만 원 · 7일 체험 →</Link></p>
             <div className="hero-actions">
               <button type="button" onClick={scrollToForm} disabled={referralChecking}>
                 {isTrial ? heroCta : title}
@@ -415,7 +415,7 @@ export default function PublicApplication({ fixedType }) {
             </div>
             {courseCatalog.map(course => (
               <div key={course.id} className="course-comparison__row" role="row">
-                <strong role="cell">{course.name}{course.id === 'python-coding' && <Link to={`/python${window.location.search}`} style={{ display: 'block', fontSize: 13, marginTop: 6 }}>파이썬 과정 자세히 보기 ↗</Link>}</strong>
+                <strong role="cell">{course.name}{course.id === 'math-classics' && <a href="/math/" style={{ display: 'block', fontSize: 13, marginTop: 6 }}>초등수학 과정 자세히 보기 ↗</a>}{course.id === 'python-coding' && <Link to={`/python${(typeof window === 'undefined' ? '' : window.location.search)}`} style={{ display: 'block', fontSize: 13, marginTop: 6 }}>파이썬 과정 자세히 보기 ↗</Link>}</strong>
                 <span role="cell">{course.target}</span>
                 <span role="cell">{course.schedule}</span>
                 <b role="cell">{course.price}</b>
@@ -473,7 +473,7 @@ export default function PublicApplication({ fixedType }) {
           <div className="section-heading">
             <span>Class Schedule</span>
             <h2>수업 일정</h2>
-            <p>매일 정해진 시간에 함께 학습하는 온라인 학습 공동체입니다. 요일별 시간표를 확인하세요.</p>
+            <p>아래는 정해진 시간에 참여하는 과정의 시간표입니다. 파이썬은 초등 3학년부터 참여하는 자율 학습 과정으로, 아래 시간표와 별도로 진행합니다.</p>
           </div>
           <div className="schedule-table-wrap">
             <table className="schedule-table">

@@ -1,0 +1,12 @@
+[
+  {
+    "path": "/math/",
+    "status": 200,
+    "verified": true
+  },
+  {
+    "path": "/math/books/",
+    "status": 200,
+    "verified": true
+  }
+]

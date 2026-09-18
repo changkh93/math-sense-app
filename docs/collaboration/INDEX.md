@@ -7,10 +7,14 @@ For an existing task, read its STATE.md and actual artifacts before continuing.
 
 | ID | Goal | Phase | State file | Next action |
 |---|---|---|---|---|
+| 20260918-manual-assignment-feedback | 현재 대기 과제 상세 수동 피드백 | COMPLETE | [STATE](tasks/20260918-manual-assignment-feedback/STATE.md) | 37건 상세 초안 저장·재조회 완료, 비AI 모든 필드/사용자29명 불변, 추가 제출0 |
+| 20260918-marketing-resume | 여행 후 마케팅3번 이후 실행 | ACTIVE | [STATE](tasks/20260918-marketing-resume/STATE.md) | 5채널·GA·FAQ·교류 완료, 네이버CAPTCHA/인스타앱 링크 후속 |
 | 20260917-live-status-crew-attendance | 실시간 학습 현황 결석 우선·크루 탭·집중방 참여 확인 | DEPLOYED_AND_VERIFIED | [STATE](tasks/20260917-live-status-crew-attendance/STATE.md) | `895746ed` Functions+Hosting 배포·운영 번들 확인; 관리자 실데이터 클릭 확인만 남음 |
+| 20260917-manual-assignment-feedback | 현재 대기 과제 상세 수동 피드백 | DONE | [STATE](tasks/20260917-manual-assignment-feedback/STATE.md) | 38건 상세 초안 저장·재조회 통과, 비초안 필드 불변·추가 대기 0건; 창문 함수 정답 오류 별도 기록 |
 | 20260917-fractonis-fraction-reduction-lab | 프락토니스 약분 묶음·압축 체험 학습 | DEPLOYED_AND_VERIFIED | [STATE](tasks/20260917-fractonis-fraction-reduction-lab/STATE.md) | `7223c3c1` 배포; 기약분수 도달 기록·10광석·운영 번들 확인 |
 | 20260917-fractonis-equivalent-fraction-lab | 프락토니스 같은 크기 분수 겹침 렌즈 | DEPLOYED_AND_VERIFIED | [STATE](tasks/20260917-fractonis-equivalent-fraction-lab/STATE.md) | `7223c3c1` 배포; 미션 완료 기록·10광석·운영 번들 확인 |
 | 20260917-fractonis-common-denominator-lab | 프락토니스 통분 겹침 렌즈 | DEPLOYED_AND_VERIFIED | [STATE](tasks/20260917-fractonis-common-denominator-lab/STATE.md) | `7223c3c1` 배포; 통분·비교 완료 기록·10광석·운영 번들 확인 |
+| 20260917-light-cards-marketing | 구구단 불빛 카드 쇼츠·전 채널 배포 | COMPLETE | [STATE](tasks/20260917-light-cards-marketing/STATE.md) | 실제 화면 캡처·제작·공개 검증 |
 | 20260917-interactive-learning-record-rewards | 체험 학습 일일 기록·멱등 광석·과제 피드백 반영 | DEPLOYED_AND_VERIFIED | [STATE](tasks/20260917-interactive-learning-record-rewards/STATE.md) | `7223c3c1` 함수+Hosting 배포; 7종 계약·운영 분수 번들 확인 |
 | 20260917-dividia-division-card-lab | 디비디아 나눗셈 묶음·구구단 음성 카드 | DEPLOYED_AND_VERIFIED | [STATE](tasks/20260917-dividia-division-card-lab/STATE.md) | `863f538d`를 `main`과 Firebase Hosting에 배포하고 운영 JS/CSS 해시 일치 확인 |
 | 20260917-dividia-long-division-lab | 디비디아 20문제 세로 나눗셈 체험 학습 | DEPLOYED_AND_VERIFIED | [STATE](tasks/20260917-dividia-long-division-lab/STATE.md) | `4dc4d13` 배포, 5구간·154단계 및 실운영 파일 해시 검증 완료 |
@@ -22,10 +26,19 @@ For an existing task, read its STATE.md and actual artifacts before continuing.
 | 20260916-coach-learning-loop | 학생 오류·질문 누적으로 개선되는 기본 힌트 시스템 | DEPLOYED (collection off) | [STATE](tasks/20260916-coach-learning-loop/STATE.md) | 관리자 작업대·함수·규칙 배포, 선택적 관찰/사례 수집은 꺼짐 |
 | 20260916-studio-private-coach | 코드 구조 보존·개인정보 전송 최소화 및 약관 보완 | DEPLOYED / AI ACTIVE | [STATE](tasks/20260916-studio-private-coach/STATE.md) | 구조형 요청·실운영 인증 응답 확인, ZDR는 승인 대기 |
 | 20260916-studio-error-coach | Luna 단일 모델·학생 오류 힌트·비용 제한 | RELEASED / AI ACTIVE | [STATE](tasks/20260916-coach-production-release/STATE.md) | 구조형 v2·운영 설정 활성화 및 실제 응답 확인 |
+| 20260916-studio-notebook | 파일·노트북 전환 및 상태 유지 셀 실행 | DONE (Hosting deployed) | [STATE](tasks/20260916-studio-notebook/STATE.md) | 791f9efa 커밋·푸시·Hosting 배포 및 운영 파일 해시 일치 확인 |
+| 20260916-manual-assignment-feedback | 현재 대기 과제 상세 수동 피드백 | DONE | [STATE](tasks/20260916-manual-assignment-feedback/STATE.md) | 30건 상세 초안 저장·재조회 통과, 비-AI 필드 불변·추가 대기 0건 |
+| 20260915-lumi-object-core-visual | ACT 9 잃어버린 편대 루미 무응답 제보 | DONE (local; not deployed) | [STATE](tasks/20260915-lumi-object-core-visual/STATE.md) | 객체 미션 화면 분류·Gate 4/빌드 검증 완료; 웹 배포 전 |
 | 20260915-studio-project-import | 정시원 코드 스튜디오 프로젝트 가져오기 실패·용량 상향 | DONE (Hosting deployed) | [STATE](tasks/20260915-studio-project-import/STATE.md) | `1f0883e3` 배포·운영 해시 일치; 학생 강력 새로고침 후 재시도 |
+| 20260915-manual-assignment-feedback | 현재 대기 과제 상세 수동 피드백 | DONE | [STATE](tasks/20260915-manual-assignment-feedback/STATE.md) | 41건 상세 초안 저장·재조회 통과, 비-AI 필드 불변·추가 대기 0건 |
 | 20260914-studio-responsive-preview | 패드 실행 화면 잘림·결과 가시성 | DONE (Hosting deployed) | [STATE](tasks/20260914-studio-responsive-preview/STATE.md) | 842fe2c6 푸시·운영 JS/CSS 해시 일치, 패드 실물 확인 후속 |
 | 20260914-studio-font-upload | 큰 한글 TTF 업로드 실패 | DONE (Hosting deployed) | [STATE](tasks/20260914-studio-font-upload/STATE.md) | 공식 TTF 실기·842fe2c6 배포 검증 완료, 학생 새로고침 후 업로드 |
-| 20260912-study-crew-profile-image | 스터디 크루 프로필 이미지 관리·목록 교차·상세 배치 | DONE (local; not deployed) | [STATE](tasks/20260912-study-crew-profile-image/STATE.md) | 함수·Storage 규칙·웹 함께 배포 후 운영자 업로드/모바일 실기 확인 |
+| 20260914-manual-assignment-feedback | 현재 대기 과제 상세 수동 피드백 | DONE | [STATE](tasks/20260914-manual-assignment-feedback/STATE.md) | 43건 개별 초안 저장·재조회 일치, 공개/상태/지급 등 비초안 필드 불변 확인 |
+| 20260913-python-guides | 파이썬10편·SEO/AEO/GEO/SNS 운영 | DONE (Hosting deployed) | [STATE](tasks/20260913-python-guides/STATE.md) | 검색도구·측정 연결, 실제 학생자료 별도 검토 |
+| 20260913-public-seo | 메인·체험·파이썬 공개 검색 구조 | DONE (student-root fix deployed) | [STATE](tasks/20260913-public-seo/STATE.md) | 이수진 학생 새로고침 후 초등수학 실기 확인 |
+| 20260913-python-conversion | 파이썬 전용 유입·신청·검색 개선 | DEPLOYED | [STATE](tasks/20260913-python-conversion/STATE.md) | 운영 HTML·화면 확인, 통계 연결 후속 |
+| 20260913-twin-crew-growth-reward | T.W.I.N. 성장 보상 누락 복구 및 표시 개선 | DONE (production remediated, UI deployed) | [STATE](tasks/20260913-twin-crew-growth-reward/STATE.md) | 9월 15일 06:39 KST 이후 인정 19명 전환 및 t10 검증 시작 여부 관찰; t20에는 유효 참여자 1명 추가 필요 |
+| 20260912-study-crew-profile-image | 스터디 크루 프로필 이미지 관리·목록 교차·상세 배치 | DEPLOYED (founder retry pending) | [STATE](tasks/20260912-study-crew-profile-image/STATE.md) | 창설자가 새 번들에서 업로드 재시도 후 목록/상세 실기 확인 |
 | 20260911-study-stream-30-sfu-plan | 크루 Google Meet를 최대 30명 앱 내부 Study Stream으로 전환 | DONE (design only; not implemented) | [STATE](tasks/20260911-study-stream-30-sfu-plan/STATE.md) | Cloudflare Realtime SFU 권장안·비용·대안·파일럿 계획 완성; 구현 시 Phase 0 안전 상한부터 |
 | 20260911-code-trace-draft-restore | CODE TRACE 초안 복원·Python 자동 추천·괄호 자동 닫기 | DONE (local; not deployed) | [STATE](tasks/20260911-code-trace-draft-restore/STATE.md) | 실제 초안 복원·자동완성 11군·괄호 통합·빌드 통과; Hosting 배포 후 로그인 실기 확인 |
 | 20260911-studio-input | 코드 스튜디오 input 대화형 입력 | DONE (local) | [STATE](tasks/20260911-studio-input/STATE.md) | 한글·연속 입력·int·정지/재실행·모바일·turtle/pygame 검증 완료, 배포 전 |
@@ -44,7 +57,7 @@ For an existing task, read its STATE.md and actual artifacts before continuing.
 | 20260910-quiz-progress-wording | 퀴즈 진행 숫자·나중에 풀기 안내 개선 | DONE (local; not deployed) | [STATE](tasks/20260910-quiz-progress-wording/STATE.md) | 전체 기준 답 선택 현황·고정 문제 번호·명확한 보류 안내, 회귀·브라우저·빌드 확인; 웹 배포 전 |
 | 20260910-unified-math-input | 수식 입력 모달 통일 및 + 누락 해결 | ACTIVE | [STATE](tasks/20260910-unified-math-input/STATE.md) | 공통 키패드·같은 모달 내 직접 입력 구현 및 회귀 검증 |
 | 20260910-dark-matter-tablet-focus | 패드 다크매터 퀴즈 잠금·복귀 개선 | DONE (local; not deployed) | [STATE](tasks/20260910-dark-matter-tablet-focus/STATE.md) | visible blur 오탐·잠금 중 중복·복귀 무응답·투명 레이어 수정, 진단 보강. 세션/화면/빌드 검증 완료; 웹 배포 및 실물 패드 확인 남음 |
-| 20260910-smartstore-growth | 둘시네 스마트스토어 세 상품군 점검·검색 및 판매 개선 | PARTIAL / REVIEW_PENDING | [STATE](tasks/20260910-smartstore-growth/STATE.md) | 9/12 분수 상세 개편 완료. 리뷰 AI Basic 월19,900원 네이버 신청 저장·자동충전 등록 완료. 공급사 가입 기본정보 입력 완료, 사용자 비밀번호 설정·휴대폰 인증 대기. 오뒷세이아 리뷰0으로 덧뺄셈 대체 예정. 기존 복구/광고·메시지 성과 후속 남음 |
+| 20260910-smartstore-growth | 스마트스토어 검색·카테고리·광고 개선 | ACTIVE | [STATE](tasks/20260910-smartstore-growth/STATE.md) | 도서3종 등록·전자책3종 서지 정정, 도서서비스16/가격비교매칭0 확인. 영상유형·도서카탈로그 담당자확인, 외부가격비교2%수수료 검토. 광고 미집행 |
 | 20260910-game-studio-distribution | 게임 스튜디오 채널 배포·오늘 마케팅 실행 | DONE (distribution) | [STATE](tasks/20260910-game-studio-distribution/STATE.md) | 게임3채널·곱셈 수정YouTube 공개, 접수·교류 기록 완료; 알림 연동 후속 확인 |
 | 20260910-game-projects-parent-reel | 학부모 대상 게임 프로젝트 쇼츠·릴스 홍보 영상 | DONE | [STATE](tasks/20260910-game-projects-parent-reel/STATE.md) | 36초 세로 MP4 v2·표지·게시 문구 완성. 전환음 제거, Pixelland 음악/출처 적용·음량 검증 |
 | 20260910-mars-expedition-intro-video | 화성 탐사대 1분 실제 플레이·한글 설명 영상 | DONE | [STATE](tasks/20260910-mars-expedition-intro-video/STATE.md) | 1분 1080p MP4, 한글 애니메이션·게임 음악/효과음, 15시점 시각 검증 완료 |
@@ -73,7 +86,7 @@ For an existing task, read its STATE.md and actual artifacts before continuing.
 | 20260907-hoverpack-water | 호버팩 수면 보호·장비 변경 자동 부상 | DONE (local) | [STATE](tasks/20260907-hoverpack-water/STATE.md) | 수면 제한·수중 전환 브라우저 검증 및 빌드 완료, 운영 배포 전 |
 | 20260907-crew-member-removal | 크루 리더 멤버 강퇴 및 폐쇄 흐름 | DONE (local) | [STATE](tasks/20260907-crew-member-removal/STATE.md) | 서버·UI 검사 및 빌드 완료, 함수·규칙·웹 배포 전 |
 | 20260907-hoverpack-experience | 저비용 절차형 고공 비행·링 탐사 경험 개선 | DONE (local, revised) | [STATE](tasks/20260907-hoverpack-experience/STATE.md) | 추종 입자·모호한 비행체 제거, 구름·카메라 재구성 및 실화면 검증; 운영 배포 전 |
-| 20260907-kakao-business-channel | 기존 카카오톡 채널을 메타센스 마케팅·상담 채널로 개선 | WAITING_EXTERNAL | [STATE](tasks/20260907-kakao-business-channel/STATE.md) | 기본 설정·운영 관계 안내 완료; 이름 유지 확정, 사업자 심사 증빙은 별도 필요 |
+| 20260907-kakao-business-channel | 기존 카카오톡 채널을 메타센스 마케팅·상담 채널로 개선 | WAITING_EXTERNAL | [STATE](tasks/20260907-kakao-business-channel/STATE.md) | 기본 설정·운영 관계 안내 완료; 9/18 심사 신청 사용자 완료, 승인 결과 대기 |
 | 20260907-official-marketing-channels | 네이버 블로그·인스타그램 비즈니스 공식 계정 신규 개설 | DONE | [STATE](tasks/20260907-official-marketing-channels/STATE.md) | 외부 링크 확인 완료, 둘시네 운영 관계 소개 반영 |
 | 20260907-profile-performance | 프로필 진입 속도·조회 비용·오류 처리 개선 | DONE (local) | [STATE](tasks/20260907-profile-performance/STATE.md) | 로컬 검증 완료, 답변 인덱스 준비 후 웹 배포 필요 |
 | 20260907-profile-photo | 프로필 사진 등록 및 공개 영역 표시 | DONE (local) | [STATE](tasks/20260907-profile-photo/STATE.md) | 로컬 구현·검증 완료, Storage 규칙 포함 운영 배포 전 |
@@ -85,3 +98,12 @@ For an existing task, read its STATE.md and actual artifacts before continuing.
 
 New task records belong in `tasks/<unique-ID>/STATE.md` with numbered request and return files.
 Keep completed rows for traceability. Do not overwrite other sessions' records.
+# Active task: Fractonis common-denominator lab
+
+- State: `docs/collaboration/tasks/20260917-fractonis-common-denominator-lab/STATE.md`
+
+# Active task: Fractonis fraction-reduction lab
+
+- State: `docs/collaboration/tasks/20260917-fractonis-fraction-reduction-lab/STATE.md`
+
+| 20260918-math-public-pages | 초등수학 과정·수학감각 교재·초기 콘텐츠 10편 | DONE | [STATE](tasks/20260918-math-public-pages/STATE.md) | 14 정적 페이지 운영 공개·모바일/본문/FAQ/사이트맵 검증 완료 |

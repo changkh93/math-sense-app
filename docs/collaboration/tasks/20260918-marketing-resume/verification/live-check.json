@@ -1,0 +1,42 @@
+[
+  {
+    "path": "/",
+    "status": 200,
+    "analytics": true,
+    "google": true,
+    "naver": true,
+    "bytes": 3212
+  },
+  {
+    "path": "/trial",
+    "status": 200,
+    "analytics": true,
+    "google": false,
+    "naver": false,
+    "bytes": 22279
+  },
+  {
+    "path": "/python",
+    "status": 200,
+    "analytics": true,
+    "google": false,
+    "naver": false,
+    "bytes": 30072
+  },
+  {
+    "path": "/python/guides/first-turtle-drawing/",
+    "status": 200,
+    "analytics": true,
+    "google": false,
+    "naver": false,
+    "bytes": 6731
+  },
+  {
+    "path": "/marketing-analytics.js",
+    "status": 200,
+    "analytics": false,
+    "google": false,
+    "naver": false,
+    "bytes": 3577
+  }
+]

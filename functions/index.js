@@ -6529,7 +6529,10 @@ function normalizeCrewProfileImageUpdate(data, crewId, crewData = {}) {
   const profileImageUrl = String(data?.profileImageUrl ?? crewData.profileImageUrl ?? "").trim();
   const profileImagePath = String(data?.profileImagePath ?? crewData.profileImagePath ?? "").trim();
   if (hasUpdate) {
-    const validPath = !profileImagePath || profileImagePath.startsWith(`crew-profile-images/${crewId}/`);
+    const leaderId = String(crewData.leaderId || "").trim();
+    const validPath = !profileImagePath || (
+      leaderId && profileImagePath.startsWith(`crew-profile-images/${leaderId}/${crewId}/`)
+    );
     const validUrl = !profileImageUrl || /^https:\/\//i.test(profileImageUrl);
     const hasCompletePair = Boolean(profileImageUrl) === Boolean(profileImagePath);
     if (!validPath || !validUrl || !hasCompletePair || profileImageUrl.length > 2048 || profileImagePath.length > 320) {

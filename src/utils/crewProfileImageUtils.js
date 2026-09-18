@@ -12,15 +12,22 @@ export function validateCrewProfileImageFile(file) {
   return '';
 }
 
-export function buildCrewProfileImageStoragePath(crewId, timestamp = Date.now()) {
+export function buildCrewProfileImageStoragePath(crewId, ownerUid, timestamp = Date.now()) {
   const safeCrewId = String(crewId || '').trim();
+  const safeOwnerUid = String(ownerUid || '').trim();
   if (!safeCrewId || safeCrewId.includes('/')) throw new Error('크루 정보를 확인할 수 없습니다.');
+  if (!safeOwnerUid || safeOwnerUid.includes('/')) throw new Error('크루 창설자를 확인할 수 없습니다.');
   const safeTimestamp = Math.max(0, Math.trunc(Number(timestamp) || 0));
-  return `crew-profile-images/${safeCrewId}/profile-${safeTimestamp}.jpg`;
+  return `crew-profile-images/${safeOwnerUid}/${safeCrewId}/profile-${safeTimestamp}.jpg`;
 }
 
-export function isOwnedCrewProfileImagePath(path, crewId) {
+export function isOwnedCrewProfileImagePath(path, crewId, ownerUid) {
   const value = String(path || '').trim();
   const safeCrewId = String(crewId || '').trim();
-  return Boolean(value && safeCrewId && !safeCrewId.includes('/') && value.startsWith(`crew-profile-images/${safeCrewId}/`));
+  const safeOwnerUid = String(ownerUid || '').trim();
+  return Boolean(
+    value && safeCrewId && safeOwnerUid &&
+    !safeCrewId.includes('/') && !safeOwnerUid.includes('/') &&
+    value.startsWith(`crew-profile-images/${safeOwnerUid}/${safeCrewId}/`)
+  );
 }

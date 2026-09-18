@@ -36,7 +36,7 @@ const inputStyle = {
   fontFamily: 'var(--font-tech)',
 };
 
-function CrewLeaderProfileImageEditor({ crew, busy, setBusy, setMessage }) {
+function CrewLeaderProfileImageEditor({ crew, ownerUid, busy, setBusy, setMessage }) {
   const inputRef = useRef(null);
   const [file, setFile] = useState(null);
   const [previewUrl, setPreviewUrl] = useState('');
@@ -75,7 +75,7 @@ function CrewLeaderProfileImageEditor({ crew, busy, setBusy, setMessage }) {
       if (optimized.size > CREW_PROFILE_IMAGE_MAX_STORED_BYTES) {
         throw new Error('압축한 이미지가 2MB를 넘습니다. 더 작은 이미지를 선택해주세요.');
       }
-      uploadedPath = buildCrewProfileImageStoragePath(crew.id);
+      uploadedPath = buildCrewProfileImageStoragePath(crew.id, ownerUid);
       const uploadedRef = ref(storage, uploadedPath);
       await uploadBytes(uploadedRef, optimized, {
         contentType: 'image/jpeg',
@@ -87,7 +87,7 @@ function CrewLeaderProfileImageEditor({ crew, busy, setBusy, setMessage }) {
         profileImageUrl,
         profileImagePath: uploadedPath,
       });
-      if (isOwnedCrewProfileImagePath(crew.profileImagePath, crew.id) && crew.profileImagePath !== uploadedPath) {
+      if (isOwnedCrewProfileImagePath(crew.profileImagePath, crew.id, ownerUid) && crew.profileImagePath !== uploadedPath) {
         deleteObject(ref(storage, crew.profileImagePath)).catch((cleanupError) => console.warn('이전 크루 이미지 정리 실패:', cleanupError));
       }
       setFile(null);
@@ -110,7 +110,7 @@ function CrewLeaderProfileImageEditor({ crew, busy, setBusy, setMessage }) {
     setMessage('');
     try {
       await httpsCallable(functions, 'updateStudyCrew')({ crewId: crew.id, profileImageUrl: '', profileImagePath: '' });
-      if (isOwnedCrewProfileImagePath(crew.profileImagePath, crew.id)) {
+      if (isOwnedCrewProfileImagePath(crew.profileImagePath, crew.id, ownerUid)) {
         await deleteObject(ref(storage, crew.profileImagePath)).catch((cleanupError) => console.warn('크루 이미지 파일 정리 실패:', cleanupError));
       }
       setFile(null);
@@ -355,7 +355,7 @@ export default function CrewSettingsModal({ isOpen, onClose, crew }) {
           </div>
 
           <div style={{ display: 'grid', gap: '0.9rem', marginBottom: '1rem' }}>
-            <CrewLeaderProfileImageEditor crew={crew} busy={busy} setBusy={setBusy} setMessage={setMessage} />
+            <CrewLeaderProfileImageEditor crew={crew} ownerUid={crew?.leaderId || user?.uid} busy={busy} setBusy={setBusy} setMessage={setMessage} />
 
             <label style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
               <span className="font-tech" style={{ color: 'var(--crystal-cyan)', fontWeight: 700 }}>크루 이름</span>

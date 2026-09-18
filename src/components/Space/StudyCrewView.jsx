@@ -299,15 +299,23 @@ function CrewDirectoryHangar({ crew, isMyCrew, isApproved }) {
         <CrewMothership crew={crew} variant="directory" />
       </div>
       {crew.profileImageUrl && !imageFailed && (
-        <img
-          className="crew-directory-hangar__profile"
-          src={crew.profileImageUrl}
-          alt={`${crew.name || '스터디'} 크루 프로필`}
-          loading="lazy"
-          decoding="async"
-          onLoad={(event) => setImageReady(event.currentTarget.naturalWidth > 0)}
-          onError={() => setImageFailed(true)}
-        />
+        <div className="crew-directory-hangar__profile-stage">
+          <img
+            className="crew-directory-hangar__profile-backdrop"
+            src={crew.profileImageUrl}
+            alt=""
+            aria-hidden="true"
+          />
+          <img
+            className="crew-directory-hangar__profile"
+            src={crew.profileImageUrl}
+            alt={`${crew.name || '스터디'} 크루 프로필`}
+            loading="lazy"
+            decoding="async"
+            onLoad={(event) => setImageReady(event.currentTarget.naturalWidth > 0)}
+            onError={() => setImageFailed(true)}
+          />
+        </div>
       )}
       <div className="crew-directory-hangar__level font-tech">
         <span>LV.{level.level}</span>
@@ -1765,7 +1773,7 @@ export default function StudyCrewView({ onNavigateStore }) {
               </div>
               <div style={{ minWidth: isMobile ? '100%' : 270 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', color: '#e9d5ff', fontWeight: 900, marginBottom: 7 }}>
-                  <span>우리 크루 인원</span>
+                  <span>보상 인정 인원</span>
                   <span style={{ fontSize: '1.1rem', color: '#67e8f9' }}>{growthEvent?.eligibleCount ?? (hasCrew ? '…' : 0)} <span style={{ fontSize: '0.8rem', color: 'rgba(255,255,255,0.6)' }}>/ 40명</span></span>
                 </div>
                 {/* 10명 & 20명 & 40명 3단계 마일스톤 게이지 */}
@@ -1794,6 +1802,11 @@ export default function StudyCrewView({ onNavigateStore }) {
                             ? `다음 목표까지 앞으로 ${growthEvent.neededForNextTarget ?? Math.max(0, 10 - (growthEvent.eligibleCount || 0))}명 · 활동 게스트 ${growthEvent.activeGuestCount || 0}명`
                             : hasCrew ? '진행도를 불러오는 중…' : '크루에 참여하면 진행도가 표시됩니다'}
                 </div>
+                {hasCrew && growthEvent && (
+                  <div className="font-tech" style={{ color: 'rgba(255,255,255,0.5)', fontSize: '0.68rem', marginTop: 4 }}>
+                    현재 정회원 {growthEvent.memberCount || 0}명 · 48시간 대기·이동 이력 등 제외 {growthEvent.eventExcludedMemberCount || 0}명
+                  </div>
+                )}
               </div>
             </div>
             {hasCrew && (

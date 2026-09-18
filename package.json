@@ -5,11 +5,12 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "npm run test:frontier-audio-assets && vite build",
+    "build": "npm run test:frontier-audio-assets && vite build && node scripts/prerender-python.mjs && node scripts/build-python-guides.mjs && node scripts/build-math-pages.mjs && node scripts/build-math-application.mjs",
     "build:ext": "bash scripts/build-ext.sh",
     "lint": "eslint .",
     "test:crew-member-removal": "node --test functions/crewMemberRemoval.test.cjs && node scripts/test-crew-member-removal-ui.mjs",
-    "test:crew-growth": "node --test functions/crewGrowthEventPolicy.test.cjs functions/crewGrowthEventService.test.cjs functions/crewGuestTrial.test.cjs",
+    "test:crew-growth": "node --test functions/crewGrowthEventPolicy.test.cjs functions/crewGrowthEventService.test.cjs functions/crewGuestTrial.test.cjs functions/crewGrowthBackfillPolicy.test.cjs",
+    "backfill:crew-growth-locks": "node scripts/backfill-crew-growth-v2-locks.mjs",
     "test:store-gift": "node scripts/validate-base-theme-catalog.mjs && node --test functions/storeGiftPolicy.test.cjs",
     "test:agora-badges": "node scripts/test-agora-badges.mjs",
     "backfill:agora-stats": "node scripts/backfill-agora-stats.mjs",
@@ -64,6 +65,7 @@
     "test:vertical-division-lab": "node scripts/test-vertical-division-lab.mjs",
     "test:multiplication-card-lab": "node scripts/test-multiplication-card-lab.mjs",
     "test:division-card-lab": "node scripts/test-division-card-lab.mjs",
+    "test:fraction-reduction-lab": "node scripts/test-fraction-reduction-lab.mjs",
     "test:mission-card-completion": "node scripts/test-mission-card-completion.mjs",
     "test:code-trace": "node scripts/test-code-trace-progress-utils.mjs && node scripts/test-code-trace-editor-contract.mjs && node --test scripts/test-python-game-completion.mjs",
     "test:galaxy-terrain": "node scripts/test-galaxy-walk-surfaces.mjs",
@@ -92,7 +94,8 @@
     "test:python-game-turtle": "python3 scripts/test-python-game-turtle.py && python3 scripts/test-python-game-sync.py",
     "test:python-game-completion": "node --test scripts/test-python-game-completion.mjs",
     "dev:python-game-runner": "node scripts/serve-python-game-runner.mjs",
-    "test:python-game-math": "python3 -B scripts/test-python-game-math.py"
+    "test:python-game-math": "python3 -B scripts/test-python-game-math.py",
+    "test:python-guides": "node scripts/test-python-guides.mjs"
   },
   "dependencies": {
     "@codemirror/autocomplete": "^6.20.3",

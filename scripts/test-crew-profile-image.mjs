@@ -13,10 +13,10 @@ test('crew image file validation and storage ownership are bounded', () => {
   assert.equal(validateCrewProfileImageFile({ type: 'image/png', size: 2048 }), '');
   assert.match(validateCrewProfileImageFile({ type: 'image/gif', size: 2048 }), /JPG/);
   assert.match(validateCrewProfileImageFile({ type: 'image/jpeg', size: 6 * 1024 * 1024 }), /5MB/);
-  assert.equal(buildCrewProfileImageStoragePath('crew-1', 123), 'crew-profile-images/crew-1/profile-123.jpg');
-  assert.equal(isOwnedCrewProfileImagePath('crew-profile-images/crew-1/profile-123.jpg', 'crew-1'), true);
-  assert.equal(isOwnedCrewProfileImagePath('crew-profile-images/crew-2/profile-123.jpg', 'crew-1'), false);
-  assert.throws(() => buildCrewProfileImageStoragePath('bad/id'));
+  assert.equal(buildCrewProfileImageStoragePath('crew-1', 'leader-1', 123), 'crew-profile-images/leader-1/crew-1/profile-123.jpg');
+  assert.equal(isOwnedCrewProfileImagePath('crew-profile-images/leader-1/crew-1/profile-123.jpg', 'crew-1', 'leader-1'), true);
+  assert.equal(isOwnedCrewProfileImagePath('crew-profile-images/leader-2/crew-1/profile-123.jpg', 'crew-1', 'leader-1'), false);
+  assert.throws(() => buildCrewProfileImageStoragePath('bad/id', 'leader-1'));
 });
 
 test('server and storage contracts allow only the crew leader or site admin', async () => {
@@ -25,12 +25,12 @@ test('server and storage contracts allow only the crew leader or site admin', as
     read('storage.rules'),
   ]);
   assert.match(functionsSource, /profileImageUrl: crewData\.profileImageUrl \|\| ''/);
-  assert.match(functionsSource, /crew-profile-images\/\$\{crewId\}\//);
+  assert.match(functionsSource, /crew-profile-images\/\$\{leaderId\}\/\$\{crewId\}\//);
   assert.match(functionsSource, /profileImageUpdatedBy: adminUid/);
-  assert.match(storageRules, /match \/crew-profile-images\/\{crewId\}\/\{fileName\}/);
-  assert.match(storageRules, /function canManageCrewImage\(crewId\)/);
-  assert.match(storageRules, /documents\/crews\/\$\(crewId\)\)\.data\.leaderId == request\.auth\.uid/);
-  assert.match(storageRules, /allow create, update: if canManageCrewImage\(crewId\)/);
+  assert.match(storageRules, /match \/crew-profile-images\/\{ownerUid\}\/\{crewId\}\/\{fileName\}/);
+  assert.match(storageRules, /function canManageCrewImage\(ownerUid\)/);
+  assert.match(storageRules, /request\.auth\.uid == ownerUid/);
+  assert.match(storageRules, /allow create, update: if canManageCrewImage\(ownerUid\)/);
 });
 
 test('directory crossfade and stable detail identity are both wired', async () => {
