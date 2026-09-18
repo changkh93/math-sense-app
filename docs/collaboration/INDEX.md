@@ -57,7 +57,7 @@ For an existing task, read its STATE.md and actual artifacts before continuing.
 | 20260910-quiz-progress-wording | 퀴즈 진행 숫자·나중에 풀기 안내 개선 | DONE (local; not deployed) | [STATE](tasks/20260910-quiz-progress-wording/STATE.md) | 전체 기준 답 선택 현황·고정 문제 번호·명확한 보류 안내, 회귀·브라우저·빌드 확인; 웹 배포 전 |
 | 20260910-unified-math-input | 수식 입력 모달 통일 및 + 누락 해결 | ACTIVE | [STATE](tasks/20260910-unified-math-input/STATE.md) | 공통 키패드·같은 모달 내 직접 입력 구현 및 회귀 검증 |
 | 20260910-dark-matter-tablet-focus | 패드 다크매터 퀴즈 잠금·복귀 개선 | DONE (local; not deployed) | [STATE](tasks/20260910-dark-matter-tablet-focus/STATE.md) | visible blur 오탐·잠금 중 중복·복귀 무응답·투명 레이어 수정, 진단 보강. 세션/화면/빌드 검증 완료; 웹 배포 및 실물 패드 확인 남음 |
-| 20260910-smartstore-growth | 스마트스토어 검색·카테고리·광고 개선 | ACTIVE | [STATE](tasks/20260910-smartstore-growth/STATE.md) | 도서3종 등록·전자책3종 서지 정정, 도서서비스16/가격비교매칭0 확인. 영상유형·도서카탈로그 담당자확인, 외부가격비교2%수수료 검토. 광고 미집행 |
+| 20260910-smartstore-growth | 스마트스토어 검색·카테고리·광고 개선 | ACTIVE | [STATE](tasks/20260910-smartstore-growth/STATE.md) | 쿠폰10장 발행·답글4건·수학영상3편/프로필 개선·블로그1편 공개. 외부가격비교 제외·새광고 보류. 검색반영/영상유형·수학공개주소 후속 |
 | 20260910-game-studio-distribution | 게임 스튜디오 채널 배포·오늘 마케팅 실행 | DONE (distribution) | [STATE](tasks/20260910-game-studio-distribution/STATE.md) | 게임3채널·곱셈 수정YouTube 공개, 접수·교류 기록 완료; 알림 연동 후속 확인 |
 | 20260910-game-projects-parent-reel | 학부모 대상 게임 프로젝트 쇼츠·릴스 홍보 영상 | DONE | [STATE](tasks/20260910-game-projects-parent-reel/STATE.md) | 36초 세로 MP4 v2·표지·게시 문구 완성. 전환음 제거, Pixelland 음악/출처 적용·음량 검증 |
 | 20260910-mars-expedition-intro-video | 화성 탐사대 1분 실제 플레이·한글 설명 영상 | DONE | [STATE](tasks/20260910-mars-expedition-intro-video/STATE.md) | 1분 1080p MP4, 한글 애니메이션·게임 음악/효과음, 15시점 시각 검증 완료 |
