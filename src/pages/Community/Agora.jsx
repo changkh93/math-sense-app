@@ -83,7 +83,7 @@ function FeaturedReadingShare({ share, onOpen }) {
 
 export default function Agora() {
   const navigate = useNavigate();
-  const { user, userData } = useAuth();
+  const { user, userData, loading: authLoading } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const filter = searchParams.get('filter') || 'all';
   const searchTermParam = searchParams.get('search') || '';
@@ -99,13 +99,14 @@ export default function Agora() {
     isLoading, 
     isError, 
     error, 
+    refetch,
     fetchNextPage, 
     hasNextPage, 
     isFetchingNextPage 
   } = usePublicQuestions(filter, {
     // Dedicated feeds render instead of the question board.
     // Disabling this query avoids 20 unrelated question reads on every visit.
-    enabled: !['reading', 'archive', 'notices'].includes(filter),
+    enabled: !authLoading && Boolean(user) && !['reading', 'archive', 'notices'].includes(filter),
   });
   const shouldFeatureReading = filter === 'all' && !searchTerm.trim();
   const shouldFeatureNotices = filter === 'all' && !searchTerm.trim();
@@ -283,15 +284,15 @@ export default function Agora() {
               <ReadingLoungeView />
             ) : filter === 'archive' ? (
               <AssignmentShareFeed highlightId={highlightId} />
-            ) : isLoading ? (
+            ) : authLoading || isLoading ? (
               <div className="loading-state">질문을 불러오는 중...</div>
         ) : isError ? (
           <div className="error-state glass">
              <div className="error-icon">🛰️</div>
              <h3>데이터를 불러오지 못했습니다</h3>
              <p className="error-msg">{error?.message || '알 수 없는 오류가 발생했습니다.'}</p>
-             <p className="hint">인덱스가 생성 중이거나 통신에 문제가 있을 수 있습니다. <br/>브라우저 콘솔을 확인해 보세요.</p>
-             <button className="retry-btn" onClick={() => window.location.reload()}>다시 시도</button>
+             <p className="hint">{error?.code === 'permission-denied' ? '로그인 상태를 확인하지 못했습니다. 다시 시도해 주세요. 계속되면 로그인을 다시 해주세요.' : '질문 목록을 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.'}</p>
+             <button className="retry-btn" onClick={() => refetch()}>다시 시도</button>
           </div>
         ) : !questions || questions.length === 0 ? (
           <div className="empty-state glass">
@@ -447,6 +448,7 @@ export default function Agora() {
           ) : (
             <AgoraMotivationPanel
               userData={userData}
+              authReady={!authLoading && Boolean(user)}
             />
           )}
         </div>

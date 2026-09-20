@@ -6,9 +6,9 @@ import soundManager from '../../utils/SoundManager';
 import { calculateExplorerLevel, getExplorerExperience } from '../../utils/explorerLevelUtils';
 import './AgoraMotivationPanel.css';
 
-export default function AgoraMotivationPanel({ userData }) {
+export default function AgoraMotivationPanel({ userData, authReady = false }) {
   const navigate = useNavigate();
-  const { data: ranking, isLoading } = useQARanking();
+  const { data: ranking, isLoading } = useQARanking({ enabled: authReady });
   const [isExperienceGuideOpen, setIsExperienceGuideOpen] = useState(false);
 
   const openPublicProfile = (event, uid) => {

@@ -32,6 +32,8 @@ export function usePublicQuestions(filter = 'all', options = {}) {
     queryKey: ['publicQuestions', filter],
     queryFn: async ({ pageParam }) => {
       try {
+        // Wait for persisted authentication before a protected Firestore query.
+        await auth.authStateReady();
         const constraints = [];
 
         if (filter === 'my') {
