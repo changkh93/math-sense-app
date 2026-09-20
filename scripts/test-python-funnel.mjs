@@ -3,6 +3,7 @@ import { readFile } from 'node:fs/promises';
 import { pythonAttribution, trackPython } from '../src/utils/pythonFunnel.js';
 assert.equal(pythonAttribution('?utm_source=naver&utm_medium=organic&utm_campaign=python_trial&ref=private'), 'utm_source=naver&utm_medium=organic&utm_campaign=python_trial');
 assert.equal(pythonAttribution('?utm_source=01012345678&utm_campaign=parent@example.com'), '');
+assert.equal(pythonAttribution('?utm_source=google&utm_medium=cpc&utm_campaign=python_trial&gclid=private&email=private@example.com'), 'utm_source=google&utm_medium=cpc&utm_campaign=python_trial');
 globalThis.window = { dataLayer: [] };
 trackPython('python_success', '010-1234-5678');
 trackPython('private_name', 'name');

@@ -1,0 +1,23 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import {mathAttribution, mathMarketingWindow, trackMath} from '../src/utils/mathFunnel.js';
+assert.equal(mathAttribution('?utm_source=google&utm_medium=cpc&utm_campaign=math_trial&gclid=secret&email=private@example.com'), 'utm_source=google&utm_medium=cpc&utm_campaign=math_trial');
+assert.equal(mathAttribution('?utm_source=private@example.com&utm_campaign=python_trial'), '');
+const parent={location:{origin:'https://msense.me',pathname:'/math/'},dataLayer:[]};
+const frame={parent,location:{origin:'https://msense.me'}};
+assert.equal(mathMarketingWindow(frame),parent);
+trackMath('success',parent); trackMath('private@example.com',parent);
+assert.deepEqual(parent.dataLayer,[{event:'math_success',funnel:'math',label:''}]);
+assert.equal(mathMarketingWindow({parent,location:{origin:'https://unrelated.example'}}),null);
+assert.equal(mathMarketingWindow({parent:{location:{origin:'https://msense.me',pathname:'/admin'}},location:frame.location}),null);
+assert.equal(mathMarketingWindow({get parent(){throw Error('cross origin');}}),null);
+const form=fs.readFileSync('src/pages/PublicApplication.jsx','utf8');
+const submit=form.slice(form.indexOf('const handleSubmit'),form.indexOf('if (done)'));
+assert(submit.indexOf("onMarketingEvent?.('success')")>submit.indexOf('await submit({'));
+assert(submit.indexOf("onMarketingEvent?.('success')")<submit.indexOf('catch (err)'));
+assert(submit.includes("onMarketingEvent?.('error')"));
+console.log('PASS: math iframe origin isolation, fixed-event allowlist, attribution sanitization, success after application save');
+
+const mathHtml=fs.readFileSync('dist/math/index.html','utf8');
+assert(!mathHtml.includes('href="/math/#apply"'),'Same-page trial links must preserve Google UTM parameters');
+console.log('PASS: all math in-page trial links retain campaign attribution');

@@ -1,4 +1,4 @@
-import { createElement, useEffect, useMemo, useState } from 'react';
+import { createElement, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { httpsCallable } from 'firebase/functions';
 import { functions } from '../firebase';
@@ -172,7 +172,7 @@ const faqItems = [
   ['어떤 과정을 체험할 수 있나요?', '초등 수학과 고전읽기, 서양고전 탐구, 중등 스스로Math-AI, 파이썬 코딩 중 관심 과정을 선택할 수 있습니다. 통합 패키지는 무료체험 대상이 아닙니다.'],
 ];
 
-export default function PublicApplication({ fixedType, initialCourse = '' }) {
+export default function PublicApplication({ fixedType, initialCourse = '', sourceAttribution = '', onMarketingEvent }) {
   const params = useParams();
   const navigate = useNavigate();
   const type = fixedType || params.type || 'trial';
@@ -190,6 +190,7 @@ export default function PublicApplication({ fixedType, initialCourse = '' }) {
     referrerParentPhone: '',
     message: '',
   });
+  const formStarted = useRef(false);
   const [submitting, setSubmitting] = useState(false);
   const [done, setDone] = useState(false);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
@@ -248,16 +249,20 @@ export default function PublicApplication({ fixedType, initialCourse = '' }) {
     e.preventDefault();
     if (referralChecking) return;
     setSubmitting(true);
+    onMarketingEvent?.('submit');
     try {
       const submit = httpsCallable(functions, 'submitPublicApplication');
       await submit({
         type: isTrial ? 'trial' : 'consultation',
         ...form,
+        ...(sourceAttribution ? {message: `${sourceAttribution}\n${form.message}`.slice(0, 1000)} : {}),
         referralToken: isReferralTrial ? referralToken : ''
       });
       setDone(true);
+      onMarketingEvent?.('success');
       window.scrollTo({ top: 0, behavior: 'smooth' });
     } catch (err) {
+      onMarketingEvent?.('error');
       console.error(err);
       alert(err?.message || '신청 저장에 실패했습니다.');
     } finally {
@@ -551,7 +556,7 @@ export default function PublicApplication({ fixedType, initialCourse = '' }) {
             </div>
           </div>
 
-          <form onSubmit={handleSubmit} className="application-form">
+          <form onFocus={() => { if (!formStarted.current) { formStarted.current = true; onMarketingEvent?.('form_start'); } }} onSubmit={handleSubmit} className="application-form">
             <div className="form-title">
               <span>{isTrial ? 'Trial Application' : 'Consultation'}</span>
               <h2>{title}</h2>
