@@ -1,7 +1,7 @@
 // Explicit production release checks. Synthetic account only; credentials stay in memory.
 import {createRequire} from 'node:module'
 import {randomBytes} from 'node:crypto'
-import {writeFile} from 'node:fs/promises'
+import {writeFile,realpath} from 'node:fs/promises'
 import {execFileSync} from 'node:child_process'
 import path from 'node:path'
 import {inspectBehavior,behaviorError} from '../functions/studioBehaviorCoach.mjs'
@@ -10,8 +10,9 @@ import {makeCoachPayload,parseError} from '../functions/studioErrorCoachPolicy.m
 const mode=process.argv[2]
 if(!['--activate','--verify','--verify-current','--schedule-check'].includes(mode))throw new Error('Use --activate, --verify, --verify-current or --schedule-check explicitly')
 const project='math-sense-1f6a8', region='asia-northeast3'
-const globalRoot=execFileSync('npm',['root','-g'],{encoding:'utf8',stdio:['ignore','pipe','pipe']}).trim()
-const req=createRequire(import.meta.url), cli=createRequire(path.join(globalRoot,'firebase-tools/package.json'))
+const firebaseBinary=execFileSync('which',['firebase'],{encoding:'utf8',stdio:['ignore','pipe','pipe']}).trim()
+const firebaseRoot=path.resolve(path.dirname(await realpath(firebaseBinary)),'../..')
+const req=createRequire(import.meta.url), cli=createRequire(path.join(firebaseRoot,'package.json'))
 const logger=cli('./lib/logger.js').logger;logger.silent=true;logger.clear()
 const ca=cli('./lib/auth.js'),account=ca.getGlobalDefaultAccount()
 await cli('./lib/requireAuth.js').requireAuth({project,nonInteractive:true,user:account?.user,tokens:account?.tokens})
@@ -23,7 +24,7 @@ const field=v=>v instanceof Date?{timestampValue:v.toISOString()}:typeof v==='bo
 const value=v=>'booleanValue'in v?v.booleanValue:'integerValue'in v?Number(v.integerValue):'timestampValue'in v?new Date(v.timestampValue):'stringValue'in v?v.stringValue:Object.fromEntries(Object.entries(v.mapValue?.fields||{}).map(([k,x])=>[k,value(x)]))
 const document=async(path,method='GET',data,query='')=>{
  const t=await token(),res=await fetch(`https://firestore.googleapis.com/v1/projects/${project}/databases/(default)/documents/${path}${query}`,{method,headers:{Authorization:`Bearer ${t.access_token}`,'Content-Type':'application/json'},...(data?{body:JSON.stringify({fields:Object.fromEntries(Object.entries(data).map(([k,v])=>[k,field(v)]))})}:{})})
- if(method==='GET'&&res.status===404)return{exists:false,data:()=>undefined}
+ if(['GET','DELETE'].includes(method)&&res.status===404)return{exists:false,data:()=>undefined}
  if(!res.ok){const error=new Error('firestore-operation');error.code=`firestore-${res.status}`;throw error}
  const body=method==='DELETE'?{}:await res.json();return{exists:true,data:()=>Object.fromEntries(Object.entries(body.fields||{}).map(([k,v])=>[k,value(v)]))}
 }
@@ -93,7 +94,11 @@ try{
  evidence.passed=true
 }catch(error){evidence.passed=false;evidence.stoppedAt=phase;evidence.failureCode=typeof error.code==='string'?error.code:undefined;process.exitCode=1}
 finally{
- if(uid){await db.doc(`users/${uid}`).delete();await admin.auth().deleteUser(uid);evidence.syntheticAccountDeleted=true}
+ if(uid){
+  const cleanup=await Promise.allSettled([db.doc(`users/${uid}`).delete(),admin.auth().deleteUser(uid).catch(error=>{if(error.code!=='auth/user-not-found')throw error})])
+  evidence.syntheticAccountDeleted=cleanup.every(result=>result.status==='fulfilled')
+  if(!evidence.syntheticAccountDeleted){evidence.passed=false;evidence.cleanupIncomplete=cleanup.map((r,i)=>r.status==='rejected'?['profile','auth'][i]:null).filter(Boolean);process.exitCode=1}
+ }
  await admin.app().delete()
  await writeFile(mode==='--verify-current'?'docs/collaboration/tasks/20260921-studio-coach-release/verify.json':`docs/collaboration/tasks/20260916-coach-production-release/${mode.slice(2)}.json`,JSON.stringify(evidence,null,2))
  console.log(JSON.stringify(evidence,null,2))

@@ -142,3 +142,11 @@ syntax checks passed; build passed. Browser used the actual admin component with
 the read-only audit summary and synthetic enabled/unavailable scenarios. All
 three messages were verified without mutating production. Temporary harness
 removed. Changes are local and not deployed.
+
+
+## 2026-09-21 production release
+
+The local improvements above are now deployed from db05922e. Both targeted
+functions and Hosting succeeded; production AI, access boundaries, reporting,
+and asset-byte checks passed. See ../20260921-studio-coach-release/STATE.md
+and its verify.json / hosting.json evidence. Optional collection remains off.

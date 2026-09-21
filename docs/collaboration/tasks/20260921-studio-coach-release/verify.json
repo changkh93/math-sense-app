@@ -1,0 +1,114 @@
+{
+  "at": "2026-09-21T11:24:01.039Z",
+  "mode": "--verify-current",
+  "syntheticOnly": true,
+  "checks": [
+    {
+      "name": "unauthenticated denied",
+      "passed": true
+    },
+    {
+      "name": "synthetic student signed in",
+      "passed": true
+    },
+    {
+      "name": "optional collection stays off",
+      "passed": true
+    },
+    {
+      "name": "student cannot access admin report",
+      "passed": true
+    },
+    {
+      "name": "legacy raw code rejected",
+      "passed": true
+    },
+    {
+      "name": "state-field-mismatch masked payload ready",
+      "passed": true
+    },
+    {
+      "name": "state-field-mismatch deployed Luna returned four-field advice",
+      "passed": true
+    },
+    {
+      "name": "state-field-mismatch duplicate does not charge again",
+      "passed": true
+    },
+    {
+      "name": "loop-type-image-mismatch masked payload ready",
+      "passed": true
+    },
+    {
+      "name": "loop-type-image-mismatch deployed Luna returned four-field advice",
+      "passed": true
+    },
+    {
+      "name": "loop-type-image-mismatch duplicate does not charge again",
+      "passed": true
+    },
+    {
+      "name": "method-typo masked payload ready",
+      "passed": true
+    },
+    {
+      "name": "method-typo deployed Luna returned four-field advice",
+      "passed": true
+    },
+    {
+      "name": "method-typo duplicate does not charge again",
+      "passed": true
+    },
+    {
+      "name": "authorized admin report responds",
+      "passed": true
+    },
+    {
+      "name": "deployed report includes 14-day reservations",
+      "passed": true
+    },
+    {
+      "name": "collection remains disabled after verification",
+      "passed": true
+    }
+  ],
+  "responses": [
+    {
+      "id": "state-field-mismatch",
+      "status": 200,
+      "advice": {
+        "explanation": "실행 오류가 발생했다는 뜻은 아니에요. 다만 42줄에서는 새로 고른 항목의 종류를 variable_14에 저장하고, 43줄에서는 이미지와 함께 variable_4를 바꾸고 있어요. 그런데 관련 코드 23줄은 색상을 고를 때 variable_3을 읽으므로, 이미지와 색상 선택에 쓰는 상태가 서로 다를 가능성이 있습니다.",
+        "hint": "기본 힌트에 따라 42~43줄과 23줄을 비교해 보세요. 바꾸려는 이미지의 종류를 저장한 속성과 색상 목록의 색인으로 읽는 속성이 같은지 확인하세요. 한쪽을 바꿔도 다른 속성은 자동으로 바뀌지 않습니다.",
+        "question": "이미지를 바꾼 직후 23줄에서 색상 색인으로 사용하는 값은 어떤 속성인가요?",
+        "check": "작게 확인하려면 이미지 변경 전후에 해당 두 속성의 값을 출력해 보세요. 다시 실행해서 이미지와 색상이 함께 의도대로 바뀌는지 비교해 보세요."
+      }
+    },
+    {
+      "id": "loop-type-image-mismatch",
+      "status": 200,
+      "advice": {
+        "explanation": "59줄의 바깥 반복에서 variable_15가 바뀌지만, 60줄의 안쪽 반복은 두 항목을 모두 처리하는 동안 variable_15가 그대로입니다. 그래서 같은 타입 번호에 여러 이미지가 연결되는 의도하지 않은 결과가 생길 가능성이 있습니다. 이는 실행 오류가 아니라 결과를 살펴봐야 하는 동작 점검입니다.",
+        "hint": "59~61줄을 확인해 보세요. 기본 힌트처럼 이미지와 타입 번호의 순서를 서로 맞추려는 의도라면, 바깥 반복의 번호와 안쪽 반복의 이미지 선택이 같은 항목을 가리키는지 살펴보세요. 이미지 파일 이름은 가려져 있어 어떤 이미지가 표시되는지는 판단할 수 없습니다.",
+        "question": "반복문 안에서 variable_15의 값 하나가 유지되는 동안 이미지가 두 번 바뀌는 구조가, 원하는 이미지-타입 연결과 같은가요?",
+        "check": "작게 확인하려면 61줄에서 생성 직전에 variable_15와 이미지 표시용 값을 출력해 보세요. 실행 후 각 타입 번호에 어떤 이미지가 연결되는지 비교해 보세요."
+      }
+    },
+    {
+      "id": "method-typo",
+      "status": 200,
+      "advice": {
+        "explanation": "3줄에서 update 메서드가 self.variable_2를 호출하지만, 제시된 부분에는 그 이름의 메서드가 보이지 않습니다. 24줄의 variable_3은 다른 이름이므로, 이름이 서로 달라 AttributeError가 난 가능성이 큽니다.",
+        "hint": "기본 힌트를 참고해 3줄의 호출 이름과 24줄의 메서드 이름을 한 글자씩 비교해 보세요. 의도한 메서드가 variable_3이라면 3줄을 그 이름과 같게 고치는 작은 수정이 될 수 있습니다.",
+        "question": "두 이름의 철자와 숫자 부분이 정확히 같은가요?",
+        "check": "이름을 확인한 뒤 파일을 다시 실행하고, 같은 AttributeError가 사라지는지 관찰해 보세요. 다른 오류가 이어지면 그 위치를 따로 살펴보세요."
+      }
+    }
+  ],
+  "reportPeriod": {
+    "from": "2026-09-08",
+    "through": "2026-09-21",
+    "timeZone": "UTC"
+  },
+  "passed": true,
+  "syntheticAccountDeleted": true
+}

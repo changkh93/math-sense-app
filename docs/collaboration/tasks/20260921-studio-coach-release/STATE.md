@@ -25,4 +25,30 @@ authorization boundaries, 14-day report, duplicate protection, unchanged disable
 collection, and production asset bytes. Temporary verification account is removed
 in finally; aggregate request reservations can include these release checks.
 
-Status: preparing scoped commit and isolated release.
+Status: deployed and verified on 2026-09-21.
+
+Implementation commit: db05922e, pushed to origin/main. Production was built
+from a clean Git archive of that commit, excluding unrelated working-tree edits.
+The isolated release passed all three relevant test commands and npm run build.
+Firebase deployed studioErrorCoach and studioCoachLearningAdmin (asia-northeast3),
+then Hosting for math-sense-1f6a8. No rules or collection controls were changed.
+
+Production verification:
+- hosting.json: msense.me index, SPA entry, and all five feature JS/CSS files
+  returned HTTP 200 and matched the isolated build byte-for-byte.
+- verify.json: all 17 checks passed, including three real deployed Luna replies
+  (state mismatch, loop/image mismatch, method typo), duplicate protection,
+  unauthenticated/student boundaries, raw-code rejection, the 14-day admin
+  report, and unchanged disabled optional collection. Synthetic profile and
+  Auth account were deleted in finally. Aggregate reservation counters include
+  these synthetic release requests.
+- Replies were reviewed: they distinguish behavior checks from exceptions,
+  compare relevant lines, give conditional guidance and small checks, and do
+  not claim execution or knowledge of masked image names.
+
+Limits: browser interactions were verified before deployment as documented in
+OPERATIONS.md; production checks here use deployed APIs and exact asset bytes.
+A production Code Trace cloud save/reopen scenario was not repeated. Existing
+build/deployment warnings were non-blocking; no unrelated dependencies changed.
+Verification-only scripts/evidence are committed separately after deployment;
+they do not change the deployed application bundle.

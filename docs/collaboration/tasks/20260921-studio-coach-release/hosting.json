@@ -1,0 +1,49 @@
+{
+  "at": "2026-09-21T11:24:09.562Z",
+  "site": "https://msense.me",
+  "passed": true,
+  "checks": [
+    {
+      "file": "index.html",
+      "status": 200,
+      "matches": true,
+      "sha256": "297ecb904b18a475375388a0583f2f93315d721b18e475665706d45094246a44"
+    },
+    {
+      "file": "spa.html",
+      "status": 200,
+      "matches": true,
+      "sha256": "578646569237e2376f45e15303da2e8839c8860e048672f9087694f2c40bb826"
+    },
+    {
+      "file": "assets/CodeTracePlayer-0zKrOVp4.js",
+      "status": 200,
+      "matches": true,
+      "sha256": "177b1d9248a375d1c00365c3ce020834843de7bc6b9c6e681db45ae9c3c71086"
+    },
+    {
+      "file": "assets/PythonGameStudioPage-BiWTr8Cb.js",
+      "status": 200,
+      "matches": true,
+      "sha256": "77384a4c30f7a25df13d6d08595273b003f72fa78880ab1014ff6586e6cb3670"
+    },
+    {
+      "file": "assets/PythonGameStudioPage-CWZdY85T.css",
+      "status": 200,
+      "matches": true,
+      "sha256": "12461cad39aaa32ffd85a3af82fb19c7bd3ca5ffcdde4754b7dddd88e507bb77"
+    },
+    {
+      "file": "assets/StudioCoachLearning-kTsZ1Sw7.css",
+      "status": 200,
+      "matches": true,
+      "sha256": "70b2420ce7a60944989d7a211c8cb8a801d9eca6c6f7e73135ff426aac132cc4"
+    },
+    {
+      "file": "assets/StudioCoachLearning-qkRGZr5l.js",
+      "status": 200,
+      "matches": true,
+      "sha256": "4f6c1bb7b51ff0af7bb8c9578d5e08a5b13dea97e0d402538dc90a19107fca16"
+    }
+  ]
+}
