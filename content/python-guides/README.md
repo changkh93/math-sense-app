@@ -17,3 +17,7 @@
 20편 단위 페이지네이션을 자동 생성한다. 101편이면 목록 6페이지가 생긴다. 페이지별 canonical/Article/BreadcrumbList/FAQPage 및 sitemap/llms.txt는 자동 생성한다. llms.txt는 보조 목차다. 향후 카테고리별 자료가 충분해지면 카테고리 허브를 추가하며 빈 허브를 미리 공개하지 않는다.
 
 스크립트: scripts/build-python-guides.mjs. 스타일: public/python-guides/guide.css. 문서 본문에는 앱 JS가 필요 없다. 신청은 /python#apply에서 한다.
+
+## 2026-09-22 과정 코드 노트
+
+신규400편은 `courseNote` 출처 메타데이터와 `expansion/sources.json`을 사용한다. 정확히 대응하는 이미지가 없으면 image는 null로 두며 관련 없는 대표 이미지를 붙이지 않는다. 이 경우 imageAlt/imageCaption도 필수가 아니다. 코드 확인 범위는 `expansion/verification.json`과 각 본문에 표시한다. 생성 후 `python3 scripts/test-python-course-sources.py`, 빌드 후 `node scripts/test-python-guides.mjs`로 수량·출처·표본 함수·허브를 검사한다.

@@ -1,0 +1,156 @@
+[
+  {
+    "slug": "code-math-101",
+    "function": "is_prime",
+    "cases": 101,
+    "result": "pass",
+    "scope": "양의 정수 중심 명시적 표본; 모든 입력 보증 아님"
+  },
+  {
+    "slug": "code-math-102",
+    "function": "is_prime",
+    "cases": 101,
+    "result": "pass",
+    "scope": "양의 정수 중심 명시적 표본; 모든 입력 보증 아님"
+  },
+  {
+    "slug": "code-math-103",
+    "function": "is_prime",
+    "cases": 101,
+    "result": "pass",
+    "scope": "양의 정수 중심 명시적 표본; 모든 입력 보증 아님"
+  },
+  {
+    "slug": "code-math-104",
+    "function": "is_prime",
+    "cases": 101,
+    "result": "pass",
+    "scope": "양의 정수 중심 명시적 표본; 모든 입력 보증 아님"
+  },
+  {
+    "slug": "code-math-105",
+    "function": "is_prime",
+    "cases": 101,
+    "result": "pass",
+    "scope": "양의 정수 중심 명시적 표본; 모든 입력 보증 아님"
+  },
+  {
+    "slug": "code-math-108",
+    "function": "divisors1",
+    "cases": 50,
+    "result": "pass",
+    "scope": "양의 정수 중심 명시적 표본; 모든 입력 보증 아님"
+  },
+  {
+    "slug": "code-math-109",
+    "function": "divisors",
+    "cases": 50,
+    "result": "pass",
+    "scope": "양의 정수 중심 명시적 표본; 모든 입력 보증 아님"
+  },
+  {
+    "slug": "code-math-113",
+    "function": "gcd",
+    "cases": 5,
+    "result": "pass",
+    "scope": "양의 정수 중심 명시적 표본; 모든 입력 보증 아님"
+  },
+  {
+    "slug": "code-math-114",
+    "function": "gcd",
+    "cases": 5,
+    "result": "pass",
+    "scope": "양의 정수 중심 명시적 표본; 모든 입력 보증 아님"
+  },
+  {
+    "slug": "code-math-115",
+    "function": "gcd1",
+    "cases": 5,
+    "result": "pass",
+    "scope": "양의 정수 중심 명시적 표본; 모든 입력 보증 아님"
+  },
+  {
+    "slug": "code-math-116",
+    "function": "lcm",
+    "cases": 4,
+    "result": "pass",
+    "scope": "양의 정수 중심 명시적 표본; 모든 입력 보증 아님"
+  },
+  {
+    "slug": "code-math-119",
+    "function": "gcd",
+    "cases": 5,
+    "result": "pass",
+    "scope": "양의 정수 중심 명시적 표본; 모든 입력 보증 아님"
+  },
+  {
+    "slug": "code-math-119",
+    "function": "lcm_with_gcd",
+    "cases": 4,
+    "result": "pass",
+    "scope": "양의 정수 중심 명시적 표본; 모든 입력 보증 아님"
+  },
+  {
+    "slug": "code-math-134",
+    "function": "divisors",
+    "cases": 50,
+    "result": "pass",
+    "scope": "양의 정수 중심 명시적 표본; 모든 입력 보증 아님"
+  },
+  {
+    "slug": "code-math-134",
+    "function": "gcd",
+    "cases": 5,
+    "result": "pass",
+    "scope": "양의 정수 중심 명시적 표본; 모든 입력 보증 아님"
+  },
+  {
+    "slug": "code-math-134",
+    "function": "lcm",
+    "cases": 4,
+    "result": "pass",
+    "scope": "양의 정수 중심 명시적 표본; 모든 입력 보증 아님"
+  },
+  {
+    "slug": "code-math-137",
+    "function": "divisors",
+    "cases": 50,
+    "result": "pass",
+    "scope": "양의 정수 중심 명시적 표본; 모든 입력 보증 아님"
+  },
+  {
+    "slug": "code-math-137",
+    "function": "gcd",
+    "cases": 5,
+    "result": "pass",
+    "scope": "양의 정수 중심 명시적 표본; 모든 입력 보증 아님"
+  },
+  {
+    "slug": "code-math-137",
+    "function": "lcm",
+    "cases": 4,
+    "result": "pass",
+    "scope": "양의 정수 중심 명시적 표본; 모든 입력 보증 아님"
+  },
+  {
+    "slug": "code-math-140",
+    "function": "fibonacci_list",
+    "cases": 8,
+    "result": "pass",
+    "scope": "양의 정수 중심 명시적 표본; 모든 입력 보증 아님"
+  },
+  {
+    "slug": "code-math-141",
+    "function": "fibo_vars",
+    "cases": 8,
+    "result": "pass",
+    "scope": "양의 정수 중심 명시적 표본; 모든 입력 보증 아님"
+  },
+  {
+    "slug": "code-math-200",
+    "function": "is_prime",
+    "cases": 101,
+    "result": "pass",
+    "scope": "양의 정수 중심 명시적 표본; 모든 입력 보증 아님"
+  }
+]

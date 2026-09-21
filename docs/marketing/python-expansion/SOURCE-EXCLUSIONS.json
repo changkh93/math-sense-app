@@ -1,0 +1,62 @@
+[
+  {
+    "id": "unit_python_3_code_1_1782901537358",
+    "reason": "invalid syntax (example, line 1)"
+  },
+  {
+    "id": "unit_python_5_code_1_1782901797306",
+    "reason": "invalid syntax (example, line 1)"
+  },
+  {
+    "id": "unit_python_6_code_1_1782901881963",
+    "reason": "invalid syntax (example, line 1)"
+  },
+  {
+    "id": "unit_gameproj_14_code_1_1782911431242",
+    "reason": "invalid syntax (example, line 2)"
+  },
+  {
+    "id": "unit_gameproj_14_code_4_1782911431242",
+    "reason": "invalid syntax (example, line 2)"
+  },
+  {
+    "id": "unit_gameproj_14_code_5_1782911431242",
+    "reason": "invalid syntax (example, line 2)"
+  },
+  {
+    "id": "unit_gameproj_23_code_4_1782915065176",
+    "reason": "long full-project code; use focused exercises"
+  },
+  {
+    "id": "unit_gameproj_23_code_5_1782915065176",
+    "reason": "long full-project code; use focused exercises"
+  },
+  {
+    "id": "unit_py_adv_7_code_4_1782961492656",
+    "reason": "unterminated string literal (detected at line 2) (example, line 2)"
+  },
+  {
+    "id": "unit_py_adv_10_code_1_1782961673464",
+    "reason": "closing parenthesis '}' does not match opening parenthesis '(' on line 3 (example, line 6)"
+  },
+  {
+    "id": "unit_py_adv_10_code_3_1782961673464",
+    "reason": "closing parenthesis '}' does not match opening parenthesis '(' on line 1 (example, line 7)"
+  },
+  {
+    "id": "unit_py_math_6_code_1_1782985951882",
+    "reason": "unterminated string literal (detected at line 5) (example, line 5)"
+  },
+  {
+    "id": "unit_py_math_6_code_3_1782985951882",
+    "reason": "unterminated string literal (detected at line 5) (example, line 5)"
+  },
+  {
+    "id": "chap_py_math_21_30_unit_1773320168513_code_1_1782998992921",
+    "reason": "unterminated f-string literal (detected at line 19) (example, line 19)"
+  },
+  {
+    "id": "unit_py_math_52_code_5_1783002493124",
+    "reason": "long full-project code; use focused exercises"
+  }
+]
