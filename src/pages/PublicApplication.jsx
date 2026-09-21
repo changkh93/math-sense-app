@@ -60,18 +60,18 @@ const courseCatalog = [
   },
   {
     id: 'ai-math',
-    name: '스스로Math-AI',
-    shortName: '중등 수학 AI',
+    name: '중등수학',
+    shortName: '중등수학',
     schedule: '월수목금, 주 4회',
     price: '월 150,000원',
     image: '/images/clusters/middle_math.png',
     tone: 'green',
     target: '중등 수학 전 과정을 자기 주도적으로 진행하는 과정',
-    summary: 'AI를 풀이 복사 도구가 아니라 사고를 점검하는 파트너로 쓰며 중등 개념을 완성합니다.',
+    summary: '핵심 개념의 전체 흐름부터 개념 익힘, 수준별 평가와 내신 대비까지 선생님과 함께 학습합니다.',
     features: [
       '중등 수학 전 과정 개념 학습',
-      'ChatGPT를 활용한 질문과 검산 훈련',
-      '막힌 문제를 끝까지 붙잡는 루틴',
+      '실시간 일대일 질문 지도와 성장 상담',
+      '수업 후 과제 제출 · AI평가와 선생님 리뷰',
       '진도와 학습 태도 기록',
     ],
   },
@@ -118,7 +118,7 @@ const testimonials = [
 
 const classSchedule = [
   { time: '17:00-17:50', mon: '수학과 고전읽기', tue: '수학과 고전읽기', wed: '수학과 고전읽기', thu: '수학과 고전읽기', fri: '수학과 고전읽기' },
-  { time: '20:00-20:50', mon: '스스로Math-AI', tue: '-', wed: '스스로Math-AI', thu: '스스로Math-AI', fri: '스스로Math-AI' },
+  { time: '20:00-20:50', mon: '중등수학', tue: '-', wed: '중등수학', thu: '중등수학', fri: '중등수학' },
   { time: '21:00-21:50', mon: '서양고전 탐구', tue: '-', wed: '서양고전 탐구', thu: '서양고전 탐구', fri: '서양고전 탐구' },
 ];
 
@@ -169,7 +169,7 @@ const faqItems = [
   ['무료체험 후 자동으로 결제되나요?', '아니요. 체험 종료 후 자동으로 유료 전환되거나 결제되지 않습니다. 계속 수강을 원할 때 별도로 신청합니다.'],
   ['일반 방문과 추천 방문의 체험 기간은 어떻게 다른가요?', '일반 신청은 7일, 확인된 추천 링크로 신청하면 4주 동안 체험할 수 있습니다.'],
   ['체험 시작일은 어떻게 정하나요?', '신청 내용을 확인한 뒤 담당자가 연락드리며, 학생 일정과 과정 운영 시간을 함께 확인해 시작일을 정합니다.'],
-  ['어떤 과정을 체험할 수 있나요?', '초등 수학과 고전읽기, 서양고전 탐구, 중등 스스로Math-AI, 파이썬 코딩 중 관심 과정을 선택할 수 있습니다. 통합 패키지는 무료체험 대상이 아닙니다.'],
+  ['어떤 과정을 체험할 수 있나요?', '초등 수학과 고전읽기, 서양고전 탐구, 중등수학, 파이썬 코딩 중 관심 과정을 선택할 수 있습니다. 통합 패키지는 무료체험 대상이 아닙니다.'],
 ];
 
 export default function PublicApplication({ fixedType, initialCourse = '', sourceAttribution = '', onMarketingEvent }) {
@@ -420,7 +420,7 @@ export default function PublicApplication({ fixedType, initialCourse = '', sourc
             </div>
             {courseCatalog.map(course => (
               <div key={course.id} className="course-comparison__row" role="row">
-                <strong role="cell">{course.name}{course.id === 'math-classics' && <a href="/math/" style={{ display: 'block', fontSize: 13, marginTop: 6 }}>초등수학 과정 자세히 보기 ↗</a>}{course.id === 'python-coding' && <Link to={`/python${(typeof window === 'undefined' ? '' : window.location.search)}`} style={{ display: 'block', fontSize: 13, marginTop: 6 }}>파이썬 과정 자세히 보기 ↗</Link>}</strong>
+                <strong role="cell">{course.name}{course.id === 'math-classics' && <a href="/math/" style={{ display: 'block', fontSize: 13, marginTop: 6 }}>초등수학 과정 자세히 보기 ↗</a>}{course.id === 'ai-math' && <a href="/middle-math/" style={{ display: 'block', fontSize: 13, marginTop: 6 }}>중등수학 과정 자세히 보기 ↗</a>}{course.id === 'python-coding' && <Link to={`/python${(typeof window === 'undefined' ? '' : window.location.search)}`} style={{ display: 'block', fontSize: 13, marginTop: 6 }}>파이썬 과정 자세히 보기 ↗</Link>}</strong>
                 <span role="cell">{course.target}</span>
                 <span role="cell">{course.schedule}</span>
                 <b role="cell">{course.price}</b>

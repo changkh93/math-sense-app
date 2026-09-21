@@ -21,3 +21,9 @@ console.log('PASS: math iframe origin isolation, fixed-event allowlist, attribut
 const mathHtml=fs.readFileSync('dist/math/index.html','utf8');
 assert(!mathHtml.includes('href="/math/#apply"'),'Same-page trial links must preserve Google UTM parameters');
 console.log('PASS: all math in-page trial links retain campaign attribution');
+
+assert.equal(mathAttribution('?utm_source=naver_blog&utm_medium=organic_social&utm_campaign=m07_20260921&email=private@example.com'), 'utm_source=naver_blog&utm_medium=organic_social&utm_campaign=m07_20260921');
+assert.equal(mathAttribution('?utm_campaign=m07_private@example.com'), '');
+
+const middleParent={location:{origin:'https://msense.me',pathname:'/middle-math/'},dataLayer:[]};
+assert.equal(mathMarketingWindow({parent:middleParent,location:frame.location}),middleParent);

@@ -5,13 +5,13 @@ export function mathMarketingWindow(current = typeof window === 'undefined' ? nu
   try {
     const target = current.parent !== current ? current.parent : current;
     if (target.location.origin !== current.location.origin ||
-        !['/math', '/math/'].includes(target.location.pathname)) return null;
+        !['/math', '/math/', '/middle-math', '/middle-math/'].includes(target.location.pathname)) return null;
     return target;
   } catch { return null; }
 }
 export function mathAttribution(search = '') {
   const params = new URLSearchParams(search);
-  const allowed = {utm_source: ['naver', 'google', 'instagram', 'youtube', 'kakao', 'clip'], utm_medium: ['organic', 'social', 'video', 'cpc'], utm_campaign: ['math_trial']};
+  const allowed = {utm_source: ['naver', 'naver_blog', 'google', 'instagram', 'youtube', 'kakao', 'clip'], utm_medium: ['organic', 'organic_social', 'social', 'video', 'cpc'], utm_campaign: ['math_trial', 'm07_20260921']};
   return Object.entries(allowed).flatMap(([key, values]) => values.includes(params.get(key)) ? [`${key}=${params.get(key)}`] : []).join('&');
 }
 export function trackMath(stage, target = mathMarketingWindow()) {

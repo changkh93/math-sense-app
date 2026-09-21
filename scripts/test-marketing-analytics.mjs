@@ -1,7 +1,7 @@
 import vm from 'node:vm';import fs from 'node:fs';import assert from 'node:assert/strict';
 const code=fs.readFileSync('public/marketing-analytics.js','utf8');
-function run(pathname,hostname='msense.me',source='instagram',campaign='python_trial'){
- const context={location:{hostname,pathname,search:'?email=private@example.com&gclid=private-click&utm_source='+source+'&utm_medium=cpc&utm_campaign='+campaign,href:'https://msense.me'+pathname,origin:'https://msense.me'},URL,URLSearchParams,Date,Set};
+function run(pathname,hostname='msense.me',source='instagram',campaign='python_trial',medium='cpc'){
+ const context={location:{hostname,pathname,search:'?email=private@example.com&gclid=private-click&utm_source='+source+'&utm_medium='+medium+'&utm_campaign='+campaign,href:'https://msense.me'+pathname,origin:'https://msense.me'},URL,URLSearchParams,Date,Set};
  context.window=context;context.dataLayer=[];context.addEventListener=()=>{};context.history={pushState(a,b,url){context.location.pathname=url;},replaceState(a,b,url){context.location.pathname=url;}};
  context.document={referrer:'https://example.com/private?token=secret',head:{appendChild(){}},createElement:()=>({}),addEventListener:()=>{}};
  vm.runInNewContext(code,context);return context;
@@ -35,3 +35,11 @@ const before=math.dataLayer.filter(x=>x[0]==='event').length;
 math.dataLayer.push({event:'math_success'});
 assert.equal(math.dataLayer.filter(x=>x[0]==='event').length,before);
 console.log('PASS: math route attribution, successful-application event, iframe/private routes excluded');
+
+const contentVisit=run('/math/','msense.me','naver_blog','m07_20260921','organic_social');
+const contentEvent=contentVisit.dataLayer.find(x=>x[0]==='event'&&x[1]==='page_view')[2];
+assert.equal(contentEvent.campaign_source,'naver_blog');
+assert.equal(contentEvent.campaign_medium,'organic_social');
+assert.equal(contentEvent.campaign_name,'m07_20260921');
+assert(!JSON.stringify(contentVisit.dataLayer.filter(x=>x[0])).includes('private@example.com'));
+console.log('PASS: published M07 attribution retained without private query data');

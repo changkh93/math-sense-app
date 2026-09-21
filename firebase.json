@@ -91,9 +91,22 @@
             "value": "no-cache"
           }
         ]
+      },
+      {
+        "source": "/middle-math{,/**}",
+        "headers": [
+          {
+            "key": "Cache-Control",
+            "value": "no-cache"
+          }
+        ]
       }
     ],
     "rewrites": [
+      {
+        "source": "/middle-math",
+        "destination": "/middle-math/index.html"
+      },
       {
         "source": "/math",
         "destination": "/math/index.html"
