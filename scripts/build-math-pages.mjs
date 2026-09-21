@@ -258,15 +258,16 @@ for (const a of articles) {
       md,
     ),
   );
+  const evidence = a.source ?? a.illustration;
   const image =
-    a.source?.image ??
+    evidence?.image ??
     (a.slug === "multiplication-light-cards"
       ? "/math-assets/light-cards.png"
       : a.category === "분수"
         ? "/math-assets/fraction-book.jpg"
         : "/math-assets/light-cards.png");
-  const sourceFigure = a.source
-    ? `<figure class="source-page"><a href="${a.source.image}" aria-label="${esc(a.source.title)} ${a.source.page}쪽 크게 보기"><img src="${a.source.image}" alt="${esc(a.source.alt)}" loading="eager"></a><figcaption>${esc(a.source.title)} · ${a.source.page}쪽 실제 교재 화면 · 이미지를 누르면 크게 볼 수 있습니다.</figcaption></figure>`
+  const sourceFigure = evidence
+    ? `<figure class="source-page"><a href="${evidence.image}" aria-label="${esc(evidence.title)} ${evidence.page}쪽 크게 보기"><img src="${evidence.image}" alt="${esc(evidence.alt)}" loading="eager"></a><figcaption>${esc(evidence.title)} · ${evidence.page}쪽 실제 교재 화면 · 이미지를 누르면 크게 볼 수 있습니다.</figcaption></figure>`
     : image
       ? `<figure><img src="${image}" alt="${a.category === "분수" ? "수학감각 분수 실제 본문 42쪽" : "메타센스 구구단 불빛 카드 실제 화면"}"><figcaption>${a.category === "분수" ? "수학감각 분수 · 42쪽" : "메타센스 도구 화면 · 학생의 학습 기록이 아닙니다."}</figcaption></figure>`
       : "";

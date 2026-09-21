@@ -156,6 +156,12 @@
       "fraction-whole",
       "growth-conversation"
     ],
+    "illustration": {
+      "title": "수학감각 분수 1권",
+      "page": 60,
+      "image": "/math-assets/fractions/book-1/page-060.webp",
+      "alt": "같은 길이의 막대를 2등분과 4등분하여 1/2과 2/4가 같음을 보여 주는 수학감각 분수 1권 60쪽"
+    },
     "faq": [
       {
         "question": "1/2과 2/4는 왜 같을까요? 약분·통분 전의 한 장면",
