@@ -1,7 +1,9 @@
 import { readFile, writeFile, mkdir, access } from "node:fs/promises";
+import { createHash } from "node:crypto";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import Markdown from "react-markdown";
+const mathCssVersion = createHash("sha256").update(await readFile("public/math-assets/math.css")).digest("hex").slice(0, 16);
 const base = "https://msense.me",
   root = "/math/guides/";
 const all = JSON.parse(
@@ -56,7 +58,7 @@ async function emit(
   await mkdir(`dist${path}`, { recursive: true });
   await writeFile(
     `dist${path}/index.html`,
-    `<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${esc(title)} | 메타센스</title><meta name="description" content="${esc(desc)}"><link rel="canonical" href="${base}${path}"><meta name="robots" content="index,follow,max-image-preview:large"><meta property="og:type" content="${schema.some((x) => x["@type"] === "Article") ? "article" : "website"}"><meta property="og:title" content="${esc(title)}"><meta property="og:description" content="${esc(desc)}"><meta property="og:url" content="${base}${path}"><meta property="og:image" content="${base}${image}"><link rel="stylesheet" href="/math-assets/math.css?v=20260920-ratios"><link rel="icon" href="/m-logo.svg"><script type="application/ld+json">${json({ "@context": "https://schema.org", "@graph": schema })}</script><script defer src="/marketing-analytics.js"></script></head><body>${applyLinks(nav)}<main id="main">${applyLinks(body)}</main>${footer}</body></html>`,
+    `<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${esc(title)} | 메타센스</title><meta name="description" content="${esc(desc)}"><link rel="canonical" href="${base}${path}"><meta name="robots" content="index,follow,max-image-preview:large"><meta property="og:type" content="${schema.some((x) => x["@type"] === "Article") ? "article" : "website"}"><meta property="og:title" content="${esc(title)}"><meta property="og:description" content="${esc(desc)}"><meta property="og:url" content="${base}${path}"><meta property="og:image" content="${base}${image}"><link rel="stylesheet" href="/math-assets/math.css?v=${mathCssVersion}"><link rel="icon" href="/m-logo.svg"><script type="application/ld+json">${json({ "@context": "https://schema.org", "@graph": schema })}</script><script defer src="/marketing-analytics.js"></script></head><body>${applyLinks(nav)}<main id="main">${applyLinks(body)}</main>${footer}</body></html>`,
   );
 }
 await emit('/middle-math/', '중등수학 | 핵심 개념부터 내신 대비·실시간 일대일 지도', '중1~3 핵심 개념을 3~4분 영상·텍스트·퀴즈로 연결하고, 절대개념·수준별 평가·월간평가·내신 대비로 이어갑니다. 일대일 질문 지도와 성장 상담, AI평가와 선생님 리뷰. 7일 무료체험.', await readFile('content/middle-math-intro.html', 'utf8'), [{ '@type': 'Course', name: '중등수학', description: '중1~3 핵심 개념, 절대개념, 수준별 평가와 내신 대비', provider: { '@type': 'Organization', name: '메타센스', url: base } }], '/math-assets/middle-overview.png');
