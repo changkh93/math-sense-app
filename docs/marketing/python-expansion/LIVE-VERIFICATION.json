@@ -1,0 +1,2833 @@
+{
+  "checkedAt": "2026-09-21T23:27:20.601002+00:00",
+  "checks": [
+    {
+      "url": "https://msense.me/python/guides/code-foundation-001/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-foundation-002/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-foundation-003/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-foundation-004/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-foundation-005/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-foundation-006/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-foundation-007/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-foundation-008/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-foundation-009/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-foundation-010/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-foundation-011/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-foundation-012/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-foundation-013/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-foundation-014/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-foundation-015/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-foundation-016/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-foundation-017/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-foundation-018/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-foundation-019/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-foundation-020/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-foundation-021/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-foundation-022/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-foundation-023/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-foundation-024/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-foundation-025/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-foundation-026/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-foundation-027/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-foundation-028/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-foundation-029/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-foundation-030/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-foundation-031/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-foundation-032/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-foundation-033/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-foundation-034/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-foundation-035/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-foundation-036/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-foundation-037/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-foundation-038/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-foundation-039/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-foundation-040/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-foundation-041/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-foundation-042/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-foundation-043/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-foundation-044/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-foundation-045/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-foundation-046/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-foundation-047/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-foundation-048/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-foundation-049/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-foundation-050/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-games-001/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-games-002/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-games-003/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-games-004/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-games-005/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-games-006/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-games-007/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-games-008/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-games-009/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-games-010/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-games-011/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-games-012/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-games-013/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-games-014/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-games-015/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-games-016/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-games-017/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-games-018/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-games-019/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-games-020/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-games-021/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-games-022/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-games-023/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-games-024/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-games-025/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-games-026/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-games-027/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-games-028/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-games-029/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-games-030/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-games-031/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-games-032/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-games-033/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-games-034/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-games-035/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-games-036/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-games-037/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-games-038/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-games-039/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-games-040/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-games-041/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-games-042/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-games-043/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-games-044/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-games-045/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-games-046/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-games-047/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-games-048/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-games-049/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-games-050/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-games-051/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-games-052/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-games-053/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-games-054/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-games-055/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-games-056/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-games-057/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-games-058/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-games-059/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-games-060/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-games-061/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-games-062/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-games-063/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-games-064/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-games-065/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-games-066/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-games-067/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-games-068/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-games-069/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-games-070/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-games-071/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-games-072/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-games-073/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-games-074/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-games-075/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-games-076/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-games-077/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-games-078/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-games-079/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-games-080/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-games-081/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-games-082/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-games-083/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-games-084/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-games-085/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-games-086/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-games-087/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-games-088/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-games-089/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-games-090/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-games-091/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-games-092/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-games-093/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-games-094/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-games-095/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-games-096/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-games-097/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-games-098/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-games-099/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-games-100/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-advanced-001/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-advanced-002/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-advanced-003/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-advanced-004/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-advanced-005/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-advanced-006/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-advanced-007/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-advanced-008/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-advanced-009/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-advanced-010/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-advanced-011/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-advanced-012/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-advanced-013/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-advanced-014/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-advanced-015/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-advanced-016/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-advanced-017/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-advanced-018/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-advanced-019/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-advanced-020/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-advanced-021/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-advanced-022/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-advanced-023/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-advanced-024/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-advanced-025/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-advanced-026/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-advanced-027/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-advanced-028/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-advanced-029/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-advanced-030/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-advanced-031/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-advanced-032/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-advanced-033/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-advanced-034/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-advanced-035/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-advanced-036/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-advanced-037/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-advanced-038/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-advanced-039/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-advanced-040/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-advanced-041/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-advanced-042/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-advanced-043/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-advanced-044/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-advanced-045/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-advanced-046/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-advanced-047/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-advanced-048/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-advanced-049/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-advanced-050/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-math-001/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-math-002/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-math-003/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-math-004/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-math-005/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-math-006/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-math-007/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-math-008/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-math-009/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-math-010/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-math-011/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-math-012/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-math-013/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-math-014/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-math-015/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-math-016/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-math-017/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-math-018/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-math-019/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-math-020/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-math-021/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-math-022/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-math-023/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-math-024/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-math-025/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-math-026/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-math-027/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-math-028/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-math-029/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-math-030/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-math-031/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-math-032/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-math-033/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-math-034/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-math-035/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-math-036/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-math-037/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-math-038/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-math-039/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-math-040/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-math-041/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-math-042/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-math-043/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-math-044/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-math-045/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-math-046/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-math-047/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-math-048/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-math-049/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-math-050/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-math-051/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-math-052/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-math-053/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-math-054/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-math-055/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-math-056/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-math-057/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-math-058/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-math-059/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-math-060/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-math-061/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-math-062/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-math-063/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-math-064/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-math-065/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-math-066/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-math-067/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-math-068/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-math-069/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-math-070/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-math-071/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-math-072/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-math-073/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-math-074/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-math-075/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-math-076/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-math-077/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-math-078/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-math-079/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-math-080/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-math-081/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-math-082/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-math-083/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-math-084/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-math-085/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-math-086/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-math-087/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-math-088/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-math-089/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-math-090/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-math-091/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-math-092/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-math-093/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-math-094/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-math-095/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-math-096/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-math-097/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-math-098/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-math-099/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-math-100/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-math-101/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-math-102/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-math-103/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-math-104/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-math-105/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-math-106/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-math-107/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-math-108/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-math-109/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-math-110/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-math-111/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-math-112/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-math-113/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-math-114/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-math-115/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-math-116/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-math-117/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-math-118/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-math-119/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-math-120/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-math-121/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-math-122/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-math-123/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-math-124/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-math-125/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-math-126/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-math-127/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-math-128/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-math-129/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-math-130/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-math-131/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-math-132/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-math-133/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-math-134/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-math-135/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-math-136/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-math-137/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-math-138/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-math-139/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-math-140/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-math-141/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-math-142/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-math-143/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-math-144/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-math-145/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-math-146/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-math-147/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-math-148/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-math-149/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-math-150/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-math-151/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-math-152/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-math-153/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-math-154/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-math-155/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-math-156/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-math-157/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-math-158/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-math-159/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-math-160/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-math-161/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-math-162/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-math-163/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-math-164/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-math-165/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-math-166/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-math-167/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-math-168/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-math-169/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-math-170/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-math-171/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-math-172/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-math-173/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-math-174/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-math-175/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-math-176/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-math-177/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-math-178/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-math-179/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-math-180/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-math-181/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-math-182/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-math-183/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-math-184/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-math-185/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-math-186/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-math-187/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-math-188/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-math-189/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-math-190/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-math-191/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-math-192/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-math-193/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-math-194/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-math-195/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-math-196/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-math-197/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-math-198/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-math-199/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/code-math-200/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/courses/foundation/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/courses/games/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/courses/advanced/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    },
+    {
+      "url": "https://msense.me/python/guides/courses/math/",
+      "status": 200,
+      "titleMatch": true,
+      "canonical": true,
+      "ok": true
+    }
+  ]
+}
