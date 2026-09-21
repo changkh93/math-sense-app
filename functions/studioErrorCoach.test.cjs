@@ -95,3 +95,34 @@ test('optional learning capture receives only canonical tokens and cannot discar
   await f.handler({...payload,learningConsent:true},context);assert.equal(seen.length,1);assert.equal(f.calls.length,1);
   const invalid=fixture();await assert.rejects(invalid.handler({...payload,learningConsent:'yes'},context),{code:'invalid-argument'});assert.equal(invalid.calls.length,0);
 });
+
+test('method error with an unrelated f-string reaches advice using only masked tokens', async () => {
+  const { makeCoachPayload, parseError } = await import('./studioErrorCoachPolicy.mjs');
+  const source = 'class Game:\n    def draw(self):\n        print(f"PRIVATE_EMAIL_123 {self.score}")\n    def update(self):\n        self.chooes_new_wanted()\n    def choose_new_wanted(self):\n        pass';
+  const input = makeCoachPayload(source, parseError('  File "/tmp/studio/04.py", line 5\nAttributeError: \'Game\' object has no attribute \'chooes_new_wanted\'. Did you mean: \'choose_new_wanted\'?'));
+  const f = fixture();
+  assert.deepEqual((await f.handler(input, context)).advice, advice);
+  assert.equal(f.calls.length, 1);
+  const body = JSON.parse(f.calls[0].request.body);
+  for (const text of ['PRIVATE_EMAIL_123', 'self.score', 'chooes_new_wanted', 'choose_new_wanted']) assert.ok(!body.input.includes(text), text);
+  assert.match(JSON.parse(body.input).snippet, /<text_1>/);
+});
+
+test('behavior help carries bounded related evidence without original values or a fictional runtime error', async () => {
+  const { inspectBehavior, behaviorError } = await import('./studioBehaviorCoach.mjs');
+  const { behaviorFixture } = await import('./studioBehaviorCoach.fixtures.mjs');
+  const { makeCoachPayload } = await import('./studioErrorCoachPolicy.mjs');
+  for (const finding of inspectBehavior(behaviorFixture)) {
+    const f = fixture();
+    const input = makeCoachPayload(behaviorFixture, behaviorError(finding));
+    await f.handler(input, context);
+    const body = JSON.parse(f.calls[0].request.body);
+    const rendered = JSON.parse(body.input);
+    assert.equal(rendered.errorType, 'BehaviorCheck');
+    assert.match(rendered.error, /no runtime exception/);
+    assert.match(body.instructions, /NO reported runtime exception/);
+    assert.match(body.instructions, /Other|other logic issues may remain/);
+    for (const privateText of ['PRIVATE_', 'target', 'picked', '_monster.png']) assert.ok(!body.input.includes(privateText));
+    if (finding.ruleId === 'state-field-mismatch') assert.ok(rendered.related.some(part => part.includes('color=')));
+  }
+});

@@ -1,0 +1,22 @@
+// Synthetic lesson, with related lines deliberately outside the 13-line window.
+export const behaviorFixture = [
+  'import pygame, random',
+  'class Scene:',
+  '    def __init__(self):',
+  '        self.target_type = 0',
+  '        self.target_image = None',
+  ...Array(15).fill(''),
+  '    def draw(self):',
+  '        colors = [(0, 0, 255), (0, 255, 0)]',
+  '        pygame.draw.rect(surface=screen, color=colors[self.target_type], rect=area, width=2)',
+  '        print(f"PRIVATE_HUD {self.score}")',
+  ...Array(15).fill(''),
+  '    def choose(self):',
+  '        picked = random.choice(list(self.group))',
+  '        self.target = picked.type',
+  '        self.target_image = picked.image',
+  ...Array(15).fill(''),
+  'for kind in range(4):',
+  '    for label in ["PRIVATE_BLUE", "PRIVATE_GREEN"]:',
+  '        monster = Monster(0, 100, pygame.image.load(f"{label}_monster.png"), kind)',
+].join('\n')

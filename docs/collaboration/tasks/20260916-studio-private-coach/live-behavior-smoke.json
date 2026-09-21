@@ -1,0 +1,100 @@
+{
+  "projectId": "proj_S7uL2bHA4redF0r90zUcfxRe",
+  "at": "2026-09-21T11:05:16.012Z",
+  "syntheticOnly": true,
+  "productionModified": false,
+  "checks": [
+    {
+      "id": "state-field-mismatch",
+      "passed": true,
+      "response": {
+        "status": 200,
+        "model": "gpt-5.6-luna",
+        "inputTokens": 1146,
+        "outputTokens": 215
+      },
+      "transformedInput": {
+        "mode": "file",
+        "preliminaryLocalFinding": "state-field-mismatch",
+        "errorType": "BehaviorCheck",
+        "error": "BehaviorCheck: Review whether the state written when changing an image matches the state read to select its color; no runtime exception is asserted",
+        "line": 42,
+        "snippet": "34: \n35: \n36: \n37: \n38: \n39: \n40:     def variable_11(self):\n41:         variable_12 = random.choice(list(self.variable_13))\n42:         self.variable_14 = variable_12.type\n43:         self.variable_4 = variable_12.image\n44: \n45: \n46: ",
+        "related": [
+          "2: class variable_1:\n3:     def variable_2(self):",
+          "4:         self.variable_3 = number_1\n5:         self.variable_4 = None",
+          "23:         pygame.draw.variable_6(variable_7=variable_8, color=variable_5[self.variable_3], variable_6=variable_9, variable_10=number_3)\n24:         print(\"<text_1>\")"
+        ],
+        "transformations": "Only bounded excerpts are provided, not the full program. Other methods can change the state. A behavior finding is a hypothesis, not a runtime exception or proof of the learner intent. Custom names consistently renamed. Comments removed. String/number values replaced by typed placeholders. Formatted strings, including their embedded expressions, are replaced as a whole; do not infer their contents. number_N denotes a numeric literal, NOT an undefined variable. Original spelling and literal values cannot be diagnosed from this representation. Line positions retained; imports outside the excerpt may be missing. This is NOT executable Python."
+      },
+      "advice": {
+        "explanation": "실행 오류가 발생했다는 뜻은 아니며, 원하는 색과 이미지가 서로 어긋날 가능성을 점검하는 힌트입니다. 42줄에서는 variable_14에 종류를 저장하지만, 23줄에서는 색을 고를 때 self.variable_3을 읽고 있어 서로 다른 상태를 사용할 수 있습니다.",
+        "hint": "42줄과 23줄을 비교해 보세요. 이미지가 바뀔 때 새 종류를 저장하는 곳과 색을 선택할 때 읽는 곳이 같은 속성인지 확인하고, 기본 힌트도 함께 참고하세요.",
+        "question": "이미지를 바꾼 직후 23줄에서 읽는 self.variable_3의 값도 함께 바뀌나요, 아니면 self.variable_14만 바뀌나요?",
+        "check": "한 번 실행해 이미지와 색이 의도대로 함께 바뀌는지 관찰하고, 필요하면 각 속성의 값을 출력해 비교해 보세요."
+      },
+      "cachedRepeat": true
+    },
+    {
+      "id": "loop-type-image-mismatch",
+      "passed": true,
+      "response": {
+        "status": 200,
+        "model": "gpt-5.6-luna",
+        "inputTokens": 1060,
+        "outputTokens": 222
+      },
+      "transformedInput": {
+        "mode": "file",
+        "preliminaryLocalFinding": "loop-type-image-mismatch",
+        "errorType": "BehaviorCheck",
+        "error": "BehaviorCheck: Review whether nested loops associate multiple images with the same type index; no runtime exception is asserted",
+        "line": 59,
+        "snippet": "51: \n52: \n53: \n54: \n55: \n56: \n57: \n58: \n59: for variable_15 in range(number_4):\n60:     for variable_16 in [\"<text_2>\", \"<text_3>\"]:\n61:         variable_17 = variable_18(number_1, number_5, pygame.image.load(\"<text_4>\"), variable_15)",
+        "transformations": "Only bounded excerpts are provided, not the full program. Other methods can change the state. A behavior finding is a hypothesis, not a runtime exception or proof of the learner intent. Custom names consistently renamed. Comments removed. String/number values replaced by typed placeholders. Formatted strings, including their embedded expressions, are replaced as a whole; do not infer their contents. number_N denotes a numeric literal, NOT an undefined variable. Original spelling and literal values cannot be diagnosed from this representation. Line positions retained; imports outside the excerpt may be missing. This is NOT executable Python."
+      },
+      "advice": {
+        "explanation": "59줄의 바깥 반복문에서 variable_15가 바뀌고, 60줄의 안쪽 반복문은 같은 variable_15 값으로 두 번 실행됩니다. 그래서 여러 이미지와 타입 번호를 연결하려는 의도였다면, 실행은 되지만 이미지와 번호의 짝이 어긋날 가능성이 있습니다.",
+        "hint": "59~61줄을 먼저 살펴보세요. 기본 힌트처럼 이미지 목록의 순서와 variable_15의 번호가 같은 순서로 맞는지 확인하고, 임시로 반복 안에서 variable_15와 이미지 이름을 출력해 보세요.",
+        "question": "한 바깥 반복에서 안쪽 반복이 두 번 실행될 때, 두 이미지가 정말 같은 variable_15 번호를 가져야 하나요?",
+        "check": "출력한 번호와 이미지 이름의 짝을 비교한 뒤 다시 실행해 보세요. 원하는 짝과 다르면 반복 구조나 목록의 순서를 한 부분씩 조정해 보세요."
+      },
+      "cachedRepeat": true
+    },
+    {
+      "id": "method-typo",
+      "passed": true,
+      "response": {
+        "status": 200,
+        "model": "gpt-5.6-luna",
+        "inputTokens": 1003,
+        "outputTokens": 183
+      },
+      "transformedInput": {
+        "mode": "file",
+        "preliminaryLocalFinding": "attribute-spelling",
+        "errorType": "AttributeError",
+        "error": "AttributeError: has no attribute 'variable_2'",
+        "line": 3,
+        "snippet": "1: class variable_1:\n2:     def update(self):\n3:         self.variable_2()\n4: \n5: \n6: \n7: ",
+        "related": [
+          "24:     def variable_3(self):\n25:         pass"
+        ],
+        "transformations": "Only bounded excerpts are provided, not the full program. Other methods can change the state. A behavior finding is a hypothesis, not a runtime exception or proof of the learner intent. Custom names consistently renamed. Comments removed. String/number values replaced by typed placeholders. Formatted strings, including their embedded expressions, are replaced as a whole; do not infer their contents. number_N denotes a numeric literal, NOT an undefined variable. Original spelling and literal values cannot be diagnosed from this representation. Line positions retained; imports outside the excerpt may be missing. This is NOT executable Python."
+      },
+      "advice": {
+        "explanation": "3줄에서 update 메서드가 self.variable_2()를 호출하지만, 제시된 부분에는 variable_2라는 메서드가 보이지 않습니다. 24줄의 variable_3은 다른 이름이므로, 이름 불일치가 원인일 가능성이 큽니다.",
+        "hint": "기본 힌트를 참고해 3줄의 호출 이름과 실제 메서드 정의 이름을 한 글자씩 비교해 보세요. 의도한 메서드가 variable_3이라면 호출 이름도 그 이름과 정확히 같아야 합니다.",
+        "question": "3줄의 호출 이름과 24줄의 정의 이름이 정확히 같은가요?",
+        "check": "이름을 확인한 뒤 파일을 다시 실행하고, 같은 AttributeError가 사라졌는지 관찰해 보세요."
+      },
+      "cachedRepeat": true
+    }
+  ],
+  "secret": {
+    "version": "4",
+    "state": "ENABLED",
+    "createdAt": "2026-09-16T10:23:20.345970Z"
+  },
+  "passed": true
+}

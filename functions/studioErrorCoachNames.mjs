@@ -48,11 +48,51 @@ function closesAtEnd(words, start, open, close) {
 }
 const result = (ruleId, title, action, check, example = '', confidence = 'likely') => ({ ruleId, confidence, specific: true, guide: [title, action, check], example })
 
+// Python's runtime suggestion is evidence even inside user-defined classes.
+// Confirm the failing self call and a real method in that same class locally.
+function suggestedMethod(error, lines, rows) {
+  if (error.type !== 'AttributeError') return null
+  const match = error.message?.match(/^AttributeError: ['"]([\p{L}_][\p{L}\p{N}_]*)['"] object has no attribute ['"]([\p{L}_][\p{L}\p{N}_]*)['"]\. Did you mean: ['"]([\p{L}_][\p{L}\p{N}_]*)['"]\?/u)
+  if (!match) return null
+  const [, className, missing, candidate] = match
+  if (![className, missing, candidate].every(name => name.length <= 40) || !closeName(missing, candidate)) return null
+  const stack = [], methods = [], classes = []
+  let failingClass = null
+  for (let i = 0; i < rows.length; i++) {
+    const row = rows[i], words = row.map(t => t.kind === 'string' ? '<string>' : t.value)
+    if (!words.length) continue
+    // Ignore tokens continuing a multiline literal; they are not declarations.
+    const indentation = lines[i].match(/^[ \t]*/)[0]
+    if (indentation.includes('\t')) return null
+    const indent = indentation.length
+    while (stack.length && stack.at(-1).indent >= indent) stack.pop()
+    const owner = [...stack].reverse().find(scope => scope.kind === 'class')
+    if (i + 1 === error.line && words[0] === 'self' && words[1] === '.' && words[2] === missing && words[3] === '(' && stack.at(-1)?.kind !== 'class') failingClass = owner
+    if (words[0] === 'class' && identifier.test(words[1])) {
+      const scope = { kind: 'class', name: words[1], indent, line: i + 1 }
+      classes.push(scope); stack.push(scope)
+    } else if (words[0] === 'def' && identifier.test(words[1]) && words[2] === '(') {
+      if (stack.at(-1)?.kind === 'class' && words[3] === 'self') methods.push({ owner, name: words[1], line: i + 1 })
+      stack.push({ kind: 'def', indent })
+    } else if (words.at(-1) === ':') stack.push({ kind: 'block', indent })
+  }
+  if (!failingClass || failingClass.name !== className || classes.filter(c => c.name === className).length !== 1) return null
+  const definitions = methods.filter(m => m.owner === failingClass && m.name === candidate)
+  if (definitions.length !== 1 || methods.some(m => m.owner === failingClass && m.name === missing)) return null
+  return { ...result('attribute-spelling',
+    `${error.line}번째 줄의 ${missing}와 ${definitions[0].line}번째 줄에 정의한 ${candidate}의 철자가 달라요.`,
+    `${candidate} 메서드를 호출하려던 것이라면 self.${missing}()를 self.${candidate}()로 고쳐 보세요.`,
+    '파이썬 오류 메시지도 같은 이름을 제안했어요. 한 곳을 고친 뒤 다시 실행해 보세요.',
+    `self.${candidate}()`, 'high'), relatedLines: [failingClass.line, definitions[0].line] }
+}
+
 export function diagnoseNames(error, source, ts) {
   if (!['NameError', 'AttributeError', 'TypeError', 'ImportError', 'ModuleNotFoundError'].includes(error.type)) return null
   if (source.length > 50000 || ts.length > 12000) return null
   const lines = source.split('\n'), rows = lines.map(() => [])
   for (const token of ts) rows[token.line - 1]?.push(token)
+  const method = suggestedMethod(error, lines, rows)
+  if (method) return method
   const names = new Map(builtins.map(name => [name, { kind: 'builtin', path: name }]))
   const before = rows.slice(0, error.line - 1)
   // No scope guessing across a function/class/branch/loop or multiline literal.

@@ -36,6 +36,25 @@ export function rankGroups(groups) {
     return { ...g, priority: (g.incorrect || 0) * 100 + (g.aiRequested || 0) * 3 + (g.meaning || 0) * 2 + (g['same-error'] || 0), requestRate: n ? (g.aiRequested || 0) / n : null, completedRate: n ? (g.completed || 0) / n : null, sampleWarning: n < 20 }
   }).sort((a,b) => Number(Boolean(b.incorrect)) - Number(Boolean(a.incorrect)) || b.priority - a.priority)
 }
+
+// Describe what is actually observable; never turn an empty/disabled feed into
+// a claim that learners made no mistakes or that every AI request succeeded.
+export function reportAvailability(report) {
+  const observed = (report.groups || []).some(group => group.exposures > 0)
+  const sampling = report.config?.enabled === true && report.config?.samplesEnabled === true
+  const summary = report.config?.enabled !== true
+    ? (observed ? '현재 관찰 수집은 꺼져 있어요. 아래 내용은 이전에 수집한 기록이며, 현재의 모든 오류를 나타내지 않아요.' : '오류 관찰 수집이 꺼져 있어 반복 오류를 판단할 기록이 없어요. 학생에게 오류가 없었다는 뜻은 아니에요.')
+    : observed ? '개선 참여를 선택하고 전송에 성공한 관찰만 집계했어요. 전체 학생의 오류 비율로 해석하지 마세요.'
+      : '수집 설정은 켜져 있지만 보고 기간에 도착한 관찰은 없어요. 학생의 탭 내 참여 선택과 새로고침, 관찰 전송 상태를 확인해 주세요.'
+  const samples = sampling
+    ? '대표 사례는 학생이 참여를 선택하고 AI 답변을 받은 경우에만 보관해요. 사례가 없으면 실제 코드 원인을 소급해서 알아낼 수 없어요.'
+    : '현재 변환 코드 사례를 보관하지 않아요. 오류 원문과 학생 코드는 별도 오류 로그로 저장하지 않으며, 지금 수집을 켜도 과거 오류가 복원되지는 않아요.'
+  const total = report.requestReservations?.total
+  const reservations = report.requestReservations?.available === true && Number.isSafeInteger(total) && total >= 0
+    ? `AI 요청 한도 차감 기록 ${total}건. 실패·시험 호출이 포함될 수 있으며, 캐시 응답은 추가로 차감하지 않아요. 학생 오류 수나 성공한 AI 답변 수가 아니에요.`
+    : 'AI 요청 한도 차감 기록을 확인하지 못했어요. 조회 불가를 0건으로 처리하지 않아요.'
+  return {summary,samples,reservations,observed}
+}
 export const TRANSITIONS = { draft: ['tested','retired'], tested: ['reviewed','retired'], reviewed: ['shadow','retired'], shadow: ['limited','retired'], limited: ['active','retired'], active: ['retired'], retired: [] }
 // Bounded synthetic fixtures, never supplied by student events or executed.
 export function testCard(card) {

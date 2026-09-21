@@ -181,3 +181,20 @@ test('indexed literals, conditional constructors and callbacks are not assumed t
   assert.equal(localFeedback(error('AttributeError', "object has no attribute 'foward'", 3), 'from turtle import Turtle\nt = Turtle() if ready else other\nt.foward(100)').ruleId, undefined)
   assert.notEqual(localFeedback(error('TypeError', "unrelated type error", 2), 'callback = print\ncallback(1)').ruleId, 'constructor-not-called')
 })
+
+test('runtime method suggestion is confirmed against the enclosing class, including later definitions', () => {
+  const source = 'class Game:\n    def update(self):\n        self.chooes_new_wanted()\n    def choose_new_wanted(self):\n        pass'
+  const e = error('AttributeError', "'Game' object has no attribute 'chooes_new_wanted'. Did you mean: 'choose_new_wanted'?", 3)
+  const result = localFeedback(e, source)
+  assert.equal(result.ruleId, 'attribute-spelling')
+  assert.match(result.guide[0], /3번째 줄.*4번째 줄/)
+  assert.equal(result.example, 'self.choose_new_wanted()')
+  for (const other of [
+    source.replace('class Game:', 'class Other:'),
+    source.replace('    def choose_new_wanted(self):', 'class Other:\n    def choose_new_wanted(self):'),
+    source.replace('    def choose_new_wanted(self):\n        pass', '    note = "def choose_new_wanted(self):"'),
+    source.replace('self.chooes_new_wanted()', 'other.chooes_new_wanted()'),
+    source.replace('    def choose_new_wanted(self):', '        def choose_new_wanted(self):'),
+  ]) assert.notEqual(localFeedback(e, other).ruleId, 'attribute-spelling', other)
+  assert.notEqual(localFeedback({ ...e, message: e.message.replace('choose_new_wanted', 'unrelated_method') }, source).ruleId, 'attribute-spelling')
+})

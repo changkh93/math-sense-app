@@ -2,11 +2,16 @@
 import {createRequire} from 'node:module'
 import {randomBytes} from 'node:crypto'
 import {writeFile} from 'node:fs/promises'
+import {execFileSync} from 'node:child_process'
+import path from 'node:path'
+import {inspectBehavior,behaviorError} from '../functions/studioBehaviorCoach.mjs'
+import {behaviorFixture} from '../functions/studioBehaviorCoach.fixtures.mjs'
 import {makeCoachPayload,parseError} from '../functions/studioErrorCoachPolicy.mjs'
 const mode=process.argv[2]
-if(!['--activate','--verify','--schedule-check'].includes(mode))throw new Error('Use --activate, --verify or --schedule-check explicitly')
+if(!['--activate','--verify','--verify-current','--schedule-check'].includes(mode))throw new Error('Use --activate, --verify, --verify-current or --schedule-check explicitly')
 const project='math-sense-1f6a8', region='asia-northeast3'
-const req=createRequire(import.meta.url), cli=createRequire('/Users/selah/.npm-global/lib/node_modules/firebase-tools/package.json')
+const globalRoot=execFileSync('npm',['root','-g'],{encoding:'utf8',stdio:['ignore','pipe','pipe']}).trim()
+const req=createRequire(import.meta.url), cli=createRequire(path.join(globalRoot,'firebase-tools/package.json'))
 const logger=cli('./lib/logger.js').logger;logger.silent=true;logger.clear()
 const ca=cli('./lib/auth.js'),account=ca.getGlobalDefaultAccount()
 await cli('./lib/requireAuth.js').requireAuth({project,nonInteractive:true,user:account?.user,tokens:account?.tokens})
@@ -58,24 +63,38 @@ try{
   check('student cannot access admin report',(await call('studioCoachLearningAdmin',{action:'report'},idToken)).body.error?.status==='PERMISSION_DENIED')
   check('legacy raw code rejected',(await call('studioErrorCoach',{version:1,snippet:'synthetic only'},idToken)).body.error?.status==='INVALID_ARGUMENT')
   phase='real-luna-response'
-  const payload=makeCoachPayload('from ColabTurtlePlus.Turtle import *\nt = Turtle\nt.forward(100)',parseError('  File "/tmp/studio/main.py", line 3\nTypeError: Turtle.forward() missing 1 required positional argument: \'distance\''))
-  const result=await call('studioErrorCoach',payload,idToken)
-  evidence.responseStatus=result.status
-  evidence.errorStatus=result.body.error?.status
-  check('deployed Luna returned four-field advice',result.body.result?.model==='gpt-5.6-luna'&&['explanation','hint','question','check'].every(k=>typeof result.body.result?.advice?.[k]==='string'))
-  evidence.syntheticAdvice=result.body.result.advice
-  const repeated=await call('studioErrorCoach',payload,idToken)
-  check('duplicate does not charge again',repeated.body.result?.cached===true||repeated.body.error?.status==='ALREADY_EXISTS')
+  const constructor=makeCoachPayload('from ColabTurtlePlus.Turtle import *\nt = Turtle\nt.forward(100)',parseError('  File "/tmp/studio/main.py", line 3\nTypeError: Turtle.forward() missing 1 required positional argument: \'distance\''))
+  const methodSource=['class Scene:', '    def update(self):', '        self.chose_target()', ...Array(20).fill(''), '    def choose_target(self):', '        pass'].join('\n')
+  const inputs=mode==='--verify-current' ? [
+    ...inspectBehavior(behaviorFixture).map(f=>[f.ruleId,makeCoachPayload(behaviorFixture,behaviorError(f))]),
+    ['method-typo',makeCoachPayload(methodSource,parseError('  File "/tmp/studio/main.py", line 3\nAttributeError: \'Scene\' object has no attribute \'chose_target\'. Did you mean: \'choose_target\'?'))],
+  ] : [['constructor',constructor]]
+  evidence.responses=[]
+  for(let i=0;i<inputs.length;i++){
+    if(i)await new Promise(resolve=>setTimeout(resolve,31000))
+    const [id,payload]=inputs[i]
+    check(id+' masked payload ready',!!payload)
+    const result=await call('studioErrorCoach',payload,idToken)
+    evidence.responses.push({id,status:result.status,errorStatus:result.body.error?.status,advice:result.body.result?.advice})
+    check(id+' deployed Luna returned four-field advice',result.body.result?.model==='gpt-5.6-luna'&&['explanation','hint','question','check'].every(k=>typeof result.body.result?.advice?.[k]==='string'))
+    const repeated=await call('studioErrorCoach',payload,idToken)
+    check(id+' duplicate does not charge again',repeated.body.result?.cached===true||repeated.body.error?.status==='ALREADY_EXISTS')
+  }
   phase='admin-report'
   await db.doc(`users/${uid}`).update({role:'admin'})
   const report=await call('studioCoachLearningAdmin',{action:'report'},idToken)
   check('authorized admin report responds',report.status===200&&!report.body.error)
+  if(mode==='--verify-current'){
+    check('deployed report includes 14-day reservations',report.body.result?.requestReservations?.available===true&&report.body.result?.requestReservations?.days?.length===14)
+    check('collection remains disabled after verification',report.body.result?.config?.enabled===false&&report.body.result?.config?.samplesEnabled===false)
+    evidence.reportPeriod=report.body.result.period
+  }
  }
  evidence.passed=true
 }catch(error){evidence.passed=false;evidence.stoppedAt=phase;evidence.failureCode=typeof error.code==='string'?error.code:undefined;process.exitCode=1}
 finally{
  if(uid){await db.doc(`users/${uid}`).delete();await admin.auth().deleteUser(uid);evidence.syntheticAccountDeleted=true}
  await admin.app().delete()
- await writeFile(`docs/collaboration/tasks/20260916-coach-production-release/${mode.slice(2)}.json`,JSON.stringify(evidence,null,2))
+ await writeFile(mode==='--verify-current'?'docs/collaboration/tasks/20260921-studio-coach-release/verify.json':`docs/collaboration/tasks/20260916-coach-production-release/${mode.slice(2)}.json`,JSON.stringify(evidence,null,2))
  console.log(JSON.stringify(evidence,null,2))
 }

@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
-import { localFeedback, makeCoachPayload, parseError } from '../../../functions/studioErrorCoachPolicy.mjs'
+import { useEffect, useMemo, useState } from 'react'
+import { localFeedback, parseError } from '../../../functions/studioErrorCoachPolicy.mjs'
 import { requestCoachAdvice } from './errorCoachClient'
-import { renderStructure, restoreCoachNames } from '../../../functions/studioCoachStructure.mjs'
+import CoachAdvice from './CoachAdvice'
 import { learningSession } from './coachLearningClient'
 import { ruleFor, selectCard, INTENT_LABELS } from '../../../functions/studioCoachLearningPolicy.mjs'
 import './ErrorCoach.css'
@@ -22,24 +22,9 @@ export default function ErrorCoach({ uid, source, currentSource, text, mode = 'f
   useEffect(() => {
     if (error.eligible) session.tracker.register({ key: episodeKey, scope: learningScope, source, path: learningPath, signature: `${error.type}:${error.message}`, ruleId, cardVersion: card.version, shadowVersion, mode })
   }, [session, episodeKey, learningScope, learningPath, source, error, ruleId, card.version, shadowVersion, mode])
-  const chooseIntent = value => { setIntent(value); session.tracker.intent(episodeKey, value); if (value === 'example') setStep(1) }
-  const { payload, aliases } = useMemo(() => {
-    const aliases = Object.create(null)
-    return { payload: makeCoachPayload(source, error, mode, aliases), aliases }
-  }, [source, error, mode])
-  const prepared = useMemo(() => payload ? renderStructure(payload) : null, [payload])
-  const [step, setStep] = useState(0), [preview, setPreview] = useState(false), [reviewed, setReviewed] = useState(false)
-  const [pending, setPending] = useState(false), [answer, setAnswer] = useState(null), [failure, setFailure] = useState(''), [aiStep, setAiStep] = useState(0)
-  const alive = useRef(true), lock = useRef(false)
+  const chooseIntent = value => { setIntent(value); session.tracker.intent(episodeKey, value); if (value !== 'helpful') setStep(1) }
+  const [step, setStep] = useState(0)
   const stale = currentSource !== source
-  useEffect(() => { alive.current = true; return () => { alive.current = false } }, [])
-  const ask = async () => {
-    if (lock.current || stale || !payload || !reviewed) return
-    lock.current = true; session.tracker.ai(episodeKey); setPending(true); setFailure('')
-    try { const result = await requestAdvice(uid, payload, session.consent && session.manifest.collectionEnabled, session.consent && session.manifest.samplesEnabled); session.tracker.ai(episodeKey, true); if (alive.current) setAnswer(Object.fromEntries(Object.entries(result.advice).map(([key, value]) => [key, restoreCoachNames(value, aliases)]))) }
-    catch (error) { if (alive.current) setFailure(error.message) }
-    finally { if (alive.current) setPending(false) }
-  }
   if (!error.eligible) return null
   return <section className="pgs-error-coach" aria-label="오류 해결 도우미">
     <div className="pgs-coach-heading"><strong>한 걸음씩 고쳐봐요</strong><span>기본 힌트 · AI 호출 없음</span></div>
@@ -56,19 +41,10 @@ export default function ErrorCoach({ uid, source, currentSource, text, mode = 'f
       {intent === 'helpful' && <p>이해한 내용을 내 코드에 적용하고 다시 실행해 보세요.</p>}
     </div>}
     {session.manifest.collectionEnabled && <details className="pgs-coach-participation"><summary>도움 설명 개선에 참여하기 · 선택</summary><p>오류 유형, 선택한 질문, 수정·재실행 결과를 기록해 설명을 개선해요. 코드 원문과 변수 이름은 이 기록에 보내지 않아요.{session.manifest.samplesEnabled && ' AI를 요청하면 변환된 코드와 AI 답변 일부도 검토용으로 보관할 수 있어요.'} 참여하지 않아도 도움을 받을 수 있어요. 선택은 이 탭에서만 유지돼요.</p><label><input type="checkbox" checked={session.consent} onChange={e => { session.setConsent(e.target.checked); if (e.target.checked) session.tracker.register({key:episodeKey,scope:learningScope,source,path:learningPath,signature:`${error.type}:${error.message}`,ruleId,cardVersion:card.version,shadowVersion,mode}) }} /> 설명 개선에 참여할게요</label><a href="/privacy" target="_blank" rel="noreferrer">처리 안내 보기</a></details>}
-    {stale ? <p className="pgs-coach-stale">코드를 바꿨네요. 다시 실행해서 어떤 점이 달라졌는지 확인해 보세요.</p> : <>
-      {step === 0 && <button onClick={() => setStep(1)}>확인 방법 · 예시 보기</button>}
-      {step >= 1 && payload && !preview && <button onClick={() => setPreview(true)}>아직 어렵다면 · AI 도움</button>}
-      {step >= 1 && !payload && <p>이 오류는 값이나 다른 코드까지 확인해야 해요. 내용을 가리면 잘못 설명할 수 있어 AI로 보내지 않아요. 위 기본 힌트나 선생님의 도움으로 확인해 주세요.</p>}
-      {preview && !answer && <div className="pgs-coach-preview">
-        <strong>AI에 보낼 내용 확인</strong>
-        <p>AI는 아래처럼 바꾼 코드와 오류 설명을 받아요. 직접 지은 이름은 variable_1 같은 별명으로, 글자와 숫자는 표시용 이름으로 바꾸고 주석은 빼요. 같은 이름은 같은 별명으로 표시해요. 원래 철자와 값은 AI가 볼 수 없어요. 오류 종류·줄 번호·기본 분석의 오류 유형도 함께 보내요.</p>
-        <pre>{prepared.error}{'\n'}{prepared.snippet}</pre>
-        <label><input type="checkbox" checked={reviewed} disabled={pending || lock.current} onChange={event => setReviewed(event.target.checked)} /> 변환된 코드로 도움받는 것을 확인했어요</label>
-        <div className="pgs-coach-actions"><button disabled={!reviewed || pending || lock.current} onClick={ask}>{pending ? '힌트를 생각하고 있어요…' : '확인한 내용으로 AI 힌트 받기'}</button>{!pending && !lock.current && <button onClick={() => { setPreview(false); setReviewed(false) }}>돌아가기</button>}</div>
-      </div>}
-      {failure && <p role="status">{failure}</p>}
-      {answer && <div className="pgs-coach-answer" aria-live="polite"><strong>AI 힌트</strong><p>{answer.explanation}</p><p>{answer.hint}</p>{aiStep >= 1 && <p>{answer.question}</p>}{aiStep >= 2 && <p>{answer.check}</p>}{aiStep < 2 && <button onClick={() => setAiStep(aiStep + 1)}>{aiStep === 0 ? '생각해 볼 질문' : '확인 방법 보기'}</button>}<small>AI 설명은 틀릴 수 있어요. 코드를 한 곳씩 고친 뒤 다시 실행해 보세요.</small></div>}
-    </>}
+    {!stale && step === 0 && <button onClick={() => setStep(1)}>확인 방법 · 예시 보기</button>}
+    <CoachAdvice uid={uid} source={source} error={error} mode={mode} stale={stale}
+      consent={session.consent && session.manifest.collectionEnabled}
+      samplesConsent={session.consent && session.manifest.samplesEnabled}
+      onRequested={() => session.tracker.ai(episodeKey)} onReceived={() => session.tracker.ai(episodeKey, true)} requestAdvice={requestAdvice} />
   </section>
 }

@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { createLearningService } from './studioCoachLearning.cjs'
-import { BASE_CARDS, DIAGNOSTIC_VERSION, ENGINE_VERSION, validateObservation, testCard, selectCard } from './studioCoachLearningPolicy.mjs'
+import { BASE_CARDS, DIAGNOSTIC_VERSION, ENGINE_VERSION, validateObservation, testCard, selectCard, reportAvailability } from './studioCoachLearningPolicy.mjs'
 import { createLearningTracker } from '../src/components/PythonGameStudio/coachLearningTracker.mjs'
 const student = {auth:{uid:'synthetic-student',token:{firebase:{sign_in_provider:'password'}}}}
 const admin = {auth:{uid:'synthetic-admin',token:{firebase:{sign_in_provider:'password'}}}}
@@ -11,9 +11,10 @@ const card = {ruleId:'constructor-not-called',mode:'both',...BASE_CARDS['constru
 function fixture() {
   const docs=new Map([['users/synthetic-student',{clusterAccess:{python:'active'}}],['users/synthetic-admin',{role:'admin'}]])
   let stamp=Date.UTC(2026,8,16),chain=Promise.resolve()
+  const readFailures=new Set(),reads=[]
   const copy=v=>v===undefined?undefined:structuredClone(v)
   const snap=path=>({exists:docs.has(path),id:path.split('/').at(-1),ref:ref(path),data:()=>copy(docs.get(path))})
-  const ref=path=>({path,get:async()=>snap(path),create:async v=>{assert.ok(!docs.has(path));docs.set(path,copy(v))}})
+  const ref=path=>({path,get:async()=>{reads.push(path);if(readFailures.has(path))throw new Error('read unavailable');return snap(path)},create:async v=>{assert.ok(!docs.has(path));docs.set(path,copy(v))}})
   const query=(name,filters=[],order=null,limit=Infinity)=>({
     where:(...filter)=>query(name,[...filters,filter],order,limit),orderBy:(...value)=>query(name,filters,value,limit),limit:value=>query(name,filters,order,value),
     get:async()=>{let rows=[...docs].filter(([p])=>p.split('/')[0]===name).filter(([,v])=>filters.every(([k,op,x])=>op==='>='?v[k]>=x:op==='>'?v[k]>x:op==='<='?v[k]<=x:v[k]===x));if(order)rows.sort((a,b)=>(a[1][order[0]]>b[1][order[0]]?1:-1)*(order[1]==='desc'?-1:1));rows=rows.slice(0,limit);return{size:rows.length,docs:rows.map(([p])=>snap(p))}}
@@ -26,8 +27,65 @@ function fixture() {
   const enable=()=>svc.adminAction({action:'configure',enabled:true,samplesEnabled:false,policyReviewed:true},admin)
   const create=async()=> (await svc.adminAction({action:'create',card},admin)).version
   const transition=(version,expectedStage,stage,extra={})=>svc.adminAction({action:'transition',version,expectedStage,stage,...extra},admin)
-  return {docs,svc,service,enable,create,transition,advance:ms=>stamp+=ms,entries:name=>[...docs].filter(([p])=>p.startsWith(name+'/')).map(([,v])=>v)}
+  return {docs,svc,service,enable,create,transition,reads,readFailures,advance:ms=>stamp+=ms,entries:name=>[...docs].filter(([p])=>p.startsWith(name+'/')).map(([,v])=>v)}
 }
+
+test('admin report distinguishes request reservations from missing observations without collecting identities',async()=>{
+  const f=fixture()
+  f.docs.set('studioCoachUsage/day-2026-09-16',{count:2})
+  f.docs.set('studioCoachUsage/day-2026-09-04',{count:1})
+  f.docs.set('studioCoachUsage/user-private',{count:99,fingerprints:['PRIVATE']})
+  f.docs.set('studioCoachLearningControl/config',{enabled:false,samplesEnabled:false,salt:'PRIVATE_SALT'})
+  const before=structuredClone([...f.docs])
+  const report=await f.svc.adminAction({action:'report'},admin)
+  assert.deepEqual(report.period,{from:'2026-09-03',through:'2026-09-16',timeZone:'UTC'})
+  assert.equal(report.requestReservations.total,3)
+  assert.equal(report.requestReservations.days.length,14)
+  assert.deepEqual(report.groups,[])
+  assert.ok(!JSON.stringify(report).includes('PRIVATE'))
+  assert.equal(f.reads.filter(path=>path.startsWith('studioCoachUsage/')).length,14)
+  assert.ok(!f.reads.includes('studioCoachUsage/user-private'))
+  assert.deepEqual([...f.docs],before)
+  const status=reportAvailability(report)
+  assert.match(status.summary,/수집이 꺼져/)
+  assert.match(status.summary,/오류가 없었다는 뜻은 아니/)
+  assert.match(status.reservations,/3건/)
+  assert.match(status.reservations,/학생 오류 수나 성공한 AI 답변 수가 아니/)
+})
+
+test('report uses exactly 14 UTC dates and excludes older and future aggregate records',async()=>{
+  const f=fixture()
+  for(const day of ['2026-09-02','2026-09-03','2026-09-16','2026-09-17']) {
+    f.docs.set(`studioCoachLearningStats/${day}`,{day,ruleId:'name-spelling',cardVersion:'builtin-v1',mode:'file',counts:{exposures:1}})
+    f.docs.set(`studioCoachLearningCosts/${day}`,{day,requests:1})
+    f.docs.set(`studioCoachUsage/day-${day}`,{count:1})
+  }
+  const report=await f.svc.adminAction({action:'report'},admin)
+  assert.equal(report.groups[0].exposures,2)
+  assert.equal(report.costs.length,2)
+  assert.equal(report.requestReservations.total,2)
+  assert.match(reportAvailability(report).summary,/이전에 수집한 기록/)
+})
+
+test('unavailable or malformed usage is not represented as zero and does not hide existing reports',async()=>{
+  for(const failed of [true,false]) {
+    const f=fixture()
+    if(failed)f.readFailures.add('studioCoachUsage/day-2026-09-16')
+    else f.docs.set('studioCoachUsage/day-2026-09-16',{count:-1})
+    const report=await f.svc.adminAction({action:'report'},admin)
+    assert.deepEqual(report.requestReservations,{available:false,total:null,days:[]})
+    assert.match(reportAvailability(report).reservations,/조회 불가를 0건으로 처리하지/)
+  }
+})
+
+test('collection enabled without participation records differs from an observed population',()=>{
+  const enabled={config:{enabled:true,samplesEnabled:true},groups:[]}
+  assert.match(reportAvailability(enabled).summary,/탭 내 참여 선택/)
+  assert.match(reportAvailability(enabled).samples,/학생이 참여를 선택/)
+  assert.match(reportAvailability({...enabled,groups:[{exposures:1}]}).summary,/전체 학생의 오류 비율로 해석하지/)
+  assert.match(reportAvailability({...enabled,groups:[{shadowMatches:8}]}).summary,/도착한 관찰은 없어요/)
+  assert.match(reportAvailability({}).reservations,/확인하지 못했어요/)
+})
 test('strict finite events reject raw fields, forged enums and excessive payloads',()=>{
   assert.deepEqual(validateObservation(event()),event())
   for(const bad of [{source:'private'},{path:'private.py'},{studentId:'x'},{intents:['meaning','meaning']},{ruleId:'user text'},{runtimeVersion:'old'},{consent:false},{aiReceived:true},{shadowVersion:'invalid'},{intents:['freeform']}])assert.throws(()=>validateObservation(event(bad)))

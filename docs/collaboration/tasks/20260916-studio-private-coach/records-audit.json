@@ -1,0 +1,33 @@
+{
+  "at": "2026-09-21T11:12:44.093Z",
+  "readOnly": true,
+  "learning": {
+    "exists": true,
+    "samplesEnabled": false,
+    "enabled": false
+  },
+  "coach": {
+    "exists": true,
+    "enabled": true,
+    "structureDataReady": true
+  },
+  "counts": {
+    "studioCoachLearningStats": 0,
+    "studioCoachLearningSamples": 0,
+    "studioCoachLearningCosts": 0,
+    "studioCoachLearningCards": 0
+  },
+  "stats": [],
+  "costs": [],
+  "dailyReservations": [
+    {
+      "day": "2026-09-16",
+      "count": 2
+    },
+    {
+      "day": "2026-09-18",
+      "count": 1
+    }
+  ],
+  "truncated": false
+}

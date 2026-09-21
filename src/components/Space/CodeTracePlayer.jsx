@@ -14,7 +14,7 @@ import { buildStreakWriteAudit, calculateStreakUpdate, getTodayKST } from '../..
 import { calculateGrowthUpdates } from '../../utils/rankingUtils';
 import { recordCrystalTransaction } from '../../utils/crystalLedger';
 import { applyCrystalRewardMultiplier } from '../../utils/holidayUtils';
-import { getCodeTraceResumeState, isCodeTraceProgressComplete } from '../../utils/codeTraceProgressUtils';
+import { getCodeTraceLineProgress, getCodeTraceResumeState, isCodeTraceProgressComplete } from '../../utils/codeTraceProgressUtils';
 import { studioCompletion } from '../PythonWorld/studioCompletion';
 import soundManager from '../../utils/SoundManager';
 
@@ -1218,7 +1218,7 @@ export default function CodeTracePlayer({
   const initialResumeRef = useRef(getCodeTraceResumeState(exercises, learningProgress?.codeTrace));
   const [exerciseIndex, setExerciseIndex] = useState(() => initialResumeRef.current.exerciseIndex);
   const [mode, setMode] = useState(() => initialResumeRef.current.mode);
-  const [visibleLines, setVisibleLines] = useState(1);
+  const [visibleLinesByExercise, setVisibleLinesByExercise] = useState(() => getCodeTraceLineProgress(exercises, learningProgress?.codeTrace));
   const [answerVisible, setAnswerVisible] = useState(true);
   const [revealSeconds, setRevealSeconds] = useState(ANSWER_REVEAL_SECONDS);
   const [studentCode, setStudentCode] = useState(() => initialResumeRef.current.studentCode);
@@ -1272,6 +1272,7 @@ export default function CodeTracePlayer({
   }, [learningProgress?.codeTrace?.crystalsEarnedTotal]);
 
   const exercise = exercises[exerciseIndex] || null;
+  const visibleLines = getCodeTraceLineProgress([exercise].filter(Boolean), { visibleLinesByExercise })[getExerciseId(exercise)] || 1;
   const requiredAnswerCode = useMemo(
     () => getTraceScoredCode(exercise?.answerCode || ''),
     [exercise]
@@ -1369,7 +1370,7 @@ export default function CodeTracePlayer({
       setDrafts(prev => ({ ...prev, [currentExerciseId]: '' }));
     }
     setStudentCode('');
-    setVisibleLines(1);
+    setVisibleLinesByExercise(prev => ({ ...prev, [currentExerciseId]: 1 }));
     setHintIndex(0);
     setAnswerVisible(true);
     setRevealSeconds(ANSWER_REVEAL_SECONDS);
@@ -1392,7 +1393,6 @@ export default function CodeTracePlayer({
     const targetId = getExerciseId(exercises[nextIndex]);
     setExerciseIndex(nextIndex);
     setStudentCode(nextDrafts[targetId] || '');
-    setVisibleLines(1);
     setHintIndex(0);
     setAnswerVisible(true);
     setRevealSeconds(ANSWER_REVEAL_SECONDS);
@@ -1439,7 +1439,7 @@ export default function CodeTracePlayer({
     setExerciseIndex(resumeState.exerciseIndex);
     setMode(resumeState.mode);
     setStudentCode(resumeState.studentCode);
-    setVisibleLines(1);
+    setVisibleLinesByExercise(getCodeTraceLineProgress(exercises, savedCodeTrace));
     setHintIndex(0);
     setAnswerVisible(true);
     setRevealSeconds(ANSWER_REVEAL_SECONDS);
@@ -1478,7 +1478,6 @@ export default function CodeTracePlayer({
   const changeMode = (nextMode) => {
     hasLocalSessionInteractionRef.current = true;
     setMode(nextMode);
-    setVisibleLines(1);
     setAnswerVisible(true);
     setRevealSeconds(ANSWER_REVEAL_SECONDS);
     setHintIndex(0);
@@ -1606,6 +1605,7 @@ export default function CodeTracePlayer({
             bestAccuracy,
             lastExerciseId: currentExerciseId,
             lastMode: mode,
+            visibleLinesByExercise: getCodeTraceLineProgress(exercises, { visibleLinesByExercise }),
             updatedAt: serverTimestamp()
           },
           updatedAt: serverTimestamp()
@@ -1692,7 +1692,10 @@ export default function CodeTracePlayer({
   };
 
   const savePartialProgress = async () => {
-    if (!user || !unitId) return;
+    if (!user || !unitId) {
+      onClose?.();
+      return;
+    }
     setSaving(true);
     try {
       const progressRef = doc(db, 'users', user.uid, 'learning_progress', unitId);
@@ -1720,6 +1723,7 @@ export default function CodeTracePlayer({
           completedExerciseIds: currentExerciseIds.filter(id => completedIds.has(id)),
           exerciseAttempts: filteredAttempts,
           drafts: filteredDrafts,
+          visibleLinesByExercise: getCodeTraceLineProgress(exercises, { visibleLinesByExercise }),
           completedExerciseCount: currentCompletedCount,
           totalExerciseCount: exercises.length,
           crystalsEarnedTotal,
@@ -1731,6 +1735,9 @@ export default function CodeTracePlayer({
         updatedAt: serverTimestamp()
       }, { merge: true });
       onClose?.();
+    } catch (err) {
+      console.error(err);
+      setCompletionState({ error: '진행 상황을 저장하지 못했습니다. 잠시 후 다시 시도해주세요.' });
     } finally {
       setSaving(false);
     }
@@ -2214,7 +2221,7 @@ export default function CodeTracePlayer({
         }
       `}</style>
       <div style={{ maxWidth: 1220, margin: '0 auto' }}>
-        <button className="space-nav-link font-tech" onClick={onClose} style={{ marginBottom: '1rem' }}>
+        <button className="space-nav-link font-tech" onClick={savePartialProgress} disabled={saving} style={{ marginBottom: '1rem' }}>
           <ChevronLeft size={16} /> RETURN TO MISSION CONTROL
         </button>
 
@@ -2303,7 +2310,11 @@ export default function CodeTracePlayer({
               <h3 className="font-title" style={{ margin: 0, color: 'var(--planet-green)' }}>정답 코드</h3>
               <div style={{ display: 'flex', gap: '0.4rem' }}>
                 {mode === 'line' && (
-                  <button className="hud-btn secondary glass" onClick={() => setVisibleLines(v => Math.min(totalLines, v + 1))} style={{ padding: '0.45rem 0.7rem' }}>
+                  <button className="hud-btn secondary glass" disabled={visibleLines >= totalLines} onClick={() => {
+                    hasLocalSessionInteractionRef.current = true;
+                    setVisibleLinesByExercise(prev => ({ ...prev, [currentExerciseId]: Math.min(totalLines, visibleLines + 1) }));
+                    setAnswerVisible(true);
+                  }} style={{ padding: '0.45rem 0.7rem' }}>
                     다음 줄
                   </button>
                 )}

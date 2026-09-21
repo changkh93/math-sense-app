@@ -6,7 +6,11 @@ import { execFileSync } from 'node:child_process'
 import path from 'node:path'
 import { writeFile } from 'node:fs/promises'
 import { makeCoachPayload, parseError } from '../functions/studioErrorCoachPolicy.mjs'
+import { inspectBehavior, behaviorError } from '../functions/studioBehaviorCoach.mjs'
+import { behaviorFixture } from '../functions/studioBehaviorCoach.fixtures.mjs'
+import { renderStructure } from '../functions/studioCoachStructure.mjs'
 const projectId = process.argv[2]
+const behavior = process.argv[4] === '--behavior'
 if (!/^proj_[A-Za-z0-9_-]+$/.test(projectId || '') || process.argv[3] !== '--run-synthetic') {
   console.error('Usage: node scripts/check-studio-error-coach-live.mjs proj_ID --run-synthetic'); process.exit(2)
 }
@@ -48,14 +52,19 @@ try {
     ['spelling', 'score = 10\nprint(socre)', "NameError: name 'socre' is not defined", 2],
     ['missing-import', 'from ColabTurtlePlus.Turtle import', 'SyntaxError: invalid syntax', 1],
   ]
-  for (const [id, source, message, line] of fixtures) {
-    const input = makeCoachPayload(source, parseError(`  File "/tmp/studio/main.py", line ${line}\n${message}`))
+  const methodSource = ['class Scene:', '    def update(self):', '        self.chose_target()', ...Array(20).fill(''), '    def choose_target(self):', '        pass'].join('\n')
+  const inputs = behavior ? [
+    ...inspectBehavior(behaviorFixture).map(finding => [finding.ruleId, makeCoachPayload(behaviorFixture, behaviorError(finding))]),
+    ['method-typo', makeCoachPayload(methodSource, parseError('  File "/tmp/studio/main.py", line 3\nAttributeError: \'Scene\' object has no attribute \'chose_target\'. Did you mean: \'choose_target\'?'))],
+  ] : fixtures.map(([id, source, message, line]) => [id, makeCoachPayload(source, parseError(`  File "/tmp/studio/main.py", line ${line}\n${message}`))])
+  for (const [id, input] of inputs) {
+    if (!input) throw new Error('fixture-blocked')
     const context = { auth: { uid: 'synthetic-coach-test', token: { firebase: { sign_in_provider: 'password' } } } }
     const result = await handler(input, context).catch(error => {
       evidence.checks.push({ id, passed: false, response: lastResponse, failure: error.code || 'request-failed' }); throw new Error('synthetic-failed')
     })
     const repeated = await handler(input, context)
-    evidence.checks.push({ id, passed: true, response: lastResponse, advice: result.advice, cachedRepeat: repeated.cached === true })
+    evidence.checks.push({ id, passed: true, response: lastResponse, ...(behavior ? { transformedInput: renderStructure(input) } : {}), advice: result.advice, cachedRepeat: repeated.cached === true })
     stamp += 31000
   }
   apiKey = ''
@@ -63,5 +72,5 @@ try {
 } catch {
   evidence.passed = false; evidence.stoppedAt = phase; process.exitCode = 1
 }
-await writeFile('docs/collaboration/tasks/20260916-studio-private-coach/live-smoke.json', JSON.stringify(evidence, null, 2))
+await writeFile(`docs/collaboration/tasks/20260916-studio-private-coach/${behavior ? 'live-behavior-smoke' : 'live-smoke'}.json`, JSON.stringify(evidence, null, 2))
 console.log(JSON.stringify(evidence, null, 2))

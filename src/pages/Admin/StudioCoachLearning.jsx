@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { httpsCallable } from 'firebase/functions'
 import { functions } from '../../firebase'
-import { BASE_CARDS, TRANSITIONS } from '../../../functions/studioCoachLearningPolicy.mjs'
+import { BASE_CARDS, TRANSITIONS, reportAvailability } from '../../../functions/studioCoachLearningPolicy.mjs'
 import { renderStructure } from '../../../functions/studioCoachStructure.mjs'
 import './StudioCoachLearning.css'
 const stageNames={draft:'초안',tested:'진단기 검증',reviewed:'교사 검토 완료',shadow:'관찰 적용',limited:'약 10% 세션 적용',active:'전체 적용',retired:'회수'}
@@ -16,14 +16,20 @@ export default function StudioCoachLearning({call=api}) {
   const act=async data=>{if(busy)return;setBusy(true);setNotice('');try{await call(data);await load();setNotice('반영했습니다. 배포·회수는 코드 스튜디오를 새로고침한 뒤 새 오류부터 반영됩니다.')}catch(e){setNotice(e.message||'처리하지 못했습니다.')}finally{setBusy(false)}}
   const choose=ruleId=>{setDraft({ruleId,mode:'both',meaning:'',example:'',question:'',...BASE_CARDS[ruleId]});setReview(false)}
   const costs=report?.costs||[], input=costs.reduce((n,c)=>n+(c.inputTokens||0),0), output=costs.reduce((n,c)=>n+(c.outputTokens||0),0), requests=costs.reduce((n,c)=>n+(c.requests||0),0)
+  const availability=report ? reportAvailability(report) : null
   const validPrice=['input','output','maintenance','avoid','extra'].every(k=>prices[k]!==''&&Number.isFinite(Number(prices[k]))&&Number(prices[k])>=0)
   const paid=Number(prices.input)*input/1e6+Number(prices.output)*output/1e6
   const benefit=requests?paid/requests*Number(prices.avoid)-Number(prices.maintenance)-Number(prices.extra):null
   return <main className="coach-workbench"><h1>코드 도움 개선</h1><p>학생이 반복해서 막히는 부분을 찾고, 검토한 설명만 적용합니다. 이 화면은 AI를 추가 호출하지 않습니다.</p>
     <button disabled={busy} onClick={load}>보고서 새로고침</button>{notice&&<p role="status">{notice}</p>}
     {!report?<p>아직 보고서가 없습니다.</p>:<>
+      <section aria-label="기록 수집 상태"><h2>분석할 기록이 쌓이고 있나요?</h2>
+        {report.period&&<p>{report.period.from} ~ {report.period.through} · UTC 날짜 기준 14일</p>}
+        <p><strong>{availability.summary}</strong></p><p>{availability.reservations}</p><p>{availability.samples}</p>
+        <p>새로 수집하려면 아래 수집 설정의 안내·보관 정책을 확인하고, 학생이 스튜디오에서 선택적으로 참여해야 해요. 설정만 켜도 이전 오류나 모든 학생 코드가 수집되는 것은 아니에요.</p>
+      </section>
       <section><h2>최근 14일 · 개선 후보</h2><p>개선 참여를 선택하고 전송에 성공한 도움 기준입니다. 전체 학생 통계나 학습 성취 점수가 아닙니다. 중단·관찰 불가는 성공에 포함하지 않습니다.</p>{report.truncated&&<p>조회 한도에 도달했습니다. 아래 수치는 일부 기록 기준입니다.</p>}
-        {!report.groups.length?<p>누적된 관찰이 없습니다. 데이터를 만들기 위한 AI 호출은 하지 않습니다.</p>:<div className="coach-report-scroll"><table><thead><tr><th>유형 · 버전</th><th>관찰 / 비노출 일치</th><th>이해 어려움</th><th>오진 제보</th><th>수정 후 같은 오류</th><th>실행 완료</th><th>관찰 불가</th><th>AI 요청</th><th></th></tr></thead><tbody>{report.groups.map(g=><tr key={`${g.ruleId}-${g.cardVersion}-${g.mode}-${g.diagnosticVersion}-${g.runtimeVersion}`}><td>{g.ruleId}<small>{g.mode} · {g.cardVersion}{g.sampleWarning?' · 표본 부족':''}</small><small>{g.diagnosticVersion} · {g.runtimeVersion}</small><details><summary>질문·결과 자세히</summary><small>위치 질문 {g.location||0} · 예시 요청 {g.example||0} · 고쳐도 어려움 {g['still-stuck']||0}<br/>도움 됨 {g.helpful||0} · 완료와 도움 응답 모두 {g.completedAndHelpful||0}<br/>수정 없이 같은 오류 {g.sameWithoutEdit||0} · 다른 오류 {g['different-error']||0} · 그림/게임 종료 {g['surface-ended']||0}</small></details></td><td>{g.exposures||0} / {g.shadowMatches||0}</td><td>{g.meaning||0}</td><td>{g.incorrect||0}</td><td>{g.sameAfterEdit||0}</td><td>{g.completed||0}</td><td>{g.unknown||0}</td><td>{g.aiRequested||0}</td><td><button onClick={()=>choose(g.ruleId)}>설명 초안</button></td></tr>)}</tbody></table></div>}
+        {!report.groups.length?<p>보고 기간에 분석할 관찰이 없습니다. 오류 경향을 추정하거나 데이터를 만들기 위한 AI 호출은 하지 않습니다.</p>:<div className="coach-report-scroll"><table><thead><tr><th>유형 · 버전</th><th>관찰 / 비노출 일치</th><th>이해 어려움</th><th>오진 제보</th><th>수정 후 같은 오류</th><th>실행 완료</th><th>관찰 불가</th><th>AI 요청</th><th></th></tr></thead><tbody>{report.groups.map(g=><tr key={`${g.ruleId}-${g.cardVersion}-${g.mode}-${g.diagnosticVersion}-${g.runtimeVersion}`}><td>{g.ruleId}<small>{g.mode} · {g.cardVersion}{g.sampleWarning?' · 표본 부족':''}</small><small>{g.diagnosticVersion} · {g.runtimeVersion}</small><details><summary>질문·결과 자세히</summary><small>위치 질문 {g.location||0} · 예시 요청 {g.example||0} · 고쳐도 어려움 {g['still-stuck']||0}<br/>도움 됨 {g.helpful||0} · 완료와 도움 응답 모두 {g.completedAndHelpful||0}<br/>수정 없이 같은 오류 {g.sameWithoutEdit||0} · 다른 오류 {g['different-error']||0} · 그림/게임 종료 {g['surface-ended']||0}</small></details></td><td>{g.exposures||0} / {g.shadowMatches||0}</td><td>{g.meaning||0}</td><td>{g.incorrect||0}</td><td>{g.sameAfterEdit||0}</td><td>{g.completed||0}</td><td>{g.unknown||0}</td><td>{g.aiRequested||0}</td><td><button onClick={()=>choose(g.ruleId)}>설명 초안</button></td></tr>)}</tbody></table></div>}
         <p>검토 우선순위는 오진 제보, AI 추가 요청, 이해 어려움, 오류 반복 순서로 계산합니다. 제보 자체가 오진 확정은 아닙니다.</p>
       </section>
       <section><h2>이미 받은 AI 설명 재사용</h2><p>검토용 보관이 켜져 있고 학생이 참여를 선택한 요청만 표시됩니다. 원래 이름으로 복원하기 전 답변이며, 특정 학생의 코드를 설명 카드에 복사하지 마세요.</p>{!report.samples.length?<p>보관된 대표 사례가 없습니다.</p>:report.samples.map(s=><details key={s.id}><summary>{s.ruleId} · 변환된 대표 사례</summary><pre>{renderStructure(s.payload).snippet}</pre><p>{s.advice.explanation}</p><p>{s.advice.hint}</p><p>{s.advice.question}</p><p>{s.advice.check}</p><button onClick={()=>{choose(s.ruleId);setDraft(d=>({...d,meaning:s.advice.explanation,question:s.advice.question}))}}>설명·질문을 초안으로 가져오기</button><small>별명·줄 번호를 제거하고 일반적인 합성 예제로 편집해야 합니다.</small></details>)}</section>

@@ -61,17 +61,26 @@ function createLearningService({ db, HttpsError, now = Date.now }) {
     const uid = await identity(context,true), p = await POLICY;
     if (!data || typeof data.action !== 'string') fail('invalid-argument','작업이 필요합니다.');
     if (data.action === 'report') {
-      const cutoff = new Date(now()-14*DAY).toISOString().slice(0,10);
-      const [stats,cards,samples,cfg,usage] = await Promise.all([
-        db.collection('studioCoachLearningStats').where('day','>=',cutoff).limit(1000).get(),
+      const days = Array.from({length:14},(_,i)=>new Date(now()-(13-i)*DAY).toISOString().slice(0,10));
+      const cutoff = days[0], through = days.at(-1);
+      // Existing global daily counters only. No user hashes or fingerprints;
+      // a reservation is not proof of a successful AI reply or a learner error.
+      const reservations = Promise.all(days.map(async day => {
+        const row = (await db.doc(`studioCoachUsage/day-${day}`).get()).data();
+        const count = row?.count;
+        if (row && (!Number.isSafeInteger(count) || count < 0)) throw new Error('invalid-usage-count');
+        return {day,count:count || 0};
+      })).then(rows=>({available:true,total:rows.reduce((n,r)=>n+r.count,0),days:rows}),()=>({available:false,total:null,days:[]}));
+      const [stats,cards,samples,cfg,usage,requestReservations] = await Promise.all([
+        db.collection('studioCoachLearningStats').where('day','>=',cutoff).where('day','<=',through).limit(1000).get(),
         db.collection('studioCoachLearningCards').orderBy('createdAt','desc').limit(100).get(),
         db.collection('studioCoachLearningSamples').where('expiresAt','>',new Date(now())).limit(60).get(), config(),
-        db.collection('studioCoachLearningCosts').where('day','>=',cutoff).limit(500).get()
+        db.collection('studioCoachLearningCosts').where('day','>=',cutoff).where('day','<=',through).limit(500).get(), reservations
       ]);
       const groups = new Map();
       for (const doc of stats.docs) { const a = doc.data(), k = `${a.ruleId}:${a.cardVersion}:${a.mode}:${a.diagnosticVersion}:${a.runtimeVersion}`; const g = groups.get(k) || { ruleId:a.ruleId, cardVersion:a.cardVersion, mode:a.mode, diagnosticVersion:a.diagnosticVersion, runtimeVersion:a.runtimeVersion }; for (const [name,n] of Object.entries(a.counts)) g[name] = (g[name] || 0)+n; groups.set(k,g); }
       const costs = usage.docs.map(d=>d.data());
-      return { groups:p.rankGroups([...groups.values()]), cards:cards.docs.map(d=>d.data()), samples:samples.docs.map(d=>({ id:d.id,...d.data() })), config:{enabled:cfg.enabled===true,samplesEnabled:cfg.samplesEnabled===true}, costs, truncated:stats.size===1000 || cards.size===100 || samples.size===60 || usage.size===500, rules:p.RULES };
+      return { groups:p.rankGroups([...groups.values()]), cards:cards.docs.map(d=>d.data()), samples:samples.docs.map(d=>({ id:d.id,...d.data() })), config:{enabled:cfg.enabled===true,samplesEnabled:cfg.samplesEnabled===true}, costs, requestReservations, period:{from:cutoff,through,timeZone:'UTC'}, truncated:stats.size===1000 || cards.size===100 || samples.size===60 || usage.size===500, rules:p.RULES };
     }
     if (data.action === 'configure') {
       if (typeof data.enabled !== 'boolean' || typeof data.samplesEnabled !== 'boolean' || data.policyReviewed !== true) fail('invalid-argument','고지와 보관 정책 확인이 필요합니다.');

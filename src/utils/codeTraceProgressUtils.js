@@ -45,3 +45,22 @@ export const getCodeTraceResumeState = (exercises = [], codeTrace = {}) => {
     mode: codeTrace?.lastMode === 'line' ? 'line' : 'recall',
   }
 }
+
+// Match the editor's answer projection: comment-only lines are helpers, not trace lines.
+const traceLines = code => String(code || '').replace(/\r\n/g, '\n')
+  .split('\n').filter(line => !line.trimStart().startsWith('#'))
+
+export const getCodeTraceLineProgress = (exercises = [], codeTrace = {}) => {
+  return Object.fromEntries(exercises.flatMap(exercise => {
+    const id = getExerciseId(exercise)
+    if (!id) return []
+    const totalLines = Math.max(1, traceLines(exercise.answerCode).length)
+    const saved = codeTrace?.visibleLinesByExercise?.[id]
+    const draft = codeTrace?.drafts?.[id]
+    // Old records have no reveal count. Resume from the last nonempty draft line.
+    const fallback = typeof draft === 'string' && draft.trim()
+      ? traceLines(draft.trimEnd()).length : 1
+    const count = Number.isFinite(saved) && saved >= 1 ? Math.floor(saved) : fallback
+    return [[id, Math.min(totalLines, Math.max(1, count))]]
+  }))
+}

@@ -40,7 +40,7 @@ test('literal relationships survive without actual values or executable-code cla
 })
 test('value-sensitive errors and dynamic/string-interpolated code fail closed', () => {
   for (const type of ['ValueError', 'KeyError', 'IndexError', 'FileNotFoundError', 'ZeroDivisionError']) assert.equal(make('print(1)', error(type, 'private value')), null)
-  for (const code of ['eval(secret)', 'getattr(t, name)', 'print(f"hi {student}")', 'print(r"path")', 'print(💥)']) assert.equal(make(code, error('NameError', "name 'secret' is not defined")), null)
+  for (const code of ['eval(secret)', 'getattr(t, name)', 'print(f"hi {student}")', 'print(💥)']) assert.equal(make(code, error('NameError', "name 'secret' is not defined")), null)
 })
 test('window scans strings above it and ambiguous notebook frames block requests', () => {
   const source = 'a="""\n' + 'private@example.com\n'.repeat(15) + '"""\nprint(missing)'
@@ -66,4 +66,47 @@ test('alias restoration is local-only and single-pass, including alias-shaped or
   assert.equal(restoreCoachNames('variable_1, variable_2, variable_3', aliases), 'variable_2, 철수, missing')
   assert.ok(!JSON.stringify(p).includes('철수'))
   assert.equal(Object.keys(p).includes('aliases'), false)
+})
+
+
+test('HUD f-strings do not block unrelated method errors, and no contents leave the browser', () => {
+  const source = [
+    'class Game:',
+    '    def draw(self):',
+    '        print(f"PRIVATE_SCORE {self.score}")',
+    '        print(fr"PRIVATE_PATH {self.level}")',
+    '        print(r"PRIVATE_RAW")',
+    '    def update(self):',
+    '        self.chooes_new_wanted()',
+    '    def choose_new_wanted(self):',
+    '        pass',
+  ].join('\n')
+  const p = make(source, error('AttributeError', "'Game' object has no attribute 'chooes_new_wanted'. Did you mean: 'choose_new_wanted'?", 7))
+  assert.ok(p)
+  assert.equal(p.finding, 'attribute-spelling')
+  assert.deepEqual(validateStructurePayload(p), p)
+  const outbound = JSON.stringify([p, renderStructure(p)])
+  for (const secret of ['PRIVATE_SCORE', 'PRIVATE_PATH', 'PRIVATE_RAW', 'self.score', 'self.level', 'chooes_new_wanted']) assert.ok(!outbound.includes(secret), secret)
+  assert.equal(p.rows.length, 9)
+})
+
+test('formatted strings retain line offsets and mask escapes, formatting and double braces', () => {
+  const source = 'text = f"""private\n{{literal}} {value!r:>{width}}\nprivate_end"""\nprint(missing)'
+  const p = make(source, error('NameError', "name 'missing' is not defined", 4))
+  assert.ok(p)
+  assert.equal(p.rows.length, 4)
+  assert.match(renderStructure(p).snippet, /4: print\(variable_1\)/)
+  assert.ok(!JSON.stringify(p).includes('private'))
+})
+
+test('unsupported formatted expressions have specific reasons and never expose fragments', () => {
+  for (const literal of [`f"{record['SECRET']}"`, 'f"{value # SECRET}"', 'f"unclosed {value"', 'f"stray } SECRET"', 'f"\\{value}"']) {
+    const diagnostic = {}
+    const p = makeCoachPayload(`text = ${literal}\nprint(missing)`, error('NameError', "name 'missing' is not defined", 2), 'file', {}, diagnostic)
+    assert.equal(p, null, literal)
+    assert.equal(diagnostic.reason, 'string-syntax')
+  }
+  const diagnostic = {}
+  assert.equal(makeCoachPayload('print(f"{missing}")', error('NameError', "name 'missing' is not defined"), 'file', {}, diagnostic), null)
+  assert.equal(diagnostic.reason, 'formatted-error-line')
 })
