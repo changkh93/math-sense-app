@@ -100,6 +100,24 @@
             "value": "no-cache"
           }
         ]
+      },
+      {
+        "source": "/math-application/**",
+        "headers": [
+          {
+            "key": "Cache-Control",
+            "value": "no-cache, no-store, must-revalidate"
+          }
+        ]
+      },
+      {
+        "source": "/marketing-analytics.js",
+        "headers": [
+          {
+            "key": "Cache-Control",
+            "value": "no-cache, no-store, must-revalidate"
+          }
+        ]
       }
     ],
     "rewrites": [

@@ -120,7 +120,7 @@ ${cta}<section><span class="eyebrow">책에서 화면으로, 다시 내 생각�
     )
     .join(
       "",
-    )}</div><p><a class="text-link" href="${root}">학습 노트 ${articles.length}편 모두 보기 →</a></p></section>${faqHtml(courseFaq)}<section id="apply" class="apply-section"><span class="eyebrow">7일 무료체험</span><h2>우리 아이에게 맞는 공부인지,<br>먼저 경험해 보세요.</h2><p>신청서에는 ‘수학과 고전읽기’가 기본 선택되어 있습니다. 상담으로 참여 방법과 시작할 수학 영역을 안내합니다. 문의란에 현재 읽는 책이나 독서에 관한 궁금한 점, 곱셈·나눗셈·분수·소수·비와 비례식 중 관심 영역을 남겨주세요.</p><p><strong>체험 후 자동으로 유료 전환되거나 결제되지 않습니다.</strong></p><iframe class="math-application-frame" src="/math-application/index.html" title="수학과 고전읽기 7일 무료체험 신청서" loading="lazy"></iframe><p class="small"><a href="/trial#trial-form">신청서가 표시되지 않으면 전체 신청 페이지 열기</a> · <a href="/privacy">개인정보 처리방침</a></p><noscript><p>신청서 이용에는 JavaScript가 필요합니다. <a href="https://pf.kakao.com/_xfxkGDn">카카오에서 체험 문의하기</a></p></noscript></section>`,
+    )}</div><p><a class="text-link" href="${root}">학습 노트 ${articles.length}편 모두 보기 →</a></p></section>${faqHtml(courseFaq)}<section id="apply" class="apply-section"><span class="eyebrow">7일 무료체험</span><h2>우리 아이에게 맞는 공부인지,<br>먼저 경험해 보세요.</h2><p>신청서에는 ‘수학과 고전읽기’가 기본 선택되어 있습니다. 상담으로 참여 방법과 시작할 수학 영역을 안내합니다. 문의란에 현재 읽는 책이나 독서에 관한 궁금한 점, 곱셈·나눗셈·분수·소수·비와 비례식 중 관심 영역을 남겨주세요.</p><p><strong>체험 후 자동으로 유료 전환되거나 결제되지 않습니다.</strong></p><iframe class="math-application-frame" src="/math-application/index.html?v=20260921" title="수학과 고전읽기 7일 무료체험 신청서" loading="lazy"></iframe><p class="small"><a href="/trial#trial-form">신청서가 표시되지 않으면 전체 신청 페이지 열기</a> · <a href="/privacy">개인정보 처리방침</a></p><noscript><p>신청서 이용에는 JavaScript가 필요합니다. <a href="https://pf.kakao.com/_xfxkGDn">카카오에서 체험 문의하기</a></p></noscript></section>`,
   [
     {
       "@type": "Course",
