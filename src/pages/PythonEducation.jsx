@@ -99,6 +99,9 @@ function PythonTrialForm() {
     message: '',
   })
   const [agreed, setAgreed] = useState(false)
+  const [measurementConsent, setMeasurementConsent] = useState(false)
+  const [oppref, setOppref] = useState('')
+  useEffect(() => { setOppref(new URLSearchParams(window.location.search).get('oppref') || '') }, [])
   const [state, setState] = useState('idle')
   const [error, setError] = useState('')
   const locked = useRef(false)
@@ -142,6 +145,7 @@ function PythonTrialForm() {
         ...form,
         type: 'trial',
         selectedCourse: '파이썬 코딩',
+        ...(measurementConsent && oppref ? { openaiMeasurement: { consent: true, oppref } } : {}),
         message: `[파이썬 전용 소개 페이지] ${pythonAttribution(window.location.search)}\n${form.message}`.slice(0, 1000),
         referralToken: referral?.valid ? token : '',
       })
@@ -271,6 +275,10 @@ function PythonTrialForm() {
           </Link>
         </span>
       </label>
+      {oppref && <label className="pe-consent">
+        <input type="checkbox" checked={measurementConsent} onChange={(e) => setMeasurementConsent(e.target.checked)} />
+        <span>(선택) OpenAI 광고 성과 측정에 동의합니다. 신청 완료 여부·시각·광고 클릭 식별자를 OpenAI에 전송합니다. 이름·전화번호·학생 정보는 보내지 않으며, 동의하지 않아도 신청할 수 있습니다.</span>
+      </label>}
       {error && (
         <p className="pe-form-error" role="alert">
           {error}

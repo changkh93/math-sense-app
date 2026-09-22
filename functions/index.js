@@ -4567,7 +4567,7 @@ const crewGuestTrial = require("./crewGuestTrial.cjs")({
 exports.getCrewGuestTrialOffer = costOptimizedDataFunctions.https.onCall(crewGuestTrial.preview);
 exports.submitCrewGuestTrial = costOptimizedDataFunctions.https.onCall(crewGuestTrial.submit);
 
-exports.submitPublicApplication = regionalFunctions.https.onCall(async (data) => {
+exports.submitPublicApplication = regionalFunctions.runWith({ secrets: ["OPENAI_ADS_CONVERSION_KEY"] }).https.onCall(async (data) => {
   const type = cleanText(data?.type, 30);
   if (!["trial", "consultation"].includes(type)) {
     throw new functions.https.HttpsError("invalid-argument", "신청 종류가 올바르지 않습니다.");
@@ -4653,6 +4653,13 @@ exports.submitPublicApplication = regionalFunctions.https.onCall(async (data) =>
     });
   }
   await batch.commit();
+  // Analytics failure must not undo or obscure a successfully saved application.
+  const { buildPythonLead, sendPythonLead } = require("./openaiAdsConversion.cjs");
+  const conversion = buildPythonLead(data);
+  if (conversion) {
+    const status = await sendPythonLead(conversion, process.env.OPENAI_ADS_CONVERSION_KEY, fetch);
+    console.info("OpenAI Python conversion delivery", { status });
+  }
   return { success: true, id: ref.id };
 });
 

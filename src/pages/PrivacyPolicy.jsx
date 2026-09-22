@@ -59,7 +59,7 @@ const PrivacyPolicy = () => {
             <li>방 개설자가 허용한 스터디 크루 게스트 체험 제공</li>
             <li>스터디 크루 이벤트 인원 산정, 중복·비정상 게스트 탐지 및 이의 검토</li>
           </ul>
-          <p style={{ color: '#ff4d4d', fontWeight: 'bold' }}>※ 당사는 어떠한 경우에도 사용자의 데이터를 제3자에게 판매하거나 광고용으로 활용하지 않습니다.</p>
+          <p style={{ color: '#ff4d4d', fontWeight: 'bold' }}>※ 당사는 사용자의 데이터를 판매하지 않습니다. 선택 동의한 광고 성과 측정은 아래 안내한 범위로만 처리합니다.</p>
         </section>
 
         <section style={{ marginBottom: '2.5rem' }}>
@@ -69,6 +69,13 @@ const PrivacyPolicy = () => {
             <li>게스트는 정식 학습자 프로필, 광석, 출석 또는 랭킹 기록을 생성하지 않습니다.</li>
             <li>게스트 감사 정보와 IP·설치 식별자 해시는 마지막 이용일부터 최대 30일간 보관한 뒤 자동 파기하며, 운영자가 계정을 삭제하면 즉시 이벤트 인원에서 제외됩니다.</li>
           </ul>
+        </section>
+
+        <section id="openai-ads-measurement" style={{ marginBottom: '2.5rem' }}>
+          <h2>선택적 OpenAI 광고 성과 측정</h2>
+          <p>OpenAI 광고를 통해 파이썬 체험 페이지에 방문한 보호자가 신청 화면에서 별도로 선택 동의하면, 신청 저장 후 MetaSense 서버가 신청 완료 이벤트·시각·임의 이벤트 식별자·광고 클릭 식별자(oppref)·파이썬 페이지 주소를 OpenAI에 전송합니다. 광고 클릭이 신청으로 이어졌는지 확인하기 위한 처리입니다.</p>
+          <p>이름·이메일·전화번호·학생 정보·학습 기록·방문자 IP는 전환 요청에 포함하지 않습니다. 개인정보 자동 매칭 Pixel은 설치하지 않으며 이벤트는 개인화 사용 제외(opt_out)로 전송합니다. 광고 클릭 식별자는 URL에서 읽고 별도 쿠키나 브라우저 저장소에 보관하지 않습니다.</p>
+          <p>동의하지 않아도 무료체험을 신청할 수 있습니다. 신청 전에 체크를 해제할 수 있으며, 이 선택은 이번 신청에만 적용됩니다. OpenAI의 이벤트 처리와 보관은 <a href="https://openai.com/policies/conversion-terms/" target="_blank" rel="noopener noreferrer">전환 약관</a> 및 해당 개인정보 정책에 따릅니다.</p>
         </section>
 
         <section aria-labelledby="studio-ai-privacy" style={{ marginBottom: '2.5rem', padding: '1.5rem', border: '1px solid #35575b', borderRadius: 12 }}>
