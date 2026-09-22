@@ -15,6 +15,7 @@ import { calculateGrowthUpdates } from '../../utils/rankingUtils';
 import { recordCrystalTransaction } from '../../utils/crystalLedger';
 import { applyCrystalRewardMultiplier } from '../../utils/holidayUtils';
 import { getCodeTraceLineProgress, getCodeTraceResumeState, isCodeTraceProgressComplete } from '../../utils/codeTraceProgressUtils';
+import { alignCodeTraceLineKeys } from '../../utils/codeTraceDiffUtils';
 import { studioCompletion } from '../PythonWorld/studioCompletion';
 import soundManager from '../../utils/SoundManager';
 
@@ -360,34 +361,50 @@ function evaluateCode(answerCode, studentCode) {
   const targetStudent = normalizePythonCodeForStructureCompare(student);
   const targetAnswerLines = targetAnswer.split('\n');
   const targetStudentLines = targetStudent.split('\n');
-  const targetIndexes = targetAnswerLines.map((_, index) => index);
-  const totalChars = Math.max(targetAnswer.length, targetStudent.length, 1);
-
+  const alignedPairs = alignCodeTraceLineKeys(targetAnswerLines, targetStudentLines);
   let sameChars = 0;
-  for (let i = 0; i < Math.min(targetAnswer.length, targetStudent.length); i += 1) {
-    if (targetAnswer[i] === targetStudent[i]) sameChars += 1;
-  }
-
-  let correctLines = 0;
-  targetIndexes.forEach((index) => {
-    if ((targetAnswerLines[index] || '') === (targetStudentLines[index] || '')) {
-      correctLines += 1;
+  let comparedChars = 0;
+  alignedPairs.forEach(({ answerIndex, studentIndex }, pairIndex) => {
+    const answerLine = answerIndex >= 0 ? targetAnswerLines[answerIndex] : '';
+    const studentLine = studentIndex >= 0 ? targetStudentLines[studentIndex] : '';
+    comparedChars += Math.max(answerLine.length, studentLine.length);
+    for (let charIndex = 0; charIndex < Math.min(answerLine.length, studentLine.length); charIndex += 1) {
+      if (answerLine[charIndex] === studentLine[charIndex]) sameChars += 1;
+    }
+    if (pairIndex < alignedPairs.length - 1) {
+      comparedChars += 1;
+      if (answerIndex >= 0 && studentIndex >= 0) sameChars += 1;
     }
   });
+  const totalChars = Math.max(comparedChars, 1);
+
+  const correctLines = alignedPairs.filter(({ answerIndex, studentIndex }) => (
+    answerIndex >= 0
+    && studentIndex >= 0
+    && targetAnswerLines[answerIndex] === targetStudentLines[studentIndex]
+  )).length;
 
   const issues = [];
-  targetIndexes.forEach((index) => {
-    const answerLine = answerLines[index] || '';
-    const studentLine = studentLines[index] || '';
-    if (!studentLine && answerLine) {
+  alignedPairs.forEach(({ answerIndex, studentIndex }) => {
+    const hasAnswerLine = answerIndex >= 0;
+    const hasStudentLine = studentIndex >= 0;
+    const answerLine = hasAnswerLine ? answerLines[answerIndex] || '' : '';
+    const studentLine = hasStudentLine ? studentLines[studentIndex] || '' : '';
+    const originalIndex = hasStudentLine
+      ? studentEntries[studentIndex]?.originalIndex ?? studentIndex
+      : answerEntries[answerIndex]?.originalIndex ?? answerIndex;
+    const lineNumber = originalIndex + 1;
+
+    if (hasAnswerLine && !hasStudentLine && answerLine) {
       const hasString = mapStringLiterals(answerLine) !== answerLine;
       issues.push(hasString
-        ? `${index + 1}번째 줄의 코드 구조를 입력해 보세요. 긴 문자열은 아래 도우미나 Tab으로 채울 수 있습니다.`
-        : `${index + 1}번째 줄이 비어 있습니다.`);
+        ? `${lineNumber}번째 줄의 코드 구조를 입력해 보세요. 긴 문자열은 아래 도우미나 Tab으로 채울 수 있습니다.`
+        : `${lineNumber}번째 줄이 비어 있습니다.`);
       return;
     }
+    if (!hasAnswerLine || !hasStudentLine) return;
     if (answerLine.trim().endsWith(':') && !studentLine.trim().endsWith(':')) {
-      issues.push(`${index + 1}번째 줄 끝의 콜론(:)을 확인하세요.`);
+      issues.push(`${lineNumber}번째 줄 끝의 콜론(:)을 확인하세요.`);
     }
     // 들여쓰기 안내는 깊이 단계(rank)가 실제로 어긋났을 때만.
     // 2칸/4칸/탭은 같은 깊이 단계로 정규화되므로 단계만 같으면 안내하지 않는다.
@@ -397,24 +414,24 @@ function evaluateCode(answerCode, studentCode) {
       && normalizePythonLineForCompare(answerLine).replace(/^\s*/, '') === normalizePythonLineForCompare(studentLine).replace(/^\s*/, '')
       && answerIndentRank !== studentIndentRank;
     if (sameCodeDifferentDepth) {
-      issues.push(`${index + 1}번째 줄의 들여쓰기 단계(들어가는 깊이)를 확인하세요. 탭, 스페이스 2칸, 스페이스 4칸은 같은 단계로 인정됩니다.`);
+      issues.push(`${lineNumber}번째 줄의 들여쓰기 단계(들어가는 깊이)를 확인하세요. 탭, 스페이스 2칸, 스페이스 4칸은 같은 단계로 인정됩니다.`);
     }
     if (hasOnlyQuotedWhitespaceDifference(answerLine, studentLine)) {
-      issues.push(`${index + 1}번째 줄의 문자열 내용은 자동 채우기 대상입니다. 따옴표 위치와 코드 구조를 먼저 확인하세요.`);
+      issues.push(`${lineNumber}번째 줄의 문자열 내용은 자동 채우기 대상입니다. 따옴표 위치와 코드 구조를 먼저 확인하세요.`);
     }
     if (countChar(studentLine, '(') !== countChar(studentLine, ')')) {
-      issues.push(`${index + 1}번째 줄의 괄호 짝을 확인하세요.`);
+      issues.push(`${lineNumber}번째 줄의 괄호 짝을 확인하세요.`);
     }
     if (countChar(studentLine, '"') % 2 !== 0 || countChar(studentLine, "'") % 2 !== 0) {
-      issues.push(`${index + 1}번째 줄의 따옴표 짝을 확인하세요.`);
+      issues.push(`${lineNumber}번째 줄의 따옴표 짝을 확인하세요.`);
     }
   });
 
   return {
-    perfect: correctLines === targetIndexes.length && targetIndexes.length > 0,
+    perfect: correctLines === targetAnswerLines.length && alignedPairs.length === targetAnswerLines.length && targetAnswerLines.length > 0,
     accuracy: Math.max(0, Math.round((sameChars / totalChars) * 100)),
     correctLines,
-    totalLines: targetIndexes.length,
+    totalLines: targetAnswerLines.length,
     answerLines,
     studentLines,
     issues: issues.length ? issues.slice(0, 5) : ['특별한 문법 오류는 감지되지 않았습니다. 다른 글자나 공백을 정답 코드와 비교해 보세요.']
@@ -467,9 +484,8 @@ function classifyLineIssue(answerLine = '', studentLine = '', answerIndentRanks 
   if (answerLine === studentLine) return null;
 
   const answerTrim = answerLine.trim();
-  const answerNormalized = normalizePythonLineForCompare(answerLine, answerIndentRanks);
-  const studentNormalized = normalizePythonLineForCompare(studentLine, studentIndentRanks);
-  const acceptedByScoring = answerNormalized === studentNormalized;
+  const acceptedByScoring = normalizePythonLineForStructureCompare(answerLine, answerIndentRanks)
+    === normalizePythonLineForStructureCompare(studentLine, studentIndentRanks);
 
   // 채점 통과(깊이 단계·토큰 기준)하는 줄은 diff에도 표시하지 않는다.
   // "통과하는데 틀렸다고 표시" 모순(2칸/4칸, 연산자 양옆 공백 등)을 제거.
@@ -618,46 +634,13 @@ function getLineIssueMessage(issue) {
   return `${lineLabel}: ${shortenCode(issue.studentLine)} 부분을 정답 ${shortenCode(issue.answerLine)}와 비교해 보세요.`;
 }
 
-// 정답 줄과 학생 줄을 줄-수준 LCS로 최적 정렬한다.
-// 줄 하나가 빠지거나 추가되어도 그 이후 줄들이 1:1로 잘못 짝지어지지 않도록,
-// 정규화된 줄 키(깊이 단계·토큰 기반)로 공통 부분열을 찾아 정렬 결과를 반환한다.
+// 정답 줄과 학생 줄을 줄 단위 편집 거리로 최적 정렬한다.
+// 수정된 한 줄은 '누락+추가'가 아니라 하나의 수정으로 묶고,
+// 줄 하나가 실제로 빠지거나 추가된 경우에는 뒤의 일치 줄로 다시 동기화한다.
 function alignLines(answerLines = [], studentLines = [], answerIndentRanks = null, studentIndentRanks = null) {
-  const answerKeys = answerLines.map(line => normalizePythonLineForCompare(line, answerIndentRanks));
-  const studentKeys = studentLines.map(line => normalizePythonLineForCompare(line, studentIndentRanks));
-  const aLen = answerLines.length;
-  const sLen = studentLines.length;
-
-  // 매칭 키가 같으면 "같은 줄"로 취급해 정렬의 골격을 잡는다.
-  const dp = Array.from({ length: aLen + 1 }, () => Array(sLen + 1).fill(0));
-  for (let i = aLen - 1; i >= 0; i -= 1) {
-    for (let j = sLen - 1; j >= 0; j -= 1) {
-      dp[i][j] = answerKeys[i] === studentKeys[j]
-        ? dp[i + 1][j + 1] + 1
-        : Math.max(dp[i + 1][j], dp[i][j + 1]);
-    }
-  }
-
-  const pairs = [];
-  let i = 0;
-  let j = 0;
-  while (i < aLen && j < sLen) {
-    if (answerKeys[i] === studentKeys[j]) {
-      pairs.push({ answerIndex: i, studentIndex: j });
-      i += 1;
-      j += 1;
-    } else if (dp[i + 1][j] >= dp[i][j + 1]) {
-      // 학생에게 없는 정답 줄(빠진 줄)
-      pairs.push({ answerIndex: i, studentIndex: -1 });
-      i += 1;
-    } else {
-      // 정답에 없는 학생 줄(추가된 줄)
-      pairs.push({ answerIndex: -1, studentIndex: j });
-      j += 1;
-    }
-  }
-  while (i < aLen) { pairs.push({ answerIndex: i, studentIndex: -1 }); i += 1; }
-  while (j < sLen) { pairs.push({ answerIndex: -1, studentIndex: j }); j += 1; }
-  return pairs;
+  const answerKeys = answerLines.map(line => normalizePythonLineForStructureCompare(line, answerIndentRanks));
+  const studentKeys = studentLines.map(line => normalizePythonLineForStructureCompare(line, studentIndentRanks));
+  return alignCodeTraceLineKeys(answerKeys, studentKeys);
 }
 
 function analyzeCodeDiff(answerCode = '', studentCode = '') {
