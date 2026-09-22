@@ -338,7 +338,7 @@ export default function PythonEducation() {
         <div className="pe-hero-copy">
           <div className="pe-eyebrow">
             <span />
-            초등 3학년부터 · 온라인 파이썬 자율 학습
+            초등 4학년~중학교 2학년 · 온라인 파이썬 학습
           </div>
           <h1>
             게임을 좋아하는 아이,
@@ -347,7 +347,7 @@ export default function PythonEducation() {
           </h1>
           <p>
             처음이라면 그림을 움직이는 작은 코드부터.
-            <br />기초를 익힌 뒤 게임·데이터 프로젝트로 이어집니다.
+            <br />게임을 직접 만들며 배우고, 파이썬 심화와 수학 알고리즘까지 이어집니다.
             <br />설치 없이 실행하고, 막히면 쉬운 설명과 AI 힌트로 다시 도전합니다.
           </p>
           <div className="pe-hero-actions">
@@ -693,7 +693,7 @@ export default function PythonEducation() {
           <div className="pe-faq">
             <details><summary>신청 후 언제 연락받고, 학습 질문은 어떻게 확인하나요?</summary><p>체험 신청 후 1일 이내에 시작 안내를 드립니다. 이는 체험 신청의 첫 연락 기준이며 모든 과제 피드백의 응답 시간을 뜻하지 않습니다. 학습 중 질문 위치와 피드백 확인 방법은 시작 안내에서 확인합니다.</p></details>
             <details><summary>체험 기간과 수강료는 어떻게 되나요?</summary><p>기본 체험은7일 무료이며 정규 수강료는 월15만 원입니다. 신청 후1일 이내 연락드립니다. 체험이 끝나도 자동 결제되지 않습니다.</p></details>
-            <details><summary>몇 학년부터, 어떤 방식으로 배우나요?</summary><p>초등 3학년부터 참여할 수 있는 자율 학습 과정입니다. 정해진 시간의 실시간 강의가 아니라, 학습하고 과제를 제출하며 선생님의 피드백을 받는 방식입니다.</p></details>
+            <details><summary>몇 학년부터, 어떤 방식으로 배우나요?</summary><p>초등 4학년부터 중학교 2학년까지를 대상으로 하는 과정입니다. 정해진 시간의 실시간 강의가 아니라, 학습하고 과제를 제출하며 선생님의 피드백을 받는 방식입니다.</p></details>
             <details><summary>코딩이 처음인데 게임부터 만드나요?</summary><p>처음 파이썬의 기초 활동부터 시작합니다. 게임 프로젝트는 기초 이후 단계이며, 현재 경험과 이해 정도를 확인해 시작 지점을 안내합니다.</p></details>
             <details><summary>코딩을 모르는 부모도 아이를 도울 수 있나요?</summary><p>부모님이 코드를 대신 고쳐주실 필요는 없습니다. 아이는 코드 스튜디오에서 오류 메시지와 쉬운 기본 설명을 읽고, 필요하면 AI 힌트를 요청해 직접 수정하고 다시 실행합니다. 학부모 계정에서는 연결된 자녀의 학습 활동과 공개된 과제 피드백을 함께 살펴보실 수 있습니다.</p></details>
             <details><summary>AI가 대신 풀어주면 아이가 생각할 기회가 줄지 않나요?</summary><p>오류가 나면 원래 오류 메시지부터 보여줍니다. 기본 설명과 AI 힌트는 고칠 곳과 확인할 방법을 안내하고, 코드를 수정하고 실행하는 일은 아이가 직접 합니다. AI 설명도 실행 결과로 확인하며, 제출한 과제는 선생님이 확인한 피드백으로 이어집니다.</p></details>
@@ -739,7 +739,7 @@ export default function PythonEducation() {
         </details>
       </div>
       <footer className="pe-footer pe-wrap">
-        <p><a href="/math/">초등수학 과정</a> · <a href="/math/books/">수학감각 교재 소개</a></p>
+        <p><a href="/math/">수학과 고전읽기 과정</a> · <a href="/math/books/">수학감각 교재 소개</a></p>
         <Link className="pe-brand" to="/">
           METASENSE <span>PYTHON</span>
         </Link>

@@ -8,6 +8,6 @@ export function trackPython(event, label = '') {
 }
 export function pythonAttribution(search = '') {
   const params = new URLSearchParams(search);
-  const allowed = { utm_source: ['naver', 'google', 'instagram', 'youtube', 'kakao', 'clip'], utm_medium: ['organic', 'social', 'video', 'cpc'], utm_campaign: ['python_trial'] };
+  const allowed = { utm_source: ['naver', 'google', 'instagram', 'youtube', 'kakao', 'clip', 'chatgpt'], utm_medium: ['organic', 'social', 'video', 'cpc', 'paid'], utm_campaign: ['python_trial', 'python_parent_20260929'] };
   return Object.entries(allowed).flatMap(([key, values]) => values.includes(params.get(key)) ? [`${key}=${params.get(key)}`] : []).join('&');
 }
