@@ -28,11 +28,14 @@ assert.doesNotMatch(
   'persisted learning coordinates must not override the Multi-Verse landing',
 )
 
-const loggedOutBranch = source.slice(source.indexOf('// Login Screen'), source.indexOf('if (hasAccountDataIssue)'))
+const loggedOutBranch = source.slice(source.indexOf('// Public education homepage'), source.indexOf('if (hasAccountDataIssue)'))
 assert.match(loggedOutBranch, /if \(!user\)/, 'public root chrome must be gated by the logged-out branch')
-assert.match(loggedOutBranch, /<PublicHomeIntro \/>/, 'logged-out root must retain the public introduction')
+assert.match(loggedOutBranch, /<PublicHomeIntro onLogin=\{handleLogin\} \/>/, 'logged-out root must retain the public introduction')
 assert.match(loggedOutBranch, /<Footer \/>/, 'logged-out root must retain the public footer')
 assert.doesNotMatch(appSource, /<PublicHomeIntro \/>/, 'the public introduction must not render beside the authenticated root app')
+assert.doesNotMatch(source, /isLoading && !user[^\n]*PublicHomeIntro/, 'auth bootstrap must not render the logged-out homepage')
+assert.match(source, /if \(isLoading\) \{\s*return <AuthBootstrapScreen \/>/, 'auth bootstrap must render a neutral loading screen')
+assert.match(appSource, /if \(pathname === '\/'\) return <AuthBootstrapScreen \/>/, 'the lazy root fallback must not reveal the logged-out homepage')
 assert.match(appSource, /<Route path="\/" element=\{null\} \/><Route path="\*" element=\{<Footer \/>\} \/>/, 'the global footer must stay off the authenticated root route')
 
 console.log('Space landing contract checks passed.')

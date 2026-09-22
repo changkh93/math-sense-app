@@ -1,7 +1,7 @@
 import PublicSeo from './components/PublicSeo'
 import { lazy, Suspense, useEffect } from 'react'
 import { Navigate, Routes, Route, useLocation } from 'react-router-dom'
-import PublicHomeIntro from './components/PublicHomeIntro'
+import AuthBootstrapScreen from './components/AuthBootstrapScreen'
 import { createRouteModule } from './utils/preloadableRoute'
 import './App.css'
 import Footer from './components/common/Footer'
@@ -114,7 +114,7 @@ const AlgorithmConstellationDevHub = import.meta.env.DEV
 
 function RouteFallback() {
   const { pathname } = useLocation()
-  if (pathname === '/') return <><PublicHomeIntro /><Footer /></>
+  if (pathname === '/') return <AuthBootstrapScreen />
   return (
     <div
       role="status"

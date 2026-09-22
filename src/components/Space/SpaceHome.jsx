@@ -98,6 +98,7 @@ import { isWesternClassicCluster, filterWesternClassicRegions } from '../../cons
 import { isCourseExplorerCluster } from './coursePlanetCatalog'
 import PublicHomeIntro from '../PublicHomeIntro'
 import PublicHomeLoginDialog from '../PublicHomeLoginDialog'
+import AuthBootstrapScreen from '../AuthBootstrapScreen'
 import Footer from '../common/Footer'
 
 const ASSIGNMENT_PENALTY_SWEEP_STORAGE_PREFIX = 'metasense.assignmentPenaltySweep.v1'
@@ -3590,31 +3591,8 @@ function SpaceHome() {
   // Firestore request cannot strand the page on a full-screen loader.
   const isLoading = authLoading || isUserDataPending
 
-  if (isLoading && !user) return <><PublicHomeIntro /><Footer /></>
-
   if (isLoading) {
-    return (
-      <div className="space-bg">
-        <StarField count={150} />
-        <div style={{ 
-          height: '100vh', 
-          display: 'flex', 
-          alignItems: 'center', 
-          justifyContent: 'center',
-          color: 'var(--crystal-cyan)',
-          fontSize: '1.5rem',
-          fontWeight: 700
-        }}>
-          <Motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 0.5, repeat: Infinity, repeatType: "reverse" }}
-          >
-            🚀 워프 엔진 가동 중...
-          </Motion.div>
-        </div>
-      </div>
-    )
+    return <AuthBootstrapScreen />
   }
 
   // Public education homepage; existing authentication handlers are unchanged.

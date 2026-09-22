@@ -15,6 +15,8 @@ for (const [path, meta] of Object.entries(publicSeo)) {
     const head = html.split('</head>')[0];
     assert(head.includes('<link rel="stylesheet" href="/home-assets/home.css">'), 'Homepage CSS must block the first paint from the persistent document head');
     assert.equal((html.match(/href="\/home-assets\/home.css"/g) || []).length, 1, 'Homepage CSS must not be remounted inside the React root');
+    assert(head.includes('metasense_auth_session_hint'), 'Homepage must hide its public prerender when a returning auth session is expected');
+    assert(html.includes('<div data-public-prerender>'), 'Homepage prerender must be independently hideable during auth restoration');
   }
   titles.add(meta.title);
 }

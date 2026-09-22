@@ -10,6 +10,23 @@ import {
 
 const AUTH_BOOTSTRAP_TIMEOUT_MS = 8000;
 const USER_DOCUMENT_TIMEOUT_MS = 10000;
+const AUTH_SESSION_HINT_KEY = 'metasense_auth_session_hint';
+
+const setAuthSessionHint = (hasSession) => {
+  if (typeof window === 'undefined') return;
+  try {
+    if (hasSession) {
+      window.localStorage.setItem(AUTH_SESSION_HINT_KEY, '1');
+      document.documentElement.dataset.authSessionHint = 'true';
+    } else {
+      window.localStorage.removeItem(AUTH_SESSION_HINT_KEY);
+      delete document.documentElement.dataset.authSessionHint;
+    }
+  } catch {
+    // Storage can be unavailable in privacy-restricted browsers. The hint only
+    // prevents a visual flash and never participates in authentication.
+  }
+};
 
 const buildDefaultUserData = (firebaseUser, extra = {}) => ({
   crystals: 0,
@@ -154,6 +171,8 @@ export function useAuth() {
       }
       accessRefreshAttemptRef.current = null;
 
+      setAuthSessionHint(Boolean(firebaseUser));
+
       if (firebaseUser?.isAnonymous) {
         // Anonymous Firebase Auth = crew guest. The guest entry screen
         // (CrewGuestInvite) stores the invited crew id + alias in sessionStorage
@@ -167,6 +186,7 @@ export function useAuth() {
         } catch { guestCrew = null; }
         if (!guestCrew?.crewId) {
           // No active guest session: treat as logged out so the login screen shows.
+          setAuthSessionHint(false);
           setUser(null);
           setUserData(null);
           setLoading(false);
@@ -401,6 +421,7 @@ export function useAuth() {
       clearAuthBootstrapTimeout();
       clearUserDocumentTimeout();
       console.error('useAuth: Auth state bootstrap failed:', err);
+      setAuthSessionHint(false);
       setUser(null);
       setUserData(null);
       setLoading(false);

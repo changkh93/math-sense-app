@@ -8,6 +8,17 @@
     <link rel="icon" type="image/svg+xml" href="/m-logo.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Meta Sense</title>
+    <style>
+      html[data-auth-session-hint="true"] #root > [data-public-prerender] { display: none; }
+      html[data-auth-session-hint="true"] body { background: #020617; }
+    </style>
+    <script>
+      try {
+        if (localStorage.getItem('metasense_auth_session_hint') === '1') {
+          document.documentElement.dataset.authSessionHint = 'true';
+        }
+      } catch (_) {}
+    </script>
     <link rel="stylesheet" href="/home-assets/home.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
