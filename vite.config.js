@@ -19,6 +19,22 @@ export default defineConfig(({ mode }) => {
 
   return {
     plugins: [react(), curriculumText()],
+    // The repository contains standalone video projects with their own
+    // node_modules. Dependency optimization must never mix their React copy
+    // with the app's root React/ReactDOM, or lazy routes can fail with an
+    // "Outdated Optimize Dep" 504 followed by an invalid-hook-call crash.
+    resolve: {
+      dedupe: ['react', 'react-dom'],
+    },
+    optimizeDeps: {
+      include: [
+        'react',
+        'react/jsx-runtime',
+        'react/jsx-dev-runtime',
+        'react-dom',
+        'react-dom/client',
+      ],
+    },
     server: {
       headers: {
         'Cross-Origin-Opener-Policy': 'same-origin-allow-popups',

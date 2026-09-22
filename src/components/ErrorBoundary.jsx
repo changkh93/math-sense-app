@@ -13,6 +13,10 @@ const staleChunkKey = (error) => {
   return `msense:stale-chunk-reload:${url || window.location.pathname}`;
 };
 
+// 같은 오류로 즉시 무한 새로고침하지 않되, 개발 중 Vite가 다시 의존성을
+// 최적화하거나 이후 배포가 발생했을 때는 같은 lazy 모듈도 다시 복구할 수 있어야 한다.
+const STALE_CHUNK_RELOAD_COOLDOWN_MS = 15_000;
+
 class ErrorBoundary extends React.Component {
   constructor(props) {
     super(props);
@@ -26,12 +30,13 @@ class ErrorBoundary extends React.Component {
   componentDidCatch(error, errorInfo) {
     console.error("[CRITICAL] App Crash caught by ErrorBoundary:", error, errorInfo);
 
-    // Reload once for each missing hashed asset. This recovers open tabs after
-    // a deployment without risking an endless reload for an unrelated error.
+    // Reload once per cooldown window. A permanent session flag prevented a
+    // later Vite "Outdated Optimize Dep" for the same lazy module from healing.
     if (isStaleChunkError(error)) {
       const key = staleChunkKey(error);
-      if (!sessionStorage.getItem(key)) {
-        sessionStorage.setItem(key, '1');
+      const lastReloadAt = Number(sessionStorage.getItem(key) || 0);
+      if (!Number.isFinite(lastReloadAt) || Date.now() - lastReloadAt > STALE_CHUNK_RELOAD_COOLDOWN_MS) {
+        sessionStorage.setItem(key, String(Date.now()));
         window.location.reload();
       }
     }

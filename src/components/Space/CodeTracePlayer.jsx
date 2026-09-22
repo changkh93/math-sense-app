@@ -1,6 +1,20 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { doc, runTransaction, serverTimestamp, setDoc } from 'firebase/firestore';
-import { Check, ChevronLeft, Eye, Lightbulb, LocateFixed, RotateCcw, Save } from 'lucide-react';
+import {
+  Check,
+  ChevronLeft,
+  Eye,
+  GripVertical,
+  Lightbulb,
+  LocateFixed,
+  Maximize2,
+  Minimize2,
+  Move,
+  PanelRightClose,
+  PanelRightOpen,
+  RotateCcw,
+  Save,
+} from 'lucide-react';
 import { EditorSelection, EditorState, RangeSetBuilder } from '@codemirror/state';
 import { defaultKeymap, history, historyKeymap, indentLess, indentMore } from '@codemirror/commands';
 import { python } from '@codemirror/lang-python';
@@ -25,6 +39,9 @@ const CODE_PANEL_MIN_HEIGHT = 300;
 const CODE_PANEL_MAX_HEIGHT = 720;
 const CODE_PANEL_LINE_HEIGHT_PX = 23;
 const CODE_PANEL_VERTICAL_PADDING_PX = 32;
+const FLOATING_PANEL_MARGIN_PX = 12;
+const FLOATING_PANEL_MIN_WIDTH_PX = 420;
+const FLOATING_PANEL_MIN_HEIGHT_PX = 360;
 const STRING_STRUCTURE_TOKEN = '__STRING__';
 const CODE_TRACE_COMPLETION_PROJECT = Object.freeze({ path: 'main.py', files: [] });
 const codeTraceHighlightStyle = HighlightStyle.define([
@@ -40,6 +57,20 @@ const codeTraceHighlightStyle = HighlightStyle.define([
   { tag: syntaxTags.bool, color: '#bef264', fontWeight: '700' },
   { tag: syntaxTags.invalid, color: '#fecaca', backgroundColor: 'rgba(248,113,113,0.22)' },
 ]);
+
+function getInitialFloatingPanelBounds() {
+  const viewportWidth = typeof window === 'undefined' ? 1280 : window.innerWidth;
+  const viewportHeight = typeof window === 'undefined' ? 900 : window.innerHeight;
+  const width = Math.min(780, Math.max(280, viewportWidth - 48));
+  const height = Math.min(760, Math.max(360, viewportHeight - 108));
+
+  return {
+    x: Math.max(FLOATING_PANEL_MARGIN_PX, viewportWidth - width - 24),
+    y: Math.max(FLOATING_PANEL_MARGIN_PX, Math.min(72, viewportHeight - height - FLOATING_PANEL_MARGIN_PX)),
+    width,
+    height,
+  };
+}
 
 // 보상: 라인 수 비례 + 반복 연습 감쇠
 // 기본 보상 = 코드 줄 수 × 1.5 (반올림, 최소 2)
@@ -909,6 +940,7 @@ function CodeTraceEditor({
   value,
   answerCode,
   height,
+  fillAvailableHeight = false,
   currentPassed,
   activeStringSuggestion,
   lineCombo,
@@ -1175,14 +1207,24 @@ function CodeTraceEditor({
     }
   }, [value]);
 
+  useEffect(() => {
+    if (!fillAvailableHeight || typeof ResizeObserver === 'undefined' || !hostRef.current) return undefined;
+    const observer = new ResizeObserver(() => {
+      localViewRef.current?.requestMeasure();
+    });
+    observer.observe(hostRef.current);
+    return () => observer.disconnect();
+  }, [fillAvailableHeight]);
+
   return (
     <div
       ref={hostRef}
       className={`code-trace-codemirror ${currentPassed ? 'is-passed' : ''}`}
       style={{
-        height: `${height}px`,
+        height: fillAvailableHeight ? 'auto' : `${height}px`,
+        flex: fillAvailableHeight ? '1 1 0' : undefined,
         minHeight: `${CODE_PANEL_MIN_HEIGHT}px`,
-        maxHeight: `${CODE_PANEL_MAX_HEIGHT}px`,
+        maxHeight: fillAvailableHeight ? 'none' : `${CODE_PANEL_MAX_HEIGHT}px`,
       }}
     />
   );
@@ -1227,10 +1269,97 @@ export default function CodeTracePlayer({
   const [saving, setSaving] = useState(false);
   const [analysisLevel, setAnalysisLevel] = useState('line');
   const [showWhitespace, setShowWhitespace] = useState(true);
+  const [answerPanePercent, setAnswerPanePercent] = useState(50);
+  const [studentPanelDetached, setStudentPanelDetached] = useState(false);
+  const [studentPanelExpanded, setStudentPanelExpanded] = useState(false);
+  const [floatingPanelBounds, setFloatingPanelBounds] = useState(getInitialFloatingPanelBounds);
   const [studentSelection, setStudentSelection] = useState({ start: 0, end: 0 });
   const previousLineComboRef = useRef(0);
   const studentEditorViewRef = useRef(null);
+  const codeWorkspaceRef = useRef(null);
+  const studentPanelRef = useRef(null);
+  const splitDraggingRef = useRef(false);
+  const floatingPanelInteractionRef = useRef(null);
   const hasLocalSessionInteractionRef = useRef(false);
+
+  useEffect(() => {
+    if (!studentPanelDetached || studentPanelExpanded) {
+      floatingPanelInteractionRef.current = null;
+      return undefined;
+    }
+
+    const handlePointerMove = (event) => {
+      const interaction = floatingPanelInteractionRef.current;
+      if (!interaction || interaction.pointerId !== event.pointerId) return;
+
+      const viewportWidth = window.innerWidth;
+      const viewportHeight = window.innerHeight;
+      const minWidth = Math.min(FLOATING_PANEL_MIN_WIDTH_PX, viewportWidth - (FLOATING_PANEL_MARGIN_PX * 2));
+      const minHeight = Math.min(FLOATING_PANEL_MIN_HEIGHT_PX, viewportHeight - (FLOATING_PANEL_MARGIN_PX * 2));
+      const deltaX = event.clientX - interaction.startX;
+      const deltaY = event.clientY - interaction.startY;
+      const start = interaction.bounds;
+
+      if (interaction.type === 'move') {
+        setFloatingPanelBounds({
+          ...start,
+          x: Math.min(
+            Math.max(FLOATING_PANEL_MARGIN_PX, viewportWidth - start.width - FLOATING_PANEL_MARGIN_PX),
+            Math.max(FLOATING_PANEL_MARGIN_PX, start.x + deltaX),
+          ),
+          y: Math.min(
+            Math.max(FLOATING_PANEL_MARGIN_PX, viewportHeight - start.height - FLOATING_PANEL_MARGIN_PX),
+            Math.max(FLOATING_PANEL_MARGIN_PX, start.y + deltaY),
+          ),
+        });
+        return;
+      }
+
+      let left = start.x;
+      let top = start.y;
+      let right = start.x + start.width;
+      let bottom = start.y + start.height;
+      const direction = interaction.direction;
+
+      if (direction.includes('e')) {
+        right = Math.min(viewportWidth - FLOATING_PANEL_MARGIN_PX, Math.max(left + minWidth, right + deltaX));
+      }
+      if (direction.includes('w')) {
+        left = Math.max(FLOATING_PANEL_MARGIN_PX, Math.min(right - minWidth, left + deltaX));
+      }
+      if (direction.includes('s')) {
+        bottom = Math.min(viewportHeight - FLOATING_PANEL_MARGIN_PX, Math.max(top + minHeight, bottom + deltaY));
+      }
+      if (direction.includes('n')) {
+        top = Math.max(FLOATING_PANEL_MARGIN_PX, Math.min(bottom - minHeight, top + deltaY));
+      }
+
+      setFloatingPanelBounds({
+        x: left,
+        y: top,
+        width: right - left,
+        height: bottom - top,
+      });
+    };
+    const handlePointerEnd = (event) => {
+      if (floatingPanelInteractionRef.current?.pointerId === event.pointerId) {
+        floatingPanelInteractionRef.current = null;
+        document.body.style.removeProperty('user-select');
+        document.body.style.removeProperty('cursor');
+      }
+    };
+
+    window.addEventListener('pointermove', handlePointerMove);
+    window.addEventListener('pointerup', handlePointerEnd);
+    window.addEventListener('pointercancel', handlePointerEnd);
+    return () => {
+      window.removeEventListener('pointermove', handlePointerMove);
+      window.removeEventListener('pointerup', handlePointerEnd);
+      window.removeEventListener('pointercancel', handlePointerEnd);
+      document.body.style.removeProperty('user-select');
+      document.body.style.removeProperty('cursor');
+    };
+  }, [studentPanelDetached, studentPanelExpanded]);
 
   useEffect(() => {
     const savedIds = learningProgress?.codeTrace?.completedExerciseIds;
@@ -1940,6 +2069,89 @@ export default function CodeTracePlayer({
   const pulseEditorLine = (combo) => {
     setLinePulse({ id: Date.now(), count: combo, enter: true });
   };
+  const updateAnswerPanePercent = (clientX) => {
+    const bounds = codeWorkspaceRef.current?.getBoundingClientRect();
+    if (!bounds?.width) return;
+    const nextPercent = ((clientX - bounds.left) / bounds.width) * 100;
+    setAnswerPanePercent(Math.min(68, Math.max(32, nextPercent)));
+  };
+  const handleSplitPointerDown = (event) => {
+    if (studentPanelDetached) return;
+    splitDraggingRef.current = true;
+    event.currentTarget.setPointerCapture?.(event.pointerId);
+    updateAnswerPanePercent(event.clientX);
+    event.preventDefault();
+  };
+  const handleSplitPointerMove = (event) => {
+    if (!splitDraggingRef.current) return;
+    updateAnswerPanePercent(event.clientX);
+  };
+  const handleSplitPointerEnd = (event) => {
+    if (!splitDraggingRef.current) return;
+    splitDraggingRef.current = false;
+    if (event.currentTarget.hasPointerCapture?.(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+  };
+  const handleSplitKeyDown = (event) => {
+    if (!['ArrowLeft', 'ArrowRight'].includes(event.key)) return;
+    event.preventDefault();
+    setAnswerPanePercent(percent => Math.min(68, Math.max(32, percent + (event.key === 'ArrowLeft' ? -2 : 2))));
+  };
+  const startFloatingPanelMove = (event) => {
+    if (!studentPanelDetached || studentPanelExpanded || event.button !== 0) return;
+    if (event.target.closest('button, a, input, textarea, select, [role="button"]')) return;
+    const bounds = studentPanelRef.current?.getBoundingClientRect();
+    if (!bounds) return;
+    floatingPanelInteractionRef.current = {
+      type: 'move',
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      bounds: { x: bounds.left, y: bounds.top, width: bounds.width, height: bounds.height },
+    };
+    document.body.style.userSelect = 'none';
+    document.body.style.cursor = 'move';
+    event.preventDefault();
+  };
+  const startFloatingPanelResize = (event, direction) => {
+    if (!studentPanelDetached || studentPanelExpanded || event.button !== 0) return;
+    const bounds = studentPanelRef.current?.getBoundingClientRect();
+    if (!bounds) return;
+    floatingPanelInteractionRef.current = {
+      type: 'resize',
+      direction,
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      bounds: { x: bounds.left, y: bounds.top, width: bounds.width, height: bounds.height },
+    };
+    document.body.style.userSelect = 'none';
+    document.body.style.cursor = `${direction}-resize`;
+    event.preventDefault();
+    event.stopPropagation();
+  };
+  const detachStudentPanel = () => {
+    setFloatingPanelBounds(getInitialFloatingPanelBounds());
+    setStudentPanelDetached(true);
+    setStudentPanelExpanded(false);
+  };
+  const attachStudentPanel = () => {
+    floatingPanelInteractionRef.current = null;
+    setStudentPanelDetached(false);
+    setStudentPanelExpanded(false);
+  };
+
+  const floatingResizeHandleStyles = studentPanelDetached && !studentPanelExpanded ? {
+    n: { left: floatingPanelBounds.x + 12, top: floatingPanelBounds.y - 5, width: floatingPanelBounds.width - 24, height: 10 },
+    ne: { left: floatingPanelBounds.x + floatingPanelBounds.width - 8, top: floatingPanelBounds.y - 8, width: 16, height: 16 },
+    e: { left: floatingPanelBounds.x + floatingPanelBounds.width - 5, top: floatingPanelBounds.y + 12, width: 10, height: floatingPanelBounds.height - 24 },
+    se: { left: floatingPanelBounds.x + floatingPanelBounds.width - 10, top: floatingPanelBounds.y + floatingPanelBounds.height - 10, width: 20, height: 20 },
+    s: { left: floatingPanelBounds.x + 12, top: floatingPanelBounds.y + floatingPanelBounds.height - 5, width: floatingPanelBounds.width - 24, height: 10 },
+    sw: { left: floatingPanelBounds.x - 8, top: floatingPanelBounds.y + floatingPanelBounds.height - 8, width: 16, height: 16 },
+    w: { left: floatingPanelBounds.x - 5, top: floatingPanelBounds.y + 12, width: 10, height: floatingPanelBounds.height - 24 },
+    nw: { left: floatingPanelBounds.x - 8, top: floatingPanelBounds.y - 8, width: 16, height: 16 },
+  } : {};
 
   return (
     <div className="space-bg" style={{ minHeight: '100vh', overflowY: 'auto', padding: '1rem 1rem 4rem' }}>
@@ -1974,6 +2186,140 @@ export default function CodeTracePlayer({
         }
         .code-trace-student-panel {
           overflow: visible;
+        }
+        .code-trace-workspace {
+          display: grid;
+          grid-template-columns:
+            minmax(0, calc(var(--code-trace-answer-width, 50%) - 7px))
+            14px
+            minmax(0, calc(100% - var(--code-trace-answer-width, 50%) - 7px));
+          align-items: stretch;
+        }
+        .code-trace-workspace.is-detached {
+          grid-template-columns: minmax(0, 1fr);
+        }
+        .code-trace-split-handle {
+          position: relative;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          width: 14px;
+          min-width: 14px;
+          padding: 0;
+          border: 0;
+          background: transparent;
+          color: rgba(148,163,184,0.72);
+          cursor: col-resize;
+          touch-action: none;
+          outline: none;
+        }
+        .code-trace-split-handle::before {
+          content: "";
+          position: absolute;
+          inset: 0 4px;
+          border-radius: 999px;
+          background: rgba(148,163,184,0.12);
+          transition: background 0.16s ease, box-shadow 0.16s ease;
+        }
+        .code-trace-split-handle:hover::before,
+        .code-trace-split-handle:focus-visible::before {
+          background: rgba(0,243,255,0.42);
+          box-shadow: 0 0 14px rgba(0,243,255,0.28);
+        }
+        .code-trace-split-handle svg {
+          position: relative;
+          z-index: 1;
+          pointer-events: none;
+        }
+        .code-trace-student-toolbar {
+          display: flex;
+          align-items: flex-start;
+          justify-content: space-between;
+          gap: 0.75rem;
+          margin-bottom: 0.75rem;
+        }
+        .code-trace-student-toolbar-actions {
+          display: flex;
+          flex-wrap: wrap;
+          justify-content: flex-end;
+          gap: 0.4rem;
+        }
+        .code-trace-student-panel.is-detached {
+          position: fixed !important;
+          z-index: 120;
+          box-sizing: border-box;
+          display: flex;
+          flex-direction: column;
+          overflow: auto;
+          border-color: rgba(0,243,255,0.42);
+          box-shadow: 0 28px 80px rgba(2,6,23,0.72), 0 0 0 1px rgba(0,243,255,0.12);
+        }
+        .code-trace-student-panel.is-detached:hover {
+          transform: none;
+        }
+        .code-trace-student-panel.is-detached.is-expanded {
+          inset: 1rem;
+          width: auto;
+          height: auto;
+          max-width: none;
+          max-height: none;
+        }
+        .code-trace-student-panel.is-detached .code-trace-student-toolbar {
+          flex: 0 0 auto;
+          position: sticky;
+          top: -1rem;
+          z-index: 8;
+          margin: -1rem -1rem 0.75rem;
+          padding: 1rem;
+          border-bottom: 1px solid rgba(0,243,255,0.18);
+          background: linear-gradient(180deg, rgba(15,23,42,0.99), rgba(15,23,42,0.94));
+          backdrop-filter: blur(16px);
+        }
+        .code-trace-student-panel.is-detached .code-trace-codemirror {
+          flex: 1 1 0;
+          min-height: ${CODE_PANEL_MIN_HEIGHT}px;
+          max-height: none;
+        }
+        .code-trace-student-panel.is-detached .code-trace-string-helper,
+        .code-trace-student-panel.is-detached .code-trace-student-actions {
+          flex: 0 0 auto;
+        }
+        .code-trace-student-panel.is-detached:not(.is-expanded) .code-trace-student-toolbar {
+          cursor: move;
+          touch-action: none;
+        }
+        .code-trace-floating-window-hint {
+          display: inline-flex;
+          align-items: center;
+          gap: 0.3rem;
+          margin-top: 0.45rem;
+          color: rgba(165,243,252,0.76);
+          font-size: 0.68rem;
+          user-select: none;
+        }
+        .code-trace-floating-resize-handle {
+          position: fixed;
+          z-index: 122;
+          touch-action: none;
+        }
+        .code-trace-floating-resize-handle[data-direction="n"],
+        .code-trace-floating-resize-handle[data-direction="s"] { cursor: ns-resize; }
+        .code-trace-floating-resize-handle[data-direction="e"],
+        .code-trace-floating-resize-handle[data-direction="w"] { cursor: ew-resize; }
+        .code-trace-floating-resize-handle[data-direction="ne"],
+        .code-trace-floating-resize-handle[data-direction="sw"] { cursor: nesw-resize; }
+        .code-trace-floating-resize-handle[data-direction="nw"],
+        .code-trace-floating-resize-handle[data-direction="se"] { cursor: nwse-resize; }
+        .code-trace-floating-resize-handle[data-direction="se"] {
+          border-right: 3px solid rgba(103,232,249,0.85);
+          border-bottom: 3px solid rgba(103,232,249,0.85);
+          border-radius: 0 0 5px 0;
+        }
+        .code-trace-answer-gutter {
+          position: sticky;
+          left: 0;
+          z-index: 3;
+          box-shadow: 8px 0 12px rgba(2,6,23,0.78);
         }
         .code-trace-student-panel.is-complete::after {
           content: "";
@@ -2201,9 +2547,17 @@ export default function CodeTracePlayer({
           .code-trace-analysis-panel {
             grid-template-columns: 1fr;
           }
+          .code-trace-workspace,
+          .code-trace-workspace.is-detached {
+            grid-template-columns: minmax(0, 1fr);
+            gap: 1rem;
+          }
+          .code-trace-split-handle {
+            display: none;
+          }
         }
       `}</style>
-      <div style={{ maxWidth: 1220, margin: '0 auto' }}>
+      <div style={{ maxWidth: 1600, margin: '0 auto' }}>
         <button className="space-nav-link font-tech" onClick={savePartialProgress} disabled={saving} style={{ marginBottom: '1rem' }}>
           <ChevronLeft size={16} /> RETURN TO MISSION CONTROL
         </button>
@@ -2287,7 +2641,11 @@ export default function CodeTracePlayer({
           })}
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 320px), 1fr))', gap: '1rem' }}>
+        <div
+          ref={codeWorkspaceRef}
+          className={`code-trace-workspace ${studentPanelDetached ? 'is-detached' : ''}`}
+          style={{ '--code-trace-answer-width': `${answerPanePercent}%` }}
+        >
           <section className="glass-card" style={{ padding: '1rem', minWidth: 0 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.75rem', alignItems: 'center', marginBottom: '0.75rem' }}>
               <h3 className="font-title" style={{ margin: 0, color: 'var(--planet-green)' }}>정답 코드</h3>
@@ -2344,6 +2702,7 @@ export default function CodeTracePlayer({
             >
               <div style={{ display: 'flex', minWidth: 'max-content', padding: '1rem 0' }}>
                 <div
+                  className="code-trace-answer-gutter"
                   aria-hidden="true"
                   style={{
                     display: 'flex',
@@ -2411,11 +2770,89 @@ export default function CodeTracePlayer({
             </div>
           </section>
 
-          <section className={`glass-card code-trace-student-panel ${currentPassed ? 'is-complete' : ''}`} style={{ padding: '1rem', minWidth: 0, position: 'relative' }}>
-            <h3 className="font-title" style={{ margin: '0 0 0.75rem', color: 'var(--crystal-cyan)' }}>학생 입력</h3>
-            <p className="font-tech" style={{ margin: '-0.35rem 0 0.75rem', color: 'var(--text-muted)', fontSize: '0.72rem' }}>
-              자동 추천은 Tab으로 선택 · Ctrl+Space로 다시 열기 · 괄호와 따옴표는 자동으로 닫힙니다.
-            </p>
+          {!studentPanelDetached && (
+            <button
+              type="button"
+              className="code-trace-split-handle"
+              role="separator"
+              aria-label="정답 코드와 학생 입력창 너비 조절"
+              aria-orientation="vertical"
+              aria-valuemin={32}
+              aria-valuemax={68}
+              aria-valuenow={Math.round(answerPanePercent)}
+              title="드래그해서 좌우 너비 조절"
+              onPointerDown={handleSplitPointerDown}
+              onPointerMove={handleSplitPointerMove}
+              onPointerUp={handleSplitPointerEnd}
+              onPointerCancel={handleSplitPointerEnd}
+              onKeyDown={handleSplitKeyDown}
+            >
+              <GripVertical size={16} />
+            </button>
+          )}
+
+          <section
+            ref={studentPanelRef}
+            className={`glass-card code-trace-student-panel ${currentPassed ? 'is-complete' : ''} ${studentPanelDetached ? 'is-detached' : ''} ${studentPanelExpanded ? 'is-expanded' : ''}`}
+            style={{
+              padding: '1rem',
+              minWidth: 0,
+              position: 'relative',
+              ...(studentPanelDetached && !studentPanelExpanded ? {
+                left: floatingPanelBounds.x,
+                top: floatingPanelBounds.y,
+                width: floatingPanelBounds.width,
+                height: floatingPanelBounds.height,
+              } : {}),
+            }}
+          >
+            <div className="code-trace-student-toolbar" onPointerDown={startFloatingPanelMove}>
+              <div>
+                <h3 className="font-title" style={{ margin: '0 0 0.75rem', color: 'var(--crystal-cyan)' }}>학생 입력</h3>
+                <p className="font-tech" style={{ margin: '-0.35rem 0 0', color: 'var(--text-muted)', fontSize: '0.72rem' }}>
+                  자동 추천은 Tab으로 선택 · Ctrl+Space로 다시 열기 · 괄호와 따옴표는 자동으로 닫힙니다.
+                </p>
+                {studentPanelDetached && !studentPanelExpanded && (
+                  <span className="font-tech code-trace-floating-window-hint">
+                    <Move size={13} /> 이 상단 바를 드래그해 이동 · 창 가장자리를 드래그해 크기 조절
+                  </span>
+                )}
+              </div>
+              <div className="code-trace-student-toolbar-actions">
+                {studentPanelDetached ? (
+                  <>
+                    <button
+                      type="button"
+                      className="hud-btn secondary glass"
+                      onClick={() => setStudentPanelExpanded(value => !value)}
+                      style={{ padding: '0.42rem 0.65rem' }}
+                      title={studentPanelExpanded ? '이전 창 크기로 복원' : '학생 입력창을 전체 화면으로 확대'}
+                    >
+                      {studentPanelExpanded ? <Minimize2 size={15} /> : <Maximize2 size={15} />}
+                      {studentPanelExpanded ? '창 크기로 복원' : '전체 화면'}
+                    </button>
+                    <button
+                      type="button"
+                      className="hud-btn primary glass"
+                      onClick={attachStudentPanel}
+                      style={{ padding: '0.42rem 0.65rem' }}
+                    >
+                      <PanelRightClose size={15} /> 다시 붙이기
+                    </button>
+                  </>
+                ) : (
+                  <button
+                    type="button"
+                    className="hud-btn secondary glass"
+                    onClick={detachStudentPanel}
+                    style={{ padding: '0.42rem 0.65rem' }}
+                    title="학생 입력창을 분리해 정답 코드를 전체 너비로 보기"
+                  >
+                    <PanelRightOpen size={15} /> 입력창 분리
+                  </button>
+                )}
+              </div>
+            </div>
             {linePulse && (
               <div
                 key={linePulse.id}
@@ -2442,6 +2879,7 @@ export default function CodeTracePlayer({
               value={studentCode}
               answerCode={requiredAnswerCode}
               height={codePanelHeight}
+              fillAvailableHeight={studentPanelDetached}
               currentPassed={currentPassed}
               activeStringSuggestion={activeStringSuggestion}
               lineCombo={lineCombo}
@@ -2489,7 +2927,7 @@ export default function CodeTracePlayer({
                 </div>
               </div>
             )}
-            <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.75rem', flexWrap: 'wrap', position: 'relative' }}>
+            <div className="code-trace-student-actions" style={{ display: 'flex', gap: '0.5rem', marginTop: '0.75rem', flexWrap: 'wrap', position: 'relative' }}>
               {rewardBurst && (
                 <div
                   key={rewardBurst.id}
@@ -2530,6 +2968,16 @@ export default function CodeTracePlayer({
               </button>
             </div>
           </section>
+          {studentPanelDetached && !studentPanelExpanded && Object.entries(floatingResizeHandleStyles).map(([direction, style]) => (
+            <span
+              key={direction}
+              aria-hidden="true"
+              className="code-trace-floating-resize-handle"
+              data-direction={direction}
+              style={style}
+              onPointerDown={(event) => startFloatingPanelResize(event, direction)}
+            />
+          ))}
         </div>
 
         <section className="glass-card" style={{ padding: '1rem', marginTop: '1rem' }}>
