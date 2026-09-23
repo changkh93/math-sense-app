@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
 import { hasFullStudioAccess, PUBLIC_STUDIO_UID } from '../src/components/PythonGameStudio/studioAccess.js'
+import { trackPython } from '../src/utils/pythonFunnel.js'
 
 const member = { uid: 'student-1', isAnonymous: false }
 assert.equal(PUBLIC_STUDIO_UID, 'public-code-studio')
@@ -12,9 +13,19 @@ assert.equal(hasFullStudioAccess(member, { clusterAccess: { python: 'active' } }
 assert.equal(hasFullStudioAccess(member, { clusterAccess: { '파이썬': 'active' } }), true)
 assert.equal(hasFullStudioAccess(member, { role: 'admin' }), true)
 assert.equal(hasFullStudioAccess(member, { clusterAccess: { math: 'active' } }), false)
+globalThis.window = { dataLayer: [] }
+trackPython('python_cta', 'studio_header')
+trackPython('python_cta', 'private-project')
+assert.deepEqual(window.dataLayer, [
+  { event: 'python_cta', funnel: 'python', label: 'studio_header' },
+  { event: 'python_cta', funnel: 'python', label: '' },
+])
+delete globalThis.window
 
 const studio = await readFile('src/components/PythonGameStudio/PythonGameStudio.jsx', 'utf8')
+const preview = await readFile('src/components/PythonGameStudio/GamePreview.jsx', 'utf8')
 const home = await readFile('src/components/PublicHomeIntro.jsx', 'utf8')
+const pythonPage = await readFile('src/pages/PythonEducation.jsx', 'utf8')
 const publicActionsStart = studio.indexOf('className="pgs-library-actions"')
 const paidActionsStart = studio.indexOf('{!publicAccess && <>', publicActionsStart)
 const publicActions = studio.slice(publicActionsStart, paidActionsStart)
@@ -24,12 +35,26 @@ for (const hidden of ['백업 파일 복원', '동전 모으기 수업 준비', 
   assert(!publicActions.includes(hidden), `public project actions must not include ${hidden}`)
 }
 assert(studio.includes('allowAi={!publicAccess}'))
-assert(studio.includes('href="/python/guides/"'))
+assert(studio.includes('href="https://msense.me/python/guides/">파이썬 학습노트</a>'))
+assert(studio.includes('파이썬 배우기'))
+assert(studio.includes('publicAccess={publicAccess}'))
+assert(preview.includes('수업에서 만드는 프로젝트 미리보기'))
+assert(preview.includes('완성 코드와 에셋은 공개하지 않습니다'))
+assert(preview.includes("trackPython('python_cta', 'studio_project')"))
+for (const forbidden of ['coinCollectTemplate', 'monsterTemplate', 'spaceInvadersTemplate', 'marsExpeditionTemplate', 'flashCardTemplate']) {
+  assert(!preview.includes(forbidden), `public learning preview must not load ${forbidden}`)
+}
 
 const section = home.slice(home.indexOf('id="home-code-studio"'), home.indexOf('className="ms-evidence-section"'))
 assert(section.includes('href="/python-game-studio"'))
 assert(section.includes('href="/python/guides/"'))
 assert(section.includes('로그인 없이'))
 assert(!section.includes('<img'))
+
+const pythonNavStart = pythonPage.indexOf('<nav aria-label="파이썬 과정 안내">')
+const pythonNavEnd = pythonPage.indexOf('</nav>', pythonNavStart)
+const pythonNav = pythonPage.slice(pythonNavStart, pythonNavEnd)
+assert(pythonNav.includes('href="https://msense.me/python/guides/">파이썬 학습노트</a>'))
+assert(pythonNav.includes('href="/python-game-studio">코드 스튜디오</a>'))
 
 console.log('PASS: public access, member access, guest project actions, local-only AI guard, and asset-free home entry')

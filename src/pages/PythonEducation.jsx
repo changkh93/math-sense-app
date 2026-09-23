@@ -335,7 +335,8 @@ export default function PythonEducation() {
         </Link>
         <nav aria-label="파이썬 과정 안내">
           <a href="#courses">학습 과정</a>
-            <a href="/python/guides/">학습 노트</a>
+          <a href="https://msense.me/python/guides/">파이썬 학습노트</a>
+          <a href="/python-game-studio">코드 스튜디오</a>
           <a href="#learning">학습 관리</a>
           <a className="pe-cta pe-cta-small" href="#apply">
             무료체험 신청 <ArrowUpRight size={17} />
@@ -662,7 +663,7 @@ export default function PythonEducation() {
       </section>
       <section className="pe-wrap pe-trust">
         <h2>수학감각 시리즈 저자가 만든 메타센스</h2>
-          <p><a href="/python/guides/">파이썬을 시작하는 부모님을 위한 학습 노트 읽기 →</a></p>
+        <p><a href="https://msense.me/python/guides/">파이썬을 시작하는 부모님을 위한 학습 노트 읽기 →</a></p>
         <p>답을 따라 쓰는 데서 멈추지 않고, 왜 그렇게 되는지 설명하는 공부를 지향합니다. 파이썬에서도 결과를 예상하고, 실행하고, 바뀐 이유를 설명하는 과정을 연결합니다.</p>
         <p>둘시네가 운영합니다. <a href="https://smartstore.naver.com/dulcine" target="_blank" rel="noopener noreferrer">수학감각 교재 확인 ↗</a> · <a href="https://blog.naver.com/metasense_edu/224406758717" target="_blank" rel="noopener noreferrer">코드 스튜디오 자세히 보기 ↗</a></p>
         <a className="pe-cta" href="#apply" data-position="learning">파이썬 무료체험 신청하기 <ArrowRight size={18} /></a>

@@ -16,11 +16,39 @@ import plotRenderer from '../../../runtime/python-game-runner/plot-renderer.js?r
 import plotFont from '../../../public/mars-expedition/assets/fonts/DoHyeon-Regular.ttf?inline'
 import studioFontsPython from '../../../runtime/python-game-runner/studio_fonts.py?raw'
 import requestsPython from '../../../runtime/python-game-runner/studio_requests.py?raw'
+import { trackPython } from '../../utils/pythonFunnel'
+import { LockKeyhole } from 'lucide-react'
 
 const runnerDocument = buildRunnerDocument(runnerHtml, turtlePython, turtleRenderer, tkPython, tkRenderer, pandasPython, plotPython, plotRenderer, plotFont, studioFontsPython, requestsPython)
 
 // One isolated interpreter per editor session. Runs replace files/state over the port.
-export default function GamePreview({ uid, run, onEvent }) {
+function PublicLearningPrompt() {
+  const projects = [
+    ['몬스터 잡기', '충돌 · 점수'],
+    ['우주 방어대', '좌표 · 클래스'],
+    ['화성 탐사대', '파일 · 사운드'],
+  ]
+  return <div className="pgs-empty pgs-learning-prompt">
+    <span className="pgs-orbit" aria-hidden="true">✦</span>
+    <div className="pgs-learning-copy">
+      <span className="pgs-learning-kicker">METASENSE PYTHON</span>
+      <strong>혼자 실행해 보고, 단계별로 직접 만들어 보세요.</strong>
+      <p>처음이라면 작은 코드부터 게임 완성까지 순서대로 시작할 수 있어요.</p>
+    </div>
+    <div className="pgs-learning-projects" aria-label="수업에서 만드는 프로젝트 미리보기">
+      {projects.map(([title, concepts]) => <a key={title} href="/python#courses" onClick={() => trackPython('python_cta', 'studio_project')}>
+        <LockKeyhole size={14} aria-hidden="true" /><strong>{title}</strong><small>{concepts}</small><b>수업에서 만들기 →</b>
+      </a>)}
+    </div>
+    <div className="pgs-learning-actions">
+      <a className="primary" href="/python#courses" onClick={() => trackPython('python_cta', 'studio_preview')}>파이썬 배우기 →</a>
+      <a href="/python#apply" onClick={() => trackPython('python_cta', 'studio_trial')}>7일 무료로 시작하기</a>
+    </div>
+    <small>프로젝트는 수업 미리보기이며 완성 코드와 에셋은 공개하지 않습니다.</small>
+  </div>
+}
+
+export default function GamePreview({ uid, run, onEvent, publicAccess = false }) {
   const frameRef = useRef(null)
   const callbackRef = useRef(onEvent)
   const runRef = useRef(run)
@@ -139,6 +167,6 @@ export default function GamePreview({ uid, run, onEvent }) {
   useEffect(() => { runRef.current = run; sendRef.current?.(run) }, [run])
   return <div className="pgs-runtime">
     <iframe key={engineEpoch} ref={frameRef} title="Python 코드 실행 화면" srcDoc={runnerDocument} sandbox="allow-scripts" allow="autoplay" referrerPolicy="no-referrer" tabIndex={run ? 0 : -1} aria-hidden={!run} style={{ pointerEvents: run ? 'auto' : 'none' }} />
-    {!run && <div className="pgs-empty"><span className="pgs-orbit">✦</span><strong>코드로 만들고, 실행하며 배워요</strong><p>실행을 누르면 코드가 바로 실행됩니다.</p><small>마우스·방향키를 사용할 때는 실행 화면을 클릭하세요.</small></div>}
+    {!run && (publicAccess ? <PublicLearningPrompt /> : <div className="pgs-empty"><span className="pgs-orbit">✦</span><strong>코드로 만들고, 실행하며 배워요</strong><p>실행을 누르면 코드가 바로 실행됩니다.</p><small>마우스·방향키를 사용할 때는 실행 화면을 클릭하세요.</small></div>)}
   </div>
 }

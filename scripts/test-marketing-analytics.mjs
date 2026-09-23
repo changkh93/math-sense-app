@@ -14,7 +14,9 @@ assert.equal(run('/admin/private-student').dataLayer.length,0);assert.equal(run(
 console.log('PASS: public routes only, funnel dispatch, query/referrer sanitization, private navigation disabled, local excluded');
 const studio=run('/python-game-studio');studio.dataLayer.push({event:'python_studio_open',label:'page',projectName:'private-project'});
 const studioEvent=studio.dataLayer.find(x=>x[0]==='event'&&x[1]==='python_studio_open');assert.equal(studioEvent[2].label,'page');assert(!JSON.stringify(studioEvent).includes('private-project'));
-console.log('PASS: public Code Studio page and privacy-safe open event');
+studio.dataLayer.push({event:'python_cta',label:'studio_project',projectName:'private-project'});
+const studioCta=studio.dataLayer.find(x=>x[0]==='event'&&x[1]==='python_cta');assert.equal(studioCta[2].label,'studio_project');assert(!JSON.stringify(studioCta).includes('private-project'));
+console.log('PASS: public Code Studio page and privacy-safe open/learning events');
 const google=run('/python','msense.me','google');
 const googlePage=google.dataLayer.find(x=>x[0]==='event' && x[1]==='page_view');
 assert.equal(googlePage[2].campaign_source,'google');

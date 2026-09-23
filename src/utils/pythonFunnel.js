@@ -2,7 +2,7 @@
 const EVENTS = new Set(['python_view', 'python_cta', 'python_form_start', 'python_submit', 'python_success', 'python_error', 'python_video']);
 export function trackPython(event, label = '') {
   if (typeof window === 'undefined' || !EVENTS.has(event)) return;
-  const payload = { event, funnel: 'python', label: ['', 'page', 'results', 'learning', 'submission', 'foundation', 'lumi', 'game', 'advanced', 'math', 'algorithm'].includes(label) ? label : '' };
+  const payload = { event, funnel: 'python', label: ['', 'page', 'results', 'learning', 'submission', 'foundation', 'lumi', 'game', 'advanced', 'math', 'algorithm', 'studio_header', 'studio_preview', 'studio_project', 'studio_trial'].includes(label) ? label : '' };
   window.dataLayer = window.dataLayer || [];
   window.dataLayer.push(payload);
 }
