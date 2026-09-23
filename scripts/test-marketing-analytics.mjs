@@ -12,6 +12,9 @@ const sent=JSON.stringify(c.dataLayer.filter(x=>x[0]));assert(!sent.includes('pr
 c.history.pushState({},'', '/admin/private-student');assert.equal(c['ga-disable-G-SGWRBZ7X2E'],true);const n=c.dataLayer.filter(x=>x[0]==='event').length;c.dataLayer.push({event:'python_success'});assert.equal(c.dataLayer.filter(x=>x[0]==='event').length,n);
 assert.equal(run('/admin/private-student').dataLayer.length,0);assert.equal(run('/python','localhost').dataLayer.length,0);assert(run('/python/guides/first-turtle-drawing/').dataLayer.length>0);
 console.log('PASS: public routes only, funnel dispatch, query/referrer sanitization, private navigation disabled, local excluded');
+const studio=run('/python-game-studio');studio.dataLayer.push({event:'python_studio_open',label:'page',projectName:'private-project'});
+const studioEvent=studio.dataLayer.find(x=>x[0]==='event'&&x[1]==='python_studio_open');assert.equal(studioEvent[2].label,'page');assert(!JSON.stringify(studioEvent).includes('private-project'));
+console.log('PASS: public Code Studio page and privacy-safe open event');
 const google=run('/python','msense.me','google');
 const googlePage=google.dataLayer.find(x=>x[0]==='event' && x[1]==='page_view');
 assert.equal(googlePage[2].campaign_source,'google');

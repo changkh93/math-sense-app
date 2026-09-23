@@ -4,6 +4,8 @@
 .pgs-shell{position:fixed;inset:0;z-index:100}.pgs-header{margin:0;text-align:left}.pgs-editor-pane .cm-content{font-size:13px}@media(max-width:800px){.pgs-shell{height:100dvh;overflow:auto}}
 
 .pgs-shell .pgs-run:hover{background:#a7ffe3;color:#10372e;border-color:#a7ffe3}
+.pgs-public-links{display:flex;align-items:center;gap:14px;margin-left:auto}.pgs-public-links a{color:#a8bad0;text-decoration:none;font-size:11px;font-weight:650;white-space:nowrap}.pgs-public-links a:hover{color:#83f3cd}.pgs-public-links a:focus-visible{outline:2px solid #83f3cd;outline-offset:4px;border-radius:3px}.pgs-public-links+.pgs-header-actions{margin-left:0}
+@media(max-width:900px){.pgs-public-links{order:3;width:100%;margin-left:0;padding-left:4px}.pgs-public-links+.pgs-header-actions{margin-left:auto}}
 
 .pgs-library .pgs-project-row{padding:0;gap:8px;align-items:center;background:#182438;border:1px solid #2b3b53;border-radius:7px}.pgs-project-row .pgs-project-open{flex:1;min-width:0;border:0;background:transparent;justify-content:flex-start;text-align:left;padding:14px;white-space:normal;overflow-wrap:anywhere}.pgs-project-open>svg{flex-shrink:0}.pgs-project-row .pgs-project-delete{flex-shrink:0;margin-right:12px;color:#ffb2b9;background:transparent}.pgs-dialog p{overflow-wrap:anywhere}
 

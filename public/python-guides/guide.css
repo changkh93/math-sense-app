@@ -2,3 +2,4 @@
 .hero img{height:auto}
 /* Course notes keep code and navigation inside narrow viewports. */
 .article-layout>*,.grid>*{min-width:0}.article-body pre{max-width:100%}.pagination{flex-wrap:wrap}.categories{margin:24px 0}.unit-links{display:flex;flex-wrap:wrap;gap:10px;margin:28px 0}.unit-links a{border:1px solid #dce1d6;border-radius:6px;padding:7px 11px;font-size:14px}.card h2{overflow-wrap:anywhere}.article-body table{display:block;max-width:100%;overflow:auto}
+.cta-actions{display:flex;flex-wrap:wrap;gap:12px;margin-top:18px}.cta-actions .button{margin:0}.cta-actions .secondary{background:transparent;color:#f9fbf5!important;border:1px solid #91ad9d}

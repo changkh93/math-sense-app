@@ -1,6 +1,7 @@
 import { useState } from 'react'
 
 const Arrow = () => <span aria-hidden="true">↗</span>
+const trackStudioOpen = () => window.dataLayer?.push({ event: 'python_studio_open', label: 'page' })
 const evidence = [
   { id: 'tools', label: '직접 해보는 공부', title: '눈으로 보고, 손으로 확인하고.', text: '구구단 불빛 카드, 분수 렌즈와 퀴즈. 화면을 직접 움직이며 식이 뜻하는 것을 살펴봅니다.', image: '/math-assets/light-cards.png', alt: '4단의 수표를 보며 4 곱하기 4의 답을 생각하는 실제 구구단 불빛 카드 화면', caption: '초등수학 · 구구단 불빛 카드' },
   { id: 'code', label: '만들면서 배우는 코딩', title: '코드 한 줄이, 내 작품이 되는 순간.', text: '파이썬으로 그림과 게임을 만들며 필요한 개념을 배웁니다. 만든 결과와 생각을 과제로 남기고 피드백을 받습니다.', image: '/python-showcase/foundation-screen.webp', alt: '메타센스 파이썬 프로젝트의 실제 학습 화면', caption: '파이썬 · 프로젝트 학습 화면' },
@@ -14,7 +15,7 @@ export default function PublicHomeIntro({ onLogin }) {
     <a className="ms-skip" href="#home-main">본문으로 이동</a>
     <header className="ms-header">
       <a className="ms-brand" href="/" aria-label="메타센스 홈"><img src="/m-logo.svg" alt="" width="35" height="35" /><span>메타센스<small>스스로 배우는 힘</small></span></a>
-      <nav className="ms-navigation" aria-label="과정 안내"><a href="/math/">수학과 고전읽기</a><a href="/middle-math/">중등수학</a><a href="/python">파이썬</a><a href="/math/books/">수학감각 교재</a></nav>
+      <nav className="ms-navigation" aria-label="과정 안내"><a href="/math/">수학과 고전읽기</a><a href="/middle-math/">중등수학</a><a href="/python">파이썬</a><a href="/python-game-studio" onClick={trackStudioOpen}>코드 스튜디오</a><a href="/math/books/">수학감각 교재</a></nav>
       <div className="ms-header-actions">{onLogin ? <button className="ms-login" onClick={onLogin}>로그인</button> : <a className="ms-login" href="/#login">로그인</a>}<a className="ms-signup" href="/signup">회원가입</a><a className="ms-button ms-small" href="/trial">7일 무료체험 <Arrow /></a></div>
     </header>
     <main id="home-main">
@@ -41,6 +42,23 @@ export default function PublicHomeIntro({ onLogin }) {
           <article className="ms-course ms-course-math"><div className="ms-course-top"><span>01 · MATH & READING</span><span className="ms-course-symbol" aria-hidden="true">× ÷</span></div><h3>수학과 고전읽기</h3><p>공식을 외우기 전에,<br /><strong>그림 속에서 이유를 발견해요.</strong></p><div className="ms-course-topics">곱셈 · 나눗셈 · 분수 · 소수 · 비와 비례식</div><ul><li>함께 고전 15분 읽기 · 읽은 생각을 독서 기록으로</li><li>수학감각 교재와 영상으로 개념 이해</li><li>인터랙티브 도구·퀴즈·워크북으로 확인</li><li>학습 기록과 일대일 성장 면담</li></ul><a className="ms-course-link" href="/math/">수학과 고전읽기 과정 살펴보기 <Arrow /></a></article>
           <article className="ms-course ms-course-math"><div className="ms-course-top"><span>02 · MIDDLE SCHOOL MATH</span><span className="ms-course-symbol" aria-hidden="true">x²</span></div><h3>중등수학</h3><p>개념의 숲을 먼저 보고,<br /><strong>막힌 문제는 선생님과 함께.</strong></p><div className="ms-course-topics">중1~3 핵심 개념 · 절대개념 · 평가 · 내신 대비</div><ul><li>3~4분 핵심 개념 영상과 텍스트·퀴즈</li><li>수준별 단원평가와 학년별 월간평가</li><li>실시간 일대일 질문 지도와 성장 상담</li><li>수업 후 과제 · AI평가와 선생님 리뷰</li></ul><a className="ms-course-link" href="/middle-math/">중등수학 과정 살펴보기 <Arrow /></a></article>
           <article className="ms-course ms-course-python"><div className="ms-course-top"><span>03 · PYTHON</span><span className="ms-course-symbol" aria-hidden="true">{'{ }'}</span></div><h3>파이썬</h3><p>좋아하는 게임을 넘어,<br /><strong>내가 만드는 프로그램으로.</strong></p><div className="ms-course-topics">초등 3학년부터 · 자율 학습 · 프로젝트</div><ul><li>그림·게임·데이터를 직접 만드는 공부</li><li>온라인 편집 도구로 코드 작성과 실행</li><li>과제와 피드백으로 생각 다듬기</li></ul><a className="ms-course-link" href="/python">파이썬 과정 살펴보기 <Arrow /></a></article>
+        </div>
+      </section>
+      <section id="home-code-studio" className="ms-studio-section">
+        <div className="ms-shell ms-studio-layout">
+          <div className="ms-studio-copy">
+            <p className="ms-eyebrow">OPEN CODE STUDIO · 무료 공개 도구</p>
+            <h2>로그인 없이,<br />바로 코드를 써보세요.</h2>
+            <p>빈 <code>main.py</code>에서 시작하거나 내 프로젝트 폴더를 가져오세요. 브라우저에서 코드를 실행하고 결과를 바로 비교할 수 있습니다.</p>
+            <ul><li>Python 파일과 Jupyter 노트북 편집</li><li>그림·게임·수학 코드 실행</li><li>초안은 계정이 아닌 이 기기에 자동 저장</li></ul>
+            <div className="ms-actions"><a className="ms-button" href="/python-game-studio" onClick={trackStudioOpen}>코드 스튜디오 열기 <Arrow /></a><a className="ms-text-link" href="/python/guides/">파이썬 학습 노트 읽기 <Arrow /></a></div>
+            <p className="ms-fine">공개 이용에는 수업용 완성 에셋이 제공되지 않습니다. 새 프로젝트를 만들거나 내 폴더를 가져와 시작하세요.</p>
+          </div>
+          <div className="ms-code-window" aria-label="코드 스튜디오 실행 예시">
+            <div className="ms-code-title"><span><i /> main.py</span><span>METASENSE / CODE STUDIO</span></div>
+            <div className="ms-code-body"><pre><span className="ms-code-keyword">for</span> number <span className="ms-code-keyword">in</span> <span className="ms-code-function">range</span>(<span className="ms-code-number">1</span>, <span className="ms-code-number">6</span>):{`\n`}    <span className="ms-code-function">print</span>(<span className="ms-code-string">"★"</span> * number)</pre><div className="ms-code-output"><small>실행 결과</small><p>★<br />★★<br />★★★<br />★★★★<br />★★★★★</p></div></div>
+            <div className="ms-code-caption"><span className="ms-status-dot" /> 읽고 → 한 줄 바꾸고 → 다시 실행하기</div>
+          </div>
         </div>
       </section>
       <section className="ms-evidence-section"><div className="ms-shell">

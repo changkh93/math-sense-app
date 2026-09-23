@@ -7,7 +7,7 @@ import { ruleFor, selectCard, INTENT_LABELS } from '../../../functions/studioCoa
 import './ErrorCoach.css'
 
 // Parent keys this by failed execution, not just by the selected filename.
-export default function ErrorCoach({ uid, source, currentSource, text, mode = 'file', learningKey, learningScope = '', learningPath = '', requestAdvice = requestCoachAdvice }) {
+export default function ErrorCoach({ uid, source, currentSource, text, mode = 'file', learningKey, learningScope = '', learningPath = '', requestAdvice = requestCoachAdvice, allowAi = true }) {
   const error = useMemo(() => parseError(text), [text])
   const diagnosis = useMemo(() => localFeedback(error, source, mode), [error, source, mode])
   const { guide, example } = diagnosis
@@ -42,9 +42,9 @@ export default function ErrorCoach({ uid, source, currentSource, text, mode = 'f
     </div>}
     {session.manifest.collectionEnabled && <details className="pgs-coach-participation"><summary>도움 설명 개선에 참여하기 · 선택</summary><p>오류 유형, 선택한 질문, 수정·재실행 결과를 기록해 설명을 개선해요. 코드 원문과 변수 이름은 이 기록에 보내지 않아요.{session.manifest.samplesEnabled && ' AI를 요청하면 변환된 코드와 AI 답변 일부도 검토용으로 보관할 수 있어요.'} 참여하지 않아도 도움을 받을 수 있어요. 선택은 이 탭에서만 유지돼요.</p><label><input type="checkbox" checked={session.consent} onChange={e => { session.setConsent(e.target.checked); if (e.target.checked) session.tracker.register({key:episodeKey,scope:learningScope,source,path:learningPath,signature:`${error.type}:${error.message}`,ruleId,cardVersion:card.version,shadowVersion,mode}) }} /> 설명 개선에 참여할게요</label><a href="/privacy" target="_blank" rel="noreferrer">처리 안내 보기</a></details>}
     {!stale && step === 0 && <button onClick={() => setStep(1)}>확인 방법 · 예시 보기</button>}
-    <CoachAdvice uid={uid} source={source} error={error} mode={mode} stale={stale}
+    {allowAi && <CoachAdvice uid={uid} source={source} error={error} mode={mode} stale={stale}
       consent={session.consent && session.manifest.collectionEnabled}
       samplesConsent={session.consent && session.manifest.samplesEnabled}
-      onRequested={() => session.tracker.ai(episodeKey)} onReceived={() => session.tracker.ai(episodeKey, true)} requestAdvice={requestAdvice} />
+      onRequested={() => session.tracker.ai(episodeKey)} onReceived={() => session.tracker.ai(episodeKey, true)} requestAdvice={requestAdvice} />}
   </section>
 }

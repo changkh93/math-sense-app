@@ -3,7 +3,7 @@ import { behaviorError, inspectBehavior } from '../../../functions/studioBehavio
 import CoachAdvice from './CoachAdvice'
 import './ErrorCoach.css'
 
-export default function BehaviorCoach({ uid, source = '', path, requestAdvice }) {
+export default function BehaviorCoach({ uid, source = '', path, requestAdvice, allowAi = true }) {
   const [review, setReview] = useState(null)
   const [selected, setSelected] = useState(0)
   const stale = review?.source !== source
@@ -26,7 +26,7 @@ export default function BehaviorCoach({ uid, source = '', path, requestAdvice })
         <p><b>확인할 부분</b> {finding.action}</p>
         <p><b>직접 확인하기</b> {finding.check}</p>
       </>}
-      {finding && <CoachAdvice key={`${review.id}:${selected}`} uid={uid} source={review.source} error={behaviorError(finding)} stale={stale} requestAdvice={requestAdvice} />}
+      {finding && allowAi && <CoachAdvice key={`${review.id}:${selected}`} uid={uid} source={review.source} error={behaviorError(finding)} stale={stale} requestAdvice={requestAdvice} />}
       {stale && !finding && <p role="status">코드가 바뀌었어요. 현재 코드로 다시 점검해 주세요.</p>}
     </>}
   </section>

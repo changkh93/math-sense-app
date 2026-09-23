@@ -2,11 +2,11 @@
 (() => {
   const id = 'G-SGWRBZ7X2E';
   if (location.hostname !== 'msense.me') return;
-  const publicPath = p => ['/', '/python', '/trial', '/math', '/middle-math', '/math/books'].includes(p) || /^\/(?:python|math)\/guides\/(?:[a-z0-9-]+\/)*$/.test(p);
+  const publicPath = p => ['/', '/python', '/python-game-studio', '/trial', '/math', '/middle-math', '/math/books'].includes(p) || /^\/(?:python|math)\/guides\/(?:[a-z0-9-]+\/)*$/.test(p);
   const path = () => location.pathname.replace(/\/$/, '') || '/';
   const allowed = () => publicPath(path()) || /^\/(?:python|math)\/guides\/(?:[a-z0-9-]+\/)*$/.test(location.pathname);
   if (!allowed()) return;
-  const events = new Set(['python_view','python_cta','python_form_start','python_submit','python_success','python_error','python_video','math_form_start','math_submit','math_success','math_error']);
+  const events = new Set(['python_view','python_cta','python_studio_open','python_form_start','python_submit','python_success','python_error','python_video','math_form_start','math_submit','math_success','math_error']);
   const labels = new Set(['','page','results','learning','submission','foundation','lumi','game','advanced','math','algorithm']);
   const sources = new Set(['naver','naver_blog','google','instagram','youtube','kakao','clip']);
   const media = new Set(['organic','organic_social','social','video','cpc']);
