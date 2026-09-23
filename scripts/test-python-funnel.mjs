@@ -11,7 +11,7 @@ assert.deepEqual(window.dataLayer, [{event:'python_success',funnel:'python',labe
 // Unknown labels, including contacts, are discarded.
 delete globalThis.window;
 const html = await readFile('dist/python/index.html','utf8');
-assert.match(html, /<h1>/); assert.match(html, /초등 3학년/); assert.match(html, /월 15만 원/);
+assert.match(html, /<h1>/); assert.match(html, /초등 4학년/); assert.match(html, /월 15만 원/);
 assert.match(html, /rel="canonical" href="https:\/\/msense.me\/python"/);
 assert.match(html, /property="og:title"/); assert.match(html, /name="description"/);
 assert.ok(!html.includes('<div id="root"></div>'));
