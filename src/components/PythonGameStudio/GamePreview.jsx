@@ -79,7 +79,7 @@ export default function GamePreview({ uid, run, onEvent, publicAccess = false })
     }
     const bootTimeout = setTimeout(() => {
       bootFailed = true
-      if (runRef.current) dispatch({ type: 'ERROR', text: 'Python 실행 환경에 연결하지 못했습니다. 인터넷 연결을 확인하고 다시 실행해 주세요.' })
+      if (runRef.current) dispatch({ type: 'ERROR', text: 'Python 실행 환경을 준비하지 못했습니다. 다시 실행해 주세요. 계속되면 페이지를 새로고침해 주세요.' })
     }, 90000)
     const send = next => {
       if (next && bootFailed) { recover(); return }
