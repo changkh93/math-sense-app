@@ -15,7 +15,7 @@ export default function PublicHomeIntro({ onLogin }) {
     <a className="ms-skip" href="#home-main">본문으로 이동</a>
     <header className="ms-header">
       <a className="ms-brand" href="/" aria-label="메타센스 홈"><img src="/m-logo.svg" alt="" width="35" height="35" /><span>메타센스<small>스스로 배우는 힘</small></span></a>
-      <nav className="ms-navigation" aria-label="과정 안내"><a href="/math/">수학과 고전읽기</a><a href="/middle-math/">중등수학</a><a href="/python">파이썬</a><a href="/python-game-studio" onClick={trackStudioOpen}>코드 스튜디오</a><a href="/math/books/">수학감각 교재</a></nav>
+      <nav className="ms-navigation" aria-label="과정 안내"><a href="/math/">수학과 고전읽기</a><a href="/middle-math/">중등수학</a><a href="/python">파이썬</a><a href="/python-game-studio/" onClick={trackStudioOpen}>코드 스튜디오</a><a href="/math/books/">수학감각 교재</a></nav>
       <div className="ms-header-actions">{onLogin ? <button className="ms-login" onClick={onLogin}>로그인</button> : <a className="ms-login" href="/#login">로그인</a>}<a className="ms-signup" href="/signup">회원가입</a><a className="ms-button ms-small" href="/trial">7일 무료체험 <Arrow /></a></div>
     </header>
     <main id="home-main">
@@ -51,7 +51,7 @@ export default function PublicHomeIntro({ onLogin }) {
             <h2>로그인 없이,<br />바로 코드를 써보세요.</h2>
             <p>빈 <code>main.py</code>에서 시작하거나 내 프로젝트 폴더를 가져오세요. 브라우저에서 코드를 실행하고 결과를 바로 비교할 수 있습니다.</p>
             <ul><li>Python 파일과 Jupyter 노트북 편집</li><li>그림·게임·수학 코드 실행</li><li>초안은 계정이 아닌 이 기기에 자동 저장</li></ul>
-            <div className="ms-actions"><a className="ms-button" href="/python-game-studio" onClick={trackStudioOpen}>코드 스튜디오 열기 <Arrow /></a><a className="ms-text-link" href="/python/guides/">파이썬 학습 노트 읽기 <Arrow /></a></div>
+            <div className="ms-actions"><a className="ms-button" href="/python-game-studio/" onClick={trackStudioOpen}>코드 스튜디오 열기 <Arrow /></a><a className="ms-text-link" href="/python/guides/">파이썬 학습 노트 읽기 <Arrow /></a></div>
             <p className="ms-fine">공개 이용에는 수업용 완성 에셋이 제공되지 않습니다. 새 프로젝트를 만들거나 내 폴더를 가져와 시작하세요.</p>
           </div>
           <div className="ms-code-window" aria-label="코드 스튜디오 실행 예시">

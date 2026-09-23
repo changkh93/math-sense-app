@@ -336,7 +336,7 @@ export default function PythonEducation() {
         <nav aria-label="파이썬 과정 안내">
           <a href="#courses">학습 과정</a>
           <a href="https://msense.me/python/guides/">파이썬 학습노트</a>
-          <a href="/python-game-studio">코드 스튜디오</a>
+          <a href="/python-game-studio/">코드 스튜디오</a>
           <a href="#learning">학습 관리</a>
           <a className="pe-cta pe-cta-small" href="#apply">
             무료체험 신청 <ArrowUpRight size={17} />

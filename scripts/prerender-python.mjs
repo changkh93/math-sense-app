@@ -21,7 +21,7 @@ try {
     const { default: Component } = await server.ssrLoadModule(module);
     const body = renderToString(createElement(MemoryRouter, { initialEntries: [path] }, createElement(Component, props)));
     const { title, description } = publicSeo[path];
-    const url = `https://msense.me${path}`;
+    const url = `https://msense.me${path}${path === '/python-game-studio' ? '/' : ''}`;
     const schema = path === '/python-game-studio' ? `<script data-public-seo-schema type="application/ld+json">${JSON.stringify(studioSchema).replace(/</g, '\\u003c')}</script>` : '';
     const head = `<meta name="description" content="${description}"><meta name="robots" content="index,follow,max-image-preview:large"><link rel="canonical" href="${url}"><meta property="og:type" content="website"><meta property="og:url" content="${url}"><meta property="og:title" content="${title}"><meta property="og:description" content="${description}"><meta property="og:image" content="https://msense.me/python-showcase/game-poster.webp">${schema}`;
     const styles = css ? assets.filter(f => f.startsWith(`${css}-`) && f.endsWith('.css')) : [];
