@@ -41,10 +41,9 @@ function PublicLearningPrompt() {
       </a>)}
     </div>
     <div className="pgs-learning-actions">
-      <a className="primary" href="/python#courses" onClick={() => trackPython('python_cta', 'studio_preview')}>파이썬 배우기 →</a>
-      <a href="/python#apply" onClick={() => trackPython('python_cta', 'studio_trial')}>7일 무료로 시작하기</a>
+      <a className="primary" href="/python#courses" onClick={() => trackPython('python_cta', 'studio_preview')}>단계별 프로젝트 시작하기 →</a>
     </div>
-    <small>프로젝트는 수업 미리보기이며 완성 코드와 에셋은 공개하지 않습니다.</small>
+    <small>MetaSense Python에서 처음부터 차근차근 만들 수 있어요.</small>
   </div>
 }
 
