@@ -335,7 +335,9 @@ export function createStudioAnalyzer(getProject = () => ({})) {
     const member = enclosing(node, 'MemberExpression')
     if (member && (node.name === 'PropertyName' || before[pos - prefix.length - 1] === '.')) {
       const target = expression(member.firstChild, scope, pos)
-      return { from: pos - prefix.length, options: [...members(target)].filter(([key]) => prefix.startsWith('_') || !key.startsWith('_')).map(([, b]) => entry(b)) }
+      return { from: pos - prefix.length, options: [...members(target)].filter(([key]) => prefix.startsWith('_') || !key.startsWith('_')).map(([, b]) => entry(b)),
+        memberRef: target?.ref,
+        sourceMembers: Boolean(target?.members && !target.bases?.length && !target.members.has('__getattr__') && !target.members.has('__getattribute__')) }
     }
     if (!prefix && !explicit) return null
     const names = new Map()

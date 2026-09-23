@@ -7,6 +7,7 @@ import { EditorView, Decoration, keymap, lineNumbers, highlightActiveLineGutter 
 
 import { studioSyntax } from './studioSyntax'
 import { studioCompletion } from './studioCompletion'
+import { studioSpelling, refreshStudioSpelling } from './studioSpelling'
 
 const setExecutionLine = StateEffect.define()
 
@@ -35,7 +36,13 @@ const PythonEditor = forwardRef(function PythonEditor({ value, onChange, activeL
   const syncingValueRef = useRef(false)
   const editableCompartmentRef = useRef(new Compartment())
   const completionContextRef = useRef(completionContext)
-  useEffect(() => { completionContextRef.current = completionContext }, [completionContext])
+  useEffect(() => {
+    const previous = completionContextRef.current
+    completionContextRef.current = completionContext
+    if (previous?.path !== completionContext?.path || previous?.prefix !== completionContext?.prefix || previous?.files !== completionContext?.files) {
+      viewRef.current?.dispatch({ effects: refreshStudioSpelling.of(null) })
+    }
+  }, [completionContext])
 
   useImperativeHandle(ref, () => ({
     insertSnippet: (insertText) => {
@@ -110,9 +117,10 @@ const PythonEditor = forwardRef(function PythonEditor({ value, onChange, activeL
           python(),
           ...(initialColorfulRef.current ? studioSyntax : []),
           ...(completionContextRef.current ? studioCompletion(() => completionContextRef.current) : []),
+          ...(completionContextRef.current ? studioSpelling(() => completionContextRef.current) : []),
           closeBrackets(),
           executionLineField,
-          editableCompartmentRef.current.of(EditorView.editable.of(!initialReadOnlyRef.current)),
+          editableCompartmentRef.current.of([EditorView.editable.of(!initialReadOnlyRef.current), EditorState.readOnly.of(initialReadOnlyRef.current)]),
           EditorState.tabSize.of(4),
           keymap.of([
             indentWithTab,
@@ -158,7 +166,7 @@ const PythonEditor = forwardRef(function PythonEditor({ value, onChange, activeL
     const view = viewRef.current
     if (!view) return
     view.dispatch({
-      effects: editableCompartmentRef.current.reconfigure(EditorView.editable.of(!readOnly)),
+      effects: editableCompartmentRef.current.reconfigure([EditorView.editable.of(!readOnly), EditorState.readOnly.of(readOnly)]),
     })
   }, [readOnly])
 
