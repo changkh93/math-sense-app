@@ -29,7 +29,7 @@ function fixture(withBridge = true) {
   if (withBridge) env.studioConnectPresentation(port)
   const command = value => env.studioTurtleCommand(JSON.stringify(value))
   return {
-    env, errors, nodes,
+    env, errors, nodes, command,
     move(speed = 3) {
       command({ op: 'turtle', id: 1, x: 0, y: 0, heading: 0, scale: [1, 1], shape: 'classic', fill: 'black', color: 'black', visible: true })
       command({ op: 'move', id: 1, points: [[0, 0], [100, 0]], headings: [0, 0], pen: true, width: 1, color: 'black', speed })
@@ -60,6 +60,17 @@ test('renderer alone clamps backwards timestamps instead of indexing points[-1]'
   f.move(); f.native(100.75, 100.75); f.native(101, 100); f.native(1000, 1000)
   assert.deepEqual(f.errors, [])
   assert.equal(f.env.studioTurtleBusy(), false)
+})
+
+test('popup turtle SVG paints its own background and follows screen color and size', () => {
+  const f = fixture(false)
+  f.command({ op: 'screen', width: 500, height: 400, color: 'navy' })
+  f.native(100.75, 100.75)
+  const background = f.nodes.find(node => node.attributes['data-layer'] === 'background')
+  assert.deepEqual(background.attributes, { 'data-layer': 'background', x: '-250', y: '-200', width: '500', height: '400', fill: 'navy' })
+  f.command({ op: 'background', color: 'white' })
+  f.native(101, 101)
+  assert.equal(background.attributes.fill, 'white')
 })
 
 test('repeated run resets and instant drawing remain valid', () => {

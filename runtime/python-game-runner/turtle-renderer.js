@@ -2,7 +2,7 @@
 // Python owns positions/control flow; this queue animates the resulting commands.
 (() => {
   const NS = 'http://www.w3.org/2000/svg'
-  let svg, drawings, actors, title, frame = 0, queue = [], cursor = 0, animation = null
+  let svg, background, drawings, actors, title, frame = 0, queue = [], cursor = 0, animation = null
   let turtles = new Map(), fills = new Map()
   const element = (tag, attrs = {}) => {
     const node = document.createElementNS(NS, tag)
@@ -14,9 +14,12 @@
       svg = element('svg', { id: 'turtle-canvas', role: 'img', 'aria-label': '거북이 그림', viewBox: '-400 -300 800 600', preserveAspectRatio: 'xMidYMid meet', width: 800, height: 600 })
       Object.assign(svg.style, { maxWidth: '100%', maxHeight: '100%', background: 'white', display: 'block', overflow: 'hidden' })
       title = element('title'); title.textContent = '거북이 그림'
+      // A painted SVG rectangle is more reliable than the root SVG's CSS
+      // background in sandboxed, separately composited popup frames.
+      background = element('rect', { 'data-layer': 'background', x: -400, y: -300, width: 800, height: 600, fill: 'white' })
       drawings = element('g', { 'data-layer': 'drawing' })
       actors = element('g', { 'data-layer': 'turtles' })
-      svg.append(title, drawings, actors)
+      svg.append(title, background, drawings, actors)
       document.body.append(svg)
     }
     if (window.studioShowSurface) window.studioShowSurface('turtle-canvas')
@@ -34,7 +37,7 @@
     return context.measureText(text).width
   }
   function clearSurface() {
-    svg?.remove(); svg = drawings = actors = title = null
+    svg?.remove(); svg = background = drawings = actors = title = null
     turtles = new Map(); fills = new Map()
     document.getElementById('canvas').style.display = ''
   }
@@ -78,7 +81,15 @@
       svg.setAttribute('width', command.width); svg.setAttribute('height', command.height)
       svg.setAttribute('viewBox', `${-command.width / 2} ${-command.height / 2} ${command.width} ${command.height}`)
       svg.style.background = command.color
-    } else if (command.op === 'background') svg.style.background = command.color
+      background.setAttribute('x', -command.width / 2)
+      background.setAttribute('y', -command.height / 2)
+      background.setAttribute('width', command.width)
+      background.setAttribute('height', command.height)
+      background.setAttribute('fill', command.color)
+    } else if (command.op === 'background') {
+      svg.style.background = command.color
+      background.setAttribute('fill', command.color)
+    }
     else if (command.op === 'title') { title.textContent = command.text; svg.setAttribute('aria-label', command.text) }
     else if (command.op === 'turtle') actor(command)
     else if (command.op === 'begin-fill') {
