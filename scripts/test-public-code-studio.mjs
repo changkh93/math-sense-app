@@ -35,6 +35,9 @@ for (const hidden of ['백업 파일 복원', '동전 모으기 수업 준비', 
   assert(!publicActions.includes(hidden), `public project actions must not include ${hidden}`)
 }
 assert(studio.includes('allowAi={!publicAccess}'))
+assert(!studio.includes("import BehaviorCoach from './BehaviorCoach'"))
+assert(!studio.includes('<BehaviorCoach'))
+assert(studio.includes('<ErrorCoach'))
 assert(studio.includes('href="https://msense.me/python/guides/">파이썬 학습노트</a>'))
 assert(studio.includes('파이썬 배우기'))
 assert(!studio.includes('href="/#login">로그인</a>'))
