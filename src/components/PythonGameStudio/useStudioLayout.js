@@ -10,7 +10,7 @@ function readLayout(key) {
   } catch { return DEFAULTS }
 }
 
-export default function useStudioLayout(uid, ready, previewRef) {
+export default function useStudioLayout(uid, ready) {
   const storageKey = `metasense-game-studio-layout:${uid}`
   const [sizes, setSizes] = useState(() => readLayout(storageKey))
   const [bounds, setBounds] = useState({ width: 1200, previewHeight: 700, mobile: false })
@@ -19,17 +19,17 @@ export default function useStudioLayout(uid, ready, previewRef) {
   const dragRef = useRef(null)
   useEffect(() => {
     if (!ready) return undefined
-    const workspace = workspaceRef.current, preview = previewRef.current
+    const workspace = workspaceRef.current
     const measure = () => {
-      const next = { width: workspace.clientWidth, previewHeight: preview.clientHeight, mobile: window.matchMedia('(max-width: 800px)').matches }
+      const next = { width: workspace.clientWidth, previewHeight: workspace.clientHeight, mobile: window.matchMedia('(max-width: 800px)').matches }
       setBounds(previous => Object.keys(next).every(key => previous[key] === next[key]) ? previous : next)
     }
     const observer = new ResizeObserver(measure)
-    observer.observe(workspace); observer.observe(preview)
+    observer.observe(workspace)
     window.addEventListener('resize', measure)
     measure()
     return () => { observer.disconnect(); window.removeEventListener('resize', measure) }
-  }, [ready, previewRef])
+  }, [ready])
   useEffect(() => {
     try { localStorage.setItem(storageKey, JSON.stringify(sizes)) } catch { /* Resizing remains available without storage. */ }
   }, [sizes, storageKey])
@@ -45,7 +45,7 @@ export default function useStudioLayout(uid, ready, previewRef) {
   const remaining = Math.max(1, bounds.width - files - GAP * 2)
   const editor = clamp(remaining * sizes.editorShare, 240, remaining - 260)
   const editorShare = editor / remaining
-  const maxConsole = Math.max(90, bounds.previewHeight - 42 - 160 - GAP)
+  const maxConsole = Math.max(90, bounds.previewHeight - 42 - 240 - GAP)
   const consoleHeight = clamp(sizes.console, 90, maxConsole)
   const mobileEditor = clamp(sizes.mobileEditor, 280, 900)
   const limits = {

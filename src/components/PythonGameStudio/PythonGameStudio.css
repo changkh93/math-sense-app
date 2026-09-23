@@ -134,3 +134,25 @@
 /* Notebook controls/editors stay above the live surface during compositor scroll.
    Only the reserved slot admits iframe pointer input. */
 .pgs-notebook-tools,.pgs-notebook-hint,.pgs-notebook-add,.pgs-cell-header,.pgs-cell>.python-editor-host,.pgs-cell-markdown,.pgs-cell>textarea,.pgs-cell-output>*:not(.pgs-cell-surface-slot){position:relative;z-index:3}
+
+/* File mode keeps code above text output. The graphics runner stays mounted off
+   screen and moves to a browser window only for visual Python programs. */
+.pgs-panel-switch{display:none!important}
+.pgs-workspace{grid-template-columns:var(--pgs-files-width,210px) 6px minmax(0,1fr);grid-template-rows:minmax(0,1fr)}
+.pgs-main-panes{display:flex;flex-direction:column;min-width:0;min-height:0;overflow:hidden}
+.pgs-main-panes>.pgs-editor-pane{flex:1;min-height:180px;border-right:0}
+.pgs-main-panes>.pgs-splitter-console{display:block;width:100%;height:6px}
+.pgs-main-panes>.pgs-console{height:var(--pgs-console-height,190px);min-height:90px;flex-shrink:0}
+.pgs-runner-window{position:fixed;left:-200vw;top:0;width:1100px;height:720px;display:flex;opacity:0;pointer-events:none;z-index:-1;border:1px solid #39516c;background:#080f20}
+.pgs-runner-window.pgs-visual-fallback-open{left:50%;top:50%;width:min(1100px,calc(100vw - 40px));height:min(760px,calc(100dvh - 40px));transform:translate(-50%,-50%);opacity:1;pointer-events:auto;z-index:1600;resize:both;overflow:hidden;border-radius:12px;box-shadow:0 24px 100px #000c}
+.pgs-runner-window.pgs-preview-expanded{left:0;top:0;transform:none;opacity:1;pointer-events:auto;z-index:1700;resize:none;border-radius:0}
+.pgs-popout-shell{width:100vw;height:100dvh;min-height:0;overflow:hidden}
+.pgs-popout-shell .pgs-runner-window{position:static;left:auto;top:auto;width:100%;height:100%;opacity:1;pointer-events:auto;z-index:auto;border:0;resize:none}
+.pgs-popout-shell .pgs-runner-window.pgs-preview-expanded{position:fixed;inset:0}
+.pgs-popout-shell .pgs-game-frame,.pgs-runner-window>.pgs-game-frame{min-height:0}
+@media(max-width:800px){
+ .pgs-workspace{grid-template-columns:var(--pgs-files-width,130px) 6px minmax(0,1fr);grid-template-rows:minmax(0,1fr)}
+ .pgs-main-panes{display:flex}
+ .pgs-main-panes>.pgs-editor-pane{flex:1}
+ .pgs-main-panes>.pgs-console{height:var(--pgs-console-height,150px)}
+}

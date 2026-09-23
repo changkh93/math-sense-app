@@ -65,7 +65,9 @@ export default function GamePreview({ uid, run, onEvent, publicAccess = false })
       return callbackRef.current({ ...event, notebook: snapshot?.notebook, coach: event.type === 'ERROR' && source !== undefined ? { source, path, projectId: snapshot.project.id, runId: snapshot.id, scope: scopeForRun(snapshot) } : null })
     }
     const frame = frameRef.current
-    const channel = new MessageChannel()
+    const hostDocument = frame.ownerDocument
+    const hostWindow = hostDocument.defaultView || window
+    const channel = new hostWindow.MessageChannel()
     const sessionId = crypto.randomUUID()
     let connected = false, engineReady = false, bootFailed = false, disposed = false, count = 0, windowAt = Date.now(), watchdog
     let waitingId = null, waitingForStop = false
@@ -89,7 +91,7 @@ export default function GamePreview({ uid, run, onEvent, publicAccess = false })
       if (next) learningSession(uid).tracker.begin({ id: next.id, scope: scopeForRun(next), sourceFor: path => next.project.files.find(f => f.path === path)?.text, source: next.notebook?.source ?? next.project.files.find(f => f.path === next.project.entrypoint)?.text ?? '' })
       channel.port1.postMessage({ type: next ? 'RUN' : 'STOP', protocolVersion: 2, sessionId, runId: waitingId, project: next?.payload, notebook: next?.notebook })
       // A normal stop must acknowledge cleanup. Reset only an unresponsive engine.
-      if (!next && engineReady && !document.hidden) watchdog = setTimeout(recover, 3500)
+      if (!next && engineReady && !hostDocument.hidden) watchdog = setTimeout(recover, 3500)
     }
     sendRef.current = send
     const connect = () => {
@@ -101,7 +103,7 @@ export default function GamePreview({ uid, run, onEvent, publicAccess = false })
       if (data?.protocolVersion !== 2 || data.sessionId !== sessionId) return
       if (Date.now() - windowAt > 1000) { count = 0; windowAt = Date.now() }
       if (++count > 150) return
-      if (data.type === 'CONNECTED') { send(runRef.current); return }
+      if (data.type === 'CONNECTED') { dispatch({ type: 'PREVIEW_CONNECTED' }); send(runRef.current); return }
       if (data.type === 'ENGINE_READY') { engineReady = true; bootFailed = false; clearTimeout(bootTimeout); return }
       if (data.type === 'RESET_REQUIRED') { recover(); return }
       if (data.runId === waitingId && ['READY','RUNNING','STOPPED','ERROR'].includes(data.type)) clearTimeout(watchdog)
@@ -150,16 +152,16 @@ export default function GamePreview({ uid, run, onEvent, publicAccess = false })
     const visibility = () => {
       clearTimeout(watchdog)
       // Hidden tabs pause animation-driven Python. Allow cleanup time on return.
-      if (!document.hidden && waitingForStop && engineReady) watchdog = setTimeout(recover, 3500)
+      if (!hostDocument.hidden && waitingForStop && engineReady) watchdog = setTimeout(recover, 3500)
     }
-    document.addEventListener('visibilitychange', visibility)
-    window.addEventListener('message', hello)
+    hostDocument.addEventListener('visibilitychange', visibility)
+    hostWindow.addEventListener('message', hello)
     frame.addEventListener('load', connect)
     return () => {
       disposed = true; clearTimeout(bootTimeout); clearTimeout(watchdog)
       sendRef.current = null
-      document.removeEventListener('visibilitychange', visibility)
-      window.removeEventListener('message', hello); frame.removeEventListener('load', connect)
+      hostDocument.removeEventListener('visibilitychange', visibility)
+      hostWindow.removeEventListener('message', hello); frame.removeEventListener('load', connect)
       channel.port1.close(); channel.port2.close()
     }
   }, [engineEpoch, uid])

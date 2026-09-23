@@ -1,5 +1,6 @@
 import { learningSession } from './coachLearningClient'
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { ArrowLeft, Play, Square, Upload, FileCode2, FolderPlus, Plus, Download, FolderOpen, Maximize2, Minimize2, Trash2, Code2, X } from 'lucide-react'
 import PythonEditor from '../PythonWorld/PythonEditor'
 import GamePreview from './GamePreview'
@@ -21,6 +22,7 @@ import useNotebookSurface from './useNotebookSurface'
 import { notebookCells } from './notebookModel.mjs'
 import { readNotebook, writeNotebook, normalizeNotebook } from './notebookFile.mjs'
 import { trackPython } from '../../utils/pythonFunnel'
+import { projectUsesVisualOutput } from './visualOutput.mjs'
 import './PythonGameStudio.css'
 
 const statusNames = { loading: '엔진 준비 중', ready: '실행 준비 완료', waiting: '입력 대기', running: '실행 중', stopped: '정지됨', error: '오류 확인', exited: '실행 완료' }
@@ -84,9 +86,11 @@ export default function PythonGameStudio({ uid = 'local-preview', onBack, public
   const [run, setRun] = useState(null)
   const [liveCell, setLiveCell] = useState(null)
   const [surfaceSlot, setSurfaceSlot] = useState(null)
-  const [compactPanel, setCompactPanel] = useState('code')
-  const [compactViewport, setCompactViewport] = useState(() => window.matchMedia('(max-width:1100px)').matches)
-  useEffect(() => { const media = window.matchMedia('(max-width:1100px)'); const change = () => setCompactViewport(media.matches); media.addEventListener('change', change); return () => media.removeEventListener('change', change) }, [])
+  const previewWindowRef = useRef(null)
+  const previewConnectedRef = useRef(false)
+  const previewFallbackTimer = useRef(null)
+  const [previewPortal, setPreviewPortal] = useState(null)
+  const [visualFallback, setVisualFallback] = useState(false)
   const [previewExpanded, setPreviewExpanded] = useState(false)
   const [inputRequest, setInputRequest] = useState(null)
   const consoleOutput = useRef(null)
@@ -104,22 +108,65 @@ export default function PythonGameStudio({ uid = 'local-preview', onBack, public
   const [dialogValue, setDialogValue] = useState('')
   const [errorLine, setErrorLine] = useState(null)
   const fileInput = useRef(null), replaceInput = useRef(null), editor = useRef(null), preview = useRef(null)
-  const layout = useStudioLayout(uid, Boolean(project), preview)
+  const layout = useStudioLayout(uid, Boolean(project))
   useNotebookSurface(preview, run && liveCell?.kernel === `${project?.id}:${selected}` ? surfaceSlot : null, Boolean(project) && editorMode === 'notebook', previewExpanded)
   const saveChain = useRef(Promise.resolve()), latest = useRef(null), mounted = useRef(true)
   const runGeneration = useRef(0)
   const notebook = useNotebook({ projectRef: latest, setRun, setStatus, setLogs, setInputRequest, setNotice })
   const notebookEvent = notebook.event, cancelNotebook = notebook.cancel
+  const closeVisualWindow = useCallback(() => {
+    window.clearTimeout(previewFallbackTimer.current)
+    previewFallbackTimer.current = null
+    previewConnectedRef.current = false
+    const target = previewWindowRef.current
+    previewWindowRef.current = null
+    if (target && !target.closed) target.close()
+    setPreviewPortal(null)
+    setVisualFallback(false)
+    setPreviewExpanded(false)
+  }, [])
+  const openVisualWindow = useCallback(() => {
+    const existing = previewWindowRef.current
+    if (existing && !existing.closed) { existing.focus(); return true }
+    const popup = window.open('', 'metasense-code-studio-preview', 'popup=yes,width=1120,height=780,resizable=yes,scrollbars=no')
+    if (!popup) { setVisualFallback(true); return false }
+    popup.document.title = 'MetaSense Code Studio · 실행 화면'
+    popup.document.head.replaceChildren()
+    const base = popup.document.createElement('base'); base.href = document.baseURI; popup.document.head.append(base)
+    document.querySelectorAll('link[rel="stylesheet"],style').forEach(node => popup.document.head.append(node.cloneNode(true)))
+    const root = popup.document.createElement('div'); root.id = 'metasense-code-studio-preview'; popup.document.body.replaceChildren(root)
+    popup.document.documentElement.style.cssText = 'width:100%;height:100%;margin:0;overflow:hidden'
+    popup.document.body.style.cssText = 'width:100%;height:100%;margin:0;overflow:hidden'
+    root.style.height = '100%'
+    previewWindowRef.current = popup
+    previewConnectedRef.current = false
+    setPreviewPortal({ root, popup })
+    setVisualFallback(false)
+    popup.focus()
+    window.clearTimeout(previewFallbackTimer.current)
+    previewFallbackTimer.current = window.setTimeout(() => {
+      if (previewConnectedRef.current || previewWindowRef.current !== popup) return
+      previewWindowRef.current = null
+      if (!popup.closed) popup.close()
+      setPreviewPortal(null); setPreviewExpanded(false); setVisualFallback(true)
+    }, 4000)
+    return true
+  }, [])
+  const stop = useCallback(() => {
+    learningSession(uid).tracker.abandon(); cancelNotebook(); closeVisualWindow()
+    runGeneration.current++; setRun(null); setInputRequest(null); setStatus('stopped')
+  }, [uid, cancelNotebook, closeVisualWindow])
   useEffect(() => { currentRun.current = run }, [run])
   const selectFile = path => {
     const kind = project.files.find(file => file.path === path)?.kind
+    if (kind === 'notebook' && editorMode !== 'notebook') stop()
     lastModeFile.current[`${project.id}:${kind}`] = path
     setSelected(path); setSelectedFolder(path.split('/').slice(0, -1).join('/')); setErrorLine(null)
     setEditorMode(project.files.find(file => file.path === path)?.kind === 'notebook' ? 'notebook' : 'file')
-    setPreviewExpanded(false); setCompactPanel('code')
   }
   const changeEditorMode = mode => {
     if (!project || busy || notebook.running) return
+    stop()
     const kind = mode === 'notebook' ? 'notebook' : 'python'
     const current = project.files.find(file => file.path === selected)
     const previousPath = lastModeFile.current[`${project.id}:${kind}`]
@@ -131,7 +178,7 @@ export default function PythonGameStudio({ uid = 'local-preview', onBack, public
       const legacy = mode === 'notebook' && current?.kind === 'python' && /#\s*%%/.test(current.text)
       const text = mode === 'notebook' ? writeNotebook(legacy ? notebookCells(current.text) : undefined) : ''
       setProject(validateProject({ ...project, files: [...project.files, { path, kind, text }] }))
-      setSelected(path); setSelectedFolder(''); setEditorMode(mode); setCompactPanel('code'); setPreviewExpanded(false)
+      closeVisualWindow(); setSelected(path); setSelectedFolder(''); setEditorMode(mode)
       setNotice(legacy ? `기존 셀의 코드·설명을 ${path}로 복사했습니다. 원본 Python 파일도 남아 있습니다.` : `${path} 파일을 만들었습니다. 이 파일에 작성한 내용은 자동 저장됩니다.`)
     } catch (error) { setNotice(error.message) }
   }
@@ -146,7 +193,7 @@ export default function PythonGameStudio({ uid = 'local-preview', onBack, public
     }
     latest.current = next
     cancelNotebook()
-    runGeneration.current++; setRun(null); setInputRequest(null); setStatus('stopped'); setLogs([]); setUploadError(''); setCompactPanel('code'); setPreviewExpanded(false); setProject(next); setSelected(savedFile(uid, next)); setEditorMode(next.files.find(file => file.path === savedFile(uid, next))?.kind === 'notebook' ? 'notebook' : 'file'); setSelectedFolder(''); setErrorLine(null); setDrawer(false); return true }, [uid, cancelNotebook])
+    closeVisualWindow(); runGeneration.current++; setRun(null); setInputRequest(null); setStatus('stopped'); setLogs([]); setUploadError(''); setProject(next); setSelected(savedFile(uid, next)); setEditorMode(next.files.find(file => file.path === savedFile(uid, next))?.kind === 'notebook' ? 'notebook' : 'file'); setSelectedFolder(''); setErrorLine(null); setDrawer(false); return true }, [uid, cancelNotebook, closeVisualWindow])
   useEffect(() => {
     mounted.current = true
     listDrafts(uid).then(rows => { if (mounted.current) { setDrafts(rows); setProject(rows[0]?.project || createProject()); setSelected(rows[0] ? savedFile(uid, rows[0].project) : 'main.py'); setEditorMode(rows[0]?.project.files.find(file => file.path === savedFile(uid, rows[0].project))?.kind === 'notebook' ? 'notebook' : 'file') } }).catch(() => { if (mounted.current) { setProject(createProject()); setNotice('브라우저 초안을 읽지 못했습니다. 프로젝트 다운로드로 작업을 보관해 주세요.') } })
@@ -173,6 +220,16 @@ export default function PythonGameStudio({ uid = 'local-preview', onBack, public
     return () => window.removeEventListener('beforeunload', beforeUnload)
   }, [saved])
   useEffect(() => {
+    if (!previewPortal) return undefined
+    const timer = window.setInterval(() => {
+      if (!previewPortal.popup.closed) return
+      previewWindowRef.current = null; setPreviewPortal(null); setPreviewExpanded(false)
+      runGeneration.current++; setRun(null); setInputRequest(null); setStatus('stopped')
+    }, 300)
+    return () => window.clearInterval(timer)
+  }, [previewPortal])
+  useEffect(() => () => { window.clearTimeout(previewFallbackTimer.current); const target = previewWindowRef.current; previewWindowRef.current = null; if (target && !target.closed) target.close() }, [])
+  useEffect(() => {
     if (!previewExpanded) return undefined
     const escape = event => { if (event.key === 'Escape') setPreviewExpanded(false) }
     window.addEventListener('keydown', escape)
@@ -189,7 +246,6 @@ export default function PythonGameStudio({ uid = 'local-preview', onBack, public
     if (latestError) output.scrollTop += latestError.getBoundingClientRect().top - output.getBoundingClientRect().top
     else output.scrollTop = output.scrollHeight
   }, [logs, inputRequest])
-  const stop = () => { learningSession(uid).tracker.abandon(); cancelNotebook(); runGeneration.current++; setRun(null); setInputRequest(null); setStatus('stopped') }
   const runPath = ['python', 'notebook'].includes(activeFile?.kind) ? activeFile.path : project?.entrypoint
   const execute = async () => {
     if (project.files.find(file => file.path === runPath)?.kind === 'notebook') {
@@ -200,7 +256,9 @@ export default function PythonGameStudio({ uid = 'local-preview', onBack, public
       return
     }
     cancelNotebook()
-    setCompactPanel('preview')
+    const visual = projectUsesVisualOutput(project)
+    if (visual) openVisualWindow()
+    else closeVisualWindow()
     const generation = ++runGeneration.current
     setBusy(true); setRun(null); setInputRequest(null)
     try {
@@ -218,9 +276,15 @@ export default function PythonGameStudio({ uid = 'local-preview', onBack, public
     return () => document.removeEventListener('visibilitychange', hide)
   }, [uid])
   const handleEvent = useCallback(event => {
+    if (event.type === 'PREVIEW_CONNECTED') {
+      previewConnectedRef.current = true
+      window.clearTimeout(previewFallbackTimer.current); previewFallbackTimer.current = null
+      return
+    }
     notebookEvent(event)
     if (['KERNEL_RESET', 'KERNEL_LOST'].includes(event.type)) setLiveCell(null)
     if (event.type === 'SURFACE' && event.notebook) setLiveCell({ ...event.notebook, surface: event.text })
+    if (event.type === 'SURFACE' && !event.notebook && !previewWindowRef.current) setVisualFallback(true)
     if (event.type === 'FILE_WRITE') {
       try {
         const next = applyRuntimeCsv(latest.current, event.projectId, event.file, event.expectedData)
@@ -235,7 +299,7 @@ export default function PythonGameStudio({ uid = 'local-preview', onBack, public
       }
     }
     if (event.type === 'READY') setStatus('ready')
-    if (event.type === 'INPUT_REQUEST') { if (!event.notebook) setCompactPanel('preview'); setInputRequest(event); setStatus('waiting'); return }
+    if (event.type === 'INPUT_REQUEST') { setInputRequest(event); setStatus('waiting'); return }
     if (['INPUT_CANCEL', 'ERROR', 'EXIT'].includes(event.type)) {
       setInputRequest(null)
       if (event.type === 'INPUT_CANCEL') setStatus(previous => previous === 'waiting' ? 'running' : previous)
@@ -258,7 +322,7 @@ export default function PythonGameStudio({ uid = 'local-preview', onBack, public
       while (project.files.some(f => f.path.toLowerCase() === path.toLowerCase())) path = normalizePath([selectedFolder, `${name}-${count++}.ipynb`].filter(Boolean).join('/'))
       const next = validateProject({ ...project, files: [...project.files, { path, kind: 'notebook', text }] })
       if (latest.current !== baseline) throw new Error('프로젝트가 변경되었습니다. 다시 가져와 주세요.')
-      setProject(next); setSelected(path); setEditorMode('notebook'); setCompactPanel('code')
+      stop(); setProject(next); setSelected(path); setEditorMode('notebook')
       setNotice('노트북의 코드·설명을 가져왔습니다. .ipynb 파일로 보관합니다. 기존 출력은 가져오지 않으며, 이미지·CSV 등 자료는 파일 올리기로 추가해 주세요.')
     } catch (error) { setNotice(`노트북 가져오기 실패: ${error.message}`) } finally { setBusy(false) }
   }
@@ -403,17 +467,21 @@ export default function PythonGameStudio({ uid = 'local-preview', onBack, public
   const jumpToError = text => {
     const matches = [...text.matchAll(/File "\/tmp\/studio\/([^"]+)", line (\d+)/g)]
     const match = matches.at(-1)
-    if (match && project.files.some(f => f.path === match[1])) { selectFile(match[1]); setCompactPanel('code'); setPreviewExpanded(false); setSelectedFolder(match[1].split('/').slice(0, -1).join('/')); setErrorLine(Number(match[2])); requestAnimationFrame(() => editor.current?.revealLine(Number(match[2]))) }
+    if (match && project.files.some(f => f.path === match[1])) { selectFile(match[1]); setSelectedFolder(match[1].split('/').slice(0, -1).join('/')); setErrorLine(Number(match[2])); requestAnimationFrame(() => editor.current?.revealLine(Number(match[2]))) }
   }
   if (!project) return <div className="pgs-shell pgs-loading">내 프로젝트를 불러오고 있습니다…</div>
+  const visualPane = <section inert={editorMode !== 'notebook' && !previewPortal && !visualFallback ? true : undefined} aria-hidden={editorMode !== 'notebook' && !previewPortal && !visualFallback ? true : undefined} className={`pgs-preview-pane pgs-runner-window${visualFallback ? ' pgs-visual-fallback-open' : ''}${previewExpanded ? ' pgs-preview-expanded' : ''}`} ref={preview}>
+    <div className="pgs-panel-title"><span>실행 화면</span><div><span className="pgs-fit-label">별도 창 · 화면에 맞춤</span><button aria-label={previewExpanded ? '실행 화면 원래 크기로' : '실행 화면 크게 보기'} aria-pressed={previewExpanded} onClick={() => setPreviewExpanded(value => !value)}>{previewExpanded ? <Minimize2 size={16} /> : <Maximize2 size={16} />}</button>{editorMode !== 'notebook' && <button aria-label="실행 화면 닫기" onClick={stop}><X size={16} /></button>}</div></div>
+    <div className="pgs-game-frame"><GamePreview uid={uid} run={run} onEvent={handleEvent} publicAccess={publicAccess} /></div>
+  </section>
+  const visualSurface = previewPortal ? createPortal(<main className="pgs-shell pgs-popout-shell" data-code-theme={preferences.theme}>{visualPane}</main>, previewPortal.root) : visualPane
   return <main className="pgs-shell" data-editor-mode={editorMode} data-code-theme={preferences.theme} onDragOver={e => { if (Array.from(e.dataTransfer.types).includes('Files')) e.preventDefault() }} onDrop={e => { if (!e.dataTransfer.files.length) return; e.preventDefault(); e.stopPropagation(); if (!busy) upload(e.dataTransfer.files) }}>
     <header className="pgs-header">{onBack && <button className="pgs-icon-btn" aria-label={publicAccess ? '메타센스 홈으로' : '수업으로 돌아가기'} onClick={async () => { try { await saveChain.current.catch(() => {}); await saveDraft(uid, project); stop(); onBack() } catch (error) { setNotice(error.message) } }}><ArrowLeft size={20} /></button>}<div className="pgs-brand"><span>METASENSE {publicAccess ? 'CODE STUDIO' : '/ CODE STUDIO'}</span>{publicAccess && <small className="pgs-brand-tagline">만들면서 배우는 Python</small>}<input aria-label="프로젝트 이름" value={project.title} maxLength={80} onChange={e => setProject({ ...project, title: e.target.value })} /></div><span className="pgs-save-state" role="status">{saved}</span>{publicAccess && <nav className="pgs-public-links" aria-label="메타센스 안내"><a href="https://msense.me/python/guides/">파이썬 학습노트</a><a className="pgs-learn-link" href="/python#courses" onClick={() => trackPython('python_cta', 'studio_header')}>파이썬 배우기</a></nav>}<div className="pgs-header-actions"><button onClick={showLibrary}><FolderOpen size={16} /> 내 프로젝트</button><button aria-label="프로젝트 다운로드" title="프로젝트 다운로드" onClick={() => download(`${project.title || 'game'}.mspygame.json`, JSON.stringify(project), 'application/json')}><Download size={17} /></button></div></header>
     {notice && <div className="pgs-notice" role="status">{notice}<button aria-label="안내 닫기" onClick={() => setNotice('')}><X size={15} /></button></div>}
     <div className="pgs-toolbar"><div><span className="pgs-dot" /> {publicAccess ? '로그인 없이 코드를 실행하고, 초안은 이 기기에 저장하세요.' : '그림부터 게임, 수학까지 파이썬으로 직접 만들어 보세요.'}</div><div className="pgs-run-actions"><span className={`pgs-run-status ${status}`}>{statusNames[status]}</span><span className="pgs-run-target" title={`실행 대상: ${runPath}`}>{runPath}</span><button className="pgs-run" title={`${runPath} 실행`} disabled={busy || notebook.running} onClick={execute}><Play size={16} fill="currentColor" /> 실행</button><button disabled={!run} onClick={stop}><Square size={15} /> 정지</button></div></div>
     <div className="pgs-editor-switch" role="group" aria-label="편집 방식"><button aria-pressed={editorMode === 'file'} disabled={busy || notebook.running} onClick={() => changeEditorMode('file')}>파일 모드</button><button aria-pressed={editorMode === 'notebook'} disabled={busy || notebook.running} onClick={() => changeEditorMode('notebook')}>노트북 모드</button><span>.py 파일과 .ipynb 노트북을 한 프로젝트에서</span><button disabled={busy || notebook.running} onClick={() => notebookInput.current.click()}>Colab 노트북 가져오기</button><input ref={notebookInput} type="file" accept=".ipynb" hidden onChange={loadNotebook} /></div>
     <StudioPlayTools preferences={preferences} onPreferences={changePreferences} />
-    <div className="pgs-panel-switch" role="group" aria-label="작업 화면 선택"><button aria-pressed={compactPanel === 'code'} onClick={() => setCompactPanel('code')}>코드 · 파일</button><button aria-pressed={compactPanel === 'preview'} onClick={() => setCompactPanel('preview')}>실행 화면 · 출력</button></div>
-    <div data-panel={editorMode === 'notebook' ? 'code' : compactPanel} ref={layout.workspaceRef} className={`pgs-workspace${layout.dragging ? ' pgs-is-resizing' : ''}`} style={layout.style}><aside className="pgs-files"><div className="pgs-panel-title">프로젝트 파일<span><button title={editorMode === 'notebook' ? '노트북 파일 추가' : 'Python 파일 추가'} aria-label={editorMode === 'notebook' ? '노트북 파일 추가' : 'Python 파일 추가'} onClick={() => { setDialogValue(editorMode === 'notebook' ? '새 노트북.ipynb' : 'helper.py'); setDialog('file') }}><Plus size={15} /></button><button title="폴더 만들기" aria-label="폴더 만들기" onClick={() => { setDialogValue('새 폴더'); setDialog('folder'); setNotice('') }}><FolderPlus size={15} /></button><button title="파일 업로드" aria-label="파일 업로드" onClick={() => fileInput.current.click()}><Upload size={15} /></button></span></div><ProjectFileTree key={project.id} project={project} selected={selected} selectedFolder={selectedFolder} onSelectFolder={setSelectedFolder} busy={busy} onMoveFile={moveFile} onUpload={upload} onError={setNotice} onSelectFile={selectFile} /><button className="pgs-upload" disabled={busy} onClick={() => fileInput.current.click()}><Upload size={18} /> {busy ? '파일 처리 중…' : '파일 올리기'}<small>이미지 · 사운드 · 폰트 · Python · 노트북 · CSV</small></button>{uploadError && <div className="pgs-upload-error" role="alert">{uploadError}</div>}<div className="pgs-file-tip">업로드 위치: {selectedFolder || '프로젝트 루트'}<br />파일을 폴더 위에 끌어다 놓으세요. 기존 파일은 ‘이동’ 버튼으로도 옮길 수 있습니다.<br />PNG, JPG, WebP · OGG, WAV, MP3 · TTF, OTF · CSV (UTF-8, 200 KB)<br />글꼴 {PROJECT_LIMITS.fontBytes / 1024 / 1024} MB · 이미지/소리 {PROJECT_LIMITS.assetBytes / 1024 / 1024} MB<br />프로젝트 전체 {PROJECT_LIMITS.totalBytes / 1024 / 1024} MB</div><input ref={fileInput} type="file" multiple accept=".py,.ipynb,.csv,.png,.jpg,.jpeg,.webp,.ogg,.wav,.mp3,.ttf,.otf" hidden onChange={e => upload(e.target.files)} /></aside>
+    <div ref={layout.workspaceRef} className={`pgs-workspace${layout.dragging ? ' pgs-is-resizing' : ''}`} style={layout.style}><aside className="pgs-files"><div className="pgs-panel-title">프로젝트 파일<span><button title={editorMode === 'notebook' ? '노트북 파일 추가' : 'Python 파일 추가'} aria-label={editorMode === 'notebook' ? '노트북 파일 추가' : 'Python 파일 추가'} onClick={() => { setDialogValue(editorMode === 'notebook' ? '새 노트북.ipynb' : 'helper.py'); setDialog('file') }}><Plus size={15} /></button><button title="폴더 만들기" aria-label="폴더 만들기" onClick={() => { setDialogValue('새 폴더'); setDialog('folder'); setNotice('') }}><FolderPlus size={15} /></button><button title="파일 업로드" aria-label="파일 업로드" onClick={() => fileInput.current.click()}><Upload size={15} /></button></span></div><ProjectFileTree key={project.id} project={project} selected={selected} selectedFolder={selectedFolder} onSelectFolder={setSelectedFolder} busy={busy} onMoveFile={moveFile} onUpload={upload} onError={setNotice} onSelectFile={selectFile} /><button className="pgs-upload" disabled={busy} onClick={() => fileInput.current.click()}><Upload size={18} /> {busy ? '파일 처리 중…' : '파일 올리기'}<small>이미지 · 사운드 · 폰트 · Python · 노트북 · CSV</small></button>{uploadError && <div className="pgs-upload-error" role="alert">{uploadError}</div>}<div className="pgs-file-tip">업로드 위치: {selectedFolder || '프로젝트 루트'}<br />파일을 폴더 위에 끌어다 놓으세요. 기존 파일은 ‘이동’ 버튼으로도 옮길 수 있습니다.<br />PNG, JPG, WebP · OGG, WAV, MP3 · TTF, OTF · CSV (UTF-8, 200 KB)<br />글꼴 {PROJECT_LIMITS.fontBytes / 1024 / 1024} MB · 이미지/소리 {PROJECT_LIMITS.assetBytes / 1024 / 1024} MB<br />프로젝트 전체 {PROJECT_LIMITS.totalBytes / 1024 / 1024} MB</div><input ref={fileInput} type="file" multiple accept=".py,.ipynb,.csv,.png,.jpg,.jpeg,.webp,.ogg,.wav,.mp3,.ttf,.otf" hidden onChange={e => upload(e.target.files)} /></aside>
     <div {...layout.separator('files')} />
     <div className="pgs-main-panes"><section className="pgs-editor-pane"><input ref={replaceInput} type="file" hidden accept={`.${selected.split('.').at(-1)}`} onChange={replaceFile} /><div className="pgs-panel-title"><span>{selected}</span><div><button disabled={busy} onClick={() => replaceInput.current.click()}>파일 교체</button><button onClick={() => { setDialogValue(selected); setDialog('rename') }}>이름 변경</button><button disabled={busy} onClick={() => { setDialogValue(selected.split('/').slice(0, -1).join('/')); setNotice(''); setDialog('move') }}>이동</button>{activeFile?.kind === 'python' && selected !== project.entrypoint && <button onClick={() => setProject({ ...project, entrypoint: selected })}>기본 실행 파일로</button>}<button aria-label="선택한 파일 다운로드" onClick={() => download(activeFile.path.split('/').at(-1), ['python', 'notebook'].includes(activeFile.kind) ? activeFile.text : base64ToBytes(activeFile.data), 'application/octet-stream')}><Download size={14} /></button><button aria-label="선택한 파일 삭제" disabled={selected === project.entrypoint} onClick={() => { setDialog('delete') }}><Trash2 size={14} /></button></div></div>{activeFile?.kind === 'notebook' ? <NotebookEditor uid={uid} key={`${project.id}:${selected}`} file={activeFile} project={project} onChange={editCode} onRun={index => notebook.execute(project, selected, index)} onRunAll={() => notebook.execute(project, selected, 0, true)} onReset={() => { stop(); notebook.reset() }} onImport={() => notebookInput.current.click()} onExpand={() => setPreviewExpanded(true)} liveIndex={run && liveCell?.kernel === `${project.id}:${selected}` ? liveCell.index : null} surfaceSlotRef={setSurfaceSlot} inputRequest={inputRequest?.notebook?.kernel === `${project.id}:${selected}` ? inputRequest : null} onInputSubmitted={() => { setInputRequest(null); setStatus('running') }} onStructureChange={() => { setLiveCell(null); notebook.clearOutputs(`${project.id}:${selected}`) }} onExport={() => download(selected.split('/').at(-1), activeFile.text, 'application/x-ipynb+json')} outputs={notebook.results[`${project.id}:${selected}`] || {}} running={notebook.running || busy} activeIndex={notebook.activeIndex} onSelect={notebook.setActiveIndex} /> : activeFile?.kind === 'python' ? <PythonEditor colorful completionContext={{ path: selected, files: project.files }} key={selected} ref={editor} value={activeFile.text} onChange={editCode} activeLine={errorLine} /> : activeFile && <AssetPreview key={selected} file={activeFile} busy={busy} onInsert={() => snippet(activeFile)} onConvert={async () => {
       setBusy(true)
@@ -426,8 +494,9 @@ export default function PythonGameStudio({ uid = 'local-preview', onBack, public
         setSelected(path); setNotice('OGG 사본을 만들었습니다. 원본 사운드도 그대로 남아 있습니다.')
       } catch (error) { setNotice(error.message) } finally { setBusy(false) }
     }} />}</section>
-    <div {...layout.separator('editor')} />
-    <section inert={editorMode !== 'notebook' && compactViewport && compactPanel === 'code' && !previewExpanded ? true : undefined} aria-hidden={editorMode !== 'notebook' && compactViewport && compactPanel === 'code' && !previewExpanded ? true : undefined} className={`pgs-preview-pane${previewExpanded ? ' pgs-preview-expanded' : ''}`} ref={preview}><div className="pgs-panel-title"><span>실행 화면</span><div>{previewExpanded && <><button disabled={busy || notebook.running} onClick={execute}><Play size={14} /> 다시 실행</button><button disabled={!run} onClick={stop}><Square size={14} /> 정지</button></>}<span className="pgs-fit-label">화면에 맞춤</span><button aria-label={previewExpanded ? '실행 화면 원래 크기로' : '실행 화면 크게 보기'} aria-pressed={previewExpanded} onClick={() => setPreviewExpanded(value => !value)}>{previewExpanded ? <Minimize2 size={16} /> : <Maximize2 size={16} />}</button></div></div><div className="pgs-game-frame"><GamePreview uid={uid} run={run} onEvent={handleEvent} publicAccess={publicAccess} /></div>{editorMode !== 'notebook' && <><div {...layout.separator('console')} /><div className="pgs-console"><div className="pgs-panel-title">출력 · 오류<button onClick={() => setLogs([])}>지우기</button></div><>{preferences.playful && <RunFeedback status={status} />}</><div className="pgs-console-scroll" ref={consoleOutput}><div aria-live="polite">{!logs.length && <span className="pgs-console-hint">print() 출력과 오류가 여기에 표시됩니다.</span>}<OutputLogs logs={logs} onJumpToError={jumpToError} /></div>{logs.filter(log => log.coach && log.coach.projectId === project.id && log.coach.path === selected).slice(-1).map(log => <ErrorCoach key={log.id} uid={uid} learningKey={log.coach.runId} learningScope={log.coach.scope} learningPath={log.coach.path} source={log.coach.source} currentSource={activeFile?.text} text={log.text} allowAi={!publicAccess} />)}</div>{inputRequest && run && <StudioInput key={`${run.id}:${inputRequest.requestId}`} request={inputRequest} onSubmitted={() => { setInputRequest(null); setStatus('running') }} />}</div></>}</section></div></div>
+    {editorMode !== 'notebook' && <><div {...layout.separator('console')} /><div className="pgs-console"><div className="pgs-panel-title">출력 · 오류<button onClick={() => setLogs([])}>지우기</button></div>{preferences.playful && <RunFeedback status={status} />}<div className="pgs-console-scroll" ref={consoleOutput}><div aria-live="polite">{!logs.length && <span className="pgs-console-hint">print() 출력과 오류가 여기에 표시됩니다.</span>}<OutputLogs logs={logs} onJumpToError={jumpToError} /></div>{logs.filter(log => log.coach && log.coach.projectId === project.id && log.coach.path === selected).slice(-1).map(log => <ErrorCoach key={log.id} uid={uid} learningKey={log.coach.runId} learningScope={log.coach.scope} learningPath={log.coach.path} source={log.coach.source} currentSource={activeFile?.text} text={log.text} allowAi={!publicAccess} />)}</div>{inputRequest && run && <StudioInput key={`${run.id}:${inputRequest.requestId}`} request={inputRequest} onSubmitted={() => { setInputRequest(null); setStatus('running') }} />}</div></>}
+    </div></div>
+    {visualSurface}
     {drawer && <div className="pgs-modal-backdrop"><section className="pgs-library" role="dialog" aria-modal="true" aria-label="내 프로젝트" aria-busy={importing}><div className="pgs-panel-title">내 프로젝트<button aria-label="프로젝트 목록 닫기" disabled={importing} onClick={() => setDrawer(false)}><X size={18} /></button></div>{notice && <p role="alert">{notice}</p>}<div className="pgs-library-actions"><button disabled={busy} onClick={() => { setDialogValue('나의 프로젝트'); setDialog('new') }}><Plus size={16} /> 새 프로젝트</button><button disabled={busy} onClick={() => folderInput.current.click()}><FolderOpen size={16} /> {importing ? '가져오는 중…' : '프로젝트 가져오기'}</button>{!publicAccess && <><button disabled={busy} onClick={() => importInput.current.click()}><Upload size={16} /> 백업 파일 복원</button><button disabled={busy} onClick={async () => {
       setBusy(true)
       try {
