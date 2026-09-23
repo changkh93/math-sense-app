@@ -4,10 +4,8 @@ import { renderStructure, restoreCoachNames } from '../../../functions/studioCoa
 import { requestCoachAdvice } from './errorCoachClient'
 
 const blockMessage = reason => ({
-  'formatted-error-line': '오류 줄에 f-string이 있어, 내부 식을 가리면 원인을 확인하기 어려워요. 이 줄의 AI 도움은 아직 지원하지 않아요.',
   'string-syntax': '이 코드의 복잡한 문자열 구문은 AI 전송용 변환기가 아직 지원하지 않아요.',
-  'dynamic-code': '실행 중 이름이나 코드를 결정하는 구문이 있어 AI 전송용으로 변환하지 못했어요.',
-  'error-type': '이 오류는 실제 값이 필요해, 값을 가리는 현재 AI 도움으로는 분석하기 어려워요.',
+  'error-type': '오류 정보를 아직 AI 도움용으로 정리하지 못했어요.',
   location: '오류 위치와 분석할 코드의 범위를 확실하게 맞출 수 없어 AI 도움을 준비하지 못했어요.',
   size: '변환할 코드가 AI 도움의 처리 범위를 넘었어요.',
 }[reason] || '현재 코드 구문을 AI 전송용으로 변환하지 못했어요. 코드가 틀렸다는 뜻은 아니에요.')
@@ -39,7 +37,7 @@ export default function CoachAdvice({ uid, source, error, mode = 'file', stale, 
     {!preview && <button onClick={() => setPreview(true)}>AI에게 물어보기</button>}
     {preview && !answer && <div className="pgs-coach-preview">
       <strong>AI에 보낼 내용 확인</strong>
-      <p>아래 코드 일부와 관련 줄을 함께 보내요. 직접 지은 이름은 별명으로, 글자와 숫자는 표시용 이름으로 바꾸고 주석은 빼요. f-string은 안에 들어 있는 식까지 전체를 가려요. 원래 철자·값·실제 화면은 AI가 볼 수 없어요.</p>
+      <p>오류 종류와 아래 코드 일부·관련 줄을 함께 보내요. 직접 지은 이름은 별명으로, 글자와 숫자는 표시용 이름으로 바꾸고 주석은 빼요. f-string은 안에 들어 있는 식까지 전체를 가려요. AI는 원래 값이나 화면을 볼 수 없지만, 가능한 원인과 내 코드에서 확인할 방법을 안내해요.</p>
       <pre>{prepared.error}{'\n'}{prepared.snippet}{prepared.related?.map((part, i) => `\n\n관련 코드 ${i + 1}\n${part}`).join('')}</pre>
       <label><input type="checkbox" checked={reviewed} disabled={pending || lock.current} onChange={event => setReviewed(event.target.checked)} /> 변환된 코드로 도움받는 것을 확인했어요</label>
       <div className="pgs-coach-actions"><button disabled={!reviewed || pending || lock.current} onClick={ask}>{pending ? '힌트를 생각하고 있어요…' : '확인한 내용으로 AI 힌트 받기'}</button>{!pending && !lock.current && <button onClick={() => { setPreview(false); setReviewed(false) }}>돌아가기</button>}</div>

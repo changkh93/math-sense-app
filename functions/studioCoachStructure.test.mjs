@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { makeCoachPayload, parseError } from './studioErrorCoachPolicy.mjs'
+import { ERROR_TYPES, makeCoachPayload, parseError } from './studioErrorCoachPolicy.mjs'
 import { validateStructurePayload, renderStructure, STRUCTURE_WORDS, restoreCoachNames } from './studioCoachStructure.mjs'
 const error = (type, message, line = 1, path = 'main.py') => parseError(`  File "/tmp/studio/${path}", line ${line}\n${type}: ${message}`)
 const make = (source, e, mode) => makeCoachPayload(source, e, mode)
@@ -38,9 +38,23 @@ test('literal relationships survive without actual values or executable-code cla
   assert.match(r.snippet, /text_1.*text_1.*text_2/)
   assert.match(r.transformations, /NOT executable/)
 })
-test('value-sensitive errors and dynamic/string-interpolated code fail closed', () => {
-  for (const type of ['ValueError', 'KeyError', 'IndexError', 'FileNotFoundError', 'ZeroDivisionError']) assert.equal(make('print(1)', error(type, 'private value')), null)
-  for (const code of ['eval(secret)', 'getattr(t, name)', 'print(f"hi {student}")', 'print(💥)']) assert.equal(make(code, error('NameError', "name 'secret' is not defined")), null)
+test('every parsed error category can request structural advice without raw error prose', () => {
+  for (const type of ERROR_TYPES) {
+    const p = make('print(1)', error(type, 'PRIVATE_VALUE_01012345678'))
+    assert.ok(p, type)
+    assert.deepEqual(validateStructurePayload(p), p)
+    const rendered = renderStructure(p)
+    assert.ok(!JSON.stringify([p, rendered]).includes('PRIVATE_VALUE'))
+    assert.ok(!rendered.error.includes('undefined'))
+  }
+})
+test('dynamic calls and masked f-strings allow advice without executing or exposing them', () => {
+  for (const code of ['eval("PRIVATE_CODE")', 'getattr(t, "PRIVATE_ATTRIBUTE")', 'print(f"PRIVATE_HUD {student}")']) {
+    const p = make(code, error('NameError', "name 'student' is not defined"))
+    assert.ok(p, code)
+    assert.ok(!JSON.stringify([p, renderStructure(p)]).includes('PRIVATE_'))
+  }
+  assert.equal(make('print(💥)', error('SyntaxError', 'invalid character')), null)
 })
 test('window scans strings above it and ambiguous notebook frames block requests', () => {
   const source = 'a="""\n' + 'private@example.com\n'.repeat(15) + '"""\nprint(missing)'
@@ -107,6 +121,38 @@ test('unsupported formatted expressions have specific reasons and never expose f
     assert.equal(diagnostic.reason, 'string-syntax')
   }
   const diagnostic = {}
-  assert.equal(makeCoachPayload('print(f"{missing}")', error('NameError', "name 'missing' is not defined"), 'file', {}, diagnostic), null)
-  assert.equal(diagnostic.reason, 'formatted-error-line')
+  const p = makeCoachPayload('print(f"{missing}")', error('NameError', "name 'missing' is not defined"), 'file', {}, diagnostic)
+  assert.ok(p)
+  assert.equal(diagnostic.reason, undefined)
+  assert.match(renderStructure(p).snippet, /print\(f"<hidden_expression_text_1>"\)/)
+  assert.equal(p.name, null) // An alias must not fabricate visibility into the hidden expression.
+})
+
+test('common runtime failures retain actionable meanings but hide values, paths and exception text', () => {
+  const cases = [
+    ['amount = int("PRIVATE_INPUT")', 'ValueError', "invalid literal for int() with base 10: 'PRIVATE_INPUT'", 'number-conversion', /converted to a number/],
+    ['a, b = [1, 2, 3]', 'ValueError', 'too many values to unpack (expected 2)', 'unpack-count', /unpacking/],
+    ['print([1][3])', 'IndexError', 'list index out of range', 'index-range', /index/],
+    ['print({}["PRIVATE_KEY"])', 'KeyError', "'PRIVATE_KEY'", 'missing-key', /key/],
+    ['print(12 / 0)', 'ZeroDivisionError', 'division by zero', 'zero-division', /zero/],
+    ['open("PRIVATE_PATH.csv")', 'FileNotFoundError', "[Errno 2] No such file or directory: 'PRIVATE_PATH.csv'", 'missing-file', /file/],
+    ['print("PRIVATE_TEXT" + 1)', 'TypeError', 'can only concatenate str (not "int") to str', 'type-mismatch', /incompatible type/],
+    ['print(None[0])', 'TypeError', "'NoneType' object is not subscriptable", 'not-subscriptable', /indexing/],
+    ['list(1)', 'TypeError', "'int' object is not iterable", 'not-iterable', /iterated/],
+    ['print(PRIVATE_ARG=1)', 'TypeError', "unexpected keyword argument 'PRIVATE_ARG'", 'unexpected-keyword', /keyword/],
+    ['pygame.display.flip()', 'pygame.error', 'video system not initialized', 'pygame-video', /video system/],
+    ['pygame.Surface((10, 10)).convert()', 'pygame.error', 'No video mode has been set', 'pygame-display', /display mode/],
+    ['pygame.mixer.Sound("PRIVATE_SOUND.wav")', 'pygame.error', 'mixer not initialized', 'pygame-mixer', /mixer/],
+    ['run()', 'RuntimeError', 'PRIVATE_RUNTIME_DETAIL', 'runtime-failure', /runtime operation/],
+  ]
+  for (const [source, type, message, reason, meaning] of cases) {
+    for (const mode of ['file', 'notebook']) {
+      const p = make(source, error(type, message), mode)
+      assert.ok(p, `${type} in ${mode}`)
+      assert.equal(p.reason, reason)
+      assert.match(renderStructure(p).error, meaning)
+      assert.ok(!JSON.stringify([p, renderStructure(p)]).includes('PRIVATE_'))
+      assert.throws(() => validateStructurePayload({ ...p, errorType: 'SyntaxError' }))
+    }
+  }
 })

@@ -107,7 +107,36 @@ test('method error with an unrelated f-string reaches advice using only masked t
   assert.equal(f.calls.length, 1);
   const body = JSON.parse(f.calls[0].request.body);
   for (const text of ['PRIVATE_EMAIL_123', 'self.score', 'chooes_new_wanted', 'choose_new_wanted']) assert.ok(!body.input.includes(text), text);
-  assert.match(JSON.parse(body.input).snippet, /<text_1>/);
+  assert.match(JSON.parse(body.input).snippet, /f"<hidden_expression_text_1>"/);
+});
+
+test('previously blocked runtime errors reach the paid boundary without leaking values or expanding access', async () => {
+  const { makeCoachPayload, parseError } = await import('./studioErrorCoachPolicy.mjs');
+  const cases = [
+    ['amount = int("PRIVATE_INPUT@example.com")', 'ValueError: invalid literal for int() with base 10: PRIVATE_INPUT@example.com'],
+    ['print([123456789][5])', 'IndexError: list index out of range'],
+    ['print({}["PRIVATE_KEY"])', 'KeyError: PRIVATE_KEY'],
+    ['print(123456789 / 0)', 'ZeroDivisionError: division by zero'],
+    ['open("PRIVATE_PATH.csv")', 'FileNotFoundError: PRIVATE_PATH.csv'],
+    ['print("PRIVATE_TEXT" + 123456789)', 'TypeError: can only concatenate str (not "int") to str'],
+    ['print(f"PRIVATE_HUD {PRIVATE_MISSING}")', "NameError: name 'PRIVATE_MISSING' is not defined"],
+    ['getattr(obj, "PRIVATE_ATTRIBUTE")', "AttributeError: 'object' object has no attribute 'PRIVATE_ATTRIBUTE'"],
+    ['pygame.display.flip()', 'pygame.error: video system not initialized'],
+  ];
+  for (const [source, exception] of cases) {
+    const input = makeCoachPayload(source, parseError(`  File "/tmp/studio/PRIVATE_FILE.py", line 1\n${exception}`));
+    const f = fixture();
+    assert.ok(input, exception);
+    assert.deepEqual((await f.handler(input, context)).advice, advice);
+    assert.equal(f.calls.length, 1);
+    const body = JSON.parse(f.calls[0].request.body);
+    for (const secret of ['PRIVATE_', '123456789', '@example.com']) assert.ok(!body.input.includes(secret), secret);
+    assert.match(body.instructions, /Hidden values are not a reason to refuse help/);
+    assert.match(body.instructions, /Do not ask the learner to send private values back/);
+    const denied = fixture({ user: { clusterAccess: { python: 'expired' } } });
+    await assert.rejects(denied.handler(input, context), { code: 'permission-denied' });
+    assert.equal(denied.calls.length, 0);
+  }
 });
 
 test('behavior help carries bounded related evidence without original values or a fictional runtime error', async () => {

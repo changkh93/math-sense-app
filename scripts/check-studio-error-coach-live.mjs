@@ -12,6 +12,7 @@ import { renderStructure } from '../functions/studioCoachStructure.mjs'
 const projectId = process.argv[2]
 const behavior = process.argv[4] === '--behavior'
 const migration = process.argv[4] === '--migration-check'
+const runtimeErrors = process.argv[4] === '--runtime-errors'
 if (!/^proj_[A-Za-z0-9_-]+$/.test(projectId || '') || process.argv[3] !== '--run-synthetic') {
   console.error('Usage: node scripts/check-studio-error-coach-live.mjs proj_ID --run-synthetic'); process.exit(2)
 }
@@ -53,11 +54,21 @@ try {
     ['spelling', 'score = 10\nprint(socre)', "NameError: name 'socre' is not defined", 2],
     ['missing-import', 'from ColabTurtlePlus.Turtle import', 'SyntaxError: invalid syntax', 1],
   ]
+  const runtimeFixtures = [
+    ['conversion', 'amount = int("not_a_number")', "ValueError: invalid literal for int() with base 10: 'not_a_number'", 1],
+    ['index', 'items = [1, 2]\nprint(items[2])', 'IndexError: list index out of range', 2],
+    ['key', 'record = {"score": 10}\nprint(record["points"])', "KeyError: 'points'", 2],
+    ['division', 'count = 0\nprint(10 / count)', 'ZeroDivisionError: division by zero', 2],
+    ['file', 'with open("data/synthetic.csv") as file:\n    print(file.read())', "FileNotFoundError: [Errno 2] No such file or directory: 'data/synthetic.csv'", 1],
+    ['type', 'score = "10"\nprint(score + 1)', 'TypeError: can only concatenate str (not "int") to str', 2],
+    ['pygame-video', 'import pygame\npygame.quit()\npygame.display.flip()', 'pygame.error: video system not initialized', 3],
+    ['formatted-name', 'print(f"Score: {unknown_score}")', "NameError: name 'unknown_score' is not defined", 1],
+  ]
   const methodSource = ['class Scene:', '    def update(self):', '        self.chose_target()', ...Array(20).fill(''), '    def choose_target(self):', '        pass'].join('\n')
   const inputs = behavior ? [
     ...inspectBehavior(behaviorFixture).map(finding => [finding.ruleId, makeCoachPayload(behaviorFixture, behaviorError(finding))]),
     ['method-typo', makeCoachPayload(methodSource, parseError('  File "/tmp/studio/main.py", line 3\nAttributeError: \'Scene\' object has no attribute \'chose_target\'. Did you mean: \'choose_target\'?'))],
-  ] : (migration ? fixtures.slice(0, 1) : fixtures).map(([id, source, message, line]) => [id, makeCoachPayload(source, parseError(`  File "/tmp/studio/main.py", line ${line}\n${message}`))])
+  ] : (runtimeErrors ? runtimeFixtures : migration ? fixtures.slice(0, 1) : fixtures).map(([id, source, message, line]) => [id, makeCoachPayload(source, parseError(`  File "/tmp/studio/main.py", line ${line}\n${message}`))])
   for (const [id, input] of inputs) {
     if (!input) throw new Error('fixture-blocked')
     const context = { auth: { uid: 'synthetic-coach-test', token: { firebase: { sign_in_provider: 'password' } } } }
@@ -77,5 +88,5 @@ try {
 } catch {
   evidence.passed = false; evidence.stoppedAt = phase; process.exitCode = 1
 }
-await writeFile(migration ? 'docs/collaboration/tasks/20260923-studio-coach-luna/preflight.json' : `docs/collaboration/tasks/20260916-studio-private-coach/${behavior ? 'live-behavior-smoke' : 'live-smoke'}.json`, JSON.stringify(evidence, null, 2))
+await writeFile(runtimeErrors ? 'docs/collaboration/tasks/20260923-studio-coach-runtime-errors/preflight.json' : migration ? 'docs/collaboration/tasks/20260923-studio-coach-luna/preflight.json' : `docs/collaboration/tasks/20260916-studio-private-coach/${behavior ? 'live-behavior-smoke' : 'live-smoke'}.json`, JSON.stringify(evidence, null, 2))
 console.log(JSON.stringify(evidence, null, 2))

@@ -6,11 +6,33 @@ import { readCoachString } from './studioCoachStrings.mjs'
 import { inspectBehavior } from './studioBehaviorCoach.mjs'
 const FINDINGS = Object.freeze(['state-field-mismatch', 'loop-type-image-mismatch', 'none', 'constructor-not-called', 'call-missing-argument', 'name-spelling', 'attribute-spelling', 'import-spelling', 'module-spelling', 'name-commented-assignment', 'import-missing-target', 'import-missing-module', 'from-missing-module', 'from-missing-import', 'import-missing-alias', 'import-star-without-from'])
 const WORDS = `False None True and as assert async await break class continue def del elif else except finally for from global if import in is lambda nonlocal not or pass raise return try while with yield print input int float str len range list dict set tuple sum max min abs round sorted enumerate zip type open isinstance bool super self ColabTurtlePlus Turtle Screen turtle clearscreen forward backward back left right penup pendown color pencolor fillcolor pensize speed goto circle shape hideturtle showturtle begin_fill end_fill xcor ycor write setheading position setup bgcolor title clear update mainloop done pygame init quit display event time draw image font mixer Rect Surface set_mode set_caption flip get Clock tick load render blit fill KEYDOWN QUIT pandas DataFrame Series read_csv to_csv to_dict head tail columns index loc iloc numpy array arange zeros ones histogram random mean multiply randint seed choice rand randrange shuffle csv reader writer DictReader DictWriter math sqrt floor ceil sin cos pi itertools product permutations combinations groupby fractions Fraction matplotlib pyplot plot scatter hist bar show figure axes xlabel ylabel xticks yticks grid legend xlim ylim axvline axhline text append extend insert remove pop sort reverse count copy split strip replace lower upper startswith endswith find join tkinter Tk Canvas Button PhotoImage config grid create_image create_text itemconfig after after_cancel destroy`.split(' ')
-export const STRUCTURE_WORDS = Object.freeze([...new Set(WORDS)])
+export const STRUCTURE_WORDS = Object.freeze([...new Set([...WORDS, 'eval', 'exec', 'getattr', 'setattr', 'globals', 'locals', '__import__'])])
 const SYMBOLS = Object.freeze(['(', ')', '[', ']', '{', '}', ':', ',', '.', ';', '+', '-', '*', '/', '%', '=', '<', '>', '!', '&', '|', '^', '~', '@', '\\'])
-const TYPES = Object.freeze(['BehaviorCheck', 'SyntaxError', 'IndentationError', 'TabError', 'NameError', 'UnboundLocalError', 'TypeError', 'AttributeError', 'ImportError', 'ModuleNotFoundError'])
-const REASONS = Object.freeze(['behavior-state', 'behavior-loop', 'syntax', 'unclosed-string', 'unclosed-bracket', 'bracket-mismatch', 'colon', 'comma', 'indent', 'undefined-name', 'unbound-name', 'missing-argument', 'module-call', 'not-callable', 'missing-attribute', 'missing-import', 'missing-module'])
-const REASON_TYPES = { 'behavior-state': 'BehaviorCheck', 'behavior-loop': 'BehaviorCheck', syntax: 'SyntaxError', 'unclosed-string': 'SyntaxError', 'unclosed-bracket': 'SyntaxError', 'bracket-mismatch': 'SyntaxError', colon: 'SyntaxError', comma: 'SyntaxError', indent: ['IndentationError', 'TabError'], 'undefined-name': 'NameError', 'unbound-name': 'UnboundLocalError', 'missing-argument': 'TypeError', 'module-call': 'TypeError', 'not-callable': 'TypeError', 'missing-attribute': 'AttributeError', 'missing-import': 'ImportError', 'missing-module': 'ModuleNotFoundError' }
+// Only finite error meanings cross the boundary, never raw exception prose.
+// A hidden value limits certainty, not the learner's ability to request help.
+const EXTRA_REASONS = Object.freeze({
+  'type-mismatch': ['TypeError', 'operation or argument received an incompatible type'],
+  'not-subscriptable': ['TypeError', 'object does not support indexing'],
+  'not-iterable': ['TypeError', 'object cannot be iterated'],
+  'unexpected-keyword': ['TypeError', 'call received an unexpected keyword argument'],
+  'attribute-operation': ['AttributeError', 'requested attribute operation failed'],
+  'import-failure': ['ImportError', 'import operation failed'],
+  'invalid-value': ['ValueError', 'value or shape is not accepted by this operation'],
+  'number-conversion': ['ValueError', 'text could not be converted to a number'],
+  'unpack-count': ['ValueError', 'number of values does not match unpacking targets'],
+  'index-range': ['IndexError', 'requested index is outside the available sequence'],
+  'missing-key': ['KeyError', 'requested key or column is missing'],
+  'zero-division': ['ZeroDivisionError', 'division or modulo by zero'],
+  'missing-file': ['FileNotFoundError', 'requested file was not found; its path is hidden'],
+  'runtime-failure': ['RuntimeError', 'runtime operation failed; original details are hidden'],
+  'other-error': ['Error', 'an exception occurred; original type and details may be hidden'],
+  'pygame-video': ['Error', 'pygame video system is not initialized'],
+  'pygame-display': ['Error', 'pygame display mode has not been set'],
+  'pygame-mixer': ['Error', 'pygame mixer is not initialized'],
+})
+const REASON_TYPES = { 'behavior-state': 'BehaviorCheck', 'behavior-loop': 'BehaviorCheck', syntax: 'SyntaxError', 'unclosed-string': 'SyntaxError', 'unclosed-bracket': 'SyntaxError', 'bracket-mismatch': 'SyntaxError', colon: 'SyntaxError', comma: 'SyntaxError', indent: ['IndentationError', 'TabError'], 'undefined-name': 'NameError', 'unbound-name': 'UnboundLocalError', 'missing-argument': 'TypeError', 'module-call': 'TypeError', 'not-callable': 'TypeError', 'missing-attribute': 'AttributeError', 'missing-import': 'ImportError', 'missing-module': 'ModuleNotFoundError', ...Object.fromEntries(Object.entries(EXTRA_REASONS).map(([reason, [type]]) => [reason, type])) }
+const REASONS = Object.freeze(Object.keys(REASON_TYPES))
+const TYPES = Object.freeze([...new Set(Object.values(REASON_TYPES).flat())])
 const own = (o, key) => Object.prototype.hasOwnProperty.call(o, key)
 const integer = (n, low, high) => Number.isInteger(n) && n >= low && n <= high
 const exactKeys = (o, keys) => o && !Array.isArray(o) && Object.keys(o).sort().join(',') === keys.sort().join(',')
@@ -20,13 +42,20 @@ function classify(error) {
   switch (error.type) {
     case 'SyntaxError': return /unterminated.*string|EOL while scanning string/.test(m) ? 'unclosed-string' : /was never closed/.test(m) ? 'unclosed-bracket' : /unmatched|does not match opening/.test(m) ? 'bracket-mismatch' : /expected ':'/.test(m) ? 'colon' : /Perhaps you forgot a comma/.test(m) ? 'comma' : 'syntax'
     case 'TabError': case 'IndentationError': return 'indent'
-    case 'NameError': return /^NameError: name ['"].*['"] is not defined$/.test(m) ? 'undefined-name' : null
+    case 'NameError': return 'undefined-name'
     case 'UnboundLocalError': return 'unbound-name'
-    case 'TypeError': return /missing \d+ required positional argument/.test(m) ? 'missing-argument' : /'module' object is not callable/.test(m) ? 'module-call' : /object is not callable/.test(m) ? 'not-callable' : null
-    case 'AttributeError': return /has no attribute/.test(m) ? 'missing-attribute' : null
-    case 'ImportError': return /cannot import name/.test(m) ? 'missing-import' : null
+    case 'TypeError': return /missing \d+ required (?:positional|keyword-only) argument/.test(m) ? 'missing-argument' : /'module' object is not callable/.test(m) ? 'module-call' : /object is not callable/.test(m) ? 'not-callable' : /not subscriptable/.test(m) ? 'not-subscriptable' : /not iterable/.test(m) ? 'not-iterable' : /unexpected keyword argument/.test(m) ? 'unexpected-keyword' : 'type-mismatch'
+    case 'AttributeError': return /has no attribute/.test(m) ? 'missing-attribute' : 'attribute-operation'
+    case 'ImportError': return /cannot import name/.test(m) ? 'missing-import' : 'import-failure'
     case 'ModuleNotFoundError': return 'missing-module'
-    default: return null // Numeric/value/path-sensitive problems use local help.
+    case 'ValueError': return /invalid literal for int|could not convert string to float/.test(m) ? 'number-conversion' : /(?:too many|not enough) values to unpack/.test(m) ? 'unpack-count' : 'invalid-value'
+    case 'IndexError': return 'index-range'
+    case 'KeyError': return 'missing-key'
+    case 'ZeroDivisionError': return 'zero-division'
+    case 'FileNotFoundError': return 'missing-file'
+    case 'RuntimeError': return 'runtime-failure'
+    case 'Error': return /^pygame\.error: video system not initialized$/.test(m) ? 'pygame-video' : /^pygame\.error: No video mode has been set$/.test(m) ? 'pygame-display' : /^pygame\.error: mixer not initialized$/.test(m) ? 'pygame-mixer' : 'other-error'
+    default: return null
   }
 }
 
@@ -58,17 +87,16 @@ export function makeStructurePayload(source, error, mode = 'file', localAliases 
       if (!literal) return blocked('string-syntax')
       const raw = source.slice(i, literal.end), firstLine = rows.length
       const lastLine = firstLine + raw.split('\n').length - 1
-      // A hidden replacement expression might itself be the failing operation.
-      // Other lines still receive AI help; don't discard the whole game for a HUD string.
-      if (literal.formatted && error.line >= firstLine && error.line <= lastLine) return blocked('formatted-error-line')
-      add(['q', ref(strings, raw)])
+      // Mask replacement expressions too. AI can explain the error category and
+      // suggest local checks even when it cannot see the failing expression.
+      add([literal.formatted ? 'f' : 'q', ref(strings, raw)])
       for (let j = firstLine; j < lastLine; j++) rows.push([])
       if (!literal.closed && reason !== 'unclosed-string') return blocked('string-syntax')
       i = literal.end
       continue
     }
     if (name) {
-      if (['eval', 'exec', 'getattr', 'setattr', 'globals', 'locals', '__import__'].includes(name)) return blocked('dynamic-code')
+      // Dynamic calls are represented, never executed; their strings stay masked.
       add(nameToken(name)); i += name.length; continue
     }
     const num = source.slice(i).match(/^(?:0[xob][\da-f_]+|(?:\d[\d_]*(?:\.[\d_]*)?|\.\d[\d_]*)(?:e[+-]?\d[\d_]*)?j?)/i)?.[0]
@@ -99,7 +127,7 @@ export function makeStructurePayload(source, error, mode = 'file', localAliases 
 
 export function validateStructurePayload(data) {
   if (!exactKeys(data, ['version', 'finding', 'mode', 'errorType', 'reason', 'line', 'start', 'rows', 'name', ...(own(data || {}, 'related') ? ['related'] : [])]) || data.version !== 2 || !FINDINGS.includes(data.finding) || !['file', 'notebook'].includes(data.mode) || !TYPES.includes(data.errorType) || !REASONS.includes(data.reason) || ![REASON_TYPES[data.reason]].flat().includes(data.errorType) || !integer(data.start, 1, 100000) || !integer(data.line, data.start, data.start + 12) || !Array.isArray(data.rows) || data.rows.length < 1 || data.rows.length > 13 || data.line >= data.start + data.rows.length) throw new Error('invalid-structure')
-  const limits = { w: [0, STRUCTURE_WORDS.length - 1], p: [0, SYMBOLS.length - 1], v: [1, 512], q: [1, 512], n: [1, 512], s: [1, 80], t: [1, 8] }
+  const limits = { w: [0, STRUCTURE_WORDS.length - 1], p: [0, SYMBOLS.length - 1], v: [1, 512], q: [1, 512], f: [1, 512], n: [1, 512], s: [1, 80], t: [1, 8] }
   const token = t => Array.isArray(t) && t.length === 2 && own(limits, t[0]) && integer(t[1], ...limits[t[0]])
   if (data.rows.some(row => !Array.isArray(row) || row.length > 180 || row.some(t => !token(t))) || data.rows.flat().length > 900 || (data.name !== null && (!token(data.name) || !['w', 'v'].includes(data.name[0])))) throw new Error('invalid-tokens')
   if (data.errorType === 'BehaviorCheck' && (data.mode !== 'file' || data.finding !== ({ 'behavior-state': 'state-field-mismatch', 'behavior-loop': 'loop-type-image-mismatch' })[data.reason])) throw new Error('invalid-behavior')
@@ -111,11 +139,11 @@ export function validateStructurePayload(data) {
   // Clone whitelisted fields, never spread a user-supplied object into upstream.
   return { version: 2, finding: data.finding, mode: data.mode, errorType: data.errorType, reason: data.reason, line: data.line, start: data.start, rows: data.rows.map(r => r.map(t => [t[0], t[1]])), name: data.name && [...data.name], ...(related.length ? { related: related.map(part => ({ start: part.start, rows: part.rows.map(row => row.map(t => [...t])) })) } : {}) }
 }
-const renderToken = ([kind, n]) => kind === 'w' ? STRUCTURE_WORDS[n] : kind === 'p' ? SYMBOLS[n] : kind === 'v' ? `variable_${n}` : kind === 'q' ? `"<text_${n}>"` : kind === 'n' ? `number_${n}` : (kind === 's' ? ' ' : '\t').repeat(n)
+const renderToken = ([kind, n]) => kind === 'w' ? STRUCTURE_WORDS[n] : kind === 'p' ? SYMBOLS[n] : kind === 'v' ? `variable_${n}` : kind === 'f' ? `f"<hidden_expression_text_${n}>"` : kind === 'q' ? `"<text_${n}>"` : kind === 'n' ? `number_${n}` : (kind === 's' ? ' ' : '\t').repeat(n)
 export function renderStructure(data) {
   const p = validateStructurePayload(data)
   const messages = { 'behavior-state': 'Review whether the state written when changing an image matches the state read to select its color; no runtime exception is asserted', 'behavior-loop': 'Review whether nested loops associate multiple images with the same type index; no runtime exception is asserted', syntax: 'invalid syntax', 'unclosed-string': 'unterminated string literal', 'unclosed-bracket': 'opening bracket was never closed', 'bracket-mismatch': 'mismatched brackets', colon: "expected ':'", comma: 'Perhaps you forgot a comma', indent: 'indentation mismatch', 'undefined-name': `name '${p.name ? renderToken(p.name) : 'unknown_name'}' is not defined`, 'unbound-name': 'local variable used before assignment', 'missing-argument': 'missing required positional argument', 'module-call': "'module' object is not callable", 'not-callable': 'object is not callable', 'missing-attribute': `has no attribute '${p.name ? renderToken(p.name) : 'unknown_name'}'`, 'missing-import': 'cannot import requested name', 'missing-module': 'module not found' }
-  return { mode: p.mode, preliminaryLocalFinding: p.finding, errorType: p.errorType, error: `${p.errorType}: ${messages[p.reason]}`, line: p.line, snippet: p.rows.map((row, i) => `${p.start + i}: ${row.map(renderToken).join('')}`).join('\n'), ...(p.related ? { related: p.related.map(part => part.rows.map((row, i) => `${part.start + i}: ${row.map(renderToken).join('')}`).join('\n')) } : {}), transformations: 'Only bounded excerpts are provided, not the full program. Other methods can change the state. A behavior finding is a hypothesis, not a runtime exception or proof of the learner intent. Custom names consistently renamed. Comments removed. String/number values replaced by typed placeholders. Formatted strings, including their embedded expressions, are replaced as a whole; do not infer their contents. number_N denotes a numeric literal, NOT an undefined variable. Original spelling and literal values cannot be diagnosed from this representation. Line positions retained; imports outside the excerpt may be missing. This is NOT executable Python.' }
+  return { mode: p.mode, preliminaryLocalFinding: p.finding, errorType: p.errorType, error: `${p.errorType}: ${messages[p.reason] || EXTRA_REASONS[p.reason][1]}`, line: p.line, snippet: p.rows.map((row, i) => `${p.start + i}: ${row.map(renderToken).join('')}`).join('\n'), ...(p.related ? { related: p.related.map(part => part.rows.map((row, i) => `${part.start + i}: ${row.map(renderToken).join('')}`).join('\n')) } : {}), transformations: 'Only bounded excerpts are provided, not the full program. Other methods can change the state. A behavior finding is a hypothesis, not a runtime exception or proof of the learner intent. Custom names consistently renamed. Comments removed. String/number values replaced by typed placeholders. Formatted strings, including their embedded expressions, are replaced as a whole; do not infer their contents. number_N denotes a numeric literal, NOT an undefined variable. Original spelling and literal values cannot be diagnosed from this representation. Line positions retained; imports outside the excerpt may be missing. This is NOT executable Python.' }
 }
 
 // Restore only custom-name aliases in the UI, with a single replacement pass.
