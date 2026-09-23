@@ -2,7 +2,7 @@
 import { diagnoseLocalError } from './studioErrorCoachLocal.mjs'
 import { makeStructurePayload, validateStructurePayload } from './studioCoachStructure.mjs'
 export const COACH_VERSION = 2
-export const COACH_MODEL = 'gpt-5.6-luna'
+export const COACH_MODEL = 'gpt-6-luna'
 export const ERROR_TYPES = ['SyntaxError', 'IndentationError', 'TabError', 'NameError', 'UnboundLocalError', 'TypeError', 'ValueError', 'IndexError', 'KeyError', 'ZeroDivisionError', 'FileNotFoundError', 'ModuleNotFoundError', 'ImportError', 'AttributeError', 'RuntimeError', 'Error']
 
 export function parseError(text) {

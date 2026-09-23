@@ -38,12 +38,14 @@ test('new project and structural-data readiness are required even with a key', a
 test('fixed model, bounded Responses request, no identity and ephemeral cache', async () => {
   const f = fixture(), result = await f.handler(payload, context);
   assert.deepEqual(result.advice, advice);
+  assert.equal(result.model, 'gpt-6-luna');
   const { url, request } = f.calls[0], body = JSON.parse(request.body);
-  assert.equal(url, 'https://api.openai.com/v1/responses'); assert.equal(body.model, 'gpt-5.6-luna'); assert.equal(body.store, false);
+  assert.equal(url, 'https://api.openai.com/v1/responses'); assert.equal(body.model, 'gpt-6-luna'); assert.equal(body.store, false);
   assert.equal(body.max_output_tokens, 700); assert.equal(body.reasoning.effort, 'none'); assert.equal(body.text.format.strict, true);
   assert.equal(request.headers['OpenAI-Project'], 'proj_msense_test'); assert.ok(request.signal);
   assert.ok(!request.body.includes(context.auth.uid)); assert.ok(body.input.includes("variable_1")); assert.ok(!body.input.includes("score")); assert.equal(body.tools, undefined);
-  assert.equal((await f.handler(payload, context)).cached, true); assert.equal(f.calls.length, 1);
+  const cached = await f.handler(payload, context);
+  assert.equal(cached.cached, true); assert.equal(cached.model, 'gpt-6-luna'); assert.equal(f.calls.length, 1);
   const ledger = JSON.stringify([...f.docs.entries()].filter(([key]) => key.startsWith('studioCoachUsage')));
   for (const secret of ['print(score)', 'NameError', 'synthetic-student', advice.hint]) assert.ok(!ledger.includes(secret));
   await assert.rejects(f.coldHandler()(payload, context), { code: 'already-exists' }); assert.equal(f.calls.length, 1);

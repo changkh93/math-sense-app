@@ -5,7 +5,9 @@ import { parseError } from '../../../functions/studioErrorCoachPolicy.mjs'
 import runnerHtml from '../../../runtime/python-game-runner/index.html?raw'
 import turtlePython from '../../../runtime/python-game-runner/turtle.py?raw'
 import turtleRenderer from '../../../runtime/python-game-runner/turtle-renderer.js?raw'
-import { buildRunnerDocument } from '../../../runtime/python-game-runner/document.mjs'
+import { buildRunnerDocument, buildPresentationDocument } from '../../../runtime/python-game-runner/document.mjs'
+import presentationHost from '../../../runtime/python-game-runner/presentation-host.js?raw'
+import presentationClient from '../../../runtime/python-game-runner/presentation-client.js?raw'
 
 import tkPython from '../../../runtime/python-game-runner/tkinter.py?raw'
 import tkRenderer from '../../../runtime/python-game-runner/tkinter-renderer.js?raw'
@@ -19,7 +21,12 @@ import requestsPython from '../../../runtime/python-game-runner/studio_requests.
 import { trackPython } from '../../utils/pythonFunnel'
 import { LockKeyhole } from 'lucide-react'
 
-const runnerDocument = buildRunnerDocument(runnerHtml, turtlePython, turtleRenderer, tkPython, tkRenderer, pandasPython, plotPython, plotRenderer, plotFont, studioFontsPython, requestsPython)
+const runnerDocument = buildRunnerDocument(runnerHtml, turtlePython, turtleRenderer, tkPython, tkRenderer, pandasPython, plotPython, plotRenderer, plotFont, studioFontsPython, requestsPython, presentationHost)
+const presentationDocument = buildPresentationDocument(runnerHtml, turtleRenderer, tkRenderer, plotRenderer, presentationClient)
+export function PresentationPreview({ onFrame }) {
+  const [token] = useState(() => crypto.randomUUID())
+  return <iframe ref={onFrame} data-presentation-token={token} title="Python 그래픽 실행 창" srcDoc={presentationDocument.replaceAll('__PRESENTATION_TOKEN__', token)} sandbox="allow-scripts" />
+}
 
 // One isolated interpreter per editor session. Runs replace files/state over the port.
 function PublicLearningPrompt() {
@@ -47,11 +54,13 @@ function PublicLearningPrompt() {
   </div>
 }
 
-export default function GamePreview({ uid, run, onEvent, publicAccess = false }) {
+export default function GamePreview({ uid, run, onEvent, publicAccess = false, presentationFrame = null }) {
   const frameRef = useRef(null)
   const callbackRef = useRef(onEvent)
   const runRef = useRef(run)
   const sendRef = useRef(null)
+  const controlRef = useRef(null), attachPresentationRef = useRef(null)
+  const [engineState, setEngineState] = useState('preparing')
   const [engineEpoch, setEngineEpoch] = useState(0)
   useEffect(() => { callbackRef.current = onEvent }, [onEvent])
   useEffect(() => {
@@ -65,6 +74,8 @@ export default function GamePreview({ uid, run, onEvent, publicAccess = false })
       return callbackRef.current({ ...event, notebook: snapshot?.notebook, coach: event.type === 'ERROR' && source !== undefined ? { source, path, projectId: snapshot.project.id, runId: snapshot.id, scope: scopeForRun(snapshot) } : null })
     }
     const frame = frameRef.current
+    setEngineState('preparing')
+    dispatch({ type: 'ENGINE_PREPARING' })
     const hostDocument = frame.ownerDocument
     const hostWindow = hostDocument.defaultView || window
     const channel = new hostWindow.MessageChannel()
@@ -94,6 +105,11 @@ export default function GamePreview({ uid, run, onEvent, publicAccess = false })
       if (!next && engineReady && !hostDocument.hidden) watchdog = setTimeout(recover, 3500)
     }
     sendRef.current = send
+    controlRef.current = (type, port) => {
+      if (!connected) return false
+      channel.port1.postMessage({ type, protocolVersion: 2, sessionId, port }, port ? [port] : [])
+      return true
+    }
     const connect = () => {
       if (connected) return
       connected = true
@@ -103,8 +119,9 @@ export default function GamePreview({ uid, run, onEvent, publicAccess = false })
       if (data?.protocolVersion !== 2 || data.sessionId !== sessionId) return
       if (Date.now() - windowAt > 1000) { count = 0; windowAt = Date.now() }
       if (++count > 150) return
-      if (data.type === 'CONNECTED') { dispatch({ type: 'PREVIEW_CONNECTED' }); send(runRef.current); return }
-      if (data.type === 'ENGINE_READY') { engineReady = true; bootFailed = false; clearTimeout(bootTimeout); return }
+      if (data.type === 'CONNECTED') { attachPresentationRef.current?.(); send(runRef.current); return }
+      if (data.type === 'PRESENTATION_READY') { dispatch({ type: 'PRESENTATION_READY' }); return }
+      if (data.type === 'ENGINE_READY') { engineReady = true; bootFailed = false; clearTimeout(bootTimeout); setEngineState('ready'); dispatch({ type: 'ENGINE_READY' }); return }
       if (data.type === 'RESET_REQUIRED') { recover(); return }
       if (data.runId === waitingId && ['READY','RUNNING','STOPPED','ERROR'].includes(data.type)) clearTimeout(watchdog)
       if (data.type === 'STOPPED' && data.runId === waitingId) waitingForStop = false
@@ -160,13 +177,36 @@ export default function GamePreview({ uid, run, onEvent, publicAccess = false })
     return () => {
       disposed = true; clearTimeout(bootTimeout); clearTimeout(watchdog)
       sendRef.current = null
+      controlRef.current = null
       hostDocument.removeEventListener('visibilitychange', visibility)
       hostWindow.removeEventListener('message', hello); frame.removeEventListener('load', connect)
       channel.port1.close(); channel.port2.close()
     }
   }, [engineEpoch, uid])
+  useEffect(() => {
+    if (!presentationFrame) return
+    const host = presentationFrame.ownerDocument.defaultView
+    let attached = false, loaded = false
+    const attach = () => {
+      if (attached || !loaded) return
+      const channel = new MessageChannel()
+      if (!controlRef.current?.('PRESENTATION_CONNECT', channel.port1)) { channel.port1.close(); channel.port2.close(); return }
+      presentationFrame.contentWindow.postMessage({ type: 'DISPLAY_CONNECT', token: presentationFrame.dataset.presentationToken }, '*', [channel.port2])
+      attached = true
+    }
+    const ready = () => { loaded = true; attach() }
+    const hello = event => { if (event.source === presentationFrame.contentWindow && event.data?.type === 'DISPLAY_HELLO') ready() }
+    attachPresentationRef.current = attach
+    host.addEventListener('message', hello)
+    presentationFrame.addEventListener('load', ready)
+    return () => {
+      attachPresentationRef.current = null
+      host.removeEventListener('message', hello); presentationFrame.removeEventListener('load', ready)
+      controlRef.current?.('PRESENTATION_DISCONNECT')
+    }
+  }, [presentationFrame, engineEpoch])
   useEffect(() => { runRef.current = run; sendRef.current?.(run) }, [run])
-  return <div className="pgs-runtime">
+  return <div className="pgs-runtime" data-engine-state={engineState} data-engine-epoch={engineEpoch}>
     <iframe key={engineEpoch} ref={frameRef} title="Python 코드 실행 화면" srcDoc={runnerDocument} sandbox="allow-scripts" allow="autoplay" referrerPolicy="no-referrer" tabIndex={run ? 0 : -1} aria-hidden={!run} style={{ pointerEvents: run ? 'auto' : 'none' }} />
     {!run && (publicAccess ? <PublicLearningPrompt /> : <div className="pgs-empty"><span className="pgs-orbit">✦</span><strong>코드로 만들고, 실행하며 배워요</strong><p>실행을 누르면 코드가 바로 실행됩니다.</p><small>마우스·방향키를 사용할 때는 실행 화면을 클릭하세요.</small></div>)}
   </div>

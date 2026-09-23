@@ -116,7 +116,7 @@
   function advance(now) {
     if (!animation) return
     const { command, turtle, line, duration } = animation
-    const progress = duration === 0 ? 1 : Math.min(1, (now - animation.now) / duration)
+    const progress = duration === 0 ? 1 : Math.max(0, Math.min(1, (now - animation.now) / duration))
     if (command.op === 'turn') turtle.heading = command.start + command.angle * progress
     else {
       const index = Math.min(command.points.length - 2, Math.floor(progress * (command.points.length - 1)))

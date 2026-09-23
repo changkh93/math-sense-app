@@ -148,6 +148,10 @@
 .pgs-runner-window.pgs-visual-fallback-open{left:50%;top:50%;width:min(1100px,calc(100vw - 40px));height:min(760px,calc(100dvh - 40px));transform:translate(-50%,-50%);opacity:1;pointer-events:auto;z-index:1600;resize:both;overflow:hidden;border-radius:12px;box-shadow:0 24px 100px #000c}
 .pgs-runner-window.pgs-preview-expanded{left:0;top:0;transform:none;opacity:1;pointer-events:auto;z-index:1700;resize:none;border-radius:0}
 .pgs-popout-shell{width:100vw;height:100dvh;min-height:0;overflow:hidden}
+.pgs-popout-shell{display:flex;flex-direction:column;min-height:0}
+.pgs-display-content{position:relative;flex:1;min-height:0}
+.pgs-display-content>iframe{width:100%;height:100%;border:0;display:block}
+.pgs-display-loading{position:absolute;inset:0;display:grid;place-content:center;background:#080f20;color:#dbeafe;font-size:14px}
 .pgs-popout-shell .pgs-runner-window{position:static;left:auto;top:auto;width:100%;height:100%;opacity:1;pointer-events:auto;z-index:auto;border:0;resize:none}
 .pgs-popout-shell .pgs-runner-window.pgs-preview-expanded{position:fixed;inset:0}
 .pgs-popout-shell .pgs-game-frame,.pgs-runner-window>.pgs-game-frame{min-height:0}

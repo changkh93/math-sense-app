@@ -3,7 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { ArrowLeft, Play, Square, Upload, FileCode2, FolderPlus, Plus, Download, FolderOpen, Maximize2, Minimize2, Trash2, Code2, X } from 'lucide-react'
 import PythonEditor from '../PythonWorld/PythonEditor'
-import GamePreview from './GamePreview'
+import GamePreview, { PresentationPreview } from './GamePreview'
 import StudioInput from './StudioInput'
 import ErrorCoach from './ErrorCoach'
 import OutputLogs from './OutputLogs'
@@ -23,9 +23,10 @@ import { notebookCells } from './notebookModel.mjs'
 import { readNotebook, writeNotebook, normalizeNotebook } from './notebookFile.mjs'
 import { trackPython } from '../../utils/pythonFunnel'
 import { projectUsesVisualOutput } from './visualOutput.mjs'
+import { presentationWindowSize, presentationWindowPosition, presentationSizeLabel } from './presentationWindow.mjs'
 import './PythonGameStudio.css'
 
-const statusNames = { loading: '엔진 준비 중', ready: '실행 준비 완료', waiting: '입력 대기', running: '실행 중', stopped: '정지됨', error: '오류 확인', exited: '실행 완료' }
+const statusNames = { loading: '실행 준비 중', ready: '실행 준비 완료', waiting: '입력 대기', running: '실행 중', stopped: '정지됨', error: '오류 확인', exited: '실행 완료' }
 function readPlayPreferences(uid) {
   try {
     const saved = JSON.parse(localStorage.getItem(`metasense-studio-play:${uid}`))
@@ -87,9 +88,14 @@ export default function PythonGameStudio({ uid = 'local-preview', onBack, public
   const [liveCell, setLiveCell] = useState(null)
   const [surfaceSlot, setSurfaceSlot] = useState(null)
   const previewWindowRef = useRef(null)
+  const [previewWindowName] = useState(() => `metasense-code-studio-preview-${crypto.randomUUID()}`)
   const previewConnectedRef = useRef(false)
   const previewFallbackTimer = useRef(null)
+  const previewResolve = useRef(null)
   const [previewPortal, setPreviewPortal] = useState(null)
+  const [presentationFrame, setPresentationFrame] = useState(null)
+  const [presentationLabel, setPresentationLabel] = useState('')
+  const [engineReady, setEngineReady] = useState(false)
   const [visualFallback, setVisualFallback] = useState(false)
   const [previewExpanded, setPreviewExpanded] = useState(false)
   const [inputRequest, setInputRequest] = useState(null)
@@ -114,10 +120,64 @@ export default function PythonGameStudio({ uid = 'local-preview', onBack, public
   const runGeneration = useRef(0)
   const notebook = useNotebook({ projectRef: latest, setRun, setStatus, setLogs, setInputRequest, setNotice })
   const notebookEvent = notebook.event, cancelNotebook = notebook.cancel
+  useEffect(() => {
+    setPresentationLabel('')
+    if (!presentationFrame) return
+    const popup = presentationFrame.ownerDocument.defaultView
+    let previousSize = '', settleTimer
+    const sizeFor = (width, height) => presentationWindowSize(width, height, {
+      outerWidth: popup.outerWidth, outerHeight: popup.outerHeight,
+      innerWidth: popup.innerWidth, innerHeight: popup.innerHeight,
+      availWidth: popup.screen.availWidth, availHeight: popup.screen.availHeight,
+      headerHeight: popup.document.querySelector('.pgs-panel-title')?.getBoundingClientRect().height || 42,
+    })
+    const fit = size => {
+      const position = presentationWindowPosition(size, { screenX: popup.screenX, screenY: popup.screenY, availLeft: popup.screen.availLeft, availTop: popup.screen.availTop, availWidth: popup.screen.availWidth, availHeight: popup.screen.availHeight })
+      // Move above the work-area edge first; otherwise Chrome silently clamps
+      // growth at the bottom/right even when the game fits on this monitor.
+      try { if (popup.screenX !== position.left || popup.screenY !== position.top) popup.moveTo(position.left, position.top) } catch { /* Some browsers allow sizing but not window movement. */ }
+      popup.resizeTo(size.width, size.height)
+    }
+    const receive = event => {
+      const data = event.data
+      if (event.source !== presentationFrame.contentWindow || data?.token !== presentationFrame.dataset.presentationToken || data.type !== 'DISPLAY_VIEWPORT') return
+      const size = sizeFor(data.width, data.height)
+      if (!size || !Number.isFinite(data.renderedWidth) || !Number.isFinite(data.renderedHeight)) return
+      const key = `${data.width}x${data.height}`
+      if (previousSize !== key) {
+        previousSize = key
+        // Resize only for a new game resolution, never fight a user's resize.
+        try {
+          if (presentationFrame.clientWidth < data.width || presentationFrame.clientHeight < data.height) fit(size)
+        } catch { /* Browser may keep this as a tab; the fit label remains accurate. */ }
+        // Chrome's native-window and document units can differ while opening
+        // or under browser zoom. Bound the initial correction, then leave all
+        // subsequent user resizes alone.
+        popup.clearTimeout(settleTimer)
+        const settle = attempts => {
+          if (popup.closed) return
+          const deficitX = data.width - presentationFrame.clientWidth, deficitY = data.height - presentationFrame.clientHeight
+          const dx = deficitX > 0 ? Math.max(0, Math.min(Math.max(2, deficitX), popup.screen.availWidth - popup.outerWidth)) : 0
+          const dy = deficitY > 0 ? Math.max(0, Math.min(Math.max(2, deficitY), popup.screen.availHeight - popup.outerHeight)) : 0
+          try { if (dx || dy) fit({ width: popup.outerWidth + dx, height: popup.outerHeight + dy }) } catch { /* Fit to the available viewport. */ }
+          if ((dx || dy) && attempts > 1) settleTimer = popup.setTimeout(() => settle(attempts - 1), 300)
+        }
+        settleTimer = popup.setTimeout(() => settle(5), 300)
+      }
+      setPresentationLabel(presentationSizeLabel(data.width, data.height, data.renderedWidth, data.renderedHeight))
+      if (data.focus) {
+        presentationFrame.focus({ preventScroll: true })
+        presentationFrame.contentWindow.postMessage({ type: 'DISPLAY_FOCUS', token: presentationFrame.dataset.presentationToken }, '*')
+      }
+    }
+    popup.addEventListener('message', receive)
+    return () => { popup.clearTimeout(settleTimer); popup.removeEventListener('message', receive) }
+  }, [presentationFrame])
   const closeVisualWindow = useCallback(() => {
     window.clearTimeout(previewFallbackTimer.current)
     previewFallbackTimer.current = null
     previewConnectedRef.current = false
+    previewResolve.current?.(false); previewResolve.current = null
     const target = previewWindowRef.current
     previewWindowRef.current = null
     if (target && !target.closed) target.close()
@@ -127,11 +187,16 @@ export default function PythonGameStudio({ uid = 'local-preview', onBack, public
   }, [])
   const openVisualWindow = useCallback(() => {
     const existing = previewWindowRef.current
-    if (existing && !existing.closed) { existing.focus(); return true }
-    const popup = window.open('', 'metasense-code-studio-preview', 'popup=yes,width=1120,height=780,resizable=yes,scrollbars=no')
-    if (!popup) { setVisualFallback(true); return false }
-    popup.document.title = 'MetaSense Code Studio · 실행 화면'
+    if (existing && !existing.closed && previewConnectedRef.current) { existing.focus(); return Promise.resolve(true) }
+    // Leave room for the common 1200×700 game plus its toolbar. Actual larger
+    // surfaces can grow this later; smaller surfaces retain their native size.
+    const popup = window.open('', previewWindowName, `popup=yes,width=${Math.min(1200, window.screen.availWidth)},height=${Math.min(800, window.screen.availHeight)},resizable=yes,scrollbars=no`)
+    if (!popup) { setVisualFallback(true); return Promise.resolve(false) }
+    popup.document.open()
+    popup.document.write('<!doctype html><html lang="ko"><head></head><body></body></html>')
+    popup.document.close()
     popup.document.head.replaceChildren()
+    popup.document.title = 'MetaSense Code Studio · 실행 화면'
     const base = popup.document.createElement('base'); base.href = document.baseURI; popup.document.head.append(base)
     document.querySelectorAll('link[rel="stylesheet"],style').forEach(node => popup.document.head.append(node.cloneNode(true)))
     const root = popup.document.createElement('div'); root.id = 'metasense-code-studio-preview'; popup.document.body.replaceChildren(root)
@@ -144,14 +209,16 @@ export default function PythonGameStudio({ uid = 'local-preview', onBack, public
     setVisualFallback(false)
     popup.focus()
     window.clearTimeout(previewFallbackTimer.current)
+    const ready = new Promise(resolve => { previewResolve.current = resolve })
     previewFallbackTimer.current = window.setTimeout(() => {
       if (previewConnectedRef.current || previewWindowRef.current !== popup) return
       previewWindowRef.current = null
       if (!popup.closed) popup.close()
       setPreviewPortal(null); setPreviewExpanded(false); setVisualFallback(true)
+      previewResolve.current?.(false); previewResolve.current = null
     }, 4000)
-    return true
-  }, [])
+    return ready
+  }, [previewWindowName])
   const stop = useCallback(() => {
     learningSession(uid).tracker.abandon(); cancelNotebook(); closeVisualWindow()
     runGeneration.current++; setRun(null); setInputRequest(null); setStatus('stopped')
@@ -223,12 +290,21 @@ export default function PythonGameStudio({ uid = 'local-preview', onBack, public
     if (!previewPortal) return undefined
     const timer = window.setInterval(() => {
       if (!previewPortal.popup.closed) return
-      previewWindowRef.current = null; setPreviewPortal(null); setPreviewExpanded(false)
+      closeVisualWindow()
       runGeneration.current++; setRun(null); setInputRequest(null); setStatus('stopped')
     }, 300)
     return () => window.clearInterval(timer)
-  }, [previewPortal])
-  useEffect(() => () => { window.clearTimeout(previewFallbackTimer.current); const target = previewWindowRef.current; previewWindowRef.current = null; if (target && !target.closed) target.close() }, [])
+  }, [previewPortal, closeVisualWindow])
+  useEffect(() => {
+    const cleanup = () => {
+      window.clearTimeout(previewFallbackTimer.current)
+      previewResolve.current?.(false); previewResolve.current = null
+      const target = previewWindowRef.current; previewWindowRef.current = null
+      if (target && !target.closed) target.close()
+    }
+    window.addEventListener('pagehide', cleanup)
+    return () => { window.removeEventListener('pagehide', cleanup); cleanup() }
+  }, [])
   useEffect(() => {
     if (!previewExpanded) return undefined
     const escape = event => { if (event.key === 'Escape') setPreviewExpanded(false) }
@@ -256,29 +332,31 @@ export default function PythonGameStudio({ uid = 'local-preview', onBack, public
       return
     }
     cancelNotebook()
-    const visual = projectUsesVisualOutput(project)
-    if (visual) openVisualWindow()
-    else closeVisualWindow()
+    const visual = projectUsesVisualOutput(project, runPath)
+    const displayReady = visual ? openVisualWindow() : (closeVisualWindow(), Promise.resolve(false))
     const generation = ++runGeneration.current
     setBusy(true); setRun(null); setInputRequest(null)
     try {
       // Use a run snapshot so opening a script does not change the saved project default.
       const checked = validateProject({ ...project, entrypoint: runPath })
       setLogs([]); setErrorLine(null); setStatus('loading')
-      const payload = await prepareRunnerProject(checked)
+      const [payload] = await Promise.all([prepareRunnerProject(checked), displayReady])
       if (mounted.current && generation === runGeneration.current) setRun({ id: crypto.randomUUID(), project: checked, payload })
     } catch (error) { if (mounted.current) { setNotice(error.message); setStatus('error') } }
     finally { if (mounted.current) setBusy(false) }
   }
   useEffect(() => {
-    const hide = () => { if (document.hidden && !currentRun.current?.notebook) { learningSession(uid).tracker.abandon(); runGeneration.current++; setRun(null); setInputRequest(null); setStatus('stopped') } }
+    const hide = () => { if (document.hidden && !previewWindowRef.current && !currentRun.current?.notebook) { learningSession(uid).tracker.abandon(); runGeneration.current++; setRun(null); setInputRequest(null); setStatus('stopped') } }
     document.addEventListener('visibilitychange', hide)
     return () => document.removeEventListener('visibilitychange', hide)
   }, [uid])
   const handleEvent = useCallback(event => {
-    if (event.type === 'PREVIEW_CONNECTED') {
+    if (event.type === 'ENGINE_PREPARING') { setEngineReady(false); return }
+    if (event.type === 'ENGINE_READY') { setEngineReady(true); return }
+    if (event.type === 'PRESENTATION_READY') {
       previewConnectedRef.current = true
       window.clearTimeout(previewFallbackTimer.current); previewFallbackTimer.current = null
+      previewResolve.current?.(true); previewResolve.current = null
       return
     }
     notebookEvent(event)
@@ -470,11 +548,16 @@ export default function PythonGameStudio({ uid = 'local-preview', onBack, public
     if (match && project.files.some(f => f.path === match[1])) { selectFile(match[1]); setSelectedFolder(match[1].split('/').slice(0, -1).join('/')); setErrorLine(Number(match[2])); requestAnimationFrame(() => editor.current?.revealLine(Number(match[2]))) }
   }
   if (!project) return <div className="pgs-shell pgs-loading">내 프로젝트를 불러오고 있습니다…</div>
-  const visualPane = <section inert={editorMode !== 'notebook' && !previewPortal && !visualFallback ? true : undefined} aria-hidden={editorMode !== 'notebook' && !previewPortal && !visualFallback ? true : undefined} className={`pgs-preview-pane pgs-runner-window${visualFallback ? ' pgs-visual-fallback-open' : ''}${previewExpanded ? ' pgs-preview-expanded' : ''}`} ref={preview}>
+  const visualPane = <section inert={editorMode !== 'notebook' && !visualFallback ? true : undefined} aria-hidden={editorMode !== 'notebook' && !visualFallback ? true : undefined} className={`pgs-preview-pane pgs-runner-window${visualFallback ? ' pgs-visual-fallback-open' : ''}${previewExpanded && !previewPortal ? ' pgs-preview-expanded' : ''}`} ref={preview}>
     <div className="pgs-panel-title"><span>실행 화면</span><div><span className="pgs-fit-label">별도 창 · 화면에 맞춤</span><button aria-label={previewExpanded ? '실행 화면 원래 크기로' : '실행 화면 크게 보기'} aria-pressed={previewExpanded} onClick={() => setPreviewExpanded(value => !value)}>{previewExpanded ? <Minimize2 size={16} /> : <Maximize2 size={16} />}</button>{editorMode !== 'notebook' && <button aria-label="실행 화면 닫기" onClick={stop}><X size={16} /></button>}</div></div>
-    <div className="pgs-game-frame"><GamePreview uid={uid} run={run} onEvent={handleEvent} publicAccess={publicAccess} /></div>
+    <div className="pgs-game-frame"><GamePreview uid={uid} run={run} onEvent={handleEvent} publicAccess={publicAccess} presentationFrame={presentationFrame} /></div>
   </section>
-  const visualSurface = previewPortal ? createPortal(<main className="pgs-shell pgs-popout-shell" data-code-theme={preferences.theme}>{visualPane}</main>, previewPortal.root) : visualPane
+  const displayPopup = previewPortal && createPortal(<main className="pgs-shell pgs-popout-shell" data-code-theme={preferences.theme}>
+    <div className="pgs-panel-title"><span>실행 화면{presentationLabel && ` · ${presentationLabel}`}</span><button aria-label="실행 화면 닫기" onClick={stop}><X size={16} /></button></div>
+    <div className="pgs-display-content"><PresentationPreview onFrame={setPresentationFrame} />
+      {status === 'loading' && <div className="pgs-display-loading" role="status">{engineReady ? '코드를 실행하고 있습니다…' : 'Python 실행 환경을 처음 준비하고 있습니다…'}</div>}
+    </div>
+  </main>, previewPortal.root)
   return <main className="pgs-shell" data-editor-mode={editorMode} data-code-theme={preferences.theme} onDragOver={e => { if (Array.from(e.dataTransfer.types).includes('Files')) e.preventDefault() }} onDrop={e => { if (!e.dataTransfer.files.length) return; e.preventDefault(); e.stopPropagation(); if (!busy) upload(e.dataTransfer.files) }}>
     <header className="pgs-header">{onBack && <button className="pgs-icon-btn" aria-label={publicAccess ? '메타센스 홈으로' : '수업으로 돌아가기'} onClick={async () => { try { await saveChain.current.catch(() => {}); await saveDraft(uid, project); stop(); onBack() } catch (error) { setNotice(error.message) } }}><ArrowLeft size={20} /></button>}<div className="pgs-brand"><span>METASENSE {publicAccess ? 'CODE STUDIO' : '/ CODE STUDIO'}</span>{publicAccess && <small className="pgs-brand-tagline">만들면서 배우는 Python</small>}<input aria-label="프로젝트 이름" value={project.title} maxLength={80} onChange={e => setProject({ ...project, title: e.target.value })} /></div><span className="pgs-save-state" role="status">{saved}</span>{publicAccess && <nav className="pgs-public-links" aria-label="메타센스 안내"><a href="https://msense.me/python/guides/">파이썬 학습노트</a><a className="pgs-learn-link" href="/python#courses" onClick={() => trackPython('python_cta', 'studio_header')}>파이썬 배우기</a></nav>}<div className="pgs-header-actions"><button onClick={showLibrary}><FolderOpen size={16} /> 내 프로젝트</button><button aria-label="프로젝트 다운로드" title="프로젝트 다운로드" onClick={() => download(`${project.title || 'game'}.mspygame.json`, JSON.stringify(project), 'application/json')}><Download size={17} /></button></div></header>
     {notice && <div className="pgs-notice" role="status">{notice}<button aria-label="안내 닫기" onClick={() => setNotice('')}><X size={15} /></button></div>}
@@ -494,10 +577,11 @@ export default function PythonGameStudio({ uid = 'local-preview', onBack, public
         setSelected(path); setNotice('OGG 사본을 만들었습니다. 원본 사운드도 그대로 남아 있습니다.')
       } catch (error) { setNotice(error.message) } finally { setBusy(false) }
     }} />}</section>
-    {editorMode !== 'notebook' && <><div {...layout.separator('console')} /><div className="pgs-console"><div className="pgs-panel-title">출력 · 오류<button onClick={() => setLogs([])}>지우기</button></div>{preferences.playful && <RunFeedback status={status} />}<div className="pgs-console-scroll" ref={consoleOutput}><div aria-live="polite">{!logs.length && <span className="pgs-console-hint">{status === 'loading' ? 'Python 실행 환경을 준비하고 있습니다…' : 'print() 출력과 오류가 여기에 표시됩니다.'}</span>}<OutputLogs logs={logs} onJumpToError={jumpToError} /></div>{logs.filter(log => log.coach && log.coach.projectId === project.id && log.coach.path === selected).slice(-1).map(log => <ErrorCoach key={log.id} uid={uid} learningKey={log.coach.runId} learningScope={log.coach.scope} learningPath={log.coach.path} source={log.coach.source} currentSource={activeFile?.text} text={log.text} allowAi={!publicAccess} />)}</div>{inputRequest && run && <StudioInput key={`${run.id}:${inputRequest.requestId}`} request={inputRequest} onSubmitted={() => { setInputRequest(null); setStatus('running') }} />}</div></>}
+    {editorMode !== 'notebook' && <><div {...layout.separator('console')} /><div className="pgs-console"><div className="pgs-panel-title">출력 · 오류<button onClick={() => setLogs([])}>지우기</button></div>{preferences.playful && <RunFeedback status={status} />}<div className="pgs-console-scroll" ref={consoleOutput}><div aria-live="polite">{!logs.length && <span className="pgs-console-hint">{status === 'loading' ? (engineReady ? '코드를 실행하고 있습니다…' : 'Python 실행 환경을 처음 준비하고 있습니다…') : 'print() 출력과 오류가 여기에 표시됩니다.'}</span>}<OutputLogs logs={logs} onJumpToError={jumpToError} /></div>{logs.filter(log => log.coach && log.coach.projectId === project.id && log.coach.path === selected).slice(-1).map(log => <ErrorCoach key={log.id} uid={uid} learningKey={log.coach.runId} learningScope={log.coach.scope} learningPath={log.coach.path} source={log.coach.source} currentSource={activeFile?.text} text={log.text} allowAi={!publicAccess} />)}</div>{inputRequest && run && <StudioInput key={`${run.id}:${inputRequest.requestId}`} request={inputRequest} onSubmitted={() => { setInputRequest(null); setStatus('running') }} />}</div></>}
     {/* Notebook positioning uses this scroll container as the containing block. */}
-    {visualSurface}
+    {visualPane}
     </div></div>
+    {displayPopup}
     {drawer && <div className="pgs-modal-backdrop"><section className="pgs-library" role="dialog" aria-modal="true" aria-label="내 프로젝트" aria-busy={importing}><div className="pgs-panel-title">내 프로젝트<button aria-label="프로젝트 목록 닫기" disabled={importing} onClick={() => setDrawer(false)}><X size={18} /></button></div>{notice && <p role="alert">{notice}</p>}<div className="pgs-library-actions"><button disabled={busy} onClick={() => { setDialogValue('나의 프로젝트'); setDialog('new') }}><Plus size={16} /> 새 프로젝트</button><button disabled={busy} onClick={() => folderInput.current.click()}><FolderOpen size={16} /> {importing ? '가져오는 중…' : '프로젝트 가져오기'}</button>{!publicAccess && <><button disabled={busy} onClick={() => importInput.current.click()}><Upload size={16} /> 백업 파일 복원</button><button disabled={busy} onClick={async () => {
       setBusy(true)
       try {

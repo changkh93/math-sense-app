@@ -1,0 +1,31 @@
+{
+  "projectId": "proj_S7uL2bHA4redF0r90zUcfxRe",
+  "at": "2026-09-23T05:42:29.343Z",
+  "syntheticOnly": true,
+  "productionModified": false,
+  "checks": [
+    {
+      "id": "constructor",
+      "passed": true,
+      "response": {
+        "status": 200,
+        "model": "gpt-6-luna",
+        "inputTokens": 972,
+        "outputTokens": 153
+      },
+      "advice": {
+        "explanation": "3줄의 오류는 거북이가 움직일 때 필요한 값이 빠졌다는 뜻일 수 있어요. 2줄에서 Turtle이 실제 거북이로 만들어졌는지 먼저 확인해 보세요.",
+        "hint": "기본 힌트에 따르면 거북이를 만드는 괄호가 빠졌을 가능성이 있어요. 거북이를 만들려는 코드라면 2줄을 variable_1 = Turtle()처럼 고쳐 보세요.",
+        "question": "2줄에 괄호를 넣은 뒤에도 3줄에서 오류가 나는지 살펴볼까요?",
+        "check": "다시 실행해 보고 거북이가 움직이는지 확인해 보세요."
+      },
+      "cachedRepeat": true
+    }
+  ],
+  "secret": {
+    "version": "4",
+    "state": "ENABLED",
+    "createdAt": "2026-09-16T10:23:20.345970Z"
+  },
+  "passed": true
+}

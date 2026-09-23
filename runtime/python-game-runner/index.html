@@ -144,6 +144,8 @@ window.addEventListener('message',function connect(event){
  clearInterval(hello);port=event.ports[0];sessionId=event.data.sessionId;
  port.onmessage=({data})=>{
  if(data.sessionId!==sessionId||data.protocolVersion!==2)return;
+ if(data.type==='PRESENTATION_CONNECT'&&data.port){window.studioConnectPresentation?.(data.port);return;}
+ if(data.type==='PRESENTATION_DISCONNECT'){window.studioDisconnectPresentation?.();return;}
  if(data.type==='INPUT_RESPONSE'){
   const pending=window.studioPendingInput;
   if(pending&&data.runId===window.studioActiveRun&&data.runId===pending.runId&&data.requestId===pending.requestId&&!pending.response&&typeof data.value==='string'&&data.value.length<=8192){
@@ -187,9 +189,12 @@ for(const name of ['AudioContext','webkitAudioContext']){
   }
  };
 }
+window.studioResumeAudio=()=>{
+ for(const context of audioContexts)if(context.state==='suspended')context.resume().catch(()=>{});
+};
 function resumeAudio(event){
  if(!event.isTrusted)return;
- for(const context of audioContexts)if(context.state==='suspended')context.resume().catch(()=>{});
+ window.studioResumeAudio();
 }
 document.addEventListener('pointerdown',resumeAudio);
 document.addEventListener('keydown',resumeAudio);
@@ -796,6 +801,11 @@ async def start_project(command):
         exec(compile(STUDIO_FONTS_SOURCE, '/studio/studio_fonts.py', 'exec'), studio_fonts.__dict__)
         studio_fonts.install(pygame_sysfont, PLOT_FONT)
     def trace(frame, event, arg):
+        # Browser scheduling pauses (e.g. focusing the separate display) are not
+        # student CPU time. A task resumed by asyncio gets a fresh slice; an
+        # uninterrupted student loop still hits the same two-second limit.
+        if event == 'call' and frame.f_code.co_filename.startswith(ROOT + '/') and frame.f_back and not frame.f_back.f_code.co_filename.startswith(ROOT + '/'):
+            context['deadline'] = time.monotonic() + 2
         if event == 'line' and frame.f_code.co_filename.startswith(ROOT + '/') and time.monotonic() > context['deadline']:
             raise RuntimeError('반복문이 화면을 멈췄습니다. 게임 루프에 await asyncio.sleep(0)을 넣어 주세요.')
         return trace
@@ -812,7 +822,7 @@ async def start_project(command):
         plot_module = types.ModuleType('studio_plot')
         exec(compile(PLOT_SOURCE, '/studio/studio_plot.py', 'exec'), plot_module.__dict__)
         plot_session = plot_module.install(platform.window, ROOT, PLOT_FONT)
-    if cell and 'pygame' in packages and not pygame_surface_originals:
+    if 'pygame' in packages and not pygame_surface_originals:
         import pygame
         def surface_call(original):
             def call(*args, **kwargs):
@@ -901,4 +911,4 @@ async def studio_boot():
 
 ORIGINAL_RUN(studio_boot())
 </script></head>
-<body><canvas id="canvas" width="1200" height="700" tabindex="0"></canvas><div id="start"><div id="note">Python 실행 환경을 준비하고 있습니다.<br>첫 실행에는 시간이 조금 걸릴 수 있습니다.</div></div><div id="audio-note" hidden>소리를 들으려면 실행 화면을 클릭하세요.</div></body></html>
+<body><canvas id="canvas" width="1200" height="700" tabindex="0"></canvas><div id="start"><div id="note">Python 실행 환경을 준비하고 있습니다.<br>첫 실행에는 시간이 조금 걸릴 수 있습니다.</div></div><div id="audio-note" hidden>소리를 들으려면 실행 화면을 클릭하세요.</div><!-- STUDIO_PRESENTATION_HOST --></body></html>

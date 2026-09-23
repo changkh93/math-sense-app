@@ -6,7 +6,7 @@ import {execFileSync} from 'node:child_process'
 import path from 'node:path'
 import {inspectBehavior,behaviorError} from '../functions/studioBehaviorCoach.mjs'
 import {behaviorFixture} from '../functions/studioBehaviorCoach.fixtures.mjs'
-import {makeCoachPayload,parseError} from '../functions/studioErrorCoachPolicy.mjs'
+import {COACH_MODEL,makeCoachPayload,parseError} from '../functions/studioErrorCoachPolicy.mjs'
 const mode=process.argv[2]
 if(!['--activate','--verify','--verify-current','--schedule-check'].includes(mode))throw new Error('Use --activate, --verify, --verify-current or --schedule-check explicitly')
 const project='math-sense-1f6a8', region='asia-northeast3'
@@ -77,7 +77,7 @@ try{
     check(id+' masked payload ready',!!payload)
     const result=await call('studioErrorCoach',payload,idToken)
     evidence.responses.push({id,status:result.status,errorStatus:result.body.error?.status,advice:result.body.result?.advice})
-    check(id+' deployed Luna returned four-field advice',result.body.result?.model==='gpt-5.6-luna'&&['explanation','hint','question','check'].every(k=>typeof result.body.result?.advice?.[k]==='string'))
+    check(id+' deployed Luna returned four-field advice',result.body.result?.model===COACH_MODEL&&['explanation','hint','question','check'].every(k=>typeof result.body.result?.advice?.[k]==='string'))
     const repeated=await call('studioErrorCoach',payload,idToken)
     check(id+' duplicate does not charge again',repeated.body.result?.cached===true||repeated.body.error?.status==='ALREADY_EXISTS')
   }
