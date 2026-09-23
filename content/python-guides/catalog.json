@@ -1,5 +1,43 @@
 [
   {
+    "slug": "why-four-turns-make-a-square",
+    "title": "파이썬 반복문으로 사각형을 그릴 때 왜 네 번 돌까?",
+    "category": "직접 만들기",
+    "description": "거북이 그래픽에서 이동·90도 회전을 3·4·5회 반복해 보세요. 4회는 사각형을 닫고 5회는 첫 변을 다시 지나가는 이유를 예측과 경로로 확인합니다.",
+    "answer": "같은 길이로 이동하고 90도씩 회전하면 네 번째 이동에서 출발점으로 돌아와 사각형이 닫힙니다. 다섯 번째 이동은 오각형을 만드는 대신 첫 변을 다시 지납니다.",
+    "image": "/python-guides/assets/square-repeat-3-4-5.svg",
+    "imageAlt": "3회는 왼쪽 변이 열리고, 4회는 사각형이 닫히며, 5회는 첫 변을 겹쳐 지나는 경로 설명도",
+    "imageCaption": "거북이 이동 경로를 좌표로 검증해 만든 설명도 · 실제 코드 스튜디오 캡처 아님",
+    "published": "2026-09-24",
+    "updated": "2026-09-24",
+    "status": "published",
+    "author": "메타센스",
+    "faq": [
+      {
+        "question": "다섯 번 반복하면 왜 오각형이 아닌가요?",
+        "answer": "회전 각도가 계속 90도이기 때문입니다. 네 번 만에 한 바퀴를 돌고 출발점에 도착하므로 다섯 번째 선은 첫 변과 겹칩니다."
+      },
+      {
+        "question": "사각형이 닫히는지 무엇을 확인하면 되나요?",
+        "answer": "각 이동 뒤의 위치를 표시해 네 번째 끝점이 출발점과 같은지 확인하세요. 같은 길이로 이동하고 매번 90도 회전하는 조건도 함께 살펴야 합니다."
+      }
+    ],
+    "related": [
+      "first-turtle-drawing",
+      "code-foundation-023"
+    ],
+    "sources": [
+      {
+        "title": "메타센스 처음 파이썬 · for 반복문 활용 코드 노트",
+        "url": "https://msense.me/python/guides/code-foundation-023/"
+      },
+      {
+        "title": "Python 공식 turtle 문서",
+        "url": "https://docs.python.org/3/library/turtle.html"
+      }
+    ]
+  },
+  {
     "slug": "first-python-age",
     "title": "초등 파이썬, 몇 학년부터 시작하면 좋을까요?",
     "category": "시작 준비",
