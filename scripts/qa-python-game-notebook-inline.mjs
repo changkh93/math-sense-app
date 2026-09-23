@@ -8,6 +8,15 @@ const out='docs/collaboration/tasks/20260916-studio-notebook/verification', erro
 page.on('pageerror',e=>errors.push(e.message))
 const cell=i=>page.getByLabel(`${i}번 코드 셀`,{exact:true})
 const result=i=>page.getByLabel(`${i}번 셀 결과`,{exact:true})
+async function assertInlineSurface() {
+ const geometry=await page.evaluate(()=>{
+  const slot=document.querySelector('.pgs-cell-surface-slot'),pane=document.querySelector('.pgs-preview-pane')
+  const a=slot.getBoundingClientRect(),b=pane.getBoundingClientRect()
+  return {sameScroller:pane.parentElement===slot.closest('.pgs-main-panes'),dx:b.x-a.x,dy:b.y-a.y,dw:b.width-a.width,dh:b.height-a.height}
+ })
+ assert.equal(geometry.sameScroller,true,'The live surface must share the notebook scroll container')
+ for(const key of ['dx','dy','dw','dh']) assert.ok(Math.abs(geometry[key])<2,`Inline surface ${key}: ${geometry[key]}`)
+}
 async function run(i){console.log('run',i);await page.getByRole('button',{name:`${i}번 셀 실행`,exact:true}).click();await page.waitForFunction(()=>!document.querySelector('.pgs-cell-header button')?.disabled,null,{timeout:30000});console.log('done',i);}
 async function replace(i,code){await page.waitForFunction(()=>!document.querySelector('.pgs-cell-header button')?.disabled);await cell(i).locator('.cm-content[contenteditable="true"]').click();await page.keyboard.press('Meta+a');await page.keyboard.insertText(code);assert.equal((await cell(i).locator('.cm-content').innerText()).trim(),code.trim())}
 
@@ -23,6 +32,7 @@ try {
  const editor=await page.locator('.pgs-editor-pane').boundingBox();assert.ok(editor.width>1100)
  await page.locator('.pgs-cell-surface-slot').scrollIntoViewIfNeeded()
  await page.waitForFunction(()=>document.querySelector('.pgs-preview-pane')?.style.opacity==='1')
+ await assertInlineSurface()
  const slot=await page.locator('.pgs-cell-surface-slot').boundingBox(), box=await iframe.boundingBox();assert.ok(Math.abs(slot.x-box.x)<2&&Math.abs(slot.y-box.y)<2)
  await page.screenshot({path:out+'/inline-desktop.png'})
  await run(2);assert.match(await result(2).innerText(),/ONLY_TEXT/);assert.equal(await result(2).locator('img,.pgs-cell-surface-slot').count(),0)
@@ -38,10 +48,12 @@ try {
  await frame.getByRole('button',{name:'셀 버튼',exact:true}).click();await page.waitForFunction(()=>document.querySelector('[aria-label="2번 셀 결과"]')?.textContent.includes('CLICK_OK'))
  for(const size of [{width:1024,height:768},{width:768,height:1024}]) {
    await page.setViewportSize(size);await page.locator('.pgs-cell-surface-slot').scrollIntoViewIfNeeded();await frame.getByRole('button',{name:'셀 버튼',exact:true}).click()
+   await assertInlineSurface()
    assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false)
    await page.screenshot({path:out+`/inline-tablet-${size.width}.png`})
  }
  await page.getByRole('button',{name:'크게 보기',exact:true}).click();assert.equal(await page.locator('.pgs-preview-expanded').count(),1);await frame.getByRole('button',{name:'셀 버튼',exact:true}).click();await page.getByRole('button',{name:'실행 화면 원래 크기로',exact:true}).click();assert.equal(await frame.evaluate(()=>window.qaIdentity),'same-interpreter')
+ await assertInlineSurface()
  assert.deepEqual(errors,[])
  await writeFile(out+'/inline-checks.json',JSON.stringify({passed:true,fullWidth:true,noDuplicateConsole:true,inlineTurtle:true,inlineInput:true,inlineTkInteraction:true,syntaxErrorNoBlankGraphic:true,plainPrintNoGraphic:true,previousSnapshot:true,noTaskLeak:true,sameInterpreterAcrossCellsAndModes:true,tabletLandscapePortrait:true,enlargeRestore:true,errors},null,2))
  console.log('PASS inline notebook graphics/input/errors, persistent interpreter, full width and tablet layouts')
