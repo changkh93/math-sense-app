@@ -4,7 +4,7 @@
   <rect width="960" height="430" rx="24" fill="#f2f6ef"/>
   <g font-family="sans-serif" fill="#183b37">
     <text x="38" y="55" font-size="25" font-weight="700">같은 명령, 다른 반복 횟수</text>
-    <text x="38" y="84" font-size="16">앞으로 80 → 왼쪽으로 90° · 출발점은 각 그림의 검은 원</text>
+    <text x="38" y="84" font-size="16">앞으로 100 → 왼쪽으로 90° · 각 그림은 (0, 0)에서 별도 실행</text>
     <g transform="translate(24 108)">
       <rect width="288" height="296" rx="18" fill="#ffffff" stroke="#d6e5da"/>
       <text x="24" y="38" font-size="24" font-weight="700">3회</text>
