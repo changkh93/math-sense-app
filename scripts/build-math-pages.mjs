@@ -258,15 +258,17 @@ for (const a of articles) {
       md,
     ),
   );
+  const bookOnly = ["counting-place-value", "regrouping-addition"].includes(a.slug);
+  const articleCta = bookOnly ? `<section class="note"><h2>수학감각 종이책으로 이어가기</h2><p>이 글은 교재 활용 안내이며 별도 수세기·덧뺄셈 온라인 수업 안내가 아닙니다.</p><a class="button" href="/math/books/">교재 구성·구매 안내 보기</a></section>` : cta;
   const evidence = a.source ?? a.illustration;
   const image =
-    evidence?.image ??
+    (bookOnly ? "/m-logo.svg" : evidence?.image) ??
     (a.slug === "multiplication-light-cards"
       ? "/math-assets/light-cards.png"
       : a.category === "분수"
         ? "/math-assets/fraction-book.jpg"
         : "/math-assets/light-cards.png");
-  const sourceFigure = evidence
+  const sourceFigure = bookOnly ? "" : evidence
     ? `<figure class="source-page"><a href="${evidence.image}" aria-label="${esc(evidence.title)} ${evidence.page}쪽 크게 보기"><img src="${evidence.image}" alt="${esc(evidence.alt)}" loading="eager"></a><figcaption>${esc(evidence.title)} · ${evidence.page}쪽 실제 교재 화면 · 이미지를 누르면 크게 볼 수 있습니다.</figcaption></figure>`
     : image
       ? `<figure><img src="${image}" alt="${a.category === "분수" ? "수학감각 분수 실제 본문 42쪽" : "메타센스 구구단 불빛 카드 실제 화면"}"><figcaption>${a.category === "분수" ? "수학감각 분수 · 42쪽" : "메타센스 도구 화면 · 학생의 학습 기록이 아닙니다."}</figcaption></figure>`
@@ -298,7 +300,7 @@ for (const a of articles) {
     `${root}${a.slug}/`,
     a.title,
     a.description,
-    `<section class="article-head"><nav aria-label="현재 위치"><a href="/math/">수학과 고전읽기</a> / <a href="${root}">학습 노트</a>${series ? ` / <a href="${series.path}">${series.name}</a>` : ""}</nav><span class="eyebrow">${a.category}</span><h1>${a.title}</h1><p class="small">메타센스 편집 · 게시 ${a.published} · 수정 ${a.updated}</p><div class="answer">${a.answer}</div></section><div class="reading"><article class="prose">${sourceFigure}${body}${faqHtml(a.faq)}<p class="small">자료: <a href="/math/books/">수학감각 교재 안내</a> · <a href="/math/">메타센스 과정과 학습도구</a> · <a href="${root}editorial/">편집 기준</a></p></article><aside><strong>이 글에서</strong><ol>${toc.map((t) => `<li><a href="#${t.id}">${esc(t.text)}</a></li>`).join("")}</ol><strong>이어서 읽기</strong>${a.related.map((s) => `<p><a href="${root}${s}/">${articles.find((x) => x.slug === s).title}</a></p>`).join("")}</aside></div>${cta}`,
+    `<section class="article-head"><nav aria-label="현재 위치"><a href="/math/">수학과 고전읽기</a> / <a href="${root}">학습 노트</a>${series ? ` / <a href="${series.path}">${series.name}</a>` : ""}</nav><span class="eyebrow">${a.category}</span><h1>${a.title}</h1><p class="small">메타센스 편집 · 게시 ${a.published} · 수정 ${a.updated}</p><div class="answer">${a.answer}</div></section><div class="reading"><article class="prose">${sourceFigure}${body}${faqHtml(a.faq)}<p class="small">자료: <a href="/math/books/">수학감각 교재 안내</a> · <a href="/math/">메타센스 과정과 학습도구</a> · <a href="${root}editorial/">편집 기준</a></p></article><aside><strong>이 글에서</strong><ol>${toc.map((t) => `<li><a href="#${t.id}">${esc(t.text)}</a></li>`).join("")}</ol><strong>이어서 읽기</strong>${a.related.map((s) => `<p><a href="${root}${s}/">${articles.find((x) => x.slug === s).title}</a></p>`).join("")}</aside></div>${articleCta}`,
     [
       {
         "@type": "Article",
