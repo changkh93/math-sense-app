@@ -30,7 +30,8 @@ import { recordCrystalTransaction } from '../../utils/crystalLedger';
 import { applyCrystalRewardMultiplier } from '../../utils/holidayUtils';
 import { getCodeTraceLineProgress, getCodeTraceResumeState, isCodeTraceProgressComplete } from '../../utils/codeTraceProgressUtils';
 import { alignCodeTraceLineKeys } from '../../utils/codeTraceDiffUtils';
-import { studioCompletion } from '../PythonWorld/studioCompletion';
+import { canPassCodeTrace, isCodeTraceCommentOnlyLine } from '../../utils/codeTraceInputUtils';
+import { codeTraceLanguageTools } from './codeTraceLanguageTools';
 import soundManager from '../../utils/SoundManager';
 
 const ANSWER_REVEAL_SECONDS = 30;
@@ -43,7 +44,6 @@ const FLOATING_PANEL_MARGIN_PX = 12;
 const FLOATING_PANEL_MIN_WIDTH_PX = 420;
 const FLOATING_PANEL_MIN_HEIGHT_PX = 360;
 const STRING_STRUCTURE_TOKEN = '__STRING__';
-const CODE_TRACE_COMPLETION_PROJECT = Object.freeze({ path: 'main.py', files: [] });
 const codeTraceHighlightStyle = HighlightStyle.define([
   { tag: syntaxTags.keyword, color: '#f0abfc', fontWeight: '700' },
   { tag: [syntaxTags.name, syntaxTags.variableName, syntaxTags.propertyName], color: '#f8fafc' },
@@ -96,15 +96,11 @@ function trimTrailingWhitespace(line = '') {
   return line.replace(/\s+$/g, '');
 }
 
-function isCommentOnlyLine(line = '') {
-  return String(line || '').trimStart().startsWith('#');
-}
-
 function getTraceScoredLineEntries(code = '') {
   return normalizeNewlines(code)
     .split('\n')
     .map((line, originalIndex) => ({ line, originalIndex }))
-    .filter(entry => !isCommentOnlyLine(entry.line));
+    .filter(entry => !isCodeTraceCommentOnlyLine(entry.line));
 }
 
 function getTraceScoredCode(code = '') {
@@ -346,7 +342,7 @@ function extractCommentLineSuggestions(code = '') {
       text: line.trimStart(),
       lineNumber: index + 1,
     }))
-    .filter(item => isCommentOnlyLine(item.raw))
+    .filter(item => isCodeTraceCommentOnlyLine(item.raw))
     .filter((item) => {
       const key = item.text.replace(/\s+/g, ' ').trim();
       if (!key || seen.has(key)) return false;
@@ -857,7 +853,7 @@ function buildCodeTraceDecorations(view, answerCode = '') {
   const scoredIndexByOriginalLine = new Map();
   let scoredIndex = 0;
   studentRawLines.forEach((line, originalIndex) => {
-    if (isCommentOnlyLine(line)) return;
+    if (isCodeTraceCommentOnlyLine(line)) return;
     scoredIndexByOriginalLine.set(originalIndex, scoredIndex);
     scoredIndex += 1;
   });
@@ -867,7 +863,7 @@ function buildCodeTraceDecorations(view, answerCode = '') {
     while (pos <= to) {
       const line = view.state.doc.lineAt(pos);
       const lineIndex = line.number - 1;
-      if (isCommentOnlyLine(line.text)) {
+      if (isCodeTraceCommentOnlyLine(line.text)) {
         if (line.to >= to || line.to >= view.state.doc.length) break;
         pos = line.to + 1;
         continue;
@@ -1005,17 +1001,17 @@ function CodeTraceEditor({
         const docLine = view.state.doc.lineAt(line.from);
         const code = view.state.doc.toString();
         const rawLines = normalizeNewlines(code).split('\n');
-        if (isCommentOnlyLine(docLine.text)) {
+        if (isCodeTraceCommentOnlyLine(docLine.text)) {
           return new CodeTraceLineMarker({
             lineNumber: docLine.number,
-            done: true,
+            done: false,
             typed: true,
             current: view.state.doc.lineAt(view.state.selection.main.head).number === docLine.number,
           });
         }
         const scoredLineIndex = rawLines
           .slice(0, Math.max(0, docLine.number - 1))
-          .filter(lineText => !isCommentOnlyLine(lineText))
+          .filter(lineText => !isCodeTraceCommentOnlyLine(lineText))
           .length;
         const lineFeedback = getLineFeedback(latestRef.current.answerCode, code);
         const item = lineFeedback[scoredLineIndex] || {
@@ -1136,7 +1132,7 @@ function CodeTraceEditor({
         extensions: [
           history(),
           python(),
-          ...studioCompletion(() => CODE_TRACE_COMPLETION_PROJECT, { strictPrefix: true }),
+          ...codeTraceLanguageTools(),
           closeBrackets(),
           syntaxHighlighting(codeTraceHighlightStyle, { fallback: true }),
           codeTracePlugin,
@@ -1410,7 +1406,12 @@ export default function CodeTracePlayer({
     [stringSuggestions, studentCode, studentSelection.start]
   );
   const passingAccuracy = exercise?.passingAccuracy || 95;
-  const currentPassed = evaluation.perfect || evaluation.accuracy >= passingAccuracy;
+  const currentPassed = canPassCodeTrace({
+    studentCode,
+    perfect: evaluation.perfect,
+    accuracy: evaluation.accuracy,
+    passingAccuracy,
+  });
   const currentExerciseIds = useMemo(() => exercises.map(getExerciseId).filter(Boolean), [exercises]);
   const currentCompletedCount = useMemo(
     () => currentExerciseIds.filter(id => completedIds.has(id)).length,

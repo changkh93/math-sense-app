@@ -6,6 +6,7 @@ import { EditorView, activateHover, keymap } from '@codemirror/view'
 import { history, undo } from '@codemirror/commands'
 import { python } from '@codemirror/lang-python'
 import { studioSpelling, refreshStudioSpelling } from '../src/components/PythonWorld/studioSpelling.js'
+import { codeTraceLanguageTools } from '../src/components/Space/codeTraceLanguageTools.js'
 
 const dom = new JSDOM('<!doctype html><body></body>', { pretendToBeVisual: true })
 for (const key of ['window', 'Window', 'document', 'Node', 'Element', 'MutationObserver', 'HTMLElement', 'requestAnimationFrame', 'cancelAnimationFrame', 'getComputedStyle']) {
@@ -67,8 +68,28 @@ try {
   view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: '' } })
   beforeDeletion.click()
   assert.equal(view.state.doc.toString(), '')
+
+  const codeTraceHost = document.createElement('div')
+  document.body.append(codeTraceHost)
+  const codeTraceView = new EditorView({ parent: codeTraceHost, state: EditorState.create({
+    doc: 'pritn("hello")',
+    extensions: [python(), history(), codeTraceLanguageTools()],
+  }) })
+  await delay(450)
+  assert.deepEqual(
+    [...codeTraceView.dom.querySelectorAll('.cm-studio-spelling')].map(element => element.textContent),
+    ['pritn'],
+    'CODE TRACE uses the same spelling diagnostics as Code Studio',
+  )
+  codeTraceView.dispatch({ selection: { anchor: 2 } })
+  const codeTraceFix = codeTraceView.state.facet(keymap).flat().find(binding => binding.key === 'Alt-Enter')
+  assert.equal(codeTraceFix.run(codeTraceView), true)
+  assert.equal(codeTraceView.state.doc.toString(), 'print("hello")')
+  codeTraceView.destroy()
+  codeTraceHost.remove()
+
   assert.deepEqual(errors, [])
-  console.log('Spelling context refresh, correction/undo, read-only and stale-tooltip regressions passed')
+  console.log('Code Studio and CODE TRACE spelling regressions passed')
 } finally {
   view.destroy()
   dom.window.close()

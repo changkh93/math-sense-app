@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import { getCodeTraceLineProgress, getCodeTraceResumeState, isCodeTraceProgressComplete } from '../src/utils/codeTraceProgressUtils.js'
+import { canPassCodeTrace, hasCodeTraceSubstantiveInput, isCodeTraceCommentOnlyLine } from '../src/utils/codeTraceInputUtils.js'
 
 const exerciseIds = ['code-1', 'code-2', 'code-3', 'code-4', 'code-5']
 
@@ -115,5 +116,25 @@ assert.equal(getCodeTraceLineProgress([{ id: 'comments', answerCode: '# note\r\n
 }).comments, 3, '주석 전용 줄과 CRLF는 실제 코드 트레이스 줄 기준으로 처리한다.')
 assert.deepEqual(getCodeTraceLineProgress([], savedLineSession), {})
 assert.equal(getCodeTraceLineProgress(longExercises, { visibleLinesByExercise: { long: 40.8 } }).long, 40)
+
+assert.equal(isCodeTraceCommentOnlyLine('#'), true, '# 한 글자도 주석 전용 줄로 판정한다.')
+assert.equal(isCodeTraceCommentOnlyLine('  # placeholder'), true, '들여쓴 주석도 주석 전용 줄로 판정한다.')
+assert.equal(isCodeTraceCommentOnlyLine('print("#")'), false, '문자열 속 #은 실제 코드로 유지한다.')
+assert.equal(hasCodeTraceSubstantiveInput('#'), false, '#만 입력한 답안은 실제 코드가 아니다.')
+assert.equal(hasCodeTraceSubstantiveInput('  # first\r\n# second\r\n  '), false, '주석과 공백만 있는 여러 줄 답안도 실제 코드가 아니다.')
+assert.equal(hasCodeTraceSubstantiveInput('# optional\nimport pygame'), true, '선택 주석과 함께 실제 코드를 입력하면 유효하다.')
+assert.equal(hasCodeTraceSubstantiveInput('print("#")'), true, '문자열 속 #을 포함한 코드는 유효하다.')
+assert.equal(canPassCodeTrace({
+  studentCode: '#\n  # placeholder',
+  perfect: true,
+  accuracy: 100,
+  passingAccuracy: 95,
+}), false, '평가 결과가 잘못 100점이어도 주석뿐인 답안은 통과할 수 없다.')
+assert.equal(canPassCodeTrace({
+  studentCode: '# optional\nimport pygame',
+  perfect: false,
+  accuracy: 95,
+  passingAccuracy: 95,
+}), true, '실제 코드가 있고 기준 정확도를 충족하면 통과한다.')
 
 console.log('code trace progress utils tests passed')
