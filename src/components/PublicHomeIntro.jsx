@@ -15,7 +15,7 @@ export default function PublicHomeIntro({ onLogin }) {
     <a className="ms-skip" href="#home-main">본문으로 이동</a>
     <header className="ms-header">
       <a className="ms-brand" href="/" aria-label="메타센스 홈"><img src="/m-logo.svg" alt="" width="35" height="35" /><span>메타센스<small>스스로 배우는 힘</small></span></a>
-      <nav className="ms-navigation" aria-label="과정 안내"><a href="/math/">수학과 고전읽기</a><a href="/middle-math/">중등수학</a><a href="/python">파이썬</a><a href="/python-game-studio/" onClick={trackStudioOpen}>코드 스튜디오</a><a href="/math/books/">수학감각 교재</a></nav>
+      <nav className="ms-navigation" aria-label="과정 안내"><a href="/math/">수학과 고전읽기</a><a href="/middle-math/">중등수학</a><a href="/python/">파이썬</a><a href="/python-game-studio/" onClick={trackStudioOpen}>코드 스튜디오</a><a href="/math/books/">수학감각 교재</a></nav>
       <div className="ms-header-actions">{onLogin ? <button className="ms-login" onClick={onLogin}>로그인</button> : <a className="ms-login" href="/#login">로그인</a>}<a className="ms-signup" href="/signup">회원가입</a><a className="ms-button ms-small" href="/trial">7일 무료체험 <Arrow /></a></div>
     </header>
     <main id="home-main">
@@ -41,7 +41,7 @@ export default function PublicHomeIntro({ onLogin }) {
         <div className="ms-course-grid">
           <article className="ms-course ms-course-math"><div className="ms-course-top"><span>01 · MATH & READING</span><span className="ms-course-symbol" aria-hidden="true">× ÷</span></div><h3>수학과 고전읽기</h3><p>공식을 외우기 전에,<br /><strong>그림 속에서 이유를 발견해요.</strong></p><div className="ms-course-topics">곱셈 · 나눗셈 · 분수 · 소수 · 비와 비례식</div><ul><li>함께 고전 15분 읽기 · 읽은 생각을 독서 기록으로</li><li>수학감각 교재와 영상으로 개념 이해</li><li>인터랙티브 도구·퀴즈·워크북으로 확인</li><li>학습 기록과 일대일 성장 면담</li></ul><a className="ms-course-link" href="/math/">수학과 고전읽기 과정 살펴보기 <Arrow /></a></article>
           <article className="ms-course ms-course-math"><div className="ms-course-top"><span>02 · MIDDLE SCHOOL MATH</span><span className="ms-course-symbol" aria-hidden="true">x²</span></div><h3>중등수학</h3><p>개념의 숲을 먼저 보고,<br /><strong>막힌 문제는 선생님과 함께.</strong></p><div className="ms-course-topics">중1~3 핵심 개념 · 절대개념 · 평가 · 내신 대비</div><ul><li>3~4분 핵심 개념 영상과 텍스트·퀴즈</li><li>수준별 단원평가와 학년별 월간평가</li><li>실시간 일대일 질문 지도와 성장 상담</li><li>수업 후 과제 · AI평가와 선생님 리뷰</li></ul><a className="ms-course-link" href="/middle-math/">중등수학 과정 살펴보기 <Arrow /></a></article>
-          <article className="ms-course ms-course-python"><div className="ms-course-top"><span>03 · PYTHON</span><span className="ms-course-symbol" aria-hidden="true">{'{ }'}</span></div><h3>파이썬</h3><p>좋아하는 게임을 넘어,<br /><strong>내가 만드는 프로그램으로.</strong></p><div className="ms-course-topics">초등 3학년부터 · 자율 학습 · 프로젝트</div><ul><li>그림·게임·데이터를 직접 만드는 공부</li><li>온라인 편집 도구로 코드 작성과 실행</li><li>과제와 피드백으로 생각 다듬기</li></ul><a className="ms-course-link" href="/python">파이썬 과정 살펴보기 <Arrow /></a></article>
+          <article className="ms-course ms-course-python"><div className="ms-course-top"><span>03 · PYTHON</span><span className="ms-course-symbol" aria-hidden="true">{'{ }'}</span></div><h3>파이썬</h3><p>좋아하는 게임을 넘어,<br /><strong>내가 만드는 프로그램으로.</strong></p><div className="ms-course-topics">초등 3학년부터 · 자율 학습 · 프로젝트</div><ul><li>그림·게임·데이터를 직접 만드는 공부</li><li>온라인 편집 도구로 코드 작성과 실행</li><li>과제와 피드백으로 생각 다듬기</li></ul><a className="ms-course-link" href="/python/">파이썬 과정 살펴보기 <Arrow /></a></article>
         </div>
       </section>
       <section id="home-code-studio" className="ms-studio-section">

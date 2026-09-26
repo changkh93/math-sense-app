@@ -9,7 +9,7 @@ const getTag = pattern => html.match(pattern)?.[1]
 assert.match(html, /<h1\b[^>]*>로그인 없이 쓰는 무료 파이썬 코드 스튜디오<\/h1>/)
 assert.match(html, /설치 없이 브라우저에서 Python 파일과 노트북을 작성·실행하세요/)
 assert.match(html, /<a href="\/python\/guides\/">파이썬 학습노트<\/a>/)
-assert.match(html, /<a class="pgs-learn-link" href="\/python#courses">파이썬 배우기<\/a>/)
+assert.match(html, /<a class="pgs-learn-link" href="\/python\/#courses">파이썬 배우기<\/a>/)
 assert.equal(getTag(/<link rel="canonical" href="([^"]+)"/), 'https://msense.me/python-game-studio/')
 assert.match(html, /<meta name="robots" content="index,follow,max-image-preview:large">/)
 assert.match(html, /<meta property="og:title" content="무료 Python 코드 스튜디오/)

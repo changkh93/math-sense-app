@@ -14,7 +14,7 @@ export default function PublicSeo() {
     document.title = data?.title || '메타센스';
     if (!data) return;
     const add = (tag, attrs) => { const node = document.createElement(tag); Object.entries(attrs).forEach(([k,v]) => node.setAttribute(k,v)); document.head.appendChild(node); nodes.push(node); };
-    const url = `https://msense.me${path === '/' ? '/' : path === '/python-game-studio' ? `${path}/` : path}`;
+    const url = `https://msense.me${path === '/' ? '/' : `${path}/`}`;
     add('meta', { name: 'description', content: data.description });
     add('meta', { name: 'robots', content: 'index,follow,max-image-preview:large' });
     add('link', { rel: 'canonical', href: url });

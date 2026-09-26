@@ -615,7 +615,12 @@ await writeFile(
     "</urlset>",
     added
       .map(
-        (p) => `<url><loc>${base}${p}</loc><lastmod>2026-09-20</lastmod></url>`,
+        (p) => {
+          // Use actual editorial dates for articles; omit unknown dates for hubs/landing pages.
+          const article = articles.find((a) => p === `${root}${a.slug}/`);
+          const updated = article?.updated;
+          return `<url><loc>${base}${p}</loc>${updated ? `<lastmod>${updated}</lastmod>` : ''}</url>`;
+        },
       )
       .join("") + "</urlset>",
   ),
