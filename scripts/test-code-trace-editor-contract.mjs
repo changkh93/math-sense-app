@@ -4,14 +4,39 @@ import { filterCompletionOptionsByPrefix } from '../src/components/PythonWorld/s
 import { alignCodeTraceLineKeys } from '../src/utils/codeTraceDiffUtils.js'
 
 const source = readFileSync(new URL('../src/components/Space/CodeTracePlayer.jsx', import.meta.url), 'utf8')
+const languageToolsSource = readFileSync(new URL('../src/components/Space/codeTraceLanguageTools.js', import.meta.url), 'utf8')
 const errorBoundarySource = readFileSync(new URL('../src/components/ErrorBoundary.jsx', import.meta.url), 'utf8')
 const viteConfigSource = readFileSync(new URL('../vite.config.js', import.meta.url), 'utf8')
 
 assert.match(
   source,
-  /\.\.\.studioCompletion\(\(\) => CODE_TRACE_COMPLETION_PROJECT, \{ strictPrefix: true \}\)/,
+  /\.\.\.codeTraceLanguageTools\(\)/,
+  'CODE TRACE should install its shared completion and spelling tools',
+)
+assert.match(
+  languageToolsSource,
+  /\.\.\.studioCompletion\(getProject, \{ strictPrefix: true \}\)/,
   'CODE TRACE should reuse the Code Studio Python completion engine with strict prefix matching',
 )
+assert.match(
+  languageToolsSource,
+  /\.\.\.studioSpelling\(getProject\)/,
+  'CODE TRACE should reuse the Code Studio spelling diagnostics and corrections',
+)
+for (const dependency of [
+  '@codemirror/state',
+  '@codemirror/commands',
+  '@codemirror/lang-python',
+  '@codemirror/language',
+  '@codemirror/autocomplete',
+  '@codemirror/view',
+]) {
+  assert.match(
+    viteConfigSource,
+    new RegExp(`['"]${dependency.replace('/', '\\/')}['"]`),
+    `Vite should pre-optimize ${dependency} before lazy editor routes load`,
+  )
+}
 assert.match(
   source,
   /closeBrackets\(\)/,

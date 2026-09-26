@@ -21,8 +21,10 @@ export default defineConfig(({ mode }) => {
     plugins: [react(), curriculumText()],
     // The repository contains standalone video projects with their own
     // node_modules. Dependency optimization must never mix their React copy
-    // with the app's root React/ReactDOM, or lazy routes can fail with an
-    // "Outdated Optimize Dep" 504 followed by an invalid-hook-call crash.
+    // with the app's root React/ReactDOM. Lazy editor routes also need every
+    // direct CodeMirror package in the initial optimization pass; otherwise
+    // Vite can invalidate their browser URLs mid-session and answer with an
+    // "Outdated Optimize Dep" 504 before the lazy route finishes loading.
     resolve: {
       dedupe: ['react', 'react-dom'],
     },
@@ -33,6 +35,12 @@ export default defineConfig(({ mode }) => {
         'react/jsx-dev-runtime',
         'react-dom',
         'react-dom/client',
+        '@codemirror/state',
+        '@codemirror/commands',
+        '@codemirror/lang-python',
+        '@codemirror/language',
+        '@codemirror/autocomplete',
+        '@codemirror/view',
       ],
     },
     server: {

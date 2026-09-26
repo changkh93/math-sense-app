@@ -85,6 +85,19 @@ try {
   const codeTraceFix = codeTraceView.state.facet(keymap).flat().find(binding => binding.key === 'Alt-Enter')
   assert.equal(codeTraceFix.run(codeTraceView), true)
   assert.equal(codeTraceView.state.doc.toString(), 'print("hello")')
+
+  codeTraceView.dispatch({
+    changes: { from: 0, to: codeTraceView.state.doc.length, insert: 'inport pygame' },
+    selection: { anchor: 2 },
+  })
+  await delay(450)
+  assert.deepEqual(
+    [...codeTraceView.dom.querySelectorAll('.cm-studio-spelling')].map(element => element.textContent),
+    ['inport'],
+    'CODE TRACE marks a misspelled Python keyword',
+  )
+  assert.equal(codeTraceFix.run(codeTraceView), true)
+  assert.equal(codeTraceView.state.doc.toString(), 'import pygame')
   codeTraceView.destroy()
   codeTraceHost.remove()
 

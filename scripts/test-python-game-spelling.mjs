@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { findStudioSpelling, isOneEditAway } from '../src/components/PythonWorld/studioSpellingModel.js'
+import { findPythonKeywordSpelling, findStudioSpelling, isOneEditAway } from '../src/components/PythonWorld/studioSpellingModel.js'
 
 const project = { path: 'main.py', files: [] }
 const check = (source, context = project) => findStudioSpelling(source, context).map(issue => [issue.actual, issue.suggestion])
@@ -19,6 +19,13 @@ assert.deepEqual(check(`${pygameSetup}window.bilt = image`), []) // A new attrib
 assert.deepEqual(check(`${pygameSetup}# window.bilt(image)\nprint('window.bilt(image)')`), [])
 assert.deepEqual(check('unknown_object.bilt(image)'), []) // Unknown objects have no reliable method list.
 assert.deepEqual(check('pritn("hello")'), [['pritn', 'print']])
+assert.deepEqual(check('inport pygame'), [['inport', 'import']])
+assert.deepEqual(check('improt pygame'), [['improt', 'import']])
+assert.deepEqual(check('frmo math import sin'), [['frmo', 'from']])
+assert.deepEqual(check('whlie ready:\n    pass'), [['whlie', 'while']])
+assert.deepEqual(check('calss Game:\n    pass'), [['calss', 'class']])
+assert.deepEqual(check('def score():\n    retrun 10'), [['retrun', 'return']])
+assert.deepEqual(check('for item in items:\n    contineu'), [['contineu', 'continue']])
 assert.deepEqual(check('def pritn():\n    pass\npritn()'), []) // A student-defined name takes precedence.
 assert.deepEqual(check('class Game:\n    def move(self):\n        pass\n    def draw(self):\n        self.mvoe()'), [['mvoe', 'move']])
 assert.deepEqual(check('window.bilt(image)', { ...project, prefix: pygameSetup }), [['bilt', 'blit']])
@@ -30,6 +37,19 @@ assert.deepEqual(check('import math\nmath.sinh(1)\nmath.cosh(1)'), [])
 assert.deepEqual(check('from math import *\nsinh(1)'), [])
 assert.deepEqual(check('from unknown_module import *\npritn()'), [])
 assert.deepEqual(check('prin("hello")'), [['prin', 'print']])
+
+for (const source of [
+  'inport = pygame',
+  'def inport():\n    pass',
+  'form = 1',
+  'important = 1',
+  '# inport pygame',
+  'text = "inport pygame"',
+]) assert.deepEqual(check(source), [], source)
+
+assert.deepEqual(findPythonKeywordSpelling('inport pygame'), [
+  { from: 0, to: 6, actual: 'inport', suggestion: 'import' },
+])
 
 // Unsupported binding forms must not borrow the spelling/type of an outer name.
 for (const source of [
@@ -48,6 +68,9 @@ for (const source of [
 const cell = 'window.bilt(image)'
 assert.deepEqual(findStudioSpelling(cell, { ...project, prefix: pygameSetup }), [
   { from: 7, to: 11, actual: 'bilt', suggestion: 'blit' },
+])
+assert.deepEqual(findStudioSpelling('inport random', { ...project, prefix: pygameSetup }), [
+  { from: 0, to: 6, actual: 'inport', suggestion: 'import' },
 ])
 assert.deepEqual(check(cell, { ...project, prefix: 'window = unknown_object\n' }), [])
 
