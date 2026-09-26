@@ -1,6 +1,7 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { createHandler } = require('./studioErrorCoach.cjs');
+const studioErrorCoach = require('./studioErrorCoach.cjs');
+const { COACH_SECRET_NAME, createHandler, getCoachApiKey } = studioErrorCoach;
 class HttpsError extends Error { constructor(code, message, details) { super(message); this.code = code; this.details = details; } }
 const context = { auth: { uid: 'synthetic-student', token: { firebase: { sign_in_provider: 'password' } } } };
 const legacyPayload = { version: 1, mode: 'file', errorType: 'NameError', error: "NameError: name 'score' is not defined", line: 1, snippet: '1: print(score)' };
@@ -22,6 +23,24 @@ function fixture(options = {}) {
   const deps = { db, HttpsError, fetchImpl, getKey: () => 'synthetic-not-a-real-key', now: () => stamp, recordAdvice: options.recordAdvice };
   return { handler: createHandler(deps), coldHandler: () => createHandler(deps), docs, calls, advance: ms => { stamp += ms; } };
 }
+test('credential boundary ignores generic shell keys and binds only the coach secret', () => {
+  assert.equal(COACH_SECRET_NAME, 'STUDIO_ERROR_COACH_OPENAI_API_KEY');
+  assert.equal(getCoachApiKey({ OPENAI_API_KEY: 'sk-generic-must-not-be-used' }), '');
+  assert.equal(getCoachApiKey({ [COACH_SECRET_NAME]: '  synthetic-dedicated-key  ', OPENAI_API_KEY: 'sk-generic-must-not-be-used' }), 'synthetic-dedicated-key');
+
+  let runOptions;
+  const regionalFunctions = { runWith: options => {
+    runOptions = options;
+    return { https: { onCall: handler => handler } };
+  } };
+  studioErrorCoach({
+    functions: { https: { HttpsError } },
+    admin: { firestore: () => ({}) },
+    regionalFunctions
+  });
+  assert.deepEqual(runOptions.secrets, [COACH_SECRET_NAME]);
+  assert.ok(!runOptions.secrets.includes('OPENAI_API_KEY'));
+});
 test('no unauthenticated, anonymous, guest, or inactive upstream calls', async () => {
   for (const auth of [null, { uid: 'synthetic-student', token: { firebase: { sign_in_provider: 'anonymous' } } }]) {
     const f = fixture(); await assert.rejects(f.handler(payload, { auth }), { code: 'unauthenticated' }); assert.equal(f.calls.length, 0);

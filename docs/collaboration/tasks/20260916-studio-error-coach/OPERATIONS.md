@@ -11,10 +11,11 @@
 3. 키는 채팅·코드·Git·프런트엔드 환경 변수에 넣지 않는다. 관리자가 아래 명령의 비공개 입력 프롬프트에 직접 입력하여 Firebase Secret의 새 버전으로 등록한다. 키를 명령줄 인자에 붙이지 않는다.
 
 ```sh
-firebase functions:secrets:set OPENAI_API_KEY --project math-sense-1f6a8
+firebase functions:secrets:set STUDIO_ERROR_COACH_OPENAI_API_KEY --project math-sense-1f6a8
 ```
 
-4. 새로운 키를 사용하게 하려면 해당 Secret을 참조하는 함수를 재배포해야 한다. 이 변경에서 새로 연결하는 함수는 `studioErrorCoach` 하나다. 기존 Secret의 다른 사용처가 있다면 교체 전에 영향을 확인한다. 이전 키를 임의로 삭제하지 않는다.
+4. 새로운 키를 사용하게 하려면 해당 Secret을 참조하는 함수를 재배포해야 한다. 이 전용 Secret은 `studioErrorCoach` 하나에만 연결한다. 이전 키를 임의로 삭제하지 않는다.
+5. 키를 `~/.zshrc`, `~/.zprofile`, `launchctl setenv`, 전역 `.env` 또는 데스크톱 앱 실행 환경에 `OPENAI_API_KEY`로 export하지 않는다. 로컬 합성 검증은 `scripts/check-studio-error-coach-live.mjs`가 Firebase Secret Manager의 전용 Secret을 메모리에서만 읽는 경로를 사용한다.
 
 프로젝트 ID는 비밀 키가 아니다. 서버는 `OpenAI-Project` 헤더에 이를 지정한다. 잘못된 프로젝트/키 조합이면 자동으로 다른 키·모델로 우회하지 않는다.
 

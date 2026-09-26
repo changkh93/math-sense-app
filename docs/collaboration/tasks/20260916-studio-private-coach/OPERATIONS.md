@@ -18,6 +18,7 @@ Numeric placeholders are descriptive, not runnable Python. The prompt explicitly
 
 ## Controls and rollout (NOT performed)
 - Model remains gpt-5.6-luna; store:false; no automatic requests/retries, existing atomic caps/cooldown/cache retained.
+- The callable reads only the dedicated Firebase Secret `STUDIO_ERROR_COACH_OPENAI_API_KEY`. It deliberately ignores the generic shell variable `OPENAI_API_KEY`; never export the production coach key from shell startup files or desktop-app launch environments. Synthetic live checks read the dedicated secret directly from Secret Manager without writing it to disk or logs.
 - Server config now requires enabled:true, structureDataReady:true and a project ID. An old childDataReady:true flag DOES NOT enable v2. Do not set childDataReady to claim ZDR approval.
 - Frontend + callable must be released together. Old clients are rejected with invalid-argument; ask them to refresh. Current production is unchanged by this task.
 - No raw-snippet route exists in the revised handler. Future ZDR approval does not automatically broaden its schema.

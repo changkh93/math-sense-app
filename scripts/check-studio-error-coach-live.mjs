@@ -3,6 +3,7 @@
 // whose logger can record its plaintext output in firebase-debug.log.
 import { createRequire } from 'node:module'
 import { execFileSync } from 'node:child_process'
+import { realpathSync } from 'node:fs'
 import path from 'node:path'
 import { writeFile } from 'node:fs/promises'
 import { COACH_MODEL, makeCoachPayload, parseError } from '../functions/studioErrorCoachPolicy.mjs'
@@ -13,26 +14,31 @@ const projectId = process.argv[2]
 const behavior = process.argv[4] === '--behavior'
 const migration = process.argv[4] === '--migration-check'
 const runtimeErrors = process.argv[4] === '--runtime-errors'
+if (process.env.OPENAI_API_KEY) {
+  console.error('Refusing to run while generic OPENAI_API_KEY is set. Use the dedicated Firebase Secret only.')
+  process.exit(2)
+}
 if (!/^proj_[A-Za-z0-9_-]+$/.test(projectId || '') || process.argv[3] !== '--run-synthetic') {
   console.error('Usage: node scripts/check-studio-error-coach-live.mjs proj_ID --run-synthetic'); process.exit(2)
 }
 const req = createRequire(import.meta.url)
-const { createHandler } = req('../functions/studioErrorCoach.cjs')
+const { COACH_SECRET_NAME, createHandler } = req('../functions/studioErrorCoach.cjs')
 const evidence = { projectId, at: new Date().toISOString(), syntheticOnly: true, productionModified: false, checks: [] }
 let phase = 'secret-metadata'
 try {
-  const globalRoot = execFileSync('npm', ['root', '-g'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim()
-  const firebase = createRequire(path.join(globalRoot, 'firebase-tools/package.json'))
+  const firebaseBin = realpathSync(execFileSync('which', ['firebase'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim())
+  const firebaseRoot = path.resolve(path.dirname(firebaseBin), '..', '..')
+  const firebase = createRequire(path.join(firebaseRoot, 'package.json'))
   const { logger } = firebase('./lib/logger.js')
   logger.silent = true; logger.clear()
   const auth = firebase('./lib/auth.js'), account = auth.getGlobalDefaultAccount()
   await firebase('./lib/requireAuth.js').requireAuth({ project: 'math-sense-1f6a8', nonInteractive: true, user: account?.user, tokens: account?.tokens })
   const secrets = firebase('./lib/gcp/secretManager.js')
-  const metadata = await secrets.getSecretVersion('math-sense-1f6a8', 'OPENAI_API_KEY', 'latest')
-  evidence.secret = { version: metadata.versionId, state: metadata.state, createdAt: metadata.createTime }
+  const metadata = await secrets.getSecretVersion('math-sense-1f6a8', COACH_SECRET_NAME, 'latest')
+  evidence.secret = { name: COACH_SECRET_NAME, version: metadata.versionId, state: metadata.state, createdAt: metadata.createTime }
   if (metadata.state !== 'ENABLED') throw new Error('secret-disabled')
   phase = 'secret-access'
-  let apiKey = (await secrets.accessSecretVersion('math-sense-1f6a8', 'OPENAI_API_KEY', metadata.versionId)).trim()
+  let apiKey = (await secrets.accessSecretVersion('math-sense-1f6a8', COACH_SECRET_NAME, metadata.versionId)).trim()
   if (!/^sk-[A-Za-z0-9_-]{30,}$/.test(apiKey)) throw new Error('secret-format')
   const docs = new Map([
     ['users/synthetic-coach-test', { role: 'admin' }],

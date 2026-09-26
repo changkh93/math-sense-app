@@ -1,0 +1,32 @@
+{
+  "projectId": "proj_S7uL2bHA4redF0r90zUcfxRe",
+  "at": "2026-09-26T08:32:35.735Z",
+  "syntheticOnly": true,
+  "productionDatabaseModified": false,
+  "checks": [
+    {
+      "id": "constructor",
+      "passed": true,
+      "response": {
+        "status": 200,
+        "model": "gpt-6-luna",
+        "inputTokens": 1278,
+        "outputTokens": 158
+      },
+      "advice": {
+        "explanation": "이 오류는 거북이 동작을 호출할 때 필요한 인수가 없다는 뜻일 수 있어요. 2줄에서 거북이 설계도만 가리키고 실제 거북이를 만들지 않은 것이 원인인지 확인해 보세요.",
+        "hint": "2줄의 Turtle에 괄호가 있는지 확인해 보세요. 거북이를 만들려는 의도라면 Turtle()처럼 괄호를 붙입니다.",
+        "question": "2줄을 확인한 뒤, variable_1이 실제로 만들어진 거북이를 가리키나요?",
+        "check": "괄호를 확인하고 다시 실행해 보세요. 오류가 달라졌는지 살펴보세요."
+      },
+      "cachedRepeat": true
+    }
+  ],
+  "secret": {
+    "name": "STUDIO_ERROR_COACH_OPENAI_API_KEY",
+    "version": "1",
+    "state": "ENABLED",
+    "createdAt": "2026-09-26T08:28:48.191146Z"
+  },
+  "passed": true
+}
