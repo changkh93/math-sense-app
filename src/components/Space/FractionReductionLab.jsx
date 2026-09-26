@@ -260,27 +260,40 @@ function ReductionPanel({
             <small>{noCommonFactorSelected ? '2와 7의 공약수는 1뿐이에요.' : factorValid ? '분자와 분모가 모두 나누어떨어져요!' : selectedFactor ? '분자와 분모 중 적어도 하나가 나누어떨어지지 않아요.' : '동시에 나누어떨어지는 수를 골라요.'}</small>
           </div>
 
-          {!noCommonFactorSelected && (
-            <div className="frl-quotient-work">
-              <div>
-                <span>{current.numerator} ÷ {selectedFactor || '?'}</span>
-                <AnswerFraction
-                  value={answers.numerator}
-                  onChange={(value) => onAnswer('numerator', value)}
-                  disabled={!factorValid || Boolean(preview)}
-                  error={checks?.numerator}
-                  label="묶은 뒤 새 분자"
-                />
+          {factorValid && (
+            <div className="frl-quotient-work" role="group" aria-label="나눈 뒤 새 분수의 분자와 분모 입력">
+              <div className="frl-quotient-heading">
+                <small>나눈 뒤 새 분수</small>
+                <strong>분자와 분모를 위아래로 써요.</strong>
               </div>
-              <div>
-                <span>{current.denominator} ÷ {selectedFactor || '?'}</span>
-                <AnswerFraction
-                  value={answers.denominator}
-                  onChange={(value) => onAnswer('denominator', value)}
-                  disabled={!factorValid || Boolean(preview)}
-                  error={checks?.denominator}
-                  label="묶은 뒤 새 분모"
-                />
+              <div className="frl-quotient-layout">
+                <div className="frl-quotient-labels">
+                  <div className="frl-quotient-row is-numerator">
+                    <b>분자</b>
+                    <span>{current.numerator} ÷ {selectedFactor}</span>
+                  </div>
+                  <div className="frl-quotient-row is-denominator">
+                    <b>분모</b>
+                    <span>{current.denominator} ÷ {selectedFactor}</span>
+                  </div>
+                </div>
+                <div className="frl-quotient-input-fraction">
+                  <AnswerFraction
+                    value={answers.numerator}
+                    onChange={(value) => onAnswer('numerator', value)}
+                    disabled={Boolean(preview)}
+                    error={checks?.numerator}
+                    label="묶은 뒤 새 분자"
+                  />
+                  <span className="frl-quotient-line" aria-hidden="true" />
+                  <AnswerFraction
+                    value={answers.denominator}
+                    onChange={(value) => onAnswer('denominator', value)}
+                    disabled={Boolean(preview)}
+                    error={checks?.denominator}
+                    label="묶은 뒤 새 분모"
+                  />
+                </div>
               </div>
             </div>
           )}
@@ -290,11 +303,11 @@ function ReductionPanel({
               <button type="button" className="frl-primary-action is-observe" onClick={onConfirmIrreducible}>
                 이 분수가 가장 간단한지 확인하기 <ChevronRight size={20} />
               </button>
-            ) : (
+            ) : factorValid ? (
               <button type="button" className="frl-primary-action" disabled={!factorValid} onClick={onCheck}>
                 새 큰 방의 수 확인하기 <ChevronRight size={20} />
               </button>
-            )
+            ) : null
           ) : (
             <button type="button" className="frl-primary-action is-compress" onClick={onCompress}>
               <Combine size={19} /> 묶음마다 하나의 큰 방으로 바꾸기
@@ -472,6 +485,7 @@ export default function FractionReductionLab({ userId = 'guest', onExit }) {
   }
 
   const finalFraction = getSimplestFraction(mission.fraction[0], mission.fraction[1])
+  const destinationRevealed = factorValid || noCommonFactorSelected || history.length > 1 || conceptComplete
 
   return (
     <main className="frl-page">
@@ -509,7 +523,14 @@ export default function FractionReductionLab({ userId = 'guest', onExit }) {
                 <Fraction numerator={item.numerator} denominator={item.denominator} compact />
               </span>
             ))}
-            <small>도착할 기약분수 <Fraction numerator={finalFraction.numerator} denominator={finalFraction.denominator} compact /></small>
+            <small>
+              도착할 기약분수{' '}
+              <Fraction
+                numerator={destinationRevealed ? finalFraction.numerator : '?'}
+                denominator={destinationRevealed ? finalFraction.denominator : '?'}
+                compact
+              />
+            </small>
           </div>
 
           <div className={`frl-building-machine ${visualFactorValid || noCommonFactorSelected ? 'is-valid' : visualFactor ? 'is-invalid' : ''} ${preview || noCommonFactorSelected || (conceptComplete && lastTransition) ? 'is-ready' : ''}`}>

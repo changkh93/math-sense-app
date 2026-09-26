@@ -88,6 +88,7 @@ const PythonProtocolHub = lazy(() => import('../PythonWorld/PythonProtocolHub'))
 const AlgorithmConstellationHub = lazy(() => import('../AlgorithmConstellation/client/hub/AlgorithmConstellationHub'))
 const ReadingLibraryView = lazy(() => import('./ReadingLibrary/ReadingLibraryView'))
 const MultiplicationCardLab = lazy(() => import('./MultiplicationCardLab'))
+const MultiplicationQuestGame = lazy(() => import('./MultiplicationQuestGame'))
 const VerticalMultiplicationLab = lazy(() => import('./VerticalMultiplicationLab'))
 const DivisionCardLab = lazy(() => import('./DivisionCardLab'))
 const VerticalDivisionLab = lazy(() => import('./VerticalDivisionLab'))
@@ -951,6 +952,7 @@ function SpaceHome() {
   const [acceptedQuizBattle, setAcceptedQuizBattle] = useState(null)
   const [quizBattleReturnView, setQuizBattleReturnView] = useState('planet')
   const [multiplicationCardLabOpen, setMultiplicationCardLabOpen] = useState(false)
+  const [multiplicationQuestOpen, setMultiplicationQuestOpen] = useState(false)
   const [verticalMultiplicationLabOpen, setVerticalMultiplicationLabOpen] = useState(false)
   const [divisionCardLabOpen, setDivisionCardLabOpen] = useState(false)
   const [verticalDivisionLabOpen, setVerticalDivisionLabOpen] = useState(false)
@@ -4246,6 +4248,20 @@ function SpaceHome() {
     )
   }
 
+  if (multiplicationQuestOpen) {
+    return (
+      <Suspense fallback={<SpaceViewFallback />}>
+        <MultiplicationQuestGame
+          userId={user?.uid}
+          onExit={() => {
+            setMultiplicationQuestOpen(false)
+            soundManager.playClick?.()
+          }}
+        />
+      </Suspense>
+    )
+  }
+
   if (verticalMultiplicationLabOpen) {
     return (
       <Suspense fallback={<SpaceViewFallback />}>
@@ -5360,7 +5376,7 @@ function SpaceHome() {
                           일반 학습에서 배운 곱셈을 직접 만지고 반복하며 익혀요.
                         </span>
                       </div>
-                      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(2, minmax(0, 1fr))', gap: isMobile ? '0.75rem' : '1rem' }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, minmax(0, 1fr))', gap: isMobile ? '0.75rem' : '1rem' }}>
                         <ExperienceLearningCard
                           testId="times-card-lab-entry"
                           eyebrow="먼저 도전"
@@ -5379,6 +5395,27 @@ function SpaceHome() {
                           }}
                           onClick={() => {
                             setMultiplicationCardLabOpen(true)
+                            soundManager.playWarp?.()
+                          }}
+                        />
+                        <ExperienceLearningCard
+                          testId="multiplication-quest-entry"
+                          eyebrow="이어서 도전"
+                          badge="맞춤 원정 10개 임무"
+                          title="구구단 원정대"
+                          description="약한 곱셈을 모험 속에서 다시 만나요. 곱셈·순서 바꾸기·빈칸 찾기를 연결하고, 틀린 문제는 잠시 뒤 재도전해요."
+                          icon="🚀"
+                          isMobile={isMobile}
+                          accent={{
+                            border: 'rgba(137, 120, 255, 0.52)',
+                            background: 'linear-gradient(120deg, rgba(48, 35, 105, 0.82), rgba(24, 60, 99, 0.82))',
+                            shadow: '0 14px 38px rgba(99, 91, 255, 0.15)',
+                            icon: 'linear-gradient(135deg, #9e8bff, #51d8e8)',
+                            iconShadow: '0 0 30px rgba(126, 112, 255, 0.3)',
+                            label: '#b6a9ff',
+                          }}
+                          onClick={() => {
+                            setMultiplicationQuestOpen(true)
                             soundManager.playWarp?.()
                           }}
                         />

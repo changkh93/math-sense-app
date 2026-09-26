@@ -171,13 +171,19 @@
   align-items: center;
   justify-content: center;
   gap: 1rem;
-  min-height: 95px;
-  padding: .8rem 1rem;
+  min-height: 118px;
+  padding: 1rem 1.25rem;
   border-radius: 20px;
   background: rgba(4, 23, 37, .58);
 }
 .frl-current-equation > span { color: #6f95a3; font-size: .72rem; font-weight: 850; }
 .frl-current-equation em { color: var(--frl-gold); font-size: .76rem; font-style: normal; font-weight: 850; }
+.frl-current-equation > .frl-fraction {
+  min-width: 84px;
+  font-size: clamp(2.65rem, 4vw, 3.55rem);
+  filter: drop-shadow(0 0 18px rgba(114, 191, 255, .14));
+}
+.frl-current-equation > .frl-fraction > span:first-child { border-bottom-width: 4px; }
 
 .frl-fraction {
   min-width: 70px;
@@ -461,9 +467,60 @@
 .frl-shared-divisor.is-invalid strong,
 .frl-shared-divisor.is-invalid small { color: #ff9b96; }
 
-.frl-quotient-work { display: grid; grid-template-columns: 1fr 1fr; gap: .65rem; }
-.frl-quotient-work > div { display: grid; gap: .42rem; }
-.frl-quotient-work span { color: #8aa5af; font-size: .7rem; font-weight: 850; text-align: center; }
+.frl-quotient-work {
+  display: grid;
+  gap: .55rem;
+  padding: 1rem;
+  border: 1px solid rgba(98, 239, 208, .28);
+  border-radius: 19px;
+  background: linear-gradient(145deg, rgba(9, 47, 63, .84), rgba(4, 29, 45, .92));
+}
+.frl-quotient-heading { display: grid; gap: .18rem; margin-bottom: .25rem; text-align: center; }
+.frl-quotient-heading small { color: var(--frl-mint); font-size: .68rem; font-weight: 950; letter-spacing: .04em; }
+.frl-quotient-heading strong { color: #d5e8ec; font-size: .78rem; }
+.frl-quotient-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(96px, .72fr);
+  gap: .75rem;
+  align-items: stretch;
+}
+.frl-quotient-labels,
+.frl-quotient-input-fraction {
+  display: grid;
+  grid-template-rows: 64px 4px 64px;
+  gap: .55rem;
+}
+.frl-quotient-row {
+  display: grid;
+  grid-template-columns: 54px minmax(72px, 1fr);
+  align-items: center;
+  gap: .55rem;
+}
+.frl-quotient-row.is-numerator { grid-row: 1; }
+.frl-quotient-row.is-denominator { grid-row: 3; }
+.frl-quotient-input-fraction input:first-child { grid-row: 1; }
+.frl-quotient-input-fraction input:last-child { grid-row: 3; }
+.frl-quotient-input-fraction .frl-quotient-line { grid-row: 2; }
+.frl-quotient-input-fraction {
+  position: relative;
+}
+.frl-quotient-row b {
+  display: grid;
+  place-items: center;
+  min-height: 36px;
+  border-radius: 11px;
+  color: #062a23;
+  background: var(--frl-mint);
+  font-size: .78rem;
+  font-weight: 950;
+}
+.frl-quotient-row.is-denominator b { color: #08243a; background: var(--frl-sky); }
+.frl-quotient-row span { color: #b7cbd1; font-size: .82rem; font-weight: 900; text-align: right; }
+.frl-quotient-line {
+  height: 4px;
+  border-radius: 999px;
+  background: #e8fffb;
+}
 .frl-quotient-work input {
   width: 100%;
   height: 64px;
@@ -525,7 +582,11 @@
   .frl-observation-panel,
   .frl-control-panel { border-radius: 21px; }
   .frl-current-equation { flex-wrap: wrap; gap: .65rem; }
-  .frl-history small { display: none; }
+  .frl-current-equation > span,
+  .frl-current-equation em { width: 100%; text-align: center; }
+  .frl-current-equation > .frl-fraction { min-width: 78px; font-size: clamp(2.55rem, 12vw, 3.35rem); }
+  .frl-history { flex-wrap: wrap; }
+  .frl-history small { width: 100%; margin-left: 0; justify-content: flex-end; }
   .frl-building-machine { grid-template-columns: 1fr; }
   .frl-building-arrow { grid-auto-flow: column; }
   .frl-building-arrow svg { transform: rotate(90deg); }
@@ -536,6 +597,15 @@
   .frl-machine-core { width: 132px; min-height: 74px; justify-self: center; }
   .frl-principle { flex-wrap: wrap; text-align: center; }
   .frl-control-panel { padding: 1rem; }
+}
+
+@media (max-width: 430px) {
+  .frl-quotient-work { padding: .85rem .7rem; }
+  .frl-quotient-layout { grid-template-columns: minmax(0, 1fr) minmax(86px, .72fr); gap: .5rem; }
+  .frl-quotient-row { grid-template-columns: 48px minmax(62px, 1fr); gap: .4rem; }
+  .frl-quotient-work input { height: 58px; }
+  .frl-quotient-labels,
+  .frl-quotient-input-fraction { grid-template-rows: 58px 4px 58px; gap: .5rem; }
 }
 
 @media (prefers-reduced-motion: reduce) {

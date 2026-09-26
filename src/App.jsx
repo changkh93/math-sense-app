@@ -78,6 +78,9 @@ const VerticalMultiplicationLabDev = import.meta.env.DEV
 const MultiplicationCardLabDev = import.meta.env.DEV
   ? lazy(() => import('./components/Space/MultiplicationCardLab'))
   : null
+const MultiplicationQuestGameDev = import.meta.env.DEV
+  ? lazy(() => import('./components/Space/MultiplicationQuestGame'))
+  : null
 const DivisionCardLabDev = import.meta.env.DEV
   ? lazy(() => import('./components/Space/DivisionCardLab'))
   : null
@@ -180,6 +183,12 @@ function App() {
         <Route
           path="/dev/multiplication-card-lab"
           element={<MultiplicationCardLabDev userId="local-qa" onExit={() => window.history.back()} />}
+        />
+      )}
+      {MultiplicationQuestGameDev && (
+        <Route
+          path="/dev/multiplication-quest"
+          element={<MultiplicationQuestGameDev userId="local-qa" onExit={() => window.history.back()} />}
         />
       )}
       {DivisionCardLabDev && (
