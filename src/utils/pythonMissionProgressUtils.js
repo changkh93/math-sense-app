@@ -83,3 +83,54 @@ export function mergeMissionCompletion(progress, missionSet, missionId, stars = 
   }
 }
 
+export function buildMissionLabCompletion({
+  existingMissionLab = {},
+  missionSet,
+  missionId,
+  stars = 0,
+  assistanceLevel = 0,
+  timestamp = null,
+}) {
+  const missions = Array.isArray(missionSet?.missions) ? missionSet.missions : []
+  if (!missionSet?.id || !missionId || !missions.some((mission) => mission?.id === missionId)) {
+    return null
+  }
+
+  const wasCompleted = Array.isArray(existingMissionLab.completedMissionIds)
+    && existingMissionLab.completedMissionIds.includes(missionId)
+  const merged = mergeMissionCompletion(
+    existingMissionLab,
+    missionSet,
+    missionId,
+    Number(stars || 0),
+    { maxLevel: Number(assistanceLevel || 0) }
+  )
+  const completedMissionCount = Number(merged.completedMissionCount || merged.completedMissionIds.length)
+  const totalMissionCount = missions.length
+  const independentClearCount = Number(existingMissionLab.independentClearCount || 0)
+    + (!wasCompleted && Number(assistanceLevel || 0) === 0 ? 1 : 0)
+  const hintedClearCount = Number(existingMissionLab.hintedClearCount || 0)
+    + (!wasCompleted && Number(assistanceLevel || 0) > 0 ? 1 : 0)
+
+  return {
+    ...merged,
+    schemaVersion: Math.max(3, Number(existingMissionLab.schemaVersion || 0)),
+    experienceType: 'lumi_protocol',
+    lumiCourseId: missionSet.lumiCourseId || existingMissionLab.lumiCourseId || 'lumi-season-1',
+    missionSetId: missionSet.id,
+    currentMissionId: missionId,
+    completedMissionKeys: [...merged.completedMissionIds],
+    completedCount: completedMissionCount,
+    completedMissionCount,
+    totalCount: totalMissionCount,
+    totalMissionCount,
+    isCompleted: merged.completed === true,
+    completed: merged.completed === true,
+    lastMissionId: missionId,
+    lastCompletedMissionId: missionId,
+    lastActiveAt: timestamp,
+    lastCompletedAt: timestamp,
+    independentClearCount,
+    hintedClearCount,
+  }
+}

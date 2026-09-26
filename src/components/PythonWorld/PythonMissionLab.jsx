@@ -12,7 +12,8 @@ import PythonRuntimeClient from './runtime/PythonRuntimeClient'
 import PythonEditor from './PythonEditor'
 import PythonWorldCanvas from './PythonWorldCanvas'
 import { playLumiSound, isLumiMuted, setLumiMuted, stopWorldAmbience } from './lumiAudio'
-import { claimLumiMissionReward } from '../../services/lumiRewardService'
+import { claimLumiMissionReward, getCanonicalLumiMission } from '../../services/lumiRewardService'
+import { recordMissionLabCompletion } from '../../services/pythonMissionProgressService'
 import { deriveExecutionModel, selectSystemObjectInspectorItems } from './executionTraceSelectors'
 import { projectTacticalEvents } from './lumiTacticalEventProjector'
 import { reduceTacticalState } from './lumiTacticalReducer'
@@ -580,23 +581,32 @@ export default function PythonMissionLab({ unit, missionSet, initialMissionIndex
 
     if (!isPreviewOnly && completionEvidenceImproved && user?.uid && unit?.id) {
       try {
-        const rewardResult = await claimLumiMissionReward({
-          userId: user.uid,
-          missionId: mission.id,
-          stars: Number(evaluation.stars || 2),
-          assistanceLevel,
-          unitId: unit.id,
-          unitTitle: unit.title || 'LUMI Protocol: 사라진 빛의 항로',
-          lumiCourseId: missionSet?.lumiCourseId || 'lumi-season-1',
-          missionSetId: missionSet?.id || 'lumi-vertical-slice-v1',
-          missionSetVersion: Number(missionSet?.version || 1),
-          totalMissionCount: missions.length || 10,
-        })
-        if (rewardResult?.rewarded && rewardResult.crystalsEarned > 0) {
-          setLastRewardPaid(rewardResult)
+        if (getCanonicalLumiMission(mission.id)) {
+          const rewardResult = await claimLumiMissionReward({
+            userId: user.uid,
+            missionId: mission.id,
+            stars: Number(evaluation.stars || 2),
+            assistanceLevel,
+          })
+          if (rewardResult?.rewarded && rewardResult.crystalsEarned > 0) {
+            setLastRewardPaid(rewardResult)
+          }
+        } else {
+          const completionResult = await recordMissionLabCompletion({
+            userId: user.uid,
+            unitId: unit.id,
+            unitTitle: unit.title || '',
+            missionSet,
+            missionId: mission.id,
+            stars: Number(evaluation.stars || 2),
+            assistanceLevel,
+          })
+          if (!completionResult?.completionRecorded) {
+            console.warn('Mission Lab completion record failed:', completionResult)
+          }
         }
-      } catch (rewardErr) {
-        console.warn('LUMI mission reward claim error:', rewardErr)
+      } catch (completionError) {
+        console.warn('Mission Lab completion sync error:', completionError)
       }
     }
   }, [assistanceLevel, hintLevel, isPreviewOnly, mission, missionHints, missionSet, missions.length, progress, solutionReviewUsed, unit, user?.uid])

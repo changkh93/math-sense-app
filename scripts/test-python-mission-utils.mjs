@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { getBuiltinPythonMissionSets, getPythonMissionSetForUnit, getMissionVariant, hasPythonMissionSetForUnit, isMissionLabRequired, PYTHON_PROTOCOL_ENTRY_UNITS } from '../src/components/PythonWorld/pythonMissionCatalog.js'
 import { evaluateMissionRun } from '../src/components/PythonWorld/missionEvaluator.js'
-import { getMissionSetCompletion, mergeMissionCompletion } from '../src/utils/pythonMissionProgressUtils.js'
+import { buildMissionLabCompletion, getMissionSetCompletion, mergeMissionCompletion } from '../src/utils/pythonMissionProgressUtils.js'
 import { createPublishableMissionSet, validatePythonMissionSet } from '../src/components/PythonWorld/pythonMissionSchema.js'
 
 const unit = { id: 'unit_for', title: 'for 반복문' }
@@ -69,6 +69,37 @@ assert.deepEqual(getMissionSetCompletion(progress, set), { completedCount: 1, to
 progress = mergeMissionCompletion(progress, set, set.missions[1].id, 3)
 assert.equal(progress.completed, true)
 assert.equal(progress.bestStars, 5)
+
+let persisted = buildMissionLabCompletion({
+  existingMissionLab: {},
+  missionSet: set,
+  missionId: set.missions[0].id,
+  stars: 2,
+  assistanceLevel: 0,
+  timestamp: 100,
+})
+assert.equal(persisted.completedMissionCount, 1)
+assert.equal(persisted.totalMissionCount, 2)
+assert.equal(persisted.completed, false)
+assert.equal(persisted.independentClearCount, 1)
+persisted = buildMissionLabCompletion({
+  existingMissionLab: persisted,
+  missionSet: set,
+  missionId: set.missions[1].id,
+  stars: 3,
+  assistanceLevel: 2,
+  timestamp: 200,
+})
+assert.deepEqual(persisted.completedMissionIds, ['loop-calibration-01', 'loop-core-01'])
+assert.equal(persisted.completedCount, 2)
+assert.equal(persisted.totalCount, 2)
+assert.equal(persisted.completed, true)
+assert.equal(persisted.isCompleted, true)
+assert.equal(persisted.hintedClearCount, 1)
+assert.equal(persisted.lastCompletedAt, 200)
+assert.equal(buildMissionLabCompletion({
+  existingMissionLab: {}, missionSet: set, missionId: 'unknown-mission', timestamp: 300,
+}), null)
 
 for (const missionSet of getBuiltinPythonMissionSets()) {
   assert.deepEqual(validatePythonMissionSet(missionSet), [], `${missionSet.id} schema validation`)
