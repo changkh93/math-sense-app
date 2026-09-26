@@ -4,6 +4,7 @@
 import assert from 'node:assert/strict'
 
 import {
+  isFrontierAudioAssetsReady,
   FRONTIER_SOUNDS,
   LEGACY_SOUND_DEFS,
   getFrontierAmbienceSoundId,
@@ -231,6 +232,25 @@ async function asyncTest(name, fn) {
     failedCount += 1
   }
 }
+
+test('Production builds enable bundled Frontier audio unless explicitly disabled', () => {
+  assert.equal(isFrontierAudioAssetsReady({ PROD: true }), true)
+  assert.equal(isFrontierAudioAssetsReady({ PROD: false }), false)
+  assert.equal(
+    isFrontierAudioAssetsReady({
+      PROD: false,
+      VITE_FRONTIER_AUDIO_ASSETS_READY: 'true',
+    }),
+    true,
+  )
+  assert.equal(
+    isFrontierAudioAssetsReady({
+      PROD: true,
+      VITE_FRONTIER_AUDIO_ASSETS_READY: 'false',
+    }),
+    false,
+  )
+})
 
 test('Legacy wrappers invoke Howl.play and preserve the public API', () => {
   const { manager } = createManager()

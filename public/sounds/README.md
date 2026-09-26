@@ -48,11 +48,15 @@ VITE_FRONTIER_AUDIO_ASSETS_READY=true npm run test:frontier-audio-assets -- --st
 strict 모드에서는 실패합니다. 따라서 자산 파일만 복사하고 출처 기록을 나중으로
 미루는 상태로는 프로덕션 음원이 켜지지 않습니다.
 
-프로덕션에서 전용 음원을 활성화할 때만 빌드 환경에 다음 값을 설정합니다.
+검증된 음원이 앱 번들에 포함되어 있으므로 프로덕션 빌드에서는 전용 음원이 기본
+활성화됩니다. 개발·프리뷰 빌드에서 같은 음원을 확인하려면 다음 값을 설정합니다.
 
 ```text
 VITE_FRONTIER_AUDIO_ASSETS_READY=true
 ```
+
+운영 중 긴급하게 전용 음원을 차단해야 할 때는 빌드 환경에
+`VITE_FRONTIER_AUDIO_ASSETS_READY=false`를 명시합니다.
 
 ## 로컬 QA 합성 음원
 

@@ -58,9 +58,18 @@ export default function FrontierAudioSettingsModal({ open, onClose }) {
 
   if (!open) return null
 
+  const playAudioPreview = () => {
+    void soundManager.unlock().then((unlocked) => {
+      if (!unlocked) return
+      const previewId = soundManager.play('frontier.ui.interact', { bypassCooldown: true })
+      if (previewId === null) soundManager.playClick()
+    })
+  }
+
   const handleToggleEnabled = () => {
     const updated = soundManager.updatePreferences({ enabled: !prefs.enabled })
     setPrefs(updated)
+    if (updated.enabled) playAudioPreview()
   }
 
   const handleToggleQuietMode = () => {
@@ -101,6 +110,7 @@ export default function FrontierAudioSettingsModal({ open, onClose }) {
       quietMode: false,
     })
     setPrefs(updated)
+    playAudioPreview()
   }
 
   return (

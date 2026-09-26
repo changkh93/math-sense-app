@@ -75,7 +75,21 @@ export const LEGACY_SOUND_DEFS = {
 /**
  * 프론티어 사운드 카탈로그 (Semantic Sound Registry)
  */
-export const FRONTIER_AUDIO_ASSETS_READY = import.meta.env?.VITE_FRONTIER_AUDIO_ASSETS_READY === 'true'
+/**
+ * 프론티어 음원 게이트를 해석합니다.
+ *
+ * Vite의 로컬 전용 .env.local은 깨끗한 배포 작업공간에 복사되지 않습니다. 따라서
+ * 번들에 포함된 프론티어 음원은 프로덕션에서 기본 활성화하고, 긴급 차단이 필요할
+ * 때만 빌드 환경에서 명시적으로 false를 지정합니다.
+ */
+export const isFrontierAudioAssetsReady = (env = import.meta.env) => {
+  const configuredValue = env?.VITE_FRONTIER_AUDIO_ASSETS_READY
+  if (configuredValue === 'true') return true
+  if (configuredValue === 'false') return false
+  return env?.PROD === true
+}
+
+export const FRONTIER_AUDIO_ASSETS_READY = isFrontierAudioAssetsReady()
 
 const createThemeAmbienceDefinition = (theme) => ({
   sources: [
